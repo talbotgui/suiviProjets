@@ -31,14 +31,15 @@ Reformule le besoin exprimé pour vérifier notre compréhension mutuelle avant 
 - contexte et origine du besoin (pourquoi cette application, quel problème elle résout) ;
 - objectifs mesurables du projet ;
 - utilisateurs cibles et leurs profils/rôles ;
+- persona représentant chaque profil d'utilisateur cible (objectifs, besoins, frustrations, contexte d'usage), destinés à être réutilisés dans les étapes suivantes ;
 - périmètre explicitement inclus et explicitement exclu ;
 - contraintes connues dès à présent (délais, budget, existant à remplacer ou intégrer).
 Pose-moi les questions nécessaires pour lever les ambiguïtés avant de rédiger le document final.
 
 ## Étape 3 — Exigences fonctionnelles
 Rédige les documents décrivant les exigences fonctionnelles :
-- cas d'usage / user stories, avec critères d'acceptation ;
-- règles de gestion métier ;
+- cas d'usage / user stories, avec critères d'acceptation, en réutilisant les persona définis à l'étape 2 comme acteurs lorsqu'ils existent ;
+- règles de gestion métier, avec une description sommaire des écrans concernés par chaque règle ;
 - parcours utilisateurs principaux et alternatifs (cas d'erreur inclus) ;
 - complète le glossaire créé en étape 1 avec les termes métier propres à ces exigences.
 
@@ -61,6 +62,7 @@ Objectif : valider les choix d'interface avant qu'ils ne soient figés dans la c
 ## Étape 6 — Architecture technique et choix technologiques
 Rédige les documents décrivant l'architecture technique cible :
 - style architectural retenu et justification (monolithe, modulaire, client/serveur, etc.) ;
+- patterns d'architecture et de conception retenus (ex : MVC, hexagonal, CQRS, repository, etc.) et justification des alternatives écartées ;
 - choix technologiques structurants et alternatives écartées, avec justification ;
 - découpage en composants/modules et responsabilités de chacun ;
 - stratégie de gestion d'état et de communication entre les parties de l'application.
@@ -96,8 +98,11 @@ Rédige les normes des tests automatisés :
 - tests de bout en bout (E2E) ;
 - stratégie de couverture de code (seuils visés, périmètre couvert et non couvert, et justification des exclusions).
 
-## Étape 12 — Stratégie de mise en production et supervision
-Rédige les documents décrivant la mise en production et le suivi en conditions réelles :
+## Étape 12 — Environnements, intégration continue et mise en production
+Rédige les documents décrivant les environnements, l'intégration continue et la mise en production :
+- installation du poste de développeur et son usage (outils, configuration, exécution et tests en local) ;
+- mise en place de la plateforme d'intégration continue (PIC) et son usage (configuration du pipeline, déclenchement, lecture des résultats) ;
+- installation de l'environnement de production et stratégie de déploiement ;
 - stratégie de build, empaquetage et publication ;
 - gestion des versions et des mises à jour ;
 - journalisation applicative, gestion des erreurs en production et supervision (métriques, alerting).
