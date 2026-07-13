@@ -24,7 +24,8 @@ Avant toute rédaction de fond, définissons ensemble les règles qui encadreron
   - un paragraphe est écrit sur une seule ligne logique, sans retour à la ligne manuel au milieu d'un paragraphe ;
   - usage des icônes et emojis proscrit, sauf demande explicite de ma part ;
   - chaque fichier Markdown commence par un sommaire (table des matières) listant les titres du document.
-- création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît.
+- création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît ;
+- création d'un journal des décisions (registre des choix structurants, alternatives envisagées et écartées, justification), entretenu et complété au fil des étapes suivantes dès qu'une décision structurante est prise.
 
 ## Étape 2 — Réexpression du besoin
 Reformule le besoin exprimé pour vérifier notre compréhension mutuelle avant toute rédaction :
@@ -32,13 +33,15 @@ Reformule le besoin exprimé pour vérifier notre compréhension mutuelle avant 
 - objectifs mesurables du projet ;
 - utilisateurs cibles et leurs profils/rôles ;
 - persona représentant chaque profil d'utilisateur cible (objectifs, besoins, frustrations, contexte d'usage), destinés à être réutilisés dans les étapes suivantes ;
+- parties prenantes du projet au-delà des seuls utilisateurs (sponsor, propriétaire produit, support, etc.) ;
 - périmètre explicitement inclus et explicitement exclu ;
-- contraintes connues dès à présent (délais, budget, existant à remplacer ou intégrer).
+- contraintes connues dès à présent (délais, budget, existant à remplacer ou intégrer) ;
+- risques projet identifiés dès ce stade.
 Pose-moi les questions nécessaires pour lever les ambiguïtés avant de rédiger le document final.
 
 ## Étape 3 — Exigences fonctionnelles
 Rédige les documents décrivant les exigences fonctionnelles :
-- cas d'usage / user stories, avec critères d'acceptation, en réutilisant les persona définis à l'étape 2 comme acteurs lorsqu'ils existent ;
+- cas d'usage / user stories, avec critères d'acceptation et priorisation (convention MoSCoW), en réutilisant les persona définis à l'étape 2 comme acteurs lorsqu'ils existent ;
 - règles de gestion métier, avec une description sommaire des écrans concernés par chaque règle ;
 - parcours utilisateurs principaux et alternatifs (cas d'erreur inclus) ;
 - complète le glossaire créé en étape 1 avec les termes métier propres à ces exigences.
@@ -46,17 +49,20 @@ Rédige les documents décrivant les exigences fonctionnelles :
 ## Étape 4 — Exigences non fonctionnelles
 Rédige les documents décrivant les exigences non fonctionnelles :
 - performance (temps de réponse, volumétrie attendue) ;
+- scalabilité et montée en charge ;
 - disponibilité et tolérance aux pannes ;
 - sécurité (authentification, autorisation, protection des données) ;
 - accessibilité ;
 - portabilité et environnements cibles ;
+- internationalisation et localisation (langues, formats régionaux) si applicable ;
 - contraintes réglementaires ou légales (protection des données personnelles, etc.) si applicables.
 
 ## Étape 5 — Expérience utilisateur et maquettes
 Rédige les documents décrivant l'expérience utilisateur cible :
 - arborescence des écrans et navigation ;
 - maquettes ou wireframes (description textuelle structurée si aucun outil graphique n'est disponible) ;
-- charte d'ergonomie et principes d'interaction communs à toute l'application.
+- charte d'ergonomie et principes d'interaction communs à toute l'application ;
+- guide utilisateur et aide en ligne destinés aux utilisateurs finaux, en cohérence avec les écrans et parcours définis.
 Objectif : valider les choix d'interface avant qu'ils ne soient figés dans la conception détaillée.
 
 ## Étape 6 — Architecture technique et choix technologiques
@@ -65,12 +71,16 @@ Rédige les documents décrivant l'architecture technique cible :
 - patterns d'architecture et de conception retenus (ex : MVC, hexagonal, CQRS, repository, etc.) et justification des alternatives écartées ;
 - choix technologiques structurants et alternatives écartées, avec justification ;
 - découpage en composants/modules et responsabilités de chacun ;
+- dépendances externes (API tierces, services externes) et leur intégration ;
+- stratégie d'évolutivité de l'architecture dans le temps ;
 - stratégie de gestion d'état et de communication entre les parties de l'application.
 
 ## Étape 7 — Modèle de données
 Rédige les documents décrivant le modèle de données :
 - entités, attributs, relations et invariants ;
 - stratégie de persistance et de migration des données ;
+- stratégie de sauvegarde et de restauration des données ;
+- gouvernance et propriété des données (responsabilités par domaine de données) ;
 - règles de validation et de cohérence des données.
 
 ## Étape 8 — Conception détaillée de l'application
@@ -83,6 +93,8 @@ Rédige la conception détaillée à partir des étapes précédentes :
 Rédige les normes de développement :
 - conception technique fine (structuration du code, découpage en couches) ;
 - conventions de nommage (fichiers, composants, services, variables, etc.) ;
+- stratégie de branches et de contribution Git (workflow, convention de messages de commit, revue des pull requests) ;
+- gestion des dépendances (mise à jour des librairies, veille des vulnérabilités) ;
 - règles de qualité de code et de revue.
 
 ## Étape 10 — Normes de sécurité applicative
@@ -90,12 +102,17 @@ Rédige les normes de sécurité à appliquer lors du développement :
 - gestion des secrets et des données sensibles ;
 - contrôle des entrées et sorties (validation, échappement) ;
 - gestion des droits d'accès et des permissions ;
+- analyse des dépendances vulnérables (SCA - software composition analysis) ;
 - journalisation des événements sensibles.
 
 ## Étape 11 — Normes de tests automatisés
 Rédige les normes des tests automatisés :
+- tests unitaires ;
 - tests des clients d'API et des services ;
 - tests de bout en bout (E2E) ;
+- tests de charge et de performance (en cohérence avec les exigences de performance de l'étape 4) ;
+- gestion des données de test (jeux de données, anonymisation) ;
+- recette et tests d'acceptation utilisateur (UAT) avant mise en production ;
 - stratégie de couverture de code (seuils visés, périmètre couvert et non couvert, et justification des exclusions).
 
 ## Étape 12 — Environnements, intégration continue et mise en production
@@ -105,7 +122,9 @@ Rédige les documents décrivant les environnements, l'intégration continue et 
 - installation de l'environnement de production et stratégie de déploiement ;
 - stratégie de build, empaquetage et publication ;
 - gestion des versions et des mises à jour ;
-- journalisation applicative, gestion des erreurs en production et supervision (métriques, alerting).
+- journalisation applicative, gestion des erreurs en production et supervision (métriques, alerting) ;
+- plan de reprise d'activité (PRA) en cas d'incident majeur ;
+- procédures d'exploitation post-déploiement (runbook, astreinte).
 
 ---
 

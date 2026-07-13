@@ -2,9 +2,17 @@
 
 ## Sommaire
 
-1. [Tests des clients d'API et des services](#tests-des-clients-dapi-et-des-services)
-2. [Tests de bout en bout](#tests-de-bout-en-bout)
-3. [Stratégie de couverture de code](#stratégie-de-couverture-de-code)
+1. [Tests unitaires](#tests-unitaires)
+2. [Tests des clients d'API et des services](#tests-des-clients-dapi-et-des-services)
+3. [Tests de bout en bout](#tests-de-bout-en-bout)
+4. [Tests de charge et de performance](#tests-de-charge-et-de-performance)
+5. [Gestion des données de test](#gestion-des-données-de-test)
+6. [Recette et tests d'acceptation utilisateur](#recette-et-tests-dacceptation-utilisateur)
+7. [Stratégie de couverture de code](#stratégie-de-couverture-de-code)
+
+## Tests unitaires
+
+*Ce chapitre décrit les normes applicables aux tests unitaires : périmètre, conventions d'écriture, isolation des dépendances.*
 
 ## Tests des clients d'API et des services
 
@@ -13,6 +21,18 @@
 ## Tests de bout en bout
 
 *Ce chapitre décrit les normes applicables aux tests de bout en bout (E2E).*
+
+## Tests de charge et de performance
+
+*Ce chapitre décrit les normes applicables aux tests de charge et de performance, en cohérence avec les exigences de performance et de scalabilité définies à l'étape 4.*
+
+## Gestion des données de test
+
+*Ce chapitre décrit la gestion des données utilisées pour les tests : constitution des jeux de données, anonymisation des données sensibles.*
+
+## Recette et tests d'acceptation utilisateur
+
+*Ce chapitre décrit les modalités de recette et de tests d'acceptation utilisateur (UAT) menés avec les utilisateurs métier avant mise en production.*
 
 ## Stratégie de couverture de code
 

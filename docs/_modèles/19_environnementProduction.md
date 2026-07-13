@@ -9,6 +9,8 @@
 5. [Gestion des versions et des mises à jour](#gestion-des-versions-et-des-mises-à-jour)
 6. [Journalisation applicative et gestion des erreurs en production](#journalisation-applicative-et-gestion-des-erreurs-en-production)
 7. [Supervision](#supervision)
+8. [Plan de reprise d'activité](#plan-de-reprise-dactivité)
+9. [Procédures d'exploitation post-déploiement](#procédures-dexploitation-post-déploiement)
 
 ## Prérequis de l'environnement de production
 
@@ -45,3 +47,11 @@
 | métrique | seuil d'alerte |
 |---|---|
 | | |
+
+## Plan de reprise d'activité
+
+*Ce chapitre décrit le plan de reprise d'activité (PRA) applicable en cas d'incident majeur : scénarios couverts, objectifs de reprise (RTO/RPO), procédure de reprise.*
+
+## Procédures d'exploitation post-déploiement
+
+*Ce chapitre décrit les procédures d'exploitation post-déploiement : runbook des opérations courantes, organisation de l'astreinte.*

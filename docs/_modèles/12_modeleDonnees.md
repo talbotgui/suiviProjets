@@ -6,8 +6,10 @@
 2. [Invariants et règles de cohérence](#invariants-et-règles-de-cohérence)
 3. [Stratégie de persistance](#stratégie-de-persistance)
 4. [Stratégie de migration des données](#stratégie-de-migration-des-données)
-5. [Règles de validation des données](#règles-de-validation-des-données)
-6. [Matrice de traçabilité](#matrice-de-traçabilité)
+5. [Stratégie de sauvegarde et de restauration](#stratégie-de-sauvegarde-et-de-restauration)
+6. [Gouvernance et propriété des données](#gouvernance-et-propriété-des-données)
+7. [Règles de validation des données](#règles-de-validation-des-données)
+8. [Matrice de traçabilité](#matrice-de-traçabilité)
 
 ## Entités, attributs et relations
 
@@ -28,6 +30,18 @@
 ## Stratégie de migration des données
 
 *Ce chapitre décrit la stratégie de migration des données, notamment en cas d'évolution du modèle ou de reprise de données existantes.*
+
+## Stratégie de sauvegarde et de restauration
+
+*Ce chapitre décrit la stratégie de sauvegarde des données (fréquence, rétention) et la procédure de restauration en cas de perte ou de corruption.*
+
+## Gouvernance et propriété des données
+
+*Ce chapitre décrit la gouvernance des données : responsabilités par domaine de données, propriétaire de chaque entité, modalités d'accès et de partage.*
+
+| entité | propriétaire | responsabilité |
+|---|---|---|
+| | | |
 
 ## Règles de validation des données
 

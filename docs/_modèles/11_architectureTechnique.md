@@ -7,7 +7,9 @@
 3. [Choix technologiques structurants](#choix-technologiques-structurants)
 4. [Alternatives écartées et justification](#alternatives-écartées-et-justification)
 5. [Découpage en composants/modules et responsabilités](#découpage-en-composantsmodules-et-responsabilités)
-6. [Stratégie de gestion d'état et de communication](#stratégie-de-gestion-détat-et-de-communication)
+6. [Dépendances externes](#dépendances-externes)
+7. [Stratégie d'évolutivité](#stratégie-dévolutivité)
+8. [Stratégie de gestion d'état et de communication](#stratégie-de-gestion-détat-et-de-communication)
 
 ## Style architectural retenu et justification
 
@@ -44,6 +46,18 @@
 | composant / module | responsabilité |
 |---|---|
 | | |
+
+## Dépendances externes
+
+*Ce chapitre liste les dépendances externes de l'application (API tierces, services externes) et décrit leurs modalités d'intégration.*
+
+| dépendance externe | modalité d'intégration |
+|---|---|
+| | |
+
+## Stratégie d'évolutivité
+
+*Ce chapitre décrit la stratégie d'évolutivité de l'architecture dans le temps, face à l'évolution des usages, des volumétries ou du périmètre fonctionnel.*
 
 ## Stratégie de gestion d'état et de communication
 

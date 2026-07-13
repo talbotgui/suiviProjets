@@ -4,8 +4,10 @@
 
 1. [Structuration du code et découpage en couches](#structuration-du-code-et-découpage-en-couches)
 2. [Conventions de nommage](#conventions-de-nommage)
-3. [Règles de qualité de code](#règles-de-qualité-de-code)
-4. [Règles de revue de code](#règles-de-revue-de-code)
+3. [Stratégie de branches et de contribution Git](#stratégie-de-branches-et-de-contribution-git)
+4. [Gestion des dépendances](#gestion-des-dépendances)
+5. [Règles de qualité de code](#règles-de-qualité-de-code)
+6. [Règles de revue de code](#règles-de-revue-de-code)
 
 ## Structuration du code et découpage en couches
 
@@ -18,6 +20,14 @@
 | élément | convention |
 |---|---|
 | | |
+
+## Stratégie de branches et de contribution Git
+
+*Ce chapitre décrit le workflow de branches retenu, la convention de messages de commit et les règles de revue des pull requests.*
+
+## Gestion des dépendances
+
+*Ce chapitre décrit les règles de gestion des dépendances du projet : mise à jour des librairies, veille des vulnérabilités.*
 
 ## Règles de qualité de code
 

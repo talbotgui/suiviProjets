@@ -6,9 +6,11 @@
 2. [Objectifs mesurables du projet](#objectifs-mesurables-du-projet)
 3. [Utilisateurs cibles et profils/rôles](#utilisateurs-cibles-et-profilsrôles)
 4. [Persona](#persona)
-5. [Périmètre](#périmètre)
-6. [Contraintes connues](#contraintes-connues)
-7. [Questions et arbitrages](#questions-et-arbitrages)
+5. [Parties prenantes](#parties-prenantes)
+6. [Périmètre](#périmètre)
+7. [Contraintes connues](#contraintes-connues)
+8. [Risques projet identifiés](#risques-projet-identifiés)
+9. [Questions et arbitrages](#questions-et-arbitrages)
 
 ## Contexte et origine du besoin
 
@@ -38,6 +40,14 @@
 |---|---|---|---|---|
 | | | | | |
 
+## Parties prenantes
+
+*Ce chapitre liste les parties prenantes du projet au-delà des seuls utilisateurs : sponsor, propriétaire produit, support, et tout autre acteur ayant un rôle dans la réussite du projet.*
+
+| partie prenante | rôle dans le projet |
+|---|---|
+| | |
+
 ## Périmètre
 
 *Ce chapitre distingue ce qui est explicitement inclus dans le périmètre du projet de ce qui en est explicitement exclu.*
@@ -57,6 +67,14 @@
 | contrainte | description |
 |---|---|
 | | |
+
+## Risques projet identifiés
+
+*Ce chapitre liste les risques identifiés dès ce stade du projet : nature du risque, impact potentiel, probabilité, mesure de mitigation envisagée.*
+
+| risque | impact | probabilité | mesure de mitigation |
+|---|---|---|---|
+| | | | |
 
 ## Questions et arbitrages
 

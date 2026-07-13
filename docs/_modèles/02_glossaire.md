@@ -1,10 +1,11 @@
-# Glossaire
+# Glossaire et journal des décisions
 
 ## Sommaire
 
 1. [Termes métier](#termes-métier)
 2. [Termes techniques](#termes-techniques)
 3. [Acronymes](#acronymes)
+4. [Journal des décisions](#journal-des-décisions)
 
 ## Termes métier
 
@@ -29,3 +30,11 @@
 | aconyme | signification |
 |---|---|
 | | |
+
+## Journal des décisions
+
+*Ce chapitre trace les décisions structurantes prises au fil des étapes (choix d'architecture, de technologies, de conception, etc.) : décision retenue, alternatives envisagées, justification du choix, étape et date de la décision. Il est complété au fil des étapes suivantes dès qu'une décision structurante est prise.*
+
+| décision | alternatives envisagées | justification | étape | date |
+|---|---|---|---|---|
+| | | | | |

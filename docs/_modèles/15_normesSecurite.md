@@ -5,7 +5,8 @@
 1. [Gestion des secrets et données sensibles](#gestion-des-secrets-et-données-sensibles)
 2. [Contrôle des entrées et sorties](#contrôle-des-entrées-et-sorties)
 3. [Gestion des droits d'accès et des permissions](#gestion-des-droits-daccès-et-des-permissions)
-4. [Journalisation des événements sensibles](#journalisation-des-événements-sensibles)
+4. [Analyse des dépendances vulnérables](#analyse-des-dépendances-vulnérables)
+5. [Journalisation des événements sensibles](#journalisation-des-événements-sensibles)
 
 ## Gestion des secrets et données sensibles
 
@@ -22,6 +23,10 @@
 | rôle | permissions |
 |---|---|
 | | |
+
+## Analyse des dépendances vulnérables
+
+*Ce chapitre décrit la démarche d'analyse des dépendances vulnérables (SCA - software composition analysis) : outillage retenu, fréquence d'analyse, traitement des vulnérabilités détectées.*
 
 ## Journalisation des événements sensibles
 

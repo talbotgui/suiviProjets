@@ -4,12 +4,14 @@
 
 1. [Convention d'identifiant](#convention-didentifiant)
 2. [Performance](#performance)
-3. [Disponibilité et tolérance aux pannes](#disponibilité-et-tolérance-aux-pannes)
-4. [Sécurité](#sécurité)
-5. [Accessibilité](#accessibilité)
-6. [Portabilité et environnements cibles](#portabilité-et-environnements-cibles)
-7. [Contraintes réglementaires et légales](#contraintes-réglementaires-et-légales)
-8. [Matrice de traçabilité](#matrice-de-traçabilité)
+3. [Scalabilité et montée en charge](#scalabilité-et-montée-en-charge)
+4. [Disponibilité et tolérance aux pannes](#disponibilité-et-tolérance-aux-pannes)
+5. [Sécurité](#sécurité)
+6. [Accessibilité](#accessibilité)
+7. [Portabilité et environnements cibles](#portabilité-et-environnements-cibles)
+8. [Internationalisation et localisation](#internationalisation-et-localisation)
+9. [Contraintes réglementaires et légales](#contraintes-réglementaires-et-légales)
+10. [Matrice de traçabilité](#matrice-de-traçabilité)
 
 ## Convention d'identifiant
 
@@ -22,6 +24,14 @@
 | identifiant | exigence | valeur cible |
 |---|---|---|
 | | | |
+
+## Scalabilité et montée en charge
+
+*Ce chapitre décrit les exigences de scalabilité et de montée en charge attendues, distinctes des exigences de performance.*
+
+| identifiant | exigence |
+|---|---|
+| | |
 
 ## Disponibilité et tolérance aux pannes
 
@@ -46,6 +56,14 @@
 ## Portabilité et environnements cibles
 
 *Ce chapitre décrit les environnements cibles sur lesquels l'application doit fonctionner et les exigences de portabilité associées.*
+
+| identifiant | exigence |
+|---|---|
+| | |
+
+## Internationalisation et localisation
+
+*Ce chapitre décrit les exigences d'internationalisation et de localisation applicables, le cas échéant : langues supportées, formats régionaux (dates, devises, unités).*
 
 | identifiant | exigence |
 |---|---|
