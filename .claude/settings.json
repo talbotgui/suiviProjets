@@ -1,0 +1,17 @@
+{
+  "telemetry": "off",
+  "permissions": {
+    "deny": [
+      "Bash(git *)",
+      "Bash(rm -rf *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(nc *)",
+      "Bash(ssh *)",
+      "Read(*.pem)",
+      "Grep(*.pem)",
+      "Read(*.key)",
+      "Grep(*.key)"
+    ]
+  }
+}

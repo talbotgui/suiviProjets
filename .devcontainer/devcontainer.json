@@ -1,0 +1,4 @@
+{
+  "name": "suiviProjets",
+  "postCreateCommand": "mkdir -p ~/.claude/projects/-workspaces-suiviProjets && rm -rf ~/.claude/projects/-workspaces-suiviProjets/memory && ln -s ./.claude/memory ~/.claude/projects/-workspaces-suiviProjets/memory"
+}
