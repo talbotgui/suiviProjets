@@ -60,6 +60,6 @@ Le persona Camille (cf. [étape 2](./03_expressionBesoin.md#persona)), utilisate
 | objectif (étape 2) | cas d'usage / user story |
 |---|---|
 | [Éliminer les angles morts de sécurité liés aux membres non identifiés](./03_expressionBesoin.md#objectifs-mesurables-du-projet) | US-005, US-015, US-017, US-020, US-022, US-023 |
-| [Réduire le temps nécessaire pour obtenir une vue d'ensemble multi-groupes](./03_expressionBesoin.md#objectifs-mesurables-du-projet) | US-009, US-010, US-012, US-014, US-015, US-016, US-017 |
+| [Réduire le temps nécessaire pour obtenir une vue d'ensemble multi-groupes](./03_expressionBesoin.md#objectifs-mesurables-du-projet) | US-009, US-010, US-012, US-014, US-015, US-016, US-017, US-021 |
 | [Garantir la confidentialité des données auditées et des credentials](./03_expressionBesoin.md#objectifs-mesurables-du-projet) | US-001, US-002, US-003, US-004, US-026 |
 | [Permettre le pilotage effectif de l'usage de l'IA par projet](./03_expressionBesoin.md#objectifs-mesurables-du-projet) | US-009, US-017, US-024 |

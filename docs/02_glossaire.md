@@ -52,6 +52,11 @@ Ce chapitre liste les acronymes employés dans la discussion et les documents, a
 | MoSCoW | Méthode de priorisation Must have / Should have / Could have / Won't have, retenue pour prioriser les cas d'usage à partir de l'étape 3 |
 | US | User Story (cas d'usage), identifiant `US-NNN` défini à l'étape 3 |
 | RG | Règle de Gestion, identifiant `RG-NNN` défini à l'étape 3 |
+| RNF | Exigence Non Fonctionnelle, identifiant `RNF-NNN` défini à l'étape 4 |
+| WCAG | Web Content Accessibility Guidelines, référentiel international de critères d'accessibilité numérique (niveau AA retenu à l'étape 4, cf. [WCAG 2.1](https://www.w3.org/TR/WCAG21/), W3C) |
+| RGPD | Règlement Général sur la Protection des Données, réglementation européenne encadrant le traitement des données à caractère personnel (cf. [Règlement (UE) 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj)) |
+| CSP | Content Security Policy, mécanisme du navigateur limitant les sources de contenu exécutable pour réduire le risque d'injection (XSS) |
+| SLA | Service Level Agreement, engagement contractuel de disponibilité d'un service ; non applicable à cette application locale et mono-poste |
 
 ## Journal des décisions
 
