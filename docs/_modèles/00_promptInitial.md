@@ -22,8 +22,10 @@ L'expression de besoin est dans le répertoire ./docs/01_besoin. Un README.md, d
 6. Chaque exigence (fonctionnelle ou non fonctionnelle) porte un identifiant stable, réutilisé sans être renommé dans toutes les étapes suivantes (conception, tests, etc.), afin de garder une traçabilité de bout en bout.
 7. Le répertoire ./docs/_modèles contient des modèles de documents à utiliser pour structurer et formatter chaque document produit à chaque étape.
 8. Toutes les modifications détectées durant les conversations et à réaliser après la rédaction des documents sont tracées dans un document dédié ./docs/plan_NN_<thème>.md (NN = numéro de l'étape courante, <thème> = intitulé bref de l'étape), structuré selon le modèle ./docs/_modèles/plan_miseEnPlace.md. Chaque ligne précise l'action, le(s) fichier(s) concerné(s), l'étape d'origine (avec lien vers la section source), l'étape cible si le traitement est différé à une étape ultérieure connue, et le statut d'avancement.
-9. Les documents produits se référencent explicitement entre eux par des liens relatifs (vers un document ou vers une section précise) chaque fois qu'ils traitent d'un même sujet : par exemple, une entrée du glossaire renvoie vers la section qui introduit le terme, une action du plan de mise en place renvoie vers la section qui l'a détectée.
+9. Les documents produits se référencent explicitement entre eux par des liens relatifs (vers un document ou vers une section précise) chaque fois qu'ils traitent d'un même sujet : par exemple, une entrée du glossaire renvoie vers la section qui introduit le terme, une action du plan de mise en place renvoie vers la section qui l'a détectée. Cette règle s'applique également aux renvois vers les documents du dossier source `./docs/01_besoin` : toute mention d'un document ou d'une section de ce dossier est un lien Markdown relatif vers la section précise (ancre incluse), jamais un chemin en texte brut ou en code.
 10. Toute référence à un référentiel, une norme, un framework ou une source externe introduite par l'IA dans un document est vérifiée avant intégration et accompagnée d'un lien vers sa documentation de référence.
+11. Toute affirmation attribuée à un document (source ou produit à une étape précédente) qui n'y figure pas littéralement, mais en constitue une déduction, est explicitement présentée comme telle (« déduit de… »), et non comme une citation directe.
+12. Toute information du dossier source (`./docs/01_besoin`) qui anticipe une décision relevant d'une étape ultérieure (choix d'architecture, technologies, etc.) est traitée comme une donnée d'entrée à confirmer ou infirmer à cette étape ; elle n'est pas reprise comme acquise dans les documents produits aux étapes antérieures.
 
 # Étapes
 
@@ -35,14 +37,15 @@ Avant toute rédaction de fond, définissons ensemble les règles qui encadreron
 - règles de rédaction des documents Markdown, à respecter pour tous les documents produits dans les étapes suivantes :
   - un paragraphe est écrit sur une seule ligne logique, sans retour à la ligne manuel au milieu d'un paragraphe ;
   - usage des icônes et emojis proscrit, sauf demande explicite de ma part ;
-  - chaque fichier Markdown commence par un sommaire (table des matières) listant les titres du document.
+  - chaque fichier Markdown commence par un sommaire (table des matières) listant les titres du document ;
+  - formulations claires et directes, sans double négation ni ambiguïté syntaxique évitable.
 - création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît — y compris les acronymes couramment utilisés dans la discussion elle-même (ex : IA), à consigner dès leur première apparition même s'ils semblent triviaux ;
 - création d'un journal des décisions (registre des choix structurants, alternatives envisagées et écartées, justification), entretenu et complété au fil des étapes suivantes dès qu'une décision structurante est prise.
 
 ## Étape 2 — Réexpression du besoin
 Reformule le besoin exprimé pour vérifier notre compréhension mutuelle avant toute rédaction :
 - contexte et origine du besoin (pourquoi cette application, quel problème elle résout) ;
-- objectifs mesurables du projet ;
+- objectifs mesurables du projet, chacun assorti d'un indicateur quantifié et vérifiable (seuil chiffré, pourcentage, délai), à l'exclusion de formulations qualitatives approximatives ;
 - utilisateurs cibles et leurs profils/rôles ;
 - persona représentant chaque profil d'utilisateur cible (objectifs, besoins, frustrations, contexte d'usage), destinés à être réutilisés dans les étapes suivantes ;
 - parties prenantes du projet au-delà des seuls utilisateurs (sponsor, propriétaire produit, support, etc.) ;
@@ -79,6 +82,7 @@ Objectif : valider les choix d'interface avant qu'ils ne soient figés dans la c
 
 ## Étape 6 — Architecture technique et choix technologiques
 Rédige les documents décrivant l'architecture technique cible :
+- le cas échéant, statut (confirmé/écarté) des choix technologiques déjà mentionnés dans le dossier source, qui ne valent qu'à titre indicatif tant que cette étape ne les a pas validés ;
 - style architectural retenu et justification (monolithe, modulaire, client/serveur, etc.) ;
 - patterns d'architecture et de conception retenus (ex : MVC, hexagonal, CQRS, repository, etc.) et justification des alternatives écartées ;
 - choix technologiques structurants et alternatives écartées, avec justification ;
@@ -142,6 +146,7 @@ Rédige les documents décrivant les environnements, l'intégration continue et 
 
 Pour chaque étape, respecte ce déroulé :
 1. Rédaction des documents.
-2. Annonce que l'étape est prête pour relecture, en rappelant qu'elle doit se faire dans une session dédiée.
-3. Attente de ma validation explicite.
-4. Rappel qu'un commit humain doit être fait avant de poursuivre.
+2. Vérification que tout terme métier, technique ou acronyme nouvellement introduit dans les documents rédigés est consigné dans le glossaire, avec lien vers sa première apparition.
+3. Annonce que l'étape est prête pour relecture, en rappelant qu'elle doit se faire dans une session dédiée.
+4. Attente de ma validation explicite.
+5. Rappel qu'un commit humain doit être fait avant de poursuivre.
