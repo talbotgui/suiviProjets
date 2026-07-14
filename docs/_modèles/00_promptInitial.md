@@ -22,10 +22,11 @@ L'expression de besoin est dans le répertoire ./docs/01_besoin. Un README.md, d
 6. Chaque exigence (fonctionnelle ou non fonctionnelle) porte un identifiant stable, réutilisé sans être renommé dans toutes les étapes suivantes (conception, tests, etc.), afin de garder une traçabilité de bout en bout.
 7. Le répertoire ./docs/_modèles contient des modèles de documents à utiliser pour structurer et formatter chaque document produit à chaque étape.
 8. Toutes les modifications détectées durant les conversations et à réaliser après la rédaction des documents sont tracées dans un document dédié ./docs/plan_NN_<thème>.md (NN = numéro de l'étape courante, <thème> = intitulé bref de l'étape), structuré selon le modèle ./docs/_modèles/plan_miseEnPlace.md. Chaque ligne précise l'action, le(s) fichier(s) concerné(s), l'étape d'origine (avec lien vers la section source), l'étape cible si le traitement est différé à une étape ultérieure connue, et le statut d'avancement.
-9. Les documents produits se référencent explicitement entre eux par des liens relatifs (vers un document ou vers une section précise) chaque fois qu'ils traitent d'un même sujet : par exemple, une entrée du glossaire renvoie vers la section qui introduit le terme, une action du plan de mise en place renvoie vers la section qui l'a détectée. Cette règle s'applique également aux renvois vers les documents du dossier source `./docs/01_besoin` : toute mention d'un document ou d'une section de ce dossier est un lien Markdown relatif vers la section précise (ancre incluse), jamais un chemin en texte brut ou en code.
+9. Les documents produits se référencent explicitement entre eux par des liens relatifs (vers un document ou vers une section précise) chaque fois qu'ils traitent d'un même sujet : par exemple, une entrée du glossaire renvoie vers la section qui introduit le terme, une action du plan de mise en place renvoie vers la section qui l'a détectée. Cette règle s'applique également aux renvois vers les documents du dossier source `./docs/01_besoin` : toute mention d'un document ou d'une section de ce dossier est un lien Markdown relatif vers la section précise (ancre incluse), jamais un chemin en texte brut ou en code. Cette règle de liaison explicite s'applique également aux identifiants cités dans les cellules de tableau (codes RG-xxx, US-xxx, F-xxx, etc.) : chaque identifiant y est un lien Markdown relatif vers la section qui le détaille — vers la sous-section de regroupement en l'absence d'ancre par ligne — et non un simple texte brut.
 10. Toute référence à un référentiel, une norme, un framework ou une source externe introduite par l'IA dans un document est vérifiée avant intégration et accompagnée d'un lien vers sa documentation de référence.
 11. Toute affirmation attribuée à un document (source ou produit à une étape précédente) qui n'y figure pas littéralement, mais en constitue une déduction, est explicitement présentée comme telle (« déduit de… »), et non comme une citation directe.
 12. Toute information du dossier source (`./docs/01_besoin`) qui anticipe une décision relevant d'une étape ultérieure (choix d'architecture, technologies, etc.) est traitée comme une donnée d'entrée à confirmer ou infirmer à cette étape ; elle n'est pas reprise comme acquise dans les documents produits aux étapes antérieures.
+13. Toute table qui résume ou agrège des informations déjà détaillées ailleurs dans le même document (ex : tableau récapitulatif des écrans concernés vs tableau détaillé par règle) est recalculée depuis sa source à chaque modification de cette dernière, jamais maintenue à la main en parallèle. Toute relation bidirectionnelle entre deux tables ou deux documents (ex : matrice de traçabilité RG→US et colonne « règles de gestion associées » du tableau des cas d'usage) fait l'objet d'une vérification croisée avant livraison : chaque identifiant présent d'un côté doit se retrouver de l'autre.
 
 # Étapes
 
@@ -56,9 +57,9 @@ Pose-moi les questions nécessaires pour lever les ambiguïtés avant de rédige
 
 ## Étape 3 — Exigences fonctionnelles
 Rédige les documents décrivant les exigences fonctionnelles :
-- cas d'usage / user stories, avec critères d'acceptation et priorisation (convention MoSCoW), en réutilisant les persona définis à l'étape 2 comme acteurs lorsqu'ils existent ;
-- règles de gestion métier, avec une description sommaire des écrans concernés par chaque règle ;
-- parcours utilisateurs principaux et alternatifs (cas d'erreur inclus) ;
+- cas d'usage / user stories, avec critères d'acceptation et priorisation (convention MoSCoW), en réutilisant les persona définis à l'étape 2 comme acteurs lorsqu'ils existent ; une règle de gestion n'est associée à un cas d'usage que si son énoncé s'applique littéralement à l'action qu'il décrit, une association fondée uniquement sur un écran ou une fonctionnalité communs n'étant pas retenue ;
+- règles de gestion métier, avec une description sommaire des écrans concernés par chaque règle, établie en croisant son énoncé avec les critères d'acceptation de tous les cas d'usage qui la citent dans la matrice de traçabilité, pas seulement avec l'écran principal de son domaine fonctionnel ;
+- parcours utilisateurs principaux et alternatifs (cas d'erreur inclus), rattachés à tous les cas d'usage dont une étape du parcours réalise le critère d'acceptation, y compris les actions secondaires (export, annotation, etc.), pas seulement le cas d'usage central du parcours ;
 - complète le glossaire créé en étape 1 avec les termes métier propres à ces exigences.
 
 ## Étape 4 — Exigences non fonctionnelles
@@ -147,6 +148,7 @@ Rédige les documents décrivant les environnements, l'intégration continue et 
 Pour chaque étape, respecte ce déroulé :
 1. Rédaction des documents.
 2. Vérification que tout terme métier, technique ou acronyme nouvellement introduit dans les documents rédigés est consigné dans le glossaire, avec lien vers sa première apparition.
-3. Annonce que l'étape est prête pour relecture, en rappelant qu'elle doit se faire dans une session dédiée.
-4. Attente de ma validation explicite.
-5. Rappel qu'un commit humain doit être fait avant de poursuivre.
+3. Vérification de la cohérence croisée : tout tableau de synthèse est recalculé depuis sa source, toute matrice de traçabilité est cohérente dans les deux sens, toute association entre identifiants correspond littéralement aux énoncés concernés, et tout identifiant cité dans un tableau est lié vers sa section de référence.
+4. Annonce que l'étape est prête pour relecture, en rappelant qu'elle doit se faire dans une session dédiée.
+5. Attente de ma validation explicite.
+6. Rappel qu'un commit humain doit être fait avant de poursuivre.
