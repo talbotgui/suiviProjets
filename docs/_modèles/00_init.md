@@ -51,7 +51,7 @@ Critique les et proposition des modifications/améliorations
 * Relire chaque modification proposée
 * Une fois le travail satisfaisant, dans la seconde de relecture, exécuter le prompt suivant :
 ```
-Propose moi (s'il en existe) des éléments pourant être ajoutés dans @docs/_modèles/00_promptInitial.md  pour ne pas avoir ces modifications/améliorations à réaliser en relecture ?
+Propose moi (s'il en existe) des éléments pouvant être ajoutés dans @docs/_modèles/00_promptInitial.md  pour ne pas avoir ces modifications/améliorations à réaliser en relecture ?
 ```
 * Attention à être très précis dans ces modifications car elles sont structurantes.
 

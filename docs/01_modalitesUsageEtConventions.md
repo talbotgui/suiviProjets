@@ -88,7 +88,7 @@ L'IA peut produire des approximations, des erreurs factuelles ou des incohérenc
 Quatre domaines appellent une relecture humaine renforcée dans ce projet :
 - les règles de calcul des indicateurs qualité (statuts, seuils, couleurs), le principe fondamental du projet étant que le jugement est calculé à la volée à partir des constats bruts et n'est jamais stocké ;
 - la sécurité et la confidentialité des données, notamment le fichier de données chiffré, la gestion des membres inconnus et les données personnelles des contributeurs et des projets audités ;
-- l'architecture technique de l'application desktop Tauri/Rust/Angular, en particulier la frontière entre le cœur Rust et le front Angular et la gestion d'état associée ;
+- l'architecture technique de l'application desktop, en particulier la frontière entre les différentes couches applicatives et la gestion d'état associée (choix d'architecture non encore figé à ce stade, cf. [étape 6](./_modèles/00_promptInitial.md#étape-6--architecture-technique-et-choix-technologiques)) ;
 - la conformité aux référentiels externes utilisés pour juger la vitalité, la taille, la couverture de tests ou les notes Sonar.
 
 #### Non-substitution du jugement métier
