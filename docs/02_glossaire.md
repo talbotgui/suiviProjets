@@ -16,6 +16,22 @@ Ce chapitre liste les termes métier employés dans la discussion et les documen
 | Qualimétrie | Mesure de la qualité logicielle d'un projet (couverture de tests, dette technique, violations, notes Sonar, etc.), au sens large adopté dans ce projet pour désigner l'ensemble des indicateurs de qualité et d'obsolescence suivis. | 2 |
 | Membre inconnu (statut `inconnu`) | Statut attribué par défaut à un membre de dépôt ou contributeur ne correspondant à aucune règle des membres connus du groupe ; signal de sécurité prioritaire devant rester visible en toutes circonstances (cf. [Specification.md, section 5.17](./01_besoin/Specification.md#517-f17--surveillance-des-membres-et-premier-commit-interne)). | 2 |
 | Politique IA | Paramètre par projet (`iaAutorisee`) déterminant si l'usage d'outils d'intelligence artificielle est autorisé sur ce projet ; interdit par défaut (cf. [Specification.md, section 5.18](./01_besoin/Specification.md#518-f18--politique-ia)). | 2 |
+| Groupe | Rassemble des projets en un ensemble ayant du sens organisationnel ; porte les instances, la liste des membres connus et les annotations de portée groupe (cf. [Specification.md, section 4](./01_besoin/Specification.md#4-glossaire)). | 3 |
+| Projet | Unité logique de suivi contenant au moins un dépôt GitLab et pouvant rassembler d'autres sources (projets Sonar, autres dépôts). | 3 |
+| Source | Élément fournissant la vérité auditable : un dépôt GitLab ou un projet Sonar rattaché à une instance. | 3 |
+| Instance | Serveur GitLab ou Sonar (URL de base) référencé dans un groupe, dans lequel sont sélectionnées les sources des projets. | 3 |
+| Audit | Action d'interroger les sources d'un ou plusieurs projets pour en extraire les indicateurs à la date du jour et en sauvegarder les résultats. | 3 |
+| Campagne | Une exécution d'audit portant sur un périmètre de projets, laissant une trace (verdicts par projet) support de la reprise et du rapport d'anomalies. | 3 |
+| Brouillon | Zone de transit des résultats d'une campagne avant validation et intégration à l'historique ; au plus un brouillon à la fois. | 3 |
+| Résultat | Donnée structurée conservée d'un audit à l'autre, typée par un discriminant `type` (ex. `gitlab.dependances`, `sonar.notes`) ; ne contient jamais de verdict, seulement des constats bruts (cf. [RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)). | 3 |
+| Indicateur | Grandeur restituée à l'utilisateur, extraite d'un résultat directement ou par calcul contre les seuils et référentiels courants. | 3 |
+| Référentiel | Grille de lecture partageable entre utilisateurs (règles de dépendances, règles de marqueurs IA), exportable en clair. | 3 |
+| Membres connus | Donnée propre à un groupe, non partageable et jamais exportée en clair : règles d'identification des collaborateurs par username, email ou domaine (cf. [RG-006](./05_reglesGestion.md#membres-et-sécurité-des-accès) à [RG-008](./05_reglesGestion.md#membres-et-sécurité-des-accès)). | 3 |
+| Alerte | Situation remontée par la liste de travail (membre inconnu, violation IA, SONAR_KO, projet mort, dépendance obsolète, etc.), identifiée par une clé stable pour le suivi de traitement. | 3 |
+| Annotation | Repère daté posé sur un projet ou un groupe (migration, changement d'équipe, incident, activation IA, etc.), affiché sur les graphiques d'évolution. | 3 |
+| Ref auditée (`refAuditee`) | Branche, tag ou SHA sur lequel portent les audits d'un dépôt GitLab ; par défaut la branche par défaut du dépôt. | 3 |
+| SONAR_KO | Badge signalant que la dernière analyse Sonar est incohérente avec la date du dernier commit de la ref auditée, au-delà d'une tolérance paramétrable. | 3 |
+| Vue enregistrée | Modèle nommé de filtres (groupes, projets, indicateurs, période, tri) réutilisable sur la synthèse, le grand graphique ou la liste de travail. | 3 |
 
 ## Termes techniques
 
@@ -34,6 +50,8 @@ Ce chapitre liste les acronymes employés dans la discussion et les documents, a
 |---|---|
 | IA | Intelligence Artificielle |
 | MoSCoW | Méthode de priorisation Must have / Should have / Could have / Won't have, retenue pour prioriser les cas d'usage à partir de l'étape 3 |
+| US | User Story (cas d'usage), identifiant `US-NNN` défini à l'étape 3 |
+| RG | Règle de Gestion, identifiant `RG-NNN` défini à l'étape 3 |
 
 ## Journal des décisions
 
