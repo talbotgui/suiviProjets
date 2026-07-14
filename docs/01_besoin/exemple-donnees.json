@@ -1,0 +1,2422 @@
+{
+  "versionSchema": 1,
+  "meta": {
+    "creeLe": "2026-05-15T09:12:00Z",
+    "modifieLe": "2026-07-08T17:45:00Z",
+    "application": "SuiviQualimetrie 1.0.0"
+  },
+  "groupes": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "nom": "Socle Comptable",
+      "description": "Applications du socle comptable et facturation",
+      "instances": [
+        {
+          "id": "b0000000-0000-4000-8000-000000000001",
+          "type": "gitlab",
+          "nom": "gitlab-prod",
+          "urlBase": "https://gitlab.entreprise.fr"
+        },
+        {
+          "id": "b0000000-0000-4000-8000-000000000002",
+          "type": "sonar",
+          "nom": "sonar-core",
+          "urlBase": "https://sonar.entreprise.fr"
+        }
+      ],
+      "membresConnus": [
+        {
+          "id": "c0000000-0000-4000-8000-000000000001",
+          "critere": "*@entreprise.fr",
+          "typeCritere": "domaineEmail",
+          "statut": "interne"
+        },
+        {
+          "id": "c0000000-0000-4000-8000-000000000002",
+          "critere": "mdurand",
+          "typeCritere": "username",
+          "statut": "interne",
+          "libelle": "Marie Durand",
+          "aliasEmail": "marie.durand@entreprise.fr"
+        },
+        {
+          "id": "c0000000-0000-4000-8000-000000000003",
+          "critere": "jpetit",
+          "typeCritere": "username",
+          "statut": "interne",
+          "libelle": "Julien Petit",
+          "aliasEmail": "julien.petit@entreprise.fr"
+        },
+        {
+          "id": "c0000000-0000-4000-8000-000000000004",
+          "critere": "alopez-ext",
+          "typeCritere": "username",
+          "statut": "partenaire",
+          "libelle": "Ana Lopez (Presta-Dev)",
+          "aliasEmail": "a.lopez@presta-dev.io"
+        }
+      ],
+      "annotations": [
+        {
+          "id": "c0000000-0000-4000-8000-000000000101",
+          "date": "2026-03-10",
+          "libelle": "Migration GitLab 17",
+          "categorie": "migration",
+          "description": "Montée de version de l'instance gitlab-prod"
+        }
+      ],
+      "indicateursDesactives": [],
+      "projets": [
+        {
+          "id": "d0000000-0000-4000-8000-000000000001",
+          "nom": "API Facturation",
+          "description": "API centrale de facturation",
+          "iaAutorisee": false,
+          "premierCommitInterne": {
+            "date": "2021-03-15",
+            "sha": "a1b2c3d4",
+            "emailAuteur": "julien.petit@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:4fd1…9ab0",
+            "statut": "determine"
+          },
+          "sources": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000001",
+              "instanceId": "b0000000-0000-4000-8000-000000000001",
+              "type": "depotGitlab",
+              "idExterne": "1234",
+              "refAuditee": "develop"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000002",
+              "instanceId": "b0000000-0000-4000-8000-000000000002",
+              "type": "projetSonar",
+              "idExterne": "entreprise:api-facturation"
+            }
+          ],
+          "annotations": [
+            {
+              "id": "c0000000-0000-4000-8000-000000000102",
+              "date": "2026-04-22",
+              "libelle": "Passage develop en ref auditée",
+              "categorie": "jalon",
+              "description": "La branche vivante est develop (Gitflow)"
+            },
+            {
+              "id": "c0000000-0000-4000-8000-000000000103",
+              "date": "2026-06-01",
+              "libelle": "Montée Spring 6",
+              "categorie": "migration"
+            }
+          ],
+          "audits": [
+            {
+              "id": "10000000-0000-4000-8000-000000000001",
+              "date": "2026-06-05",
+              "campagneId": "e0000000-0000-4000-8000-000000000001",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "dependances": [
+                    {
+                      "reference": "org.springframework:spring-core",
+                      "version": "5.3.12",
+                      "manifeste": "pom.xml"
+                    },
+                    {
+                      "reference": "org.apache.logging.log4j:log4j-core",
+                      "version": "2.17.1",
+                      "manifeste": "pom.xml"
+                    },
+                    {
+                      "reference": "com.fasterxml.jackson.core:jackson-databind",
+                      "version": "2.15.2",
+                      "manifeste": "pom.xml"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.branches",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "branches": [
+                    {
+                      "nom": "develop",
+                      "avecMR": false,
+                      "rebasee": true,
+                      "nommageConforme": true,
+                      "dernierCommitLe": "2026-06-05"
+                    },
+                    {
+                      "nom": "feature/paiement-sepa",
+                      "avecMR": true,
+                      "rebasee": false,
+                      "nommageConforme": true,
+                      "dernierCommitLe": "2026-06-05"
+                    },
+                    {
+                      "nom": "wip-test-julien",
+                      "avecMR": false,
+                      "rebasee": false,
+                      "nommageConforme": false,
+                      "dernierCommitLe": "2026-02-11"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "dernierCommitLe": "2026-06-05"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "marie.durand@entreprise.fr",
+                      "nom": "Marie Durand",
+                      "nombreCommits": 42
+                    },
+                    {
+                      "email": "julien.petit@entreprise.fr",
+                      "nom": "Julien Petit",
+                      "nombreCommits": 17
+                    },
+                    {
+                      "email": "a.lopez@presta-dev.io",
+                      "nom": "Ana Lopez",
+                      "nombreCommits": 8
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "tailleOctets": 48234567
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "mrOuvertes": [
+                    {
+                      "iid": 214,
+                      "titre": "Paiement SEPA",
+                      "creeLe": "2026-06-20",
+                      "enConflit": false
+                    },
+                    {
+                      "iid": 209,
+                      "titre": "Refonte mapping tiers",
+                      "creeLe": "2026-04-02",
+                      "enConflit": true
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "marqueurs": []
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "8c1d0e44",
+                  "membres": [
+                    {
+                      "username": "mdurand",
+                      "nom": "Marie Durand",
+                      "niveauAcces": 40,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "jpetit",
+                      "nom": "Julien Petit",
+                      "niveauAcces": 30,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "alopez-ext",
+                      "nom": "Ana Lopez",
+                      "niveauAcces": 30,
+                      "herite": true,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "sonar.violations",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "parSeverite": {
+                    "bloquant": 4,
+                    "critique": 15,
+                    "majeur": 88,
+                    "mineur": 240,
+                    "info": 31
+                  },
+                  "nouvellesViolations": 9
+                },
+                {
+                  "type": "sonar.dette",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "detteMinutes": 14520,
+                  "ratioDette": 3.4
+                },
+                {
+                  "type": "sonar.couverture",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "couverture": 61.2,
+                  "couvertureNouveauCode": 71.0
+                },
+                {
+                  "type": "sonar.notes",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "fiabilite": 2.0,
+                  "securite": 3.0,
+                  "maintenabilite": 2.0,
+                  "revueSecurite": 2.0
+                },
+                {
+                  "type": "sonar.ncloc",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "ncloc": 84210,
+                  "parLangage": {
+                    "java": 79800,
+                    "xml": 4410,
+                    "js": 0
+                  }
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2026-06-05",
+                  "derniereAnalyseLe": "2026-06-05",
+                  "aucuneAnalyse": false
+                },
+                {
+                  "type": "croise.activite_sans_qualite",
+                  "nombreCommits": 67,
+                  "nouvellesViolations": 9,
+                  "evaluable": true
+                },
+                {
+                  "type": "croise.ia_nouveau_code",
+                  "marqueursPresents": false,
+                  "outilsDetectes": [],
+                  "couvertureNouveauCode": 71.0,
+                  "nouvellesViolations": 9,
+                  "duplicationNouveauCode": 2.1
+                }
+              ]
+            },
+            {
+              "id": "10000000-0000-4000-8000-000000000002",
+              "date": "2026-07-08",
+              "campagneId": "e0000000-0000-4000-8000-000000000002",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "dependances": [
+                    {
+                      "reference": "org.springframework:spring-core",
+                      "version": "6.1.8",
+                      "manifeste": "pom.xml"
+                    },
+                    {
+                      "reference": "org.apache.logging.log4j:log4j-core",
+                      "version": "2.17.1",
+                      "manifeste": "pom.xml"
+                    },
+                    {
+                      "reference": "com.fasterxml.jackson.core:jackson-databind",
+                      "version": "2.17.1",
+                      "manifeste": "pom.xml"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.branches",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "branches": [
+                    {
+                      "nom": "develop",
+                      "avecMR": false,
+                      "rebasee": true,
+                      "nommageConforme": true,
+                      "dernierCommitLe": "2026-07-08"
+                    },
+                    {
+                      "nom": "feature/paiement-sepa",
+                      "avecMR": true,
+                      "rebasee": true,
+                      "nommageConforme": true,
+                      "dernierCommitLe": "2026-07-08"
+                    },
+                    {
+                      "nom": "wip-test-julien",
+                      "avecMR": false,
+                      "rebasee": false,
+                      "nommageConforme": false,
+                      "dernierCommitLe": "2026-02-11"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "dernierCommitLe": "2026-07-08"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "marie.durand@entreprise.fr",
+                      "nom": "Marie Durand",
+                      "nombreCommits": 42
+                    },
+                    {
+                      "email": "julien.petit@entreprise.fr",
+                      "nom": "Julien Petit",
+                      "nombreCommits": 17
+                    },
+                    {
+                      "email": "a.lopez@presta-dev.io",
+                      "nom": "Ana Lopez",
+                      "nombreCommits": 8
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "tailleOctets": 52411002
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "mrOuvertes": [
+                    {
+                      "iid": 214,
+                      "titre": "Paiement SEPA",
+                      "creeLe": "2026-06-20",
+                      "enConflit": false
+                    },
+                    {
+                      "iid": 209,
+                      "titre": "Refonte mapping tiers",
+                      "creeLe": "2026-04-02",
+                      "enConflit": true
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "marqueurs": []
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000001",
+                  "refEffective": "develop",
+                  "shaTete": "3fa2b91c",
+                  "membres": [
+                    {
+                      "username": "mdurand",
+                      "nom": "Marie Durand",
+                      "niveauAcces": 40,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "jpetit",
+                      "nom": "Julien Petit",
+                      "niveauAcces": 30,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "alopez-ext",
+                      "nom": "Ana Lopez",
+                      "niveauAcces": 30,
+                      "herite": true,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "sonar.violations",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "parSeverite": {
+                    "bloquant": 2,
+                    "critique": 11,
+                    "majeur": 88,
+                    "mineur": 240,
+                    "info": 31
+                  },
+                  "nouvellesViolations": 3
+                },
+                {
+                  "type": "sonar.dette",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "detteMinutes": 13980,
+                  "ratioDette": 3.1
+                },
+                {
+                  "type": "sonar.couverture",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "couverture": 64.8,
+                  "couvertureNouveauCode": 82.5
+                },
+                {
+                  "type": "sonar.notes",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "fiabilite": 2.0,
+                  "securite": 2.0,
+                  "maintenabilite": 2.0,
+                  "revueSecurite": 2.0
+                },
+                {
+                  "type": "sonar.ncloc",
+                  "sourceId": "f0000000-0000-4000-8000-000000000002",
+                  "ncloc": 86950,
+                  "parLangage": {
+                    "java": 82100,
+                    "xml": 4410,
+                    "js": 440
+                  }
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2026-07-08",
+                  "derniereAnalyseLe": "2026-07-08",
+                  "aucuneAnalyse": false
+                },
+                {
+                  "type": "croise.activite_sans_qualite",
+                  "nombreCommits": 67,
+                  "nouvellesViolations": 3,
+                  "evaluable": true
+                },
+                {
+                  "type": "croise.ia_nouveau_code",
+                  "marqueursPresents": false,
+                  "outilsDetectes": [],
+                  "couvertureNouveauCode": 82.5,
+                  "nouvellesViolations": 3,
+                  "duplicationNouveauCode": 2.1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d0000000-0000-4000-8000-000000000002",
+          "nom": "Batch Comptable",
+          "description": "Traitements de nuit comptables",
+          "iaAutorisee": false,
+          "premierCommitInterne": {
+            "date": "2019-09-02",
+            "sha": "0f9e8d7c",
+            "emailAuteur": "marie.durand@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:4fd1…9ab0",
+            "statut": "determine"
+          },
+          "sources": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000003",
+              "instanceId": "b0000000-0000-4000-8000-000000000001",
+              "type": "depotGitlab",
+              "idExterne": "1567"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000004",
+              "instanceId": "b0000000-0000-4000-8000-000000000002",
+              "type": "projetSonar",
+              "idExterne": "entreprise:batch-comptable"
+            }
+          ],
+          "annotations": [],
+          "audits": [
+            {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "date": "2026-06-05",
+              "campagneId": "e0000000-0000-4000-8000-000000000001",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "dependances": [
+                    {
+                      "reference": "org.springframework.boot:spring-boot-starter-batch",
+                      "version": "3.2.5",
+                      "manifeste": "pom.xml"
+                    },
+                    {
+                      "reference": "org.apache.struts:struts2-core",
+                      "version": "2.5.30",
+                      "manifeste": "pom.xml"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "dernierCommitLe": "2026-06-05"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "marie.durand@entreprise.fr",
+                      "nom": "Marie Durand",
+                      "nombreCommits": 55
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "tailleOctets": 9834122
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "mrOuvertes": []
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "marqueurs": []
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000003",
+                  "refEffective": "main",
+                  "shaTete": "77aa19d0",
+                  "membres": [
+                    {
+                      "username": "mdurand",
+                      "nom": "Marie Durand",
+                      "niveauAcces": 40,
+                      "herite": true,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "sonar.violations",
+                  "sourceId": "f0000000-0000-4000-8000-000000000004",
+                  "parSeverite": {
+                    "bloquant": 1,
+                    "critique": 22,
+                    "majeur": 130,
+                    "mineur": 310,
+                    "info": 12
+                  },
+                  "nouvellesViolations": 18
+                },
+                {
+                  "type": "sonar.couverture",
+                  "sourceId": "f0000000-0000-4000-8000-000000000004",
+                  "couverture": 38.4,
+                  "couvertureNouveauCode": 22.0
+                },
+                {
+                  "type": "sonar.notes",
+                  "sourceId": "f0000000-0000-4000-8000-000000000004",
+                  "fiabilite": 3.0,
+                  "securite": 3.0,
+                  "maintenabilite": 4.0,
+                  "revueSecurite": 3.0
+                },
+                {
+                  "type": "sonar.ncloc",
+                  "sourceId": "f0000000-0000-4000-8000-000000000004",
+                  "ncloc": 21400,
+                  "parLangage": {
+                    "java": 21400
+                  }
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2026-06-05",
+                  "derniereAnalyseLe": "2026-06-05",
+                  "aucuneAnalyse": false
+                },
+                {
+                  "type": "croise.activite_sans_qualite",
+                  "nombreCommits": 55,
+                  "nouvellesViolations": 18,
+                  "evaluable": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d0000000-0000-4000-8000-000000000003",
+          "nom": "Référentiel Tiers",
+          "description": "Ancien référentiel des tiers — candidat au décommissionnement",
+          "iaAutorisee": false,
+          "premierCommitInterne": {
+            "date": "2016-01-20",
+            "sha": "11aa22bb",
+            "emailAuteur": "julien.petit@entreprise.fr",
+            "calculeLe": "2026-05-16",
+            "empreinteReferentiel": "sha256:4fd1…9ab0",
+            "statut": "determine"
+          },
+          "sources": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000005",
+              "instanceId": "b0000000-0000-4000-8000-000000000001",
+              "type": "depotGitlab",
+              "idExterne": "402",
+              "refAuditee": "master"
+            }
+          ],
+          "annotations": [
+            {
+              "id": "c0000000-0000-4000-8000-000000000104",
+              "date": "2024-12-01",
+              "libelle": "Gel du projet",
+              "categorie": "jalon",
+              "description": "Plus de développements — décommissionnement prévu 2027"
+            }
+          ],
+          "audits": [
+            {
+              "id": "10000000-0000-4000-8000-000000000004",
+              "date": "2026-06-05",
+              "campagneId": "e0000000-0000-4000-8000-000000000001",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "dependances": [
+                    {
+                      "reference": "org.springframework:spring-core",
+                      "version": "4.3.30",
+                      "manifeste": "pom.xml"
+                    },
+                    {
+                      "reference": "log4j:log4j",
+                      "version": "1.2.17",
+                      "manifeste": "pom.xml"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "dernierCommitLe": "2024-11-03"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "fenetreJours": 90,
+                  "contributeurs": []
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "tailleOctets": 3120440
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "mrOuvertes": [
+                    {
+                      "iid": 45,
+                      "titre": "Montée Spring 5",
+                      "creeLe": "2024-09-12",
+                      "enConflit": true
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "marqueurs": []
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000005",
+                  "refEffective": "master",
+                  "shaTete": "b2c3d4e5",
+                  "membres": [
+                    {
+                      "username": "jpetit",
+                      "nom": "Julien Petit",
+                      "niveauAcces": 40,
+                      "herite": true,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2024-11-03",
+                  "aucuneAnalyse": true
+                },
+                {
+                  "type": "croise.activite_sans_qualite",
+                  "nombreCommits": 0,
+                  "nouvellesViolations": null,
+                  "evaluable": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "nom": "Portail Nova",
+      "description": "Applications du portail client Nova (co-développement avec Nova Corp)",
+      "instances": [
+        {
+          "id": "b0000000-0000-4000-8000-000000000003",
+          "type": "gitlab",
+          "nom": "gitlab-nova",
+          "urlBase": "https://git.nova-project.io"
+        },
+        {
+          "id": "b0000000-0000-4000-8000-000000000004",
+          "type": "sonar",
+          "nom": "sonar-nova",
+          "urlBase": "https://sonar.nova-project.io"
+        }
+      ],
+      "membresConnus": [
+        {
+          "id": "c0000000-0000-4000-8000-000000000005",
+          "critere": "*@entreprise.fr",
+          "typeCritere": "domaineEmail",
+          "statut": "interne"
+        },
+        {
+          "id": "c0000000-0000-4000-8000-000000000006",
+          "critere": "*@nova-corp.com",
+          "typeCritere": "domaineEmail",
+          "statut": "client"
+        },
+        {
+          "id": "c0000000-0000-4000-8000-000000000007",
+          "critere": "smartin",
+          "typeCritere": "username",
+          "statut": "interne",
+          "libelle": "Sofia Martin",
+          "aliasEmail": "sofia.martin@entreprise.fr"
+        },
+        {
+          "id": "c0000000-0000-4000-8000-000000000008",
+          "critere": "kbenali",
+          "typeCritere": "username",
+          "statut": "client",
+          "libelle": "Karim Benali (Nova Corp)",
+          "aliasEmail": "k.benali@nova-corp.com"
+        }
+      ],
+      "annotations": [],
+      "indicateursDesactives": [
+        "gitlab.branches"
+      ],
+      "projets": [
+        {
+          "id": "d0000000-0000-4000-8000-000000000004",
+          "nom": "Front Portail",
+          "description": "Front Angular du portail client",
+          "iaAutorisee": true,
+          "iaAutoriseeDepuis": "2026-05-20",
+          "premierCommitInterne": {
+            "date": "2023-06-12",
+            "sha": "9e8f7a6b",
+            "emailAuteur": "sofia.martin@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:77c2…be13",
+            "statut": "determine"
+          },
+          "sources": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000006",
+              "instanceId": "b0000000-0000-4000-8000-000000000003",
+              "type": "depotGitlab",
+              "idExterne": "88",
+              "refAuditee": "develop"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000007",
+              "instanceId": "b0000000-0000-4000-8000-000000000004",
+              "type": "projetSonar",
+              "idExterne": "nova:front-portail"
+            }
+          ],
+          "annotations": [
+            {
+              "id": "c0000000-0000-4000-8000-000000000105",
+              "date": "2026-05-20",
+              "libelle": "Activation de l'IA",
+              "categorie": "activationIA",
+              "description": "Autorisation Claude Code pour l'équipe front",
+              "systeme": true
+            }
+          ],
+          "audits": [
+            {
+              "id": "10000000-0000-4000-8000-000000000005",
+              "date": "2026-06-05",
+              "campagneId": "e0000000-0000-4000-8000-000000000001",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "dependances": [
+                    {
+                      "reference": "@angular/core",
+                      "version": "18.2.1",
+                      "manifeste": "package.json"
+                    },
+                    {
+                      "reference": "rxjs",
+                      "version": "7.8.1",
+                      "manifeste": "package.json"
+                    },
+                    {
+                      "reference": "moment",
+                      "version": "2.29.4",
+                      "manifeste": "package.json"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "dernierCommitLe": "2026-06-05"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "sofia.martin@entreprise.fr",
+                      "nom": "Sofia Martin",
+                      "nombreCommits": 61
+                    },
+                    {
+                      "email": "k.benali@nova-corp.com",
+                      "nom": "Karim Benali",
+                      "nombreCommits": 24
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "tailleOctets": 156700900
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "mrOuvertes": [
+                    {
+                      "iid": 88,
+                      "titre": "Dashboard client v2",
+                      "creeLe": "2026-07-01",
+                      "enConflit": false
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "marqueurs": [
+                    {
+                      "chemin": "CLAUDE.md",
+                      "nature": "fichier",
+                      "outil": "claude"
+                    },
+                    {
+                      "chemin": ".claude",
+                      "nature": "repertoire",
+                      "outil": "claude"
+                    },
+                    {
+                      "chemin": ".mcp.json",
+                      "nature": "fichier",
+                      "outil": "claude"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "membres": [
+                    {
+                      "username": "smartin",
+                      "nom": "Sofia Martin",
+                      "niveauAcces": 40,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "kbenali",
+                      "nom": "Karim Benali",
+                      "niveauAcces": 30,
+                      "herite": false,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "sonar.violations",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "parSeverite": {
+                    "bloquant": 0,
+                    "critique": 3,
+                    "majeur": 41,
+                    "mineur": 120,
+                    "info": 9
+                  },
+                  "nouvellesViolations": 1
+                },
+                {
+                  "type": "sonar.couverture",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "couverture": 72.6,
+                  "couvertureNouveauCode": 88.1
+                },
+                {
+                  "type": "sonar.notes",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "fiabilite": 1.0,
+                  "securite": 2.0,
+                  "maintenabilite": 1.0,
+                  "revueSecurite": 1.0
+                },
+                {
+                  "type": "sonar.ncloc",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "ncloc": 44300,
+                  "parLangage": {
+                    "ts": 39800,
+                    "html": 3200,
+                    "css": 1300
+                  }
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2026-06-05",
+                  "derniereAnalyseLe": "2026-06-05",
+                  "aucuneAnalyse": false
+                },
+                {
+                  "type": "croise.ia_nouveau_code",
+                  "marqueursPresents": true,
+                  "outilsDetectes": [
+                    "claude"
+                  ],
+                  "couvertureNouveauCode": 88.1,
+                  "nouvellesViolations": 1,
+                  "duplicationNouveauCode": 1.4
+                }
+              ]
+            },
+            {
+              "id": "10000000-0000-4000-8000-000000000006",
+              "date": "2026-07-08",
+              "campagneId": "e0000000-0000-4000-8000-000000000002",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "dependances": [
+                    {
+                      "reference": "@angular/core",
+                      "version": "18.2.1",
+                      "manifeste": "package.json"
+                    },
+                    {
+                      "reference": "rxjs",
+                      "version": "7.8.1",
+                      "manifeste": "package.json"
+                    },
+                    {
+                      "reference": "moment",
+                      "version": "2.29.4",
+                      "manifeste": "package.json"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "dernierCommitLe": "2026-07-08"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "sofia.martin@entreprise.fr",
+                      "nom": "Sofia Martin",
+                      "nombreCommits": 61
+                    },
+                    {
+                      "email": "k.benali@nova-corp.com",
+                      "nom": "Karim Benali",
+                      "nombreCommits": 24
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "tailleOctets": 156700900
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "mrOuvertes": [
+                    {
+                      "iid": 88,
+                      "titre": "Dashboard client v2",
+                      "creeLe": "2026-07-01",
+                      "enConflit": false
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "marqueurs": [
+                    {
+                      "chemin": "CLAUDE.md",
+                      "nature": "fichier",
+                      "outil": "claude"
+                    },
+                    {
+                      "chemin": ".claude",
+                      "nature": "repertoire",
+                      "outil": "claude"
+                    },
+                    {
+                      "chemin": ".mcp.json",
+                      "nature": "fichier",
+                      "outil": "claude"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000006",
+                  "refEffective": "develop",
+                  "shaTete": "9e8f7a6b",
+                  "membres": [
+                    {
+                      "username": "smartin",
+                      "nom": "Sofia Martin",
+                      "niveauAcces": 40,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "kbenali",
+                      "nom": "Karim Benali",
+                      "niveauAcces": 30,
+                      "herite": false,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "sonar.violations",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "parSeverite": {
+                    "bloquant": 0,
+                    "critique": 3,
+                    "majeur": 41,
+                    "mineur": 120,
+                    "info": 9
+                  },
+                  "nouvellesViolations": 1
+                },
+                {
+                  "type": "sonar.couverture",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "couverture": 72.6,
+                  "couvertureNouveauCode": 88.1
+                },
+                {
+                  "type": "sonar.notes",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "fiabilite": 1.0,
+                  "securite": 2.0,
+                  "maintenabilite": 1.0,
+                  "revueSecurite": 1.0
+                },
+                {
+                  "type": "sonar.ncloc",
+                  "sourceId": "f0000000-0000-4000-8000-000000000007",
+                  "ncloc": 44300,
+                  "parLangage": {
+                    "ts": 39800,
+                    "html": 3200,
+                    "css": 1300
+                  }
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2026-07-08",
+                  "derniereAnalyseLe": "2026-07-08",
+                  "aucuneAnalyse": false
+                },
+                {
+                  "type": "croise.ia_nouveau_code",
+                  "marqueursPresents": true,
+                  "outilsDetectes": [
+                    "claude"
+                  ],
+                  "couvertureNouveauCode": 88.1,
+                  "nouvellesViolations": 1,
+                  "duplicationNouveauCode": 1.4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d0000000-0000-4000-8000-000000000005",
+          "nom": "API Portail",
+          "description": "Backend Node du portail",
+          "iaAutorisee": false,
+          "premierCommitInterne": {
+            "date": "2023-08-01",
+            "sha": "c4d5e6f7",
+            "emailAuteur": "sofia.martin@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:77c2…be13",
+            "statut": "determine"
+          },
+          "sources": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000008",
+              "instanceId": "b0000000-0000-4000-8000-000000000003",
+              "type": "depotGitlab",
+              "idExterne": "91"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000009",
+              "instanceId": "b0000000-0000-4000-8000-000000000004",
+              "type": "projetSonar",
+              "idExterne": "nova:api-portail"
+            }
+          ],
+          "annotations": [],
+          "audits": [
+            {
+              "id": "10000000-0000-4000-8000-000000000007",
+              "date": "2026-06-05",
+              "campagneId": "e0000000-0000-4000-8000-000000000001",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "dependances": [
+                    {
+                      "reference": "express",
+                      "version": "4.18.2",
+                      "manifeste": "package.json"
+                    },
+                    {
+                      "reference": "lodash",
+                      "version": "4.17.21",
+                      "manifeste": "package.json"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "dernierCommitLe": "2026-06-05"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "k.benali@nova-corp.com",
+                      "nom": "Karim Benali",
+                      "nombreCommits": 19
+                    },
+                    {
+                      "email": "dev.mystere@gmail.com",
+                      "nom": "dmx",
+                      "nombreCommits": 6
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "tailleOctets": 18220000
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "mrOuvertes": [
+                    {
+                      "iid": 31,
+                      "titre": "Auth OIDC",
+                      "creeLe": "2026-05-14",
+                      "enConflit": true
+                    },
+                    {
+                      "iid": 29,
+                      "titre": "Rate limiting",
+                      "creeLe": "2026-03-02",
+                      "enConflit": true
+                    },
+                    {
+                      "iid": 34,
+                      "titre": "Logs structurés",
+                      "creeLe": "2026-06-28",
+                      "enConflit": false
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "marqueurs": [
+                    {
+                      "chemin": ".cursorrules",
+                      "nature": "fichier",
+                      "outil": "cursor"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000008",
+                  "refEffective": "main",
+                  "shaTete": "c4d5e6f7",
+                  "membres": [
+                    {
+                      "username": "kbenali",
+                      "nom": "Karim Benali",
+                      "niveauAcces": 40,
+                      "herite": false,
+                      "emailPublic": null
+                    },
+                    {
+                      "username": "dmx-dev",
+                      "nom": "dmx",
+                      "niveauAcces": 40,
+                      "herite": false,
+                      "emailPublic": null
+                    }
+                  ]
+                },
+                {
+                  "type": "sonar.violations",
+                  "sourceId": "f0000000-0000-4000-8000-000000000009",
+                  "parSeverite": {
+                    "bloquant": 2,
+                    "critique": 8,
+                    "majeur": 55,
+                    "mineur": 90,
+                    "info": 4
+                  },
+                  "nouvellesViolations": 0
+                },
+                {
+                  "type": "sonar.couverture",
+                  "sourceId": "f0000000-0000-4000-8000-000000000009",
+                  "couverture": 51.0,
+                  "couvertureNouveauCode": null
+                },
+                {
+                  "type": "sonar.notes",
+                  "sourceId": "f0000000-0000-4000-8000-000000000009",
+                  "fiabilite": 2.0,
+                  "securite": 4.0,
+                  "maintenabilite": 3.0,
+                  "revueSecurite": 4.0
+                },
+                {
+                  "type": "sonar.ncloc",
+                  "sourceId": "f0000000-0000-4000-8000-000000000009",
+                  "ncloc": 15800,
+                  "parLangage": {
+                    "ts": 15800
+                  }
+                },
+                {
+                  "type": "croise.fraicheur_sonar",
+                  "dernierCommitLe": "2026-06-05",
+                  "derniereAnalyseLe": "2026-04-19",
+                  "aucuneAnalyse": false
+                },
+                {
+                  "type": "croise.activite_sans_qualite",
+                  "nombreCommits": 25,
+                  "nouvellesViolations": null,
+                  "evaluable": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d0000000-0000-4000-8000-000000000006",
+          "nom": "Mobile Nova",
+          "description": "Application mobile Android — pas encore de projet Sonar",
+          "iaAutorisee": false,
+          "premierCommitInterne": {
+            "date": "2026-02-10",
+            "sha": "d5e6f7a8",
+            "emailAuteur": "sofia.martin@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:77c2…be13",
+            "statut": "determine"
+          },
+          "sources": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000010",
+              "instanceId": "b0000000-0000-4000-8000-000000000003",
+              "type": "depotGitlab",
+              "idExterne": "104"
+            }
+          ],
+          "annotations": [],
+          "audits": [
+            {
+              "id": "10000000-0000-4000-8000-000000000008",
+              "date": "2026-06-05",
+              "campagneId": "e0000000-0000-4000-8000-000000000001",
+              "resultats": [
+                {
+                  "type": "gitlab.dependances",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "dependances": [
+                    {
+                      "reference": "com.squareup.retrofit2:retrofit",
+                      "version": "2.11.0",
+                      "manifeste": "build.gradle"
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.vitalite",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "dernierCommitLe": "2026-06-05"
+                },
+                {
+                  "type": "gitlab.contributeurs",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "fenetreJours": 90,
+                  "contributeurs": [
+                    {
+                      "email": "sofia.martin@entreprise.fr",
+                      "nom": "Sofia Martin",
+                      "nombreCommits": 12
+                    }
+                  ]
+                },
+                {
+                  "type": "gitlab.taille_depot",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "tailleOctets": 5400200
+                },
+                {
+                  "type": "gitlab.merge_requests",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "mrOuvertes": []
+                },
+                {
+                  "type": "gitlab.marqueurs_ia",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "marqueurs": []
+                },
+                {
+                  "type": "gitlab.membres",
+                  "sourceId": "f0000000-0000-4000-8000-000000000010",
+                  "refEffective": "main",
+                  "shaTete": "d5e6f7a8",
+                  "membres": [
+                    {
+                      "username": "smartin",
+                      "nom": "Sofia Martin",
+                      "niveauAcces": 50,
+                      "herite": false,
+                      "emailPublic": null
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "referentiels": {
+    "reglesDependances": [
+      {
+        "id": "20000000-0000-4000-8000-000000000001",
+        "motif": "org.springframework:*",
+        "versions": [
+          {
+            "motifVersion": "4.*",
+            "statut": "obsolete"
+          },
+          {
+            "motifVersion": "5.3.*",
+            "statut": "maintenu"
+          },
+          {
+            "motifVersion": "6.1.*",
+            "statut": "aJourM1"
+          }
+        ]
+      },
+      {
+        "id": "20000000-0000-4000-8000-000000000002",
+        "motif": "log4j:log4j",
+        "versions": [
+          {
+            "motifVersion": "*",
+            "statut": "obsolete"
+          }
+        ]
+      },
+      {
+        "id": "20000000-0000-4000-8000-000000000003",
+        "motif": "org.apache.logging.log4j:*",
+        "versions": [
+          {
+            "motifVersion": "2.17.*",
+            "statut": "maintenu"
+          },
+          {
+            "motifVersion": "2.23.*",
+            "statut": "aJourM1"
+          }
+        ]
+      },
+      {
+        "id": "20000000-0000-4000-8000-000000000004",
+        "motif": "org.apache.struts:*",
+        "versions": [
+          {
+            "motifVersion": "*",
+            "statut": "obsolete"
+          }
+        ]
+      },
+      {
+        "id": "20000000-0000-4000-8000-000000000005",
+        "motif": "@angular/*",
+        "versions": [
+          {
+            "motifVersion": "16.*",
+            "statut": "maintenu"
+          },
+          {
+            "motifVersion": "17.*",
+            "statut": "aJourM3"
+          },
+          {
+            "motifVersion": "18.*",
+            "statut": "aJourM1"
+          }
+        ]
+      },
+      {
+        "id": "20000000-0000-4000-8000-000000000006",
+        "motif": "moment",
+        "versions": [
+          {
+            "motifVersion": "*",
+            "statut": "obsolete"
+          }
+        ]
+      }
+    ],
+    "reglesMarqueursIA": [
+      {
+        "id": "30000000-0000-4000-8000-000000000001",
+        "motif": "CLAUDE.md",
+        "typeCorrespondance": "exact",
+        "portee": "partout",
+        "nature": "fichier",
+        "outil": "claude"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000002",
+        "motif": ".claude",
+        "typeCorrespondance": "exact",
+        "portee": "racine",
+        "nature": "repertoire",
+        "outil": "claude"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000003",
+        "motif": ".mcp.json",
+        "typeCorrespondance": "exact",
+        "portee": "racine",
+        "nature": "fichier",
+        "outil": "claude"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000004",
+        "motif": ".cursorrules",
+        "typeCorrespondance": "exact",
+        "portee": "partout",
+        "nature": "fichier",
+        "outil": "cursor"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000005",
+        "motif": ".cursor",
+        "typeCorrespondance": "exact",
+        "portee": "racine",
+        "nature": "repertoire",
+        "outil": "cursor"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000006",
+        "motif": ".github/copilot-instructions.md",
+        "typeCorrespondance": "exact",
+        "portee": "racine",
+        "nature": "fichier",
+        "outil": "copilot"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000007",
+        "motif": ".windsurfrules",
+        "typeCorrespondance": "exact",
+        "portee": "partout",
+        "nature": "fichier",
+        "outil": "windsurf"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000008",
+        "motif": "GEMINI.md",
+        "typeCorrespondance": "exact",
+        "portee": "partout",
+        "nature": "fichier",
+        "outil": "gemini"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000009",
+        "motif": "AGENTS.md",
+        "typeCorrespondance": "exact",
+        "portee": "partout",
+        "nature": "fichier",
+        "outil": "multi"
+      },
+      {
+        "id": "30000000-0000-4000-8000-000000000010",
+        "motif": ".aider*",
+        "typeCorrespondance": "motif",
+        "portee": "racine",
+        "nature": "fichier",
+        "outil": "aider"
+      }
+    ]
+  },
+  "parametres": {
+    "seuils": {
+      "vitalite": {
+        "mourantJours": 180,
+        "mortJours": 365
+      },
+      "tailleDepot": {
+        "borneS": 20000000,
+        "borneL": 100000000,
+        "borneXL": 500000000
+      },
+      "couverture": {
+        "seuilRouge": 40.0,
+        "seuilOrange": 60.0
+      },
+      "fraicheurSonar": {
+        "toleranceJours": 7
+      },
+      "activiteSansQualite": {
+        "minCommits": 20,
+        "minNouvellesViolations": 10
+      },
+      "fraicheurAudit": {
+        "ancienJours": 30
+      },
+      "mrOuvertes": {
+        "ageOrangeJours": 30,
+        "ageRougeJours": 90,
+        "pourcentageConflitRouge": 50.0
+      },
+      "couleursViolations": {
+        "bloquant": {
+          "seuilOrange": 1,
+          "seuilRouge": 3
+        },
+        "critique": {
+          "seuilOrange": 10,
+          "seuilRouge": 25
+        }
+      },
+      "materialiteBrouillon": {
+        "variationRelative": 0.1
+      }
+    },
+    "verrouillage": {
+      "delaiInactiviteMinutes": 15,
+      "echecsAvantFermeture": 5
+    },
+    "audit": {
+      "concurrence": 4,
+      "fenetreContributeursJours": 90,
+      "borneRecherchePremierCommitPages": 50
+    },
+    "proxy": {
+      "url": "http://proxy.entreprise.fr:3128",
+      "cheminBundleCA": "C:/certs/ca-entreprise.pem"
+    },
+    "sauvegarde": {
+      "nombreSauvegardesSecurite": 5
+    }
+  },
+  "campagnes": [
+    {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "date": "2026-06-05T08:30:00Z",
+      "perimetre": [
+        "d0000000-0000-4000-8000-000000000001",
+        "d0000000-0000-4000-8000-000000000002",
+        "d0000000-0000-4000-8000-000000000003",
+        "d0000000-0000-4000-8000-000000000004",
+        "d0000000-0000-4000-8000-000000000005",
+        "d0000000-0000-4000-8000-000000000006"
+      ],
+      "verdicts": [
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000001",
+          "statut": "succes",
+          "dureeMs": 12400
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000002",
+          "statut": "succes",
+          "dureeMs": 8100
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000003",
+          "statut": "succes",
+          "dureeMs": 6900
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000004",
+          "statut": "succes",
+          "dureeMs": 11300
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000005",
+          "statut": "succes",
+          "dureeMs": 9800
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000006",
+          "statut": "succes",
+          "dureeMs": 4200
+        }
+      ]
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000002",
+      "date": "2026-07-08T14:05:00Z",
+      "perimetre": [
+        "d0000000-0000-4000-8000-000000000001",
+        "d0000000-0000-4000-8000-000000000004",
+        "d0000000-0000-4000-8000-000000000005",
+        "d0000000-0000-4000-8000-000000000002"
+      ],
+      "verdicts": [
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000001",
+          "statut": "succes",
+          "dureeMs": 13100
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000004",
+          "statut": "succes",
+          "dureeMs": 10900
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000005",
+          "statut": "echec",
+          "anomalies": [
+            {
+              "categorie": "authentificationRefusee",
+              "sourceId": "f0000000-0000-4000-8000-000000000009",
+              "message": "HTTP 401 Unauthorized sur GET /api/authentication/validate",
+              "suggestion": "Le token de sonar-nova semble expiré : régénérez-le via l'assistant credentials puis rejouez les échecs de cette campagne."
+            }
+          ]
+        },
+        {
+          "projetId": "d0000000-0000-4000-8000-000000000002",
+          "statut": "ignore"
+        }
+      ]
+    }
+  ],
+  "brouillon": {
+    "campagneId": "e0000000-0000-4000-8000-000000000002",
+    "creeLe": "2026-07-08T14:12:00Z",
+    "resultatsParProjet": [
+      {
+        "projetId": "d0000000-0000-4000-8000-000000000001",
+        "audit": {
+          "id": "10000000-0000-4000-8000-000000000002",
+          "date": "2026-07-08",
+          "campagneId": "e0000000-0000-4000-8000-000000000002",
+          "resultats": [
+            {
+              "type": "gitlab.dependances",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "dependances": [
+                {
+                  "reference": "org.springframework:spring-core",
+                  "version": "6.1.8",
+                  "manifeste": "pom.xml"
+                },
+                {
+                  "reference": "org.apache.logging.log4j:log4j-core",
+                  "version": "2.17.1",
+                  "manifeste": "pom.xml"
+                },
+                {
+                  "reference": "com.fasterxml.jackson.core:jackson-databind",
+                  "version": "2.17.1",
+                  "manifeste": "pom.xml"
+                }
+              ]
+            },
+            {
+              "type": "gitlab.branches",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "branches": [
+                {
+                  "nom": "develop",
+                  "avecMR": false,
+                  "rebasee": true,
+                  "nommageConforme": true,
+                  "dernierCommitLe": "2026-07-08"
+                },
+                {
+                  "nom": "feature/paiement-sepa",
+                  "avecMR": true,
+                  "rebasee": true,
+                  "nommageConforme": true,
+                  "dernierCommitLe": "2026-07-08"
+                },
+                {
+                  "nom": "wip-test-julien",
+                  "avecMR": false,
+                  "rebasee": false,
+                  "nommageConforme": false,
+                  "dernierCommitLe": "2026-02-11"
+                }
+              ]
+            },
+            {
+              "type": "gitlab.vitalite",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "dernierCommitLe": "2026-07-08"
+            },
+            {
+              "type": "gitlab.contributeurs",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "fenetreJours": 90,
+              "contributeurs": [
+                {
+                  "email": "marie.durand@entreprise.fr",
+                  "nom": "Marie Durand",
+                  "nombreCommits": 42
+                },
+                {
+                  "email": "julien.petit@entreprise.fr",
+                  "nom": "Julien Petit",
+                  "nombreCommits": 17
+                },
+                {
+                  "email": "a.lopez@presta-dev.io",
+                  "nom": "Ana Lopez",
+                  "nombreCommits": 8
+                }
+              ]
+            },
+            {
+              "type": "gitlab.taille_depot",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "tailleOctets": 52411002
+            },
+            {
+              "type": "gitlab.merge_requests",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "mrOuvertes": [
+                {
+                  "iid": 214,
+                  "titre": "Paiement SEPA",
+                  "creeLe": "2026-06-20",
+                  "enConflit": false
+                },
+                {
+                  "iid": 209,
+                  "titre": "Refonte mapping tiers",
+                  "creeLe": "2026-04-02",
+                  "enConflit": true
+                }
+              ]
+            },
+            {
+              "type": "gitlab.marqueurs_ia",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "marqueurs": []
+            },
+            {
+              "type": "gitlab.membres",
+              "sourceId": "f0000000-0000-4000-8000-000000000001",
+              "refEffective": "develop",
+              "shaTete": "3fa2b91c",
+              "membres": [
+                {
+                  "username": "mdurand",
+                  "nom": "Marie Durand",
+                  "niveauAcces": 40,
+                  "herite": false,
+                  "emailPublic": null
+                },
+                {
+                  "username": "jpetit",
+                  "nom": "Julien Petit",
+                  "niveauAcces": 30,
+                  "herite": false,
+                  "emailPublic": null
+                },
+                {
+                  "username": "alopez-ext",
+                  "nom": "Ana Lopez",
+                  "niveauAcces": 30,
+                  "herite": true,
+                  "emailPublic": null
+                }
+              ]
+            },
+            {
+              "type": "sonar.violations",
+              "sourceId": "f0000000-0000-4000-8000-000000000002",
+              "parSeverite": {
+                "bloquant": 2,
+                "critique": 11,
+                "majeur": 88,
+                "mineur": 240,
+                "info": 31
+              },
+              "nouvellesViolations": 3
+            },
+            {
+              "type": "sonar.dette",
+              "sourceId": "f0000000-0000-4000-8000-000000000002",
+              "detteMinutes": 13980,
+              "ratioDette": 3.1
+            },
+            {
+              "type": "sonar.couverture",
+              "sourceId": "f0000000-0000-4000-8000-000000000002",
+              "couverture": 64.8,
+              "couvertureNouveauCode": 82.5
+            },
+            {
+              "type": "sonar.notes",
+              "sourceId": "f0000000-0000-4000-8000-000000000002",
+              "fiabilite": 2.0,
+              "securite": 2.0,
+              "maintenabilite": 2.0,
+              "revueSecurite": 2.0
+            },
+            {
+              "type": "sonar.ncloc",
+              "sourceId": "f0000000-0000-4000-8000-000000000002",
+              "ncloc": 86950,
+              "parLangage": {
+                "java": 82100,
+                "xml": 4410,
+                "js": 440
+              }
+            },
+            {
+              "type": "croise.fraicheur_sonar",
+              "dernierCommitLe": "2026-07-08",
+              "derniereAnalyseLe": "2026-07-08",
+              "aucuneAnalyse": false
+            },
+            {
+              "type": "croise.activite_sans_qualite",
+              "nombreCommits": 67,
+              "nouvellesViolations": 3,
+              "evaluable": true
+            },
+            {
+              "type": "croise.ia_nouveau_code",
+              "marqueursPresents": false,
+              "outilsDetectes": [],
+              "couvertureNouveauCode": 82.5,
+              "nouvellesViolations": 3,
+              "duplicationNouveauCode": 2.1
+            }
+          ]
+        },
+        "statut": "integre"
+      },
+      {
+        "projetId": "d0000000-0000-4000-8000-000000000004",
+        "audit": {
+          "id": "10000000-0000-4000-8000-000000000006",
+          "date": "2026-07-08",
+          "campagneId": "e0000000-0000-4000-8000-000000000002",
+          "resultats": [
+            {
+              "type": "gitlab.dependances",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "dependances": [
+                {
+                  "reference": "@angular/core",
+                  "version": "18.2.1",
+                  "manifeste": "package.json"
+                },
+                {
+                  "reference": "rxjs",
+                  "version": "7.8.1",
+                  "manifeste": "package.json"
+                },
+                {
+                  "reference": "moment",
+                  "version": "2.29.4",
+                  "manifeste": "package.json"
+                }
+              ]
+            },
+            {
+              "type": "gitlab.vitalite",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "dernierCommitLe": "2026-07-08"
+            },
+            {
+              "type": "gitlab.contributeurs",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "fenetreJours": 90,
+              "contributeurs": [
+                {
+                  "email": "sofia.martin@entreprise.fr",
+                  "nom": "Sofia Martin",
+                  "nombreCommits": 61
+                },
+                {
+                  "email": "k.benali@nova-corp.com",
+                  "nom": "Karim Benali",
+                  "nombreCommits": 24
+                }
+              ]
+            },
+            {
+              "type": "gitlab.taille_depot",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "tailleOctets": 156700900
+            },
+            {
+              "type": "gitlab.merge_requests",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "mrOuvertes": [
+                {
+                  "iid": 88,
+                  "titre": "Dashboard client v2",
+                  "creeLe": "2026-07-01",
+                  "enConflit": false
+                }
+              ]
+            },
+            {
+              "type": "gitlab.marqueurs_ia",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "marqueurs": [
+                {
+                  "chemin": "CLAUDE.md",
+                  "nature": "fichier",
+                  "outil": "claude"
+                },
+                {
+                  "chemin": ".claude",
+                  "nature": "repertoire",
+                  "outil": "claude"
+                },
+                {
+                  "chemin": ".mcp.json",
+                  "nature": "fichier",
+                  "outil": "claude"
+                }
+              ]
+            },
+            {
+              "type": "gitlab.membres",
+              "sourceId": "f0000000-0000-4000-8000-000000000006",
+              "refEffective": "develop",
+              "shaTete": "9e8f7a6b",
+              "membres": [
+                {
+                  "username": "smartin",
+                  "nom": "Sofia Martin",
+                  "niveauAcces": 40,
+                  "herite": false,
+                  "emailPublic": null
+                },
+                {
+                  "username": "kbenali",
+                  "nom": "Karim Benali",
+                  "niveauAcces": 30,
+                  "herite": false,
+                  "emailPublic": null
+                }
+              ]
+            },
+            {
+              "type": "sonar.violations",
+              "sourceId": "f0000000-0000-4000-8000-000000000007",
+              "parSeverite": {
+                "bloquant": 0,
+                "critique": 3,
+                "majeur": 41,
+                "mineur": 120,
+                "info": 9
+              },
+              "nouvellesViolations": 1
+            },
+            {
+              "type": "sonar.couverture",
+              "sourceId": "f0000000-0000-4000-8000-000000000007",
+              "couverture": 72.6,
+              "couvertureNouveauCode": 88.1
+            },
+            {
+              "type": "sonar.notes",
+              "sourceId": "f0000000-0000-4000-8000-000000000007",
+              "fiabilite": 1.0,
+              "securite": 2.0,
+              "maintenabilite": 1.0,
+              "revueSecurite": 1.0
+            },
+            {
+              "type": "sonar.ncloc",
+              "sourceId": "f0000000-0000-4000-8000-000000000007",
+              "ncloc": 44300,
+              "parLangage": {
+                "ts": 39800,
+                "html": 3200,
+                "css": 1300
+              }
+            },
+            {
+              "type": "croise.fraicheur_sonar",
+              "dernierCommitLe": "2026-07-08",
+              "derniereAnalyseLe": "2026-07-08",
+              "aucuneAnalyse": false
+            },
+            {
+              "type": "croise.ia_nouveau_code",
+              "marqueursPresents": true,
+              "outilsDetectes": [
+                "claude"
+              ],
+              "couvertureNouveauCode": 88.1,
+              "nouvellesViolations": 1,
+              "duplicationNouveauCode": 1.4
+            }
+          ]
+        },
+        "statut": "integre"
+      },
+      {
+        "projetId": "d0000000-0000-4000-8000-000000000005",
+        "audit": {
+          "id": "10000000-0000-4000-8000-000000000099",
+          "date": "2026-07-08",
+          "campagneId": "e0000000-0000-4000-8000-000000000002",
+          "resultats": []
+        },
+        "statut": "rejete",
+        "motifRejet": "Échec d'authentification Sonar — résultats partiels non exploitables",
+        "aberrations": [
+          "Aucune métrique Sonar collectée (source en échec)"
+        ]
+      }
+    ]
+  },
+  "traitementsAlertes": [
+    {
+      "id": "40000000-0000-4000-8000-000000000001",
+      "cleAlerte": "membre_inconnu|d0000000-0000-4000-8000-000000000005|dmx-dev",
+      "statut": "vue",
+      "commentaire": "Signalé au RSSI le 06/06 — identification en cours auprès de Nova Corp. Niveau Maintainer : à traiter en priorité.",
+      "horodatage": "2026-06-06T10:20:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000002",
+      "cleAlerte": "violation_ia|d0000000-0000-4000-8000-000000000005|cursor",
+      "statut": "vue",
+      "commentaire": "Marqueur .cursorrules détecté alors que l'IA est interdite — demande d'explication envoyée à l'équipe.",
+      "horodatage": "2026-06-06T10:25:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000003",
+      "cleAlerte": "sonar_ko|d0000000-0000-4000-8000-000000000005|",
+      "statut": "traitee",
+      "commentaire": "Pipeline Sonar réparé côté Nova le 20/06 — à vérifier au prochain audit.",
+      "horodatage": "2026-06-21T09:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000004",
+      "cleAlerte": "projet_mort|d0000000-0000-4000-8000-000000000003|",
+      "statut": "traitee",
+      "commentaire": "Gel assumé — décommissionnement planifié 2027, cf. annotation.",
+      "horodatage": "2026-06-06T11:00:00Z"
+    }
+  ],
+  "journal": [
+    {
+      "id": "50000000-0000-4000-8000-000000000001",
+      "horodatage": "2026-05-15T09:30:00Z",
+      "objet": "parametres.seuils.vitalite.mortJours",
+      "avant": null,
+      "apres": 365,
+      "origine": "saisieManuelle"
+    },
+    {
+      "id": "50000000-0000-4000-8000-000000000002",
+      "horodatage": "2026-05-20T14:00:00Z",
+      "objet": "projet:d0000000-0000-4000-8000-000000000004.iaAutorisee",
+      "avant": false,
+      "apres": true,
+      "origine": "saisieManuelle",
+      "detailOrigine": "Annotation système « Activation de l'IA » créée"
+    },
+    {
+      "id": "50000000-0000-4000-8000-000000000003",
+      "horodatage": "2026-06-06T10:30:00Z",
+      "objet": "groupe:a0000000-0000-4000-8000-000000000002.membresConnus",
+      "avant": null,
+      "apres": {
+        "critere": "kbenali",
+        "typeCritere": "username",
+        "statut": "client"
+      },
+      "origine": "qualificationDepuisAlerte",
+      "detailOrigine": "Qualification depuis l'alerte membre_inconnu du projet API Portail"
+    },
+    {
+      "id": "50000000-0000-4000-8000-000000000004",
+      "horodatage": "2026-06-15T16:45:00Z",
+      "objet": "referentiels.reglesDependances[moment]",
+      "avant": null,
+      "apres": {
+        "motif": "moment",
+        "statut": "obsolete"
+      },
+      "origine": "importConfiguration",
+      "detailOrigine": "Import du fichier config-equipe-archi-2026-06.json"
+    }
+  ],
+  "vuesEnregistrees": [
+    {
+      "id": "60000000-0000-4000-8000-000000000001",
+      "nom": "Revue sécurité mensuelle",
+      "ecran": "listeDeTravail",
+      "versionFiltres": 1,
+      "parDefaut": true,
+      "filtres": {
+        "groupeIds": [
+          "a0000000-0000-4000-8000-000000000001",
+          "a0000000-0000-4000-8000-000000000002"
+        ],
+        "typesIndicateurs": [
+          "gitlab.membres",
+          "gitlab.marqueurs_ia",
+          "croise.fraicheur_sonar"
+        ],
+        "tri": "gravite",
+        "options": {
+          "masquerTraitees": false
+        }
+      }
+    },
+    {
+      "id": "60000000-0000-4000-8000-000000000002",
+      "nom": "Comité obsolescence",
+      "ecran": "synthese",
+      "versionFiltres": 1,
+      "parDefaut": false,
+      "filtres": {
+        "groupeIds": [
+          "a0000000-0000-4000-8000-000000000001"
+        ],
+        "typesIndicateurs": [
+          "gitlab.dependances"
+        ],
+        "tri": "nom",
+        "options": {}
+      }
+    }
+  ]
+}
