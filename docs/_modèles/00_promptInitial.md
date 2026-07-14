@@ -21,7 +21,9 @@ L'expression de besoin est dans le répertoire ./docs/01_besoin. Un README.md, d
 5. Tous les documents produits sont écrits dans le dépôt (dossier `/docs`), au format Markdown, afin d'être versionnés par les commits successifs.
 6. Chaque exigence (fonctionnelle ou non fonctionnelle) porte un identifiant stable, réutilisé sans être renommé dans toutes les étapes suivantes (conception, tests, etc.), afin de garder une traçabilité de bout en bout.
 7. Le répertoire ./docs/_modèles contient des modèles de documents à utiliser pour structurer et formatter chaque document produit à chaque étape.
-8. Toutes les modifications détectées durant les conversations et à réaliser après la rédaction des documents doit être tracée dans un document ./docs/plan_01_miseEnPlace.md
+8. Toutes les modifications détectées durant les conversations et à réaliser après la rédaction des documents sont tracées dans un document dédié ./docs/plan_NN_<thème>.md (NN = numéro de l'étape courante, <thème> = intitulé bref de l'étape), structuré selon le modèle ./docs/_modèles/plan_miseEnPlace.md. Chaque ligne précise l'action, le(s) fichier(s) concerné(s), l'étape d'origine (avec lien vers la section source), l'étape cible si le traitement est différé à une étape ultérieure connue, et le statut d'avancement.
+9. Les documents produits se référencent explicitement entre eux par des liens relatifs (vers un document ou vers une section précise) chaque fois qu'ils traitent d'un même sujet : par exemple, une entrée du glossaire renvoie vers la section qui introduit le terme, une action du plan de mise en place renvoie vers la section qui l'a détectée.
+10. Toute référence à un référentiel, une norme, un framework ou une source externe introduite par l'IA dans un document est vérifiée avant intégration et accompagnée d'un lien vers sa documentation de référence.
 
 # Étapes
 
@@ -34,7 +36,7 @@ Avant toute rédaction de fond, définissons ensemble les règles qui encadreron
   - un paragraphe est écrit sur une seule ligne logique, sans retour à la ligne manuel au milieu d'un paragraphe ;
   - usage des icônes et emojis proscrit, sauf demande explicite de ma part ;
   - chaque fichier Markdown commence par un sommaire (table des matières) listant les titres du document.
-- création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît ;
+- création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît — y compris les acronymes couramment utilisés dans la discussion elle-même (ex : IA), à consigner dès leur première apparition même s'ils semblent triviaux ;
 - création d'un journal des décisions (registre des choix structurants, alternatives envisagées et écartées, justification), entretenu et complété au fil des étapes suivantes dès qu'une décision structurante est prise.
 
 ## Étape 2 — Réexpression du besoin
