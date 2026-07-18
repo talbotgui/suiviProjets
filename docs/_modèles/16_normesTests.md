@@ -9,6 +9,7 @@
 5. [Gestion des données de test](#gestion-des-données-de-test)
 6. [Recette et tests d'acceptation utilisateur](#recette-et-tests-dacceptation-utilisateur)
 7. [Stratégie de couverture de code](#stratégie-de-couverture-de-code)
+8. [Matrice de traçabilité](#matrice-de-traçabilité)
 
 ## Tests unitaires
 
@@ -39,5 +40,13 @@
 *Ce chapitre décrit la stratégie de couverture de code visée : seuils visés, périmètre couvert et non couvert, et justification des exclusions.*
 
 | périmètre | seuil visé |
+|---|---|
+| | |
+
+## Matrice de traçabilité
+
+*Ce chapitre relie chaque module/composant de l'étape 8, chaque cas limite technique de l'étape 8 et chaque exigence non fonctionnelle de performance/scalabilité de l'étape 4 au(x) test(s) qui le couvre(nt), ou à son exclusion justifiée (règle générale n°13) : une ligne existe pour chaque module, chaque cas limite et chaque exigence non fonctionnelle concernée, pas uniquement pour les modules. Chaque périmètre cité dans la stratégie de couverture de code ci-dessus est par ailleurs vérifié comme étant décrit par au moins un paragraphe de stratégie de test dans les chapitres précédents de ce document.*
+
+| élément couvert (module / cas limite / exigence non fonctionnelle) | test(s) correspondant(s) |
 |---|---|
 | | |
