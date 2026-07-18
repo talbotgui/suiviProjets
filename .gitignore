@@ -9,11 +9,15 @@
 
 # Node modules and dependency files
 /node_modules/
-/package-lock.json
 /yarn.lock
 
-# Environment files
+# Rust / Tauri build artefacts
+/src-tauri/target/
+
+# Environment files and secrets
 /.env
+*.pem
+*.key
 
 # Angular CLI and build artefacts
 /.angular-cli.json
