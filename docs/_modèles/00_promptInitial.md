@@ -148,6 +148,12 @@ Rédige les documents décrivant les environnements, l'intégration continue et 
 - plan de reprise d'activité (PRA) en cas d'incident majeur ;
 - procédures d'exploitation post-déploiement (runbook, astreinte).
 
+## Étape 13 — Génération des règles d'assistance IA
+Une fois l'étape 12 validée, transpose chaque document normatif déjà produit en un fichier de règle opérationnel dans `./.claude/rules/`, chargé automatiquement par l'assistant IA à chaque session de développement, sans dépendre d'une relecture manuelle de l'ensemble de la documentation à chaque fois :
+- un fichier de règle par thème normatif déjà documenté (usage de l'IA et conventions de rédaction de l'étape 1, normes de développement de l'étape 9, normes de sécurité de l'étape 10, normes de tests de l'étape 11, poste développeur de l'étape 12) ;
+- chaque fichier de règle reformule les points directement actionnables lors de l'écriture de code ou de documents, sans paraphraser intégralement le document source, et renvoie par un lien relatif vers la section de ce document qu'il synthétise ;
+- toute évolution ultérieure d'un document normatif source entraîne la mise à jour du fichier de règle correspondant, pour éviter toute divergence entre la documentation de référence et les règles effectivement appliquées par l'IA.
+
 ---
 
 Pour chaque étape, respecte ce déroulé :

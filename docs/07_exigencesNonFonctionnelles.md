@@ -74,7 +74,7 @@ Chaque exigence non fonctionnelle porte un identifiant stable de la forme `RNF-N
 
 | identifiant | exigence |
 |---|---|
-| RNF-024 | L'intégralité de l'interface, de la documentation et du modèle de données est rédigée en français ; aucune autre langue n'est prise en charge dans le périmètre actuel |
+| RNF-024 | L'intégralité de l'interface, de la documentation, du modèle de données, du code source (variables, fonctions, commandes) et des discriminants de type est rédigée en français, sous réserve de l'exception applicable aux valeurs imposées par les API externes ([RNF-025](#internationalisation-et-localisation)) ; aucune autre langue n'est prise en charge dans le périmètre actuel |
 | RNF-025 | Les valeurs imposées par les API externes (clés de métriques Sonar, champs GitLab) restent en anglais dans la seule couche connecteur et sont traduites en français à la frontière avec le reste de l'application |
 | RNF-026 | Les dates et durées affichées suivent les conventions françaises (format JJ/MM/AAAA, durées explicites) ; aucune prise en charge multi-locale n'est requise à ce stade |
 | RNF-029 | Tous les libellés sont centralisés dans l'application pour faciliter leur évolution. L'arborescence et la clef de chaque libellé est dédiée à un écran (pas de mutualisation d'un libellé utilisé dans deux écrans différents). Les libellés des zones/composants communs (menu, entête, ...) font l'objet d'une arborescence/clef dédiée. |

@@ -45,13 +45,13 @@ Sur un poste de développement GitHub-Codespace, créer le fichier **.devcontain
 * Puis exécuter, dans une seconde session, le prompt suivant :
 ```
 Relie les documents @docs/01_modalitesUsageEtConventions.md ,  @docs/02_glossaire.md   et @docs/plan_01_miseEnPlace.md généré à l'étape 1 du prompt @docs/_modèles/00_promptInitial.md .
-Critique les et proposition des modifications/améliorations 
+Critique les et proposition des modifications/améliorations
 ```
 * Discuter/décider avec l'IA
 * Relire chaque modification proposée
 * Une fois le travail satisfaisant, dans la seconde de relecture, exécuter le prompt suivant :
 ```
-Propose moi (s'il en existe) des éléments pouvant être ajoutés dans @docs/_modèles/00_promptInitial.md  pour ne pas avoir ces modifications/améliorations à réaliser en relecture ?
+Propose moi (s'il en existe) des éléments pouvant être ajoutés dans @docs/_modèles/00_promptInitial.md ou dans les modèles de document pour ne pas avoir ces modifications/améliorations à réaliser en relecture ?
 ```
 * Attention à être très précis dans ces modifications car elles sont structurantes.
 

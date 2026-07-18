@@ -1,0 +1,132 @@
+# Normes de développement
+
+## Sommaire
+
+1. [Structuration du code et découpage en couches](#structuration-du-code-et-découpage-en-couches)
+2. [Conventions de nommage](#conventions-de-nommage)
+3. [Stratégie de branches et de contribution Git](#stratégie-de-branches-et-de-contribution-git)
+4. [Gestion des dépendances](#gestion-des-dépendances)
+5. [Règles de qualité de code](#règles-de-qualité-de-code)
+   1. [Rigueur du typage et de la documentation — TypeScript](#rigueur-du-typage-et-de-la-documentation--typescript)
+   2. [Rigueur du typage et de la documentation — Rust](#rigueur-du-typage-et-de-la-documentation--rust)
+6. [Règles de revue de code](#règles-de-revue-de-code)
+
+## Structuration du code et découpage en couches
+
+Le code est organisé en un seul dépôt (monorepo Tauri), reflétant directement le découpage en modules retenu à [l'étape 6](./11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités) et à [l'étape 8](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces) :
+
+```
+repo/
+├── src/                       UI Angular (TypeScript)
+│   └── app/
+│       ├── ecrans/            un dossier par écran de l'arborescence
+│       ├── composants/        composants réutilisables
+│       ├── jugement/          Moteur de jugement (fonctions pures)
+│       ├── etat/              Store d'état applicatif (Signals)
+│       ├── recherche/         Index de recherche transversale
+│       └── commandes/         client typé de la Façade de commandes
+├── src-tauri/                 cœur natif (Rust)
+│   └── src/
+│       ├── connecteurs/       gitlab.rs, sonar.rs, croise.rs
+│       ├── persistance/       Moteur de persistance (repository)
+│       ├── campagne/          Orchestrateur de campagne
+│       ├── commandes/         Façade de commandes (commandes Tauri exposées)
+│       └── modele/            structures de données
+└── docs/
+```
+
+- `ecrans/` : un dossier par écran de l'arborescence de navigation définie à [l'étape 5](./08_arborescenceNavigation.md#arborescence-des-écrans).
+- `composants/` : composants réutilisables, conformes à la charte d'ergonomie définie à [l'étape 5](./10_charteErgonomie.md#composants-dinterface-réutilisables).
+- `modele/` : structures de données définies à [l'étape 7](./12_modeleDonnees.md#entités-attributs-et-relations).
+
+L'arborescence n'est volontairement pas symétrique entre les deux piles : `src/` est à la racine du dépôt comme dans un projet Angular/JS classique, tandis que le cœur natif est isolé dans `src-tauri/` avec son propre `src/`, `Cargo.toml` et `tauri.conf.json`. Cette disposition n'est pas un choix propre à ce projet mais la structure de scaffolding standard de [Tauri](https://v2.tauri.app/start/project-structure/) (générée par `npm create tauri-app`) : `src-tauri/` est le nom de répertoire que l'outillage Tauri (CLI, bundler) reconnaît nativement pour localiser le backend Rust à compiler et empaqueter, le lien entre les deux piles étant fait par le paramètre `frontendDist` de `tauri.conf.json`, qui pointe vers les assets frontend compilés.
+
+Chaque module correspond à un répertoire identifié, sans dépendance circulaire entre couches : un connecteur ne dépend jamais du moteur de persistance, et réciproquement, conformément à l'architecture en couches retenue à [l'étape 6](./11_architectureTechnique.md#style-architectural-retenu-et-justification).
+
+Un fichier de référence exemplaire, intégralement conforme aux règles de la section [Rigueur du typage et de la documentation](#rigueur-du-typage-et-de-la-documentation--typescript), est maintenu pour chaque pattern de fichier récurrent (un composant Angular, un service Angular, une classe utilitaire, un module Rust de connecteur) : il sert de gabarit concret à reproduire, plus fiable qu'une règle textuelle pour obtenir un style homogène d'une génération de code à l'autre, notamment lorsqu'elle est assistée par IA. La création de ces fichiers de référence est différée à l'étape 17 (poste développeur), une fois l'arborescence de code effectivement créée ; ce report est tracé dans le [plan de mise en place de l'étape 9](./plan_09_normesDeveloppement.md#actions-issues-de-létape-9--normes-de-développement).
+
+## Conventions de nommage
+
+| élément | convention |
+|---|---|
+| Fichiers Rust | `snake_case`, un module par responsabilité (ex. `connecteur_gitlab.rs`) |
+| Fichiers et dossiers Angular | `kebab-case`, suffixés par leur nature (ex. `fiche-projet.component.ts`, `moteur-jugement.service.ts`) |
+| Composants Angular | `PascalCase` pour la classe, préfixe applicatif (ex. `SqmFicheProjetComponent`) |
+| Services Angular | `PascalCase` suffixé `Service` (ex. `MoteurJugementService`) |
+| Variables et fonctions | `camelCase` côté TypeScript, `snake_case` côté Rust, noms en français conformément au principe « Français intégral » ([RNF-024](./07_exigencesNonFonctionnelles.md#internationalisation-et-localisation)), sauf identifiants imposés par les API externes |
+| Commandes de la Façade de commandes | `camelCase` côté TypeScript, `snake_case` côté Rust, noms alignés un à un entre les deux couches (ex. `creerFichier` / `creer_fichier`) |
+| Références aux exigences dans le code | Commentaire renvoyant à l'identifiant stable (`US-NNN`, `RG-NNN`) au plus près du code qui l'implémente, lorsque la règle appliquée n'est pas évidente à la seule lecture du code |
+
+Ces conventions sont contrôlées par l'outillage d'analyse statique plutôt que laissées à la seule vigilance du développeur : `@typescript-eslint/naming-convention` côté TypeScript, lints de style par défaut du compilateur (`non_snake_case`, `non_camel_case_types`, etc.) côté Rust (cf. [Rigueur du typage et de la documentation](#rigueur-du-typage-et-de-la-documentation--typescript)).
+
+## Stratégie de branches et de contribution Git
+
+Le développement étant mené en solo, la stratégie retenue est un **trunk-based simplifié** : le développement se fait par défaut directement sur la branche principale, par incréments cohérents et de taille réduite — idéalement un US ou une RG à la fois. Une branche de courte durée reste utilisée pour tout changement risqué ou expérimental (par exemple un changement de chaîne cryptographique), fusionnée rapidement une fois stabilisé plutôt que laissée diverger longtemps.
+
+Cette stratégie de branches et la convention de commits ci-dessous s'appliquent aux commits de code applicatif, à partir de la mise en place du poste de développeur (étape 17) ; les commits de la phase de cadrage documentaire déjà réalisés suivent le format libre en usage jusqu'ici et ne sont pas repris rétroactivement.
+
+Les messages de commit de code applicatif suivent la convention [**Conventional Commits**](https://www.conventionalcommits.org/) (`type(scope): description`) :
+- types retenus : `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `security` ;
+- `scope` = module concerné (ex. `connecteur-gitlab`, `moteur-jugement`, `ui-synthese`) ;
+- le corps du message référence l'identifiant US/RG concerné lorsque pertinent ;
+- la mention de l'origine IA dans les commits substantiellement générés ou assistés reste appliquée conformément à la [décision actée à l'étape 1](./01_modalitesUsageEtConventions.md#mention-de-lorigine-des-contenus).
+
+## Gestion des dépendances
+
+- Les dépendances sont verrouillées (`Cargo.lock` côté Rust, `package-lock.json` côté Angular/npm) et ce verrouillage est committé dans le dépôt.
+- L'installation des dépendances (poste développeur, hook, intégration continue) utilise systématiquement le mode strict de vérification du lockfile — `cargo build --locked` (ou `cargo check --locked`), `npm ci` plutôt que `npm install` — de sorte qu'une dépendance ne peut jamais être silencieusement remontée sans mise à jour explicite et committée du lockfile.
+- Le compilateur et l'outillage eux-mêmes sont figés, indépendamment des dépendances applicatives, pour garantir un comportement identique quels que soient le poste et la date de compilation : version de Rust et composants (`rustfmt`, `clippy`) fixés par un `rust-toolchain.toml` versionné, version de Node.js fixée par un `.nvmrc` versionné. L'édition Rust (`edition` dans `Cargo.toml`) est également fixée explicitement plutôt que laissée à la valeur par défaut de Cargo.
+- Les mises à jour sont volontaires, jamais automatiques : chaque montée de version majeure (dépendance ou toolchain) fait l'objet d'une lecture du changelog concerné avant intégration.
+- L'audit de vulnérabilités est outillé (`cargo audit` côté Rust, `npm audit` côté Angular/npm) ; son intégration en continu est détaillée à l'étape 12, les normes de sécurité associées à l'étape 10.
+- Toute nouvelle dépendance ajoutée est justifiée dans le message du commit qui l'introduit (nécessité, alternative de la bibliothèque standard écartée).
+
+## Règles de qualité de code
+
+- Le formatage automatique (`rustfmt` côté Rust, Prettier côté Angular/TypeScript) et l'analyse statique (Clippy côté Rust, ESLint côté Angular) s'exécutent automatiquement à la fin de chaque modification de code, humaine ou assistée par IA, via un [hook](./02_glossaire.md#termes-techniques) déclenché en fin de tour d'édition. Ce hook est un contrôle de confort, local et au plus tôt : c'est l'intégration continue (étape 12), rejouant les mêmes contrôles sur un environnement figé par le toolchain versionné, qui constitue le niveau de vérité bloquant avant toute fusion, que le hook ait ou non été exécuté localement.
+- La configuration de chaque outil (`rustfmt.toml`, `.prettierrc`, `.eslintrc`, configuration Clippy le cas échéant, `.editorconfig` pour les fichiers hors périmètre de ces formateurs) est versionnée dans le dépôt, garantissant un comportement identique quel que soit le poste ou l'éditeur utilisé. Le fichier [`.editorconfig`](https://editorconfig.org/) du dépôt est déjà en place, la configuration des formateurs et linters restant décrite ci-dessous comme différée.
+- Les extensions d'éditeur recommandées (analyse statique, formatage, support Rust/Angular) sont déclarées dans `.vscode/extensions.json`, déjà présent dans le dépôt et complété au fil des choix technologiques ; leur activation effective au poste développeur reste détaillée à l'étape 17.
+- La mise en place concrète de ce hook et des fichiers de configuration des formateurs/linters est différée à l'étape 17 (poste développeur), une fois l'arborescence de code effectivement créée ; ce report est tracé dans le [plan de mise en place de l'étape 9](./plan_09_normesDeveloppement.md#actions-issues-de-létape-9--normes-de-développement).
+- Une fonction du Moteur de jugement (calcul d'un indicateur) reste pure, sans effet de bord, et testable indépendamment, conformément au découpage retenu à [l'étape 6](./11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités) et à [l'étape 8](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces).
+- Aucune valeur de seuil ou de référentiel n'est codée en dur : elle provient toujours de la branche `parametres`/`referentiels` du modèle de données définie à [l'étape 7](./12_modeleDonnees.md#entités-attributs-et-relations).
+- La complexité du code est surveillée par l'outillage d'analyse statique par défaut de chaque écosystème (Clippy, ESLint), sans seuil chiffré arbitraire supplémentaire à ce stade ; ce point sera réévalué si un cas concret le justifie.
+
+### Rigueur du typage et de la documentation — TypeScript
+
+| règle | contrôle outillé |
+|---|---|
+| Visibilité explicite (`public`, `private`, `protected`) sur tout membre de classe, y compris les propriétés promues dans le constructeur | [`@typescript-eslint/explicit-member-accessibility`](https://typescript-eslint.io/rules/explicit-member-accessibility/) |
+| Type de retour explicite sur toute fonction et méthode, y compris aux frontières de module | [`@typescript-eslint/explicit-function-return-type`](https://typescript-eslint.io/rules/explicit-function-return-type/), [`@typescript-eslint/explicit-module-boundary-types`](https://typescript-eslint.io/rules/explicit-module-boundary-types/) |
+| JSDoc présente sur toute classe et toute méthode | [eslint-plugin-jsdoc](https://github.com/gajus/eslint-plugin-jsdoc), règle `require-jsdoc` avec les contextes `ClassDeclaration` et `MethodDefinition` |
+| Aucune fonction ni constante-fonction déclarée en dehors d'une classe | règle ESLint dédiée à ce projet (`no-restricted-syntax` ciblant les déclarations de fonction et les fonctions fléchées au niveau `Program`), aucune règle générique existante ne couvrant ce cas |
+| Fonctions utilitaires (résultat ne dépendant que des paramètres) regroupées en classes utilitaires, elles-mêmes rassemblées dans un répertoire dédié | organisation vérifiée en revue de code ; aucune règle générique de `typescript-eslint` ne contrôle un emplacement de fichier |
+| Aucun type `any`, explicite ou implicite | [`@typescript-eslint/no-explicit-any`](https://typescript-eslint.io/rules/no-explicit-any/) et option `noImplicitAny` de `tsconfig.json` |
+| Toute variable, tout paramètre et toute propriété de classe sont typés | options `noImplicitAny` et `strictPropertyInitialization` de `tsconfig.json` (mode strict) ; la règle `@typescript-eslint/typedef`, qui imposerait une annotation même là où le type est déjà inféré, est dépréciée par l'éditeur du plugin au profit de ces options du compilateur et n'est donc pas retenue |
+| Aucune assertion de type (`as`) ni assertion de non-nullité (`!`) non justifiée | [`@typescript-eslint/consistent-type-assertions`](https://typescript-eslint.io/rules/consistent-type-assertions/), [`@typescript-eslint/no-non-null-assertion`](https://typescript-eslint.io/rules/no-non-null-assertion/) |
+| Aucun accès ou usage non sûr d'une valeur reçue en JSON (retour d'une commande de la Façade de commandes, réponse d'API) | famille [`@typescript-eslint/no-unsafe-*`](https://typescript-eslint.io/rules/no-unsafe-assignment/) (nécessite le mode « typed linting », `parserOptions.project` dans la configuration ESLint) |
+| Variable ou import déclaré et jamais utilisé | [`@typescript-eslint/no-unused-vars`](https://typescript-eslint.io/rules/no-unused-vars/) |
+| Conventions de nommage définies à la section [Conventions de nommage](#conventions-de-nommage) | [`@typescript-eslint/naming-convention`](https://typescript-eslint.io/rules/naming-convention/) |
+| Exhaustivité du traitement du discriminant `type` d'un Résultat ([RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)) | [`@typescript-eslint/switch-exhaustiveness-check`](https://typescript-eslint.io/rules/switch-exhaustiveness-check/) (typed linting) |
+| Toute Promise est explicitement gérée (invocation d'une commande de la Façade de commandes) | [`@typescript-eslint/no-floating-promises`](https://typescript-eslint.io/rules/no-floating-promises/), [`@typescript-eslint/no-misused-promises`](https://typescript-eslint.io/rules/no-misused-promises/) |
+
+Point de vigilance : le regroupement des fonctions utilitaires en classes n'ayant que des membres statiques est explicitement déconseillé par `typescript-eslint`, via sa règle [`no-extraneous-class`](https://typescript-eslint.io/rules/no-extraneous-class/) (option `allowStaticOnly`, à `false` par défaut et recommandée telle quelle par l'éditeur du plugin, qui préconise à la place des fonctions exportées individuellement). Retenir la convention « classes utilitaires » demandée suppose donc de configurer explicitement `allowStaticOnly: true`, en connaissance de cette divergence assumée avec la recommandation par défaut de l'outillage.
+
+### Rigueur du typage et de la documentation — Rust
+
+Plusieurs règles demandées côté TypeScript sont déjà garanties structurellement par le langage, sans outillage supplémentaire : le type de retour d'une fonction Rust est toujours explicite (`-> Type`, sinon `()` implicite mais jamais un type non déclaré), et il n'existe pas d'équivalent du type `any` en Rust sûr (`safe Rust`) — toute valeur y est statiquement typée par le compilateur, sans saisie dynamique possible.
+
+D'autres règles ne se transposent pas telles quelles : la structuration par modules joue en Rust le rôle que jouent les classes en TypeScript, et la visibilité y est privée par défaut, à l'inverse de TypeScript.
+
+| règle TypeScript demandée | équivalent Rust retenu | contrôle outillé |
+|---|---|---|
+| Visibilité explicite sur chaque membre | Visibilité la plus restrictive possible à chaque frontière de module (`pub(crate)`/`pub(super)` plutôt que `pub`), un module n'exposant que ce que la Façade de commandes réutilise réellement | lint rustc [`unreachable_pub`](https://doc.rust-lang.org/stable/nightly-rustc/rustc_lint/builtin/static.UNREACHABLE_PUB.html), activé en avertissement |
+| JSDoc systématique | Commentaire de documentation Rustdoc (`///`) sur tout élément public | lint rustc [`missing_docs`](https://doc.rust-lang.org/rustdoc/lints.html), activé en avertissement |
+| Aucune fonction hors classe / fonctions utilitaires regroupées dans un répertoire dédié | Non retenu tel quel : en Rust idiomatique, les fonctions libres organisées par module (`connecteurs/`, `persistance/`, etc., cf. [Structuration du code](#structuration-du-code-et-découpage-en-couches)) remplissent déjà ce rôle ; les regrouper artificiellement dans des `impl` sans état irait à l'encontre des conventions de l'écosystème sans bénéfice de sûreté | — (organisation vérifiée en revue de code) |
+| Aucun type `any` | Aucun contournement du système de types : pas de code `unsafe`, pas de panique à la place d'un `Result`/`Option` explicite | `#![forbid(unsafe_code)]`, [`clippy::unwrap_used`](https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used) et [`clippy::expect_used`](https://rust-lang.github.io/rust-clippy/master/index.html#expect_used) activés en erreur (lints de la catégorie « restriction », non couverts par `clippy::all` par défaut) |
+| Toute variable typée | Garanti par le compilateur | aucun outillage nécessaire |
+
+## Règles de revue de code
+
+Il n'y a pas de second développeur humain disponible : le processus retenu combine **auto-revue et revue assistée par l'IA avant toute intégration** à la branche principale (ou fusion d'une branche courte).
+- Le développeur relit systématiquement son propre changement, puis le soumet à une revue outillée par l'IA, ciblant en priorité les [domaines de vigilance renforcée](./01_modalitesUsageEtConventions.md#points-de-vigilance-spécifiques-au-projet) actés à l'étape 1 : calcul des indicateurs, sécurité et confidentialité des données, architecture technique, conformité aux référentiels externes.
+- Les constats remontés par la revue assistée par IA sont examinés et tranchés par le développeur avant intégration : la revue outillée ne remplace jamais le jugement humain, conformément au [principe de non-substitution du jugement métier](./01_modalitesUsageEtConventions.md#non-substitution-du-jugement-métier) acté à l'étape 1.
+- Aucune ligne de code générée ou modifiée par l'IA n'est intégrée sans avoir été relue et comprise par le développeur, conformément à la [règle de diligence](./01_modalitesUsageEtConventions.md#relecture-obligatoire-du-code-généré) actée à l'étape 1.
