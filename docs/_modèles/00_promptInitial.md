@@ -79,7 +79,9 @@ Rédige les documents décrivant l'expérience utilisateur cible :
 - arborescence des écrans et navigation ;
 - maquettes ou wireframes (description textuelle structurée si aucun outil graphique n'est disponible) ;
 - charte d'ergonomie et principes d'interaction communs à toute l'application ;
-- guide utilisateur et aide en ligne destinés aux utilisateurs finaux, en cohérence avec les écrans et parcours définis.
+- guide utilisateur et aide en ligne destinés aux utilisateurs finaux, en cohérence avec les écrans et parcours définis ;
+- pour toute entrée de navigation regroupant plusieurs écrans (rubrique de sidebar, dossier), l'écran cible ouvert par défaut est explicitement précisé, ainsi que les règles de redirection contextuelle qui peuvent s'y substituer ;
+- la convention de présentation de l'arborescence distingue explicitement, pour chaque nœud, s'il s'agit d'un écran autonome, d'un onglet au sein d'un même écran, ou d'un écran contextuel, afin qu'aucune ambiguïté ne subsiste sur la profondeur réelle de navigation.
 Objectif : valider les choix d'interface avant qu'ils ne soient figés dans la conception détaillée.
 
 ## Étape 6 — Architecture technique et choix technologiques
