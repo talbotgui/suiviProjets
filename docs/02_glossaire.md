@@ -49,6 +49,7 @@ Ce chapitre liste les termes techniques employés dans la discussion et les docu
 | [ECharts](https://echarts.apache.org/) | Bibliothèque de graphiques JavaScript, retenue pour la synthèse graphique et son export natif en image (cf. [étape 6](./11_architectureTechnique.md#choix-technologiques-structurants)). | 6 |
 | [RustCrypto](https://github.com/RustCrypto) | Ensemble de crates Rust implémentant des primitives cryptographiques, dont Argon2id et AES-256-GCM, retenu pour la chaîne cryptographique du fichier de données (cf. [étape 6](./11_architectureTechnique.md#choix-technologiques-structurants)). | 6 |
 | [zstd](https://github.com/facebook/zstd) | Algorithme de compression sans perte, retenu pour compresser le document JSON du fichier de données avant chiffrement (cf. [étape 6](./11_architectureTechnique.md#choix-technologiques-structurants)). | 6 |
+| [reqwest](https://docs.rs/reqwest/) | Bibliothèque cliente HTTP pour Rust, retenue pour l'implémentation des connecteurs GitLab et Sonar du cœur natif, avec prise en charge de la configuration proxy du poste (cf. [étape 8](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces)). | 8 |
 
 ## Acronymes
 
