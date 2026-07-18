@@ -28,6 +28,7 @@ L'expression de besoin est dans le répertoire ./docs/01_besoin. Un README.md, d
 12. Toute information du dossier source (`./docs/01_besoin`) qui anticipe une décision relevant d'une étape ultérieure (choix d'architecture, technologies, etc.) est traitée comme une donnée d'entrée à confirmer ou infirmer à cette étape ; elle n'est pas reprise comme acquise dans les documents produits aux étapes antérieures.
 13. Toute table qui résume ou agrège des informations déjà détaillées ailleurs dans le même document (ex : tableau récapitulatif des écrans concernés vs tableau détaillé par règle) est recalculée depuis sa source à chaque modification de cette dernière, jamais maintenue à la main en parallèle. Toute relation bidirectionnelle entre deux tables ou deux documents — y compris entre les objectifs mesurables (étape 2), la matrice de couverture des cas d'usage (étape 3) et la matrice de traçabilité des exigences non fonctionnelles (étape 4), et pas seulement entre la matrice de traçabilité RG→US et la colonne « règles de gestion associées » du tableau des cas d'usage — fait l'objet d'une vérification croisée avant livraison : chaque identifiant présent d'un côté doit se retrouver de l'autre.
 14. Toute valeur chiffrée (seuil, délai, paramètre technique) reprise depuis le dossier source ou un document produit à une étape antérieure est accompagnée d'un lien vers l'endroit où elle est définie, même si aucune autre mention de ce document n'apparaît dans la phrase.
+15. Toute formulation entre guillemets attribuée à un document est recopiée mot pour mot depuis la section précise citée en lien ; si la formulation n'y figure pas littéralement, elle est soit reformulée sans guillemets, soit requalifiée comme déduction (règle 11).
 
 # Étapes
 
@@ -41,7 +42,7 @@ Avant toute rédaction de fond, définissons ensemble les règles qui encadreron
   - usage des icônes et emojis proscrit, sauf demande explicite de ma part ;
   - chaque fichier Markdown commence par un sommaire (table des matières) listant les titres du document ;
   - formulations claires et directes, sans double négation ni ambiguïté syntaxique évitable.
-- création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît — y compris les acronymes couramment utilisés dans la discussion elle-même (ex : IA), à consigner dès leur première apparition même s'ils semblent triviaux ;
+- création d'un glossaire commun des termes métier et techniques employés dans la discussion, entretenu et complété au fil des étapes suivantes dès qu'un nouveau terme ambigu apparaît — y compris les acronymes couramment utilisés dans la discussion elle-même (ex : IA), à consigner dès leur première apparition même s'ils semblent triviaux, ainsi que les noms de technologies, frameworks, bibliothèques ou outils tiers retenus ou écartés lors des étapes de conception technique (notamment l'étape 6), consignés dès leur première mention même s'ils semblent déjà connus ;
 - création d'un journal des décisions (registre des choix structurants, alternatives envisagées et écartées, justification), entretenu et complété au fil des étapes suivantes dès qu'une décision structurante est prise.
 
 ## Étape 2 — Réexpression du besoin
@@ -86,7 +87,7 @@ Objectif : valider les choix d'interface avant qu'ils ne soient figés dans la c
 
 ## Étape 6 — Architecture technique et choix technologiques
 Rédige les documents décrivant l'architecture technique cible :
-- le cas échéant, statut (confirmé/écarté) des choix technologiques déjà mentionnés dans le dossier source, qui ne valent qu'à titre indicatif tant que cette étape ne les a pas validés ;
+- le cas échéant, statut (confirmé/écarté) de chaque choix technologique déjà mentionné dans le dossier source, présenté explicitement (technologie, section du dossier source où elle était mentionnée à titre indicatif, statut retenu), distinctement des choix nouveaux propres à cette étape ;
 - style architectural retenu et justification (monolithe, modulaire, client/serveur, etc.) ;
 - patterns d'architecture et de conception retenus (ex : MVC, hexagonal, CQRS, repository, etc.) et justification des alternatives écartées ;
 - choix technologiques structurants et alternatives écartées, avec justification ;
