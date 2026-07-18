@@ -8,7 +8,7 @@
 
 ## Parcours principaux
 
-*Ce chapitre décrit les parcours utilisateurs nominaux, c'est-à-dire le déroulement attendu lorsque tout se passe normalement, étape par étape, pour chaque cas d'usage principal.*
+*Ce chapitre décrit les parcours utilisateurs nominaux, c'est-à-dire le déroulement attendu lorsque tout se passe normalement. Un sous-chapitre par parcours (`### <nom du parcours>`, un tableau étape/acteur/description par sous-chapitre), rattaché à tous les cas d'usage dont une étape du parcours réalise le critère d'acceptation, actions secondaires incluses (export, annotation, etc.), pas seulement le cas d'usage central.*
 
 | étape | acteur | description |
 |---|---|---|

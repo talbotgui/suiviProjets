@@ -27,7 +27,7 @@
 
 *Ce chapitre liste les acronymes employés dans la discussion et les documents, avec leur signification développée.*
 
-| aconyme | signification |
+| acronyme | signification |
 |---|---|
 | | |
 

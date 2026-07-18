@@ -25,7 +25,7 @@
 
 ## Choix technologiques structurants
 
-*Ce chapitre liste les choix technologiques structurants du projet (langages, frameworks, infrastructures) et leur justification.*
+*Ce chapitre liste les choix technologiques structurants du projet (langages, frameworks, infrastructures) et leur justification. Il précise d'abord, le cas échéant, le statut (confirmé/écarté) de chaque choix déjà mentionné à titre indicatif dans le dossier source, avec un lien vers la section source où il était mentionné, distinctement des choix nouveaux propres à cette étape (ceux-ci n'ayant pas de statut confirmé/écarté à établir).*
 
 | choix technologique | justification |
 |---|---|

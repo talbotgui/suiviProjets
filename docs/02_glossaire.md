@@ -70,7 +70,7 @@ Ce chapitre liste les termes techniques employés dans la discussion et les docu
 
 Ce chapitre liste les acronymes employés dans la discussion et les documents, avec leur signification développée.
 
-| aconyme | signification |
+| acronyme | signification |
 |---|---|
 | IA | Intelligence Artificielle |
 | MoSCoW | Méthode de priorisation Must have / Should have / Could have / Won't have, retenue pour prioriser les cas d'usage à partir de l'étape 3 |

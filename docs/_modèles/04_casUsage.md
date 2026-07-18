@@ -17,11 +17,11 @@
 
 ## Cas d'usage / user stories
 
-*Ce chapitre liste les cas d'usage / user stories de l'application. Chaque user story s'appuie, lorsqu'ils existent, sur les persona définis à l'étape 2 comme acteurs, et précise : identifiant, titre, persona/acteur concerné, description ("en tant que... je veux... afin de..."), critères d'acceptation, règles de gestion associées, priorité (selon la convention MoSCoW définie ci-dessus).*
+*Ce chapitre liste les cas d'usage / user stories de l'application. Chaque user story s'appuie, lorsqu'ils existent, sur les persona définis à l'étape 2 comme acteurs, et précise : identifiant, titre, persona/acteur concerné, description ("en tant que... je veux... afin de..."), type, critères d'acceptation, règles de gestion associées, priorité (selon la convention MoSCoW définie ci-dessus). Le type — consultation pure (aucune écriture dans le modèle de données) ou mutation (au moins une écriture) — est qualifié ici, une fois pour toutes, et repris tel quel dans les étapes suivantes sans être redéduit à partir de la seule description.*
 
-| identifiant | titre | persona / acteur | description | critères d'acceptation | règles de gestion associées | priorité |
-|---|---|---|---|---|---|---|
-| | | | | | | |
+| identifiant | titre | persona / acteur | description | type | critères d'acceptation | règles de gestion associées | priorité |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
 
 ## Matrice de couverture
 

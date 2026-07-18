@@ -12,7 +12,7 @@
 
 ## Maquettes par écran
 
-*Ce chapitre décrit, pour chaque écran de l'arborescence de l'étape précédente, sa maquette sous forme structurée : zones, composants, actions disponibles.*
+*Ce chapitre décrit, pour chaque écran de l'arborescence de l'étape précédente, sa maquette sous forme structurée : zones, composants, actions disponibles. Un sous-chapitre par écran (`### <nom de l'écran>`, un tableau zone/composants-actions par sous-chapitre).*
 
 | écran | zone | composants / actions |
 |---|---|---|

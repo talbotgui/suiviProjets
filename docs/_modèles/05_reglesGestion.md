@@ -21,7 +21,7 @@
 
 ## Règles de gestion par domaine fonctionnel
 
-*Ce chapitre détaille les règles de gestion métier, regroupées par domaine fonctionnel, avec pour chacune : identifiant, énoncé de la règle, écran(s) concerné(s), et conditions d'application.*
+*Ce chapitre détaille les règles de gestion métier, regroupées par domaine fonctionnel — un sous-chapitre par domaine (`### <nom du domaine>`, un tableau par sous-chapitre) —, avec pour chacune : identifiant, énoncé de la règle, écran(s) concerné(s), et conditions d'application. L'écran ou les écrans concernés sont établis en croisant l'énoncé de la règle avec les critères d'acceptation de tous les cas d'usage qui la citent dans la matrice de traçabilité ci-dessous, pas seulement avec l'écran principal du domaine.*
 
 | identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
 |---|---|---|---|
