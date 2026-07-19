@@ -152,7 +152,7 @@ Rédige les documents décrivant les environnements, l'intégration continue et 
 - installation de l'environnement de production et stratégie de déploiement ;
 - stratégie de build, empaquetage et publication ;
 - gestion des versions et des mises à jour ;
-- journalisation applicative, gestion des erreurs en production et supervision (métriques, alerting) ;
+- journalisation applicative (gestion des logs : emplacement, rotation, rétention), gestion des erreurs en production et supervision (métriques, alerting) ;
 - plan de reprise d'activité (PRA) en cas d'incident majeur ;
 - procédures d'exploitation post-déploiement (runbook, astreinte).
 
