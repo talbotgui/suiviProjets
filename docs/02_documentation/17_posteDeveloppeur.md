@@ -7,6 +7,7 @@
 3. [Configuration de l'environnement](#configuration-de-lenvironnement)
    1. [Variables d'environnement](#variables-denvironnement)
    2. [Utilisation de VS Code](#utilisation-de-vs-code)
+   3. [Traçabilité des échanges avec l'IA](#traçabilité-des-échanges-avec-lia)
 4. [Usage courant](#usage-courant)
    1. [Commandes de démarrage en mode développement](#commandes-de-démarrage-en-mode-développement)
    2. [Commandes de build](#commandes-de-build)
@@ -64,6 +65,10 @@ Le réglage d'espace de travail recommandé (formatage à l'enregistrement pour 
 
 La configuration Claude Code (`.claude/settings.json`, fichiers de règles `.claude/rules/`) suit les décisions actées à l'étape 1 (cf. [plan de mise en place de l'étape 1](../03_plan/plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire)).
 
+### Traçabilité des échanges avec l'IA
+
+Conformément à la décision de différer ce sujet jusqu'à la définition du poste développeur (cf. [traçabilité des échanges significatifs, étape 1](./01_modalitesUsageEtConventions.md#traçabilité-des-échanges-significatifs) et [journal des décisions](./02_glossaire.md#journal-des-décisions)), la journalisation automatique des prompts soumis à l'IA s'appuie sur un [hook Claude Code](https://code.claude.com/docs/en/hooks) `UserPromptSubmit`, déclaré dans `.claude/settings.json`, qui consigne l'horodatage et le contenu de chaque prompt dans un fichier local `.claude/logs/prompts.log`. Ce fichier, exclu du suivi de version par `.gitignore`, reste strictement local sans transmission distante, cohérent avec l'absence de télémétrie actée à l'étape 10 (cf. [journalisation des événements sensibles](./15_normesSecurite.md#journalisation-des-événements-sensibles)) ; il complète, sans le remplacer, l'historique des sessions et des commits Git déjà retenus comme trace de référence à l'étape 1. Sa mise en place effective (déclaration du hook, création du répertoire `.claude/logs/`) reste tracée dans le [plan de mise en place de l'étape 1](../03_plan/plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire), au même titre que les autres éléments d'outillage de poste développeur différés jusqu'au démarrage effectif du développement.
+
 ## Usage courant
 
 ### Commandes de démarrage en mode développement
@@ -72,6 +77,7 @@ La configuration Claude Code (`.claude/settings.json`, fichiers de règles `.cla
 - `npm start` (ou l'équivalent Angular CLI) permet de lancer le seul front Angular dans un navigateur, sans le cœur natif, pour un développement rapide de l'interface ne nécessitant pas de commande native ; les appels à la [Façade de commandes](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces) y sont alors indisponibles ou à simuler.
 - Le débogage du front s'appuie sur les outils de développement du navigateur intégrés à la vue Tauri en mode développement ; le débogage du cœur natif s'appuie sur la variable [`RUST_LOG`](#variables-denvironnement) et sur les outils de débogage Rust habituels (ex. extension de débogage VS Code pour `rust-analyzer`, `lldb`/`gdb`).
 - Les tests unitaires s'exécutent avec `npm test` (Jest côté Angular) et `cargo test` (côté Rust), cf. [tests unitaires, étape 11](./16_normesTests.md#tests-unitaires) ; les [tests d'intégration hors CI](./16_normesTests.md#tests-dintégration-hors-intégration-continue-contre-des-instances-réelles) s'exécutent ponctuellement et manuellement une fois les [variables d'environnement de credentials](#variables-denvironnement) définies.
+- Les [tests de bout en bout](./16_normesTests.md#tests-de-bout-en-bout) (`tauri-driver`, protocole WebDriver) se rejouent également en local contre un build de développement, ce qui permet de reproduire un échec constaté en intégration continue avant d'y apporter un correctif ; leur configuration précise reste à établir lors de la mise en œuvre effective (cf. [plan de mise en place de l'étape 11](../03_plan/plan_11_normesTests.md#actions-issues-de-létape-11--normes-de-tests-automatisés)).
 - Le formatage et l'analyse statique (`rustfmt`, Clippy, Prettier, ESLint, cf. [étape 9](./14_normesDeveloppement.md#règles-de-qualité-de-code)) s'exécutent automatiquement via le hook Claude Code dédié à chaque modification, ou manuellement (`cargo fmt`, `cargo clippy`, `npm run lint`) avant tout commit.
 
 ### Commandes de build
