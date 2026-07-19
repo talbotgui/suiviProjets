@@ -37,12 +37,23 @@ Sur un poste de développement GitHub-Codespace, créer le fichier **.devcontain
 }
 ```
 
-# 2/ Exécution
+## 1.3/ Créer l'arborescence & déposer le besoin
+- Créer le répertoire *./docs/00_init&prompt* et y déposer les fichiers *00_init.md* et *00_promptInitial.md*
+- Déposer la description (la plus complète possible) dans le répertoire *./docs/01_besoin*
+- Créer le répertoire *./docs/02_documentation/_modèles* et y déposer tous les modèles disponibles
+- Créer le répertoire *./docs/03_plan/_modèles* et y déposer tous les modèles disponibles
 
-## 2.1/ Etape 1
+# 2/ Génération de la documentation
+
+L'usage de l'IA doit toujours être cyclique car il n'est jamais parfait du premier coup.
+Les choix faits dans une session sont faits pour une raison. Pour que l'IA les revoit, il faut créer une autre session.
+
+## 2.1/ Etape initiale
 * Dans une première session, exécuter le prompt sauvegardé dans ./docs/_modèles/00_promptInitial.md et répondre aux questions demandées.
 * Relire tous les documents générés
-* Puis exécuter, dans une seconde session, le prompt suivant :
+
+## 2.2/ Etape de relecture de l'étape
+Exécuter, dans une nouvelle session, le prompt suivant :
 ```
 Relie les documents @docs/01_modalitesUsageEtConventions.md ,  @docs/02_glossaire.md   et @docs/plan_01_miseEnPlace.md généré à l'étape 1 du prompt @docs/_modèles/00_promptInitial.md .
 Critique les et proposition des modifications/améliorations
@@ -55,13 +66,22 @@ Propose moi (s'il en existe) des éléments pouvant être ajoutés dans @docs/_m
 ```
 * Attention à être très précis dans ces modifications car elles sont structurantes.
 
-
-## 2.2/ Etape 2
-* Dans la première session, valider l'étape et passer à la suivante avec le prompt :
+## 2.3/ Etape suivante
+* Dans la toute première session, valider l'étape et passer à la suivante avec le prompt :
 ```
 Une session indépendante a réalisé la relecture et les possibles améliorations.
 J'ai relu tous les documents.
 Passons à l'étape suivante.
 ```
+
+## 2.4/ Boucler
+Boucler les §2.2 et 2.3 jusqu'à arriver à la dernière étape du prompt de génération de documentation
+
+# 3/ Développement
+
+Le développement est initialement et totalement réalisé par l'IA.
+Tout le travail de documentation a mené à cela.
+
+Pour cela, créer une nouvelle session et y exécuter le prompt *00_promptDeveloppement.md*
 
 
