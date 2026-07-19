@@ -45,7 +45,7 @@ Ces règles, valables pour toute la discussion, sont rappelées ici pour mémoir
 - l'IA n'exécute jamais de commande git, quelle qu'elle soit ;
 - chaque étape se termine par un commit exécuté humainement, marquant un point de retour arrière fiable ;
 - le passage à l'étape N+1 n'a lieu qu'après validation humaine explicite de l'étape N ; une relecture seule n'y suffit pas ;
-- la relecture de chaque étape a lieu dans une session dédiée (nouvelle conversation, contexte isolé) ;
+- la relecture de chaque étape a lieu dans un contexte isolé de celui du Codeur : nouvelle conversation, ou sous-agent dédié disposant de son propre contexte (par exemple l'outil Agent d'un assistant IA orchestrant un binôme Codeur/Relecteur), l'objectif étant d'éviter que les biais et angles morts du Codeur ne se propagent tels quels à la relecture ;
 - chaque exigence fonctionnelle ou non fonctionnelle porte un identifiant stable, réutilisé sans être renommé dans toutes les étapes suivantes ;
 - le répertoire `./docs/_modèles` fournit les modèles de structure et de format à respecter pour chaque document produit.
 

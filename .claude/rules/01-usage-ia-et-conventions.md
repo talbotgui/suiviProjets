@@ -11,7 +11,7 @@ Synthèse actionnable de [01_modalitesUsageEtConventions.md](../../docs/02_docum
 ## Rappel des règles générales de collaboration
 
 - Aucun passage à l'étape N+1 sans validation humaine explicite de l'étape N ; une relecture seule n'y suffit pas.
-- Relecture de chaque étape dans une session dédiée (nouvelle conversation, contexte isolé).
+- Relecture de chaque étape dans un contexte isolé de celui du Codeur : nouvelle conversation, ou sous-agent dédié disposant de son propre contexte (ex. outil Agent orchestrant un binôme Codeur/Relecteur) — pour éviter que les biais et angles morts du Codeur ne contaminent la relecture.
 - Chaque exigence porte un identifiant stable (`US-NNN`, `RG-NNN`), réutilisé sans être renommé dans toutes les étapes suivantes.
 - Modèles de structure et de format à respecter pour tout document produit : `./docs/_modèles` ([source](../../docs/02_documentation/01_modalitesUsageEtConventions.md#rappel-des-règles-générales-de-collaboration)).
 
