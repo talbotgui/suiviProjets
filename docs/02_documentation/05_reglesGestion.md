@@ -17,7 +17,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 |---|---|---|
 | Écran d'accueil | Point d'entrée : créer ou charger le fichier de données, résumé de l'état depuis la dernière session | RG-001, RG-002, RG-003, RG-009, RG-026 |
 | Gestion des credentials | Saisie en mémoire des credentials par instance, assistant de création de token, test de connectivité | RG-004 |
-| Administration | Gestion des groupes, projets, sources, membres connus et politique IA | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015 |
+| Administration | Gestion des groupes, projets, sources, membres connus et politique IA | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015, RG-023 |
 | Constitution de campagne | Sélection du périmètre d'une campagne d'audit, contrôle des credentials nécessaires | RG-017, RG-019 |
 | Tableau de bord d'exécution | Suivi temps réel d'une campagne, annulation propre | RG-017, RG-018 |
 | Brouillon (et rapport d'anomalies) | Différentiel d'une campagne avant intégration à l'historique, anomalies d'exécution | RG-011, RG-019, RG-020, RG-021 |
@@ -65,7 +65,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 
 | identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
 |---|---|---|---|
-| RG-017 | Une campagne d'audit interroge les sources de son périmètre avec une concurrence limitée et paramétrable (valeur par défaut : quatre projets simultanés) | Constitution de campagne, Tableau de bord d'exécution | Exécution d'une campagne |
+| RG-017 | Une campagne d'audit interroge les sources de son périmètre avec une concurrence limitée et paramétrable (valeur par défaut : [quatre projets simultanés](../01_besoin/Specification.md#56-f06--tableau-de-bord-dexécution-daudit)) | Constitution de campagne, Tableau de bord d'exécution | Exécution d'une campagne |
 | RG-018 | L'annulation d'une campagne est propre : elle vide la file d'attente sans interrompre les requêtes en vol, conserve les résultats déjà acquis et classe les projets non traités en « ignoré », les faisant rejoindre le périmètre de reprise | Tableau de bord d'exécution | Annulation manuelle d'une campagne en cours |
 | RG-019 | Le lancement d'une nouvelle campagne est bloqué tant qu'un brouillon existant n'a pas été traité (intégré ou rejeté) ; au plus un brouillon existe à la fois | Constitution de campagne, Brouillon | Tentative de lancement d'une campagne |
 | RG-020 | Une variation d'indicateur jugée aberrante par rapport au dernier audit intégré du même projet est signalée automatiquement dans le brouillon avant toute intégration | Brouillon | Présentation du brouillon d'une campagne |
@@ -76,9 +76,9 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
 |---|---|---|---|
 | RG-022 | Les seuils de couleur, les bornes de classe de taille, la tolérance de fraîcheur Sonar et les référentiels de dépendances et de marqueurs IA définis au paramétrage s'appliquent uniformément à tous les écrans de restitution | Écran de paramétrage, Synthèse des audits, Synthèse graphique, Fiche projet | Restitution de tout indicateur calculé |
-| RG-023 | Toute modification d'un seuil ou d'un référentiel de jugement est consignée dans le journal des modifications, avec horodatage, valeur avant/après et origine de la modification | Écran de paramétrage, Synthèse graphique, Fiche projet | À chaque modification d'un seuil ou d'un référentiel |
-| RG-024 | La purge par densité conserve le premier audit de chaque projet, puis un audit au minimum tous les sept jours parmi les audits rapprochés ; le premier et le dernier audit de chaque projet sont toujours conservés | Écran de paramétrage (purge) | Exécution d'une purge par densité |
-| RG-025 | La purge par âge, au-delà de six mois, est toujours proposée avec prévisualisation du volume libéré et n'est jamais déclenchée automatiquement ; l'utilisateur choisit entre suppression et agrégation mensuelle | Écran de paramétrage (purge) | Proposition ou déclenchement d'une purge par âge |
+| RG-023 | Toute modification d'une donnée de jugement — seuil, référentiel de dépendances, référentiel de marqueurs IA, qualification d'un membre, politique IA d'un projet, ref auditée d'une source (périmètre complet de [F21](../01_besoin/Specification.md#521-f21--journal-des-modifications-de-paramétrage)) — est consignée dans le journal des modifications, avec horodatage, valeur avant/après et origine de la modification | Écran de paramétrage, Synthèse graphique, Fiche projet, Administration | À chaque modification d'une donnée de jugement |
+| RG-024 | La purge par densité conserve le premier audit de chaque projet, puis un audit au minimum [tous les sept jours](../01_besoin/Specification.md#519-f19--purge-des-audits) parmi les audits rapprochés ; le premier et le dernier audit de chaque projet sont toujours conservés | Écran de paramétrage (purge) | Exécution d'une purge par densité |
+| RG-025 | La purge par âge, [au-delà de six mois](../01_besoin/Specification.md#519-f19--purge-des-audits), est toujours proposée avec prévisualisation du volume libéré et n'est jamais déclenchée automatiquement ; l'utilisateur choisit entre suppression et agrégation mensuelle | Écran de paramétrage (purge) | Proposition ou déclenchement d'une purge par âge |
 
 ### Vues, alertes, export et import
 
@@ -104,7 +104,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-009 | [US-005](./04_casUsage.md#cas-dusage--user-stories), [US-015](./04_casUsage.md#cas-dusage--user-stories), [US-017](./04_casUsage.md#cas-dusage--user-stories), [US-020](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-010 | [US-017](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-011 | [US-009](./04_casUsage.md#cas-dusage--user-stories), [US-014](./04_casUsage.md#cas-dusage--user-stories), [US-015](./04_casUsage.md#cas-dusage--user-stories), [US-016](./04_casUsage.md#cas-dusage--user-stories), [US-017](./04_casUsage.md#cas-dusage--user-stories), [US-018](./04_casUsage.md#cas-dusage--user-stories) |
-| RG-012 | [US-022](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-012 | [US-022](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-013 | [US-015](./04_casUsage.md#cas-dusage--user-stories), [US-017](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-014 | [US-007](./04_casUsage.md#cas-dusage--user-stories), [US-024](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-015 | [US-024](./04_casUsage.md#cas-dusage--user-stories) |
@@ -115,7 +115,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-020 | [US-014](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-021 | [US-013](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-022 | [US-015](./04_casUsage.md#cas-dusage--user-stories), [US-016](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories) |
-| RG-023 | [US-016](./04_casUsage.md#cas-dusage--user-stories), [US-027](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-023 | [US-008](./04_casUsage.md#cas-dusage--user-stories), [US-016](./04_casUsage.md#cas-dusage--user-stories), [US-024](./04_casUsage.md#cas-dusage--user-stories), [US-027](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-024 | [US-025](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-025 | [US-025](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-026 | [US-005](./04_casUsage.md#cas-dusage--user-stories), [US-020](./04_casUsage.md#cas-dusage--user-stories) |

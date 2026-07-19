@@ -93,7 +93,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | Groupe, Projet | [RG-006](./05_reglesGestion.md#membres-et-sécurité-des-accès), [RG-014](./05_reglesGestion.md#constat-jugement-et-politique-ia) |
 | MembreConnu | [RG-006](./05_reglesGestion.md#membres-et-sécurité-des-accès), [RG-007](./05_reglesGestion.md#membres-et-sécurité-des-accès), [RG-008](./05_reglesGestion.md#membres-et-sécurité-des-accès) |
 | Résultat | [RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-013](./05_reglesGestion.md#constat-jugement-et-politique-ia) |
-| Projet (`iaAutorisee`) | [RG-014](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-015](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-016](./05_reglesGestion.md#constat-jugement-et-politique-ia) |
+| Projet (`iaAutorisee`) | [RG-014](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-015](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-016](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
 | Campagne | [RG-017](./05_reglesGestion.md#audits-et-campagnes), [RG-018](./05_reglesGestion.md#audits-et-campagnes), [RG-021](./05_reglesGestion.md#audits-et-campagnes) |
 | Brouillon | [RG-019](./05_reglesGestion.md#audits-et-campagnes), [RG-020](./05_reglesGestion.md#audits-et-campagnes) |
 | Audit | [RG-024](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-025](./05_reglesGestion.md#seuils-référentiels-et-historisation) |

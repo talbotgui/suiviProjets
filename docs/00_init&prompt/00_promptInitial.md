@@ -170,6 +170,11 @@ Ensuite, démarre un sous-agent pour
 - vérifier particulièrement les liens entre document et les matrices
 - lister les incohérences/doutes/questions (que tu me présenteras)
 - lister les remarques présentes dans la documentation décrivant l'histoire de la construction du projet et pouvant être supprimées (exemple : "initialement envisagés côté cœur natif à l'étape 6, sont déplacés côté UI (TypeScript) à l'étape 13")
+- vérifier si des actions/questions présentes dans les plans (répertoire ./docs/03_plan) peuvent être traitées
+
+## Étape 15 — Plan de développement
+Rédige le plan ./docs/03_plan/plan_13_développement décrivant toutes les étapes à partir du dépôt actuel (conserver la documentation existante).
+Le développement doit se faire uniquement à partir de la documentation *./docs/02_documentation* et pas du besoin *./docs/01_besoin*. Seules les maquettes du besoin peuvent être utilisées pour développer les feuilles de style.
 
 ---
 

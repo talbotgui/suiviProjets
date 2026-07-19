@@ -71,7 +71,7 @@ Les demandes adressées à l'IA précisent autant que possible le contexte, les 
 
 #### Traçabilité des échanges significatifs
 
-À ce stade du projet, l'historique des sessions et les commits Git constituent la trace de référence des échanges et décisions significatifs. La mise en place d'un script dédié de journalisation automatique des prompts, évoquée comme bonne pratique, a été différée aux étapes normes de développement (étape 9) puis poste développeur ([étape 12](./17_posteDeveloppeur.md#traçabilité-des-échanges-avec-lia)), une fois l'outillage de développement défini ; la conception retenue (hook Claude Code dédié) est actée à cette dernière étape. Ce report est tracé dans le [plan de mise en place](../03_plan/plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire).
+L'historique des sessions et les commits Git constituent la trace de référence des échanges et décisions significatifs, complétée par la journalisation automatique des prompts définie au poste développeur ([étape 12](./17_posteDeveloppeur.md#traçabilité-des-échanges-avec-lia), hook Claude Code dédié). La mise en œuvre effective de cette journalisation est tracée dans le [plan de mise en place](../03_plan/plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire).
 
 #### Mention de l'origine des contenus
 

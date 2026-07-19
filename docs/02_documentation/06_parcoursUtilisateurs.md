@@ -104,7 +104,7 @@ Rattaché à [US-024](./04_casUsage.md#cas-dusage--user-stories).
 | étape | acteur | description |
 |---|---|---|
 | 1 | Camille | Depuis l'administration ou la fiche du projet, active la politique IA du projet |
-| 2 | Application | Horodate le passage à autorisé et crée automatiquement une annotation système non supprimable |
+| 2 | Application | Horodate le passage à autorisé, crée automatiquement une annotation système non supprimable et consigne le changement dans le journal des modifications ([RG-015](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation)) |
 | 3 | Application | Affiche désormais les marqueurs IA détectés comme informatifs plutôt que comme violation |
 | 4 | Application | Juxtapose, sur les graphiques du projet, les courbes de qualité du nouveau code de part et d'autre de la date d'activation |
 
