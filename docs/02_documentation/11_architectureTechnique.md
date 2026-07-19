@@ -58,16 +58,18 @@ Le dossier source mentionnait déjà, à titre indicatif, un cœur Rust, une int
 
 | composant / module | responsabilité |
 |---|---|
-| Cœur natif — Connecteur GitLab | Interroge l'API GitLab (dépendances, branches, vitalité, contributeurs, taille, merge requests, marqueurs IA, membres) en respectant la configuration proxy |
-| Cœur natif — Connecteur Sonar | Interroge l'API SonarQube (violations, dette technique, couverture, notes, ncloc) |
-| Cœur natif — Connecteur croisé | Calcule les résultats croisés (`croise.*`) à partir des résultats des deux connecteurs précédents (fraîcheur Sonar, activité sans qualité, IA et nouveau code) |
+| Cœur natif — Connecteur GitLab | Interroge l'API GitLab (dépendances, branches, vitalité, contributeurs, taille, merge requests, marqueurs IA, membres) en respectant la configuration proxy ; détient et applique le credential de l'instance, désérialise les réponses avec un typage strict |
+| Cœur natif — Connecteur Sonar | Interroge l'API SonarQube (violations, dette technique, couverture, notes, ncloc) ; détient et applique le credential de l'instance, désérialise les réponses avec un typage strict |
 | Cœur natif — Moteur de persistance | Sérialisation, compression, chiffrement/déchiffrement, migration de version de schéma, sauvegardes de sécurité horodatées |
-| Cœur natif — Orchestrateur de campagne | Planifie et exécute les audits d'un périmètre avec une concurrence limitée, gère la reprise et l'annulation, alimente le brouillon |
 | Cœur natif — Façade de commandes | Expose à l'interface un ensemble de commandes et de requêtes typées ; frontière unique entre l'UI et le cœur natif |
+| UI — Connecteur croisé | Calcule les résultats croisés (`croise.*`) à partir des résultats déjà obtenus des deux connecteurs (fraîcheur Sonar, activité sans qualité, IA et nouveau code), sans appel réseau ni credential propre |
+| UI — Orchestrateur de campagne | Planifie et exécute les audits d'un périmètre avec une concurrence limitée, gère la reprise et l'annulation, alimente le brouillon, en invoquant le Connecteur GitLab et le Connecteur Sonar via la Façade de commandes |
 | UI — Moteur de jugement | Calcule à l'affichage les statuts, badges et classes à partir des constats et des référentiels/seuils courants, sans jamais les persister ([RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)) |
 | UI — Écrans et navigation | Implémente les écrans de l'arborescence et les règles de navigation définies à l'étape 5 |
 | UI — Store d'état applicatif | État réactif local : session en cours, filtres actifs, vues enregistrées sélectionnées |
 | UI — Index de recherche transversale | Index construit en mémoire à l'ouverture du fichier pour la recherche transversale ([F16](../01_besoin/Specification.md#516-f16--recherche-transversale)) |
+
+Le Connecteur croisé et l'Orchestrateur de campagne, initialement envisagés côté cœur natif à l'étape 6, sont déplacés côté UI (TypeScript) à l'étape 13 : ni l'un ni l'autre n'a besoin d'accès disque, réseau ou cryptographie propre, seuls les appels effectifs aux API GitLab/Sonar (avec gestion du credential et désérialisation stricte) restent en Rust, exposés individuellement par la Façade de commandes plutôt qu'invoqués en interne par un orchestrateur natif (cf. [conception détaillée, étape 8](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces)).
 
 ## Dépendances externes
 
@@ -86,7 +88,7 @@ Le dossier source mentionnait déjà, à titre indicatif, un cœur Rust, une int
 
 ## Stratégie de gestion d'état et de communication
 
-- La communication entre le cœur natif et l'UI se fait par des commandes typées invoquées depuis l'UI (mutations : lancer un audit, sauvegarder, qualifier un membre) et par des événements poussés par le cœur natif vers l'UI (progression de campagne en temps réel) : un canal de commandes/événements local, jamais un flux réseau.
+- La communication entre le cœur natif et l'UI se fait par des commandes typées invoquées depuis l'UI (mutations et requêtes : interroger une source, sauvegarder, qualifier un membre) et par des événements poussés par le cœur natif vers l'UI pour les cas où l'état est possédé côté natif (ex. `verrouillageDeclenche`) : un canal de commandes/événements local, jamais un flux réseau. La progression d'une campagne d'audit, désormais pilotée côté UI par l'Orchestrateur de campagne, est un état réactif local qui ne transite plus par ce canal d'événements.
 - L'état « constat » (résultats d'audit) est possédé et validé par le cœur natif, dont le fichier chiffré constitue la source de vérité ; l'état « jugement » (indicateurs calculés) est dérivé côté UI à partir des constats et des référentiels courants, et n'est jamais persisté ([RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)) : c'est la frontière la plus structurante de la gestion d'état de l'application.
 - L'état volatile sensible (credentials, clé dérivée) est cantonné à la mémoire du cœur natif et à un store mémoire dédié côté UI, jamais sérialisé, et purgé au verrouillage ([RG-004](./05_reglesGestion.md#stockage-et-confidentialité-des-données), [RG-005](./05_reglesGestion.md#stockage-et-confidentialité-des-données)).
 - L'état de session de l'interface (filtres actifs, écran courant, vue sélectionnée) est un état local réactif, non persisté, sauf lorsqu'il est explicitement enregistré comme vue nommée ([F22](../01_besoin/Specification.md#522-f22--modèles-de-vues-enregistrées)).

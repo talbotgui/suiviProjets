@@ -21,15 +21,15 @@ repo/
 │   └── app/
 │       ├── ecrans/            un dossier par écran de l'arborescence
 │       ├── composants/        composants réutilisables
+│       ├── campagne/          Orchestrateur de campagne, Connecteur croisé
 │       ├── jugement/          Moteur de jugement (fonctions pures)
 │       ├── etat/              Store d'état applicatif (Signals)
 │       ├── recherche/         Index de recherche transversale
 │       └── commandes/         client typé de la Façade de commandes
 ├── src-tauri/                 cœur natif (Rust)
 │   └── src/
-│       ├── connecteurs/       gitlab.rs, sonar.rs, croise.rs
+│       ├── connecteurs/       gitlab.rs, sonar.rs
 │       ├── persistance/       Moteur de persistance (repository)
-│       ├── campagne/          Orchestrateur de campagne
 │       ├── commandes/         Façade de commandes (commandes Tauri exposées)
 │       └── modele/            structures de données
 └── docs/

@@ -162,6 +162,10 @@ Une fois l'étape 12 validée, transpose chaque document normatif déjà produit
 - chaque fichier de règle reformule les points directement actionnables lors de l'écriture de code ou de documents, sans paraphraser intégralement le document source, et renvoie par un lien relatif vers la section de ce document qu'il synthétise ;
 - toute évolution ultérieure d'un document normatif source entraîne la mise à jour du fichier de règle correspondant, pour éviter toute divergence entre la documentation de référence et les règles effectivement appliquées par l'IA.
 
+## Étape 14 — Revue complète
+Demande moi de tout relire puis demande moi une validation formelle.
+Ensuite, démarre un sous-agent pour relire toute la documentation, recroiser toutes les informations et lister les incohérences/doutes/questions que tu me présenteras.
+
 ---
 
 Pour chaque étape, respecte ce déroulé :

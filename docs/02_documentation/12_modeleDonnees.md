@@ -67,7 +67,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 |---|---|---|
 | Groupe, Instance, MembreConnu, Annotation (portée groupe) | Camille (utilisateur unique) | Création, mise à jour et suppression via l'administration ; les membres connus ne sont jamais partagés hors de l'application |
 | Projet, Source, Annotation (portée projet) | Camille | Idem, cycle de vie lié à celui du Groupe parent |
-| Audit, Résultat, Campagne, Brouillon | Cœur natif (orchestrateur de campagne) | Produits automatiquement lors d'une campagne ; intégrés ou rejetés par Camille depuis le brouillon, jamais modifiés manuellement après intégration à l'historique |
+| Audit, Résultat, Campagne, Brouillon | UI (orchestrateur de campagne), écrits sur disque par le cœur natif (moteur de persistance) | Produits automatiquement lors d'une campagne ; intégrés ou rejetés par Camille depuis le brouillon, jamais modifiés manuellement après intégration à l'historique |
 | Référentiels (`reglesDependances`, `reglesMarqueursIA`), Paramètres (`seuils`) | Camille | Édités depuis le paramétrage ; seule portion du modèle destinée au partage entre installations (export en clair) |
 | TraitementAlerte, VueEnregistrée | Camille | Données de travail personnelles, jamais exportées |
 | EntréeJournal | Cœur natif | Écriture automatique en append-only à chaque modification d'une donnée de jugement ; lecture seule pour Camille |
