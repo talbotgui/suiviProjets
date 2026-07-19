@@ -8,7 +8,7 @@
 
 ## Conventions de description des maquettes
 
-En l'absence d'outil graphique, chaque écran est décrit textuellement sous forme de zones (regroupements visuels : en-tête, bandeau, colonne, tableau), chaque zone précisant ses composants et les actions qu'elle rend possibles. Quatre écrans (Accueil, Synthèse des audits, Fiche projet, Tableau de bord d'exécution) disposent d'une maquette haute-fidélité de référence dans [Suivi Qualimetrie.dc.html](./01_besoin/Suivi%20Qualimetrie.dc.html) (captures dans [screenshots/](./01_besoin/screenshots/)) : leur description ci-dessous en reprend fidèlement la structure. Les autres écrans sont décrits selon la même convention et les mêmes tokens visuels (cartes à coins arrondis, badges/pastilles, codes de couleur systématiques, tableau dense pour les listes volumineuses), à détailler en maquette haute-fidélité si besoin avant la conception détaillée.
+En l'absence d'outil graphique, chaque écran est décrit textuellement sous forme de zones (regroupements visuels : en-tête, bandeau, colonne, tableau), chaque zone précisant ses composants et les actions qu'elle rend possibles. Quatre écrans (Accueil, Synthèse des audits, Fiche projet, Tableau de bord d'exécution) disposent d'une maquette haute-fidélité de référence dans [Suivi Qualimetrie.dc.html](../01_besoin/Suivi%20Qualimetrie.dc.html) (captures dans [screenshots/](../01_besoin/screenshots/)) : leur description ci-dessous en reprend fidèlement la structure. Les autres écrans sont décrits selon la même convention et les mêmes tokens visuels (cartes à coins arrondis, badges/pastilles, codes de couleur systématiques, tableau dense pour les listes volumineuses), à détailler en maquette haute-fidélité si besoin avant la conception détaillée.
 
 ## Maquettes par écran
 

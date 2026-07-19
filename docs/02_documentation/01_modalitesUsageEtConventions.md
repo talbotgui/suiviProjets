@@ -71,7 +71,7 @@ Les demandes adressées à l'IA précisent autant que possible le contexte, les 
 
 #### Traçabilité des échanges significatifs
 
-À ce stade du projet, l'historique des sessions et les commits Git constituent la trace de référence des échanges et décisions significatifs. La mise en place d'un script dédié de journalisation automatique des prompts, évoquée comme bonne pratique, est différée : elle sera étudiée aux étapes normes de développement (étape 9) et poste développeur (étape 12), une fois l'outillage de développement défini. Ce report est tracé dans le [plan de mise en place](./plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire).
+À ce stade du projet, l'historique des sessions et les commits Git constituent la trace de référence des échanges et décisions significatifs. La mise en place d'un script dédié de journalisation automatique des prompts, évoquée comme bonne pratique, est différée : elle sera étudiée aux étapes normes de développement (étape 9) et poste développeur (étape 12), une fois l'outillage de développement défini. Ce report est tracé dans le [plan de mise en place](../03_plan/plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire).
 
 #### Mention de l'origine des contenus
 
@@ -88,7 +88,7 @@ L'IA peut produire des approximations, des erreurs factuelles ou des incohérenc
 Quatre domaines appellent une relecture humaine renforcée dans ce projet :
 - les règles de calcul des indicateurs qualité (statuts, seuils, couleurs), le principe fondamental du projet étant que le jugement est calculé à la volée à partir des constats bruts et n'est jamais stocké ;
 - la sécurité et la confidentialité des données, notamment le fichier de données chiffré, la gestion des membres inconnus et les données personnelles des contributeurs et des projets audités ;
-- l'architecture technique de l'application desktop, en particulier la frontière entre les différentes couches applicatives et la gestion d'état associée (choix d'architecture non encore figé à ce stade, cf. [étape 6](./_modèles/00_promptInitial.md#étape-6--architecture-technique-et-choix-technologiques)) ;
+- l'architecture technique de l'application desktop, en particulier la frontière entre les différentes couches applicatives et la gestion d'état associée (choix d'architecture non encore figé à ce stade, cf. [étape 6](../00_init&prompt/00_promptInitial.md#étape-6--architecture-technique-et-choix-technologiques)) ;
 - la conformité aux référentiels externes utilisés pour juger la vitalité, la taille, la couverture de tests ou les notes Sonar.
 
 #### Non-substitution du jugement métier
@@ -111,4 +111,4 @@ L'auteur humain reste seul responsable du contenu livré, quelle que soit la par
 
 #### Protection des informations sensibles
 
-Aucune donnée confidentielle, personnelle ou soumise à secret n'est transmise à l'IA dans les prompts, notamment le contenu du fichier de données chiffré, les données personnelles des membres, ainsi que tout secret ou clé (cf. règles de refus déjà en place dans `.claude/settings.json` pour les fichiers `.pem` et `.key`). Le complément de ces règles pour le futur fichier de données chiffré est tracé dans le [plan de mise en place](./plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire).
+Aucune donnée confidentielle, personnelle ou soumise à secret n'est transmise à l'IA dans les prompts, notamment le contenu du fichier de données chiffré, les données personnelles des membres, ainsi que tout secret ou clé (cf. règles de refus déjà en place dans `.claude/settings.json` pour les fichiers `.pem` et `.key`). Le complément de ces règles pour le futur fichier de données chiffré est tracé dans le [plan de mise en place](../03_plan/plan_01_miseEnPlace.md#actions-issues-de-létape-1--modalités-dusage-de-lia-et-glossaire).

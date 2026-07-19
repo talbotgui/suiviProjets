@@ -14,7 +14,7 @@
 
 ## Contexte et origine du besoin
 
-Le besoin naît d'un usage personnel et solo : assurer le suivi de la qualimétrie et de l'obsolescence des dépendances d'un grand nombre de projets, répartis dans plusieurs groupes organisationnels, en s'appuyant sur les API de plusieurs instances GitLab et SonarQube. Aucun outillage existant ne permet aujourd'hui d'agréger ces informations, de les historiser et d'en tirer des alertes exploitables sans revue manuelle fastidieuse, projet par projet. L'application vise à combler ce manque, tout en respectant une contrainte forte : rester strictement locale, sans serveur ni base de données, avec des données chiffrées et des secrets jamais persistés (cf. [Specification.md, section 1](./01_besoin/Specification.md#1-introduction) et [section 2](./01_besoin/Specification.md#2-objectifs)).
+Le besoin naît d'un usage personnel et solo : assurer le suivi de la qualimétrie et de l'obsolescence des dépendances d'un grand nombre de projets, répartis dans plusieurs groupes organisationnels, en s'appuyant sur les API de plusieurs instances GitLab et SonarQube. Aucun outillage existant ne permet aujourd'hui d'agréger ces informations, de les historiser et d'en tirer des alertes exploitables sans revue manuelle fastidieuse, projet par projet. L'application vise à combler ce manque, tout en respectant une contrainte forte : rester strictement locale, sans serveur ni base de données, avec des données chiffrées et des secrets jamais persistés (cf. [Specification.md, section 1](../01_besoin/Specification.md#1-introduction) et [section 2](../01_besoin/Specification.md#2-objectifs)).
 
 ## Objectifs mesurables du projet
 
@@ -49,7 +49,7 @@ Aucune autre partie prenante n'est identifiée à ce stade : le projet est perso
 
 ### Inclus
 
-- Suivi et historisation de la qualimétrie et de l'obsolescence des dépendances de projets répartis en groupes organisationnels, via les API GitLab et SonarQube (fonctionnalités F01 à F26 de [Specification.md, section 3](./01_besoin/Specification.md#3-résumé-des-fonctionnalités)).
+- Suivi et historisation de la qualimétrie et de l'obsolescence des dépendances de projets répartis en groupes organisationnels, via les API GitLab et SonarQube (fonctionnalités F01 à F26 de [Specification.md, section 3](../01_besoin/Specification.md#3-résumé-des-fonctionnalités)).
 - Détection et mise en avant prioritaire des membres de dépôt non identifiés (signal de sécurité).
 - Détection de l'usage non autorisé de l'IA par croisement avec une politique par projet.
 - Stockage exclusivement local dans un fichier chiffré, sans serveur ni base de données, avec gestion des credentials en mémoire volatile uniquement.
@@ -74,7 +74,7 @@ Aucune autre partie prenante n'est identifiée à ce stade : le projet est perso
 
 | risque | impact | probabilité | mesure de mitigation |
 |---|---|---|---|
-| Perte du mot de passe du fichier de données | Perte totale et définitive d'accès aux données historisées (absence de tout mécanisme de recouvrement, déduite de la chaîne cryptographique décrite dans [Specification.md, section 5.1](./01_besoin/Specification.md#51-f01--stockage-chiffré-local)) | Moyenne | Documenter clairement l'absence de recouvrement dans le guide utilisateur, et recommander l'usage d'un gestionnaire de mots de passe dédié tel que [KeePass](https://keepass.info/) (documentation : [https://keepass.info/help/index.html](https://keepass.info/help/index.html)) pour conserver durablement le mot de passe du fichier de données |
+| Perte du mot de passe du fichier de données | Perte totale et définitive d'accès aux données historisées (absence de tout mécanisme de recouvrement, déduite de la chaîne cryptographique décrite dans [Specification.md, section 5.1](../01_besoin/Specification.md#51-f01--stockage-chiffré-local)) | Moyenne | Documenter clairement l'absence de recouvrement dans le guide utilisateur, et recommander l'usage d'un gestionnaire de mots de passe dédié tel que [KeePass](https://keepass.info/) (documentation : [https://keepass.info/help/index.html](https://keepass.info/help/index.html)) pour conserver durablement le mot de passe du fichier de données |
 | Temps disponible pour un développement solo insuffisant face à l'ampleur du périmètre (F01 à F26) | Retard indéfini ou abandon du projet | Moyenne | Étapes de cadrage validées indépendamment les unes des autres, priorisation MoSCoW des cas d'usage à l'étape 3 |
 | Évolution des contrats d'API GitLab ou Sonar | Rupture ponctuelle d'un ou plusieurs connecteurs | Faible à moyenne | Test de connectivité dédié (F24), anomalies typées et actions suggérées (F08) |
 | Apparition de nouveaux outils IA non couverts par le référentiel de détection | Faux négatifs sur la politique IA | Moyenne | Référentiel de marqueurs IA paramétrable et évolutif (`reglesMarqueursIA`) |

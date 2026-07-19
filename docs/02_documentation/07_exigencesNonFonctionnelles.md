@@ -22,7 +22,7 @@ Chaque exigence non fonctionnelle porte un identifiant stable de la forme `RNF-N
 | identifiant | exigence | valeur cible |
 |---|---|---|
 | RNF-001 | Temps d'affichage de la synthèse des audits après ouverture du fichier de données | Moins de 2 secondes, à l'échelle de volumétrie visée (cf. [RNF-006](#scalabilité-et-montée-en-charge)) |
-| RNF-002 | Temps de dérivation de clé (Argon2id, mémoire ≥ 64 Mo, 3 itérations, cf. [Specification.md, section 5.1](./01_besoin/Specification.md#51-f01--stockage-chiffré-local)) au chargement et à la sauvegarde du fichier | Quelques secondes au maximum ; ponctuel et acceptable au regard du gain de sécurité |
+| RNF-002 | Temps de dérivation de clé (Argon2id, mémoire ≥ 64 Mo, 3 itérations, cf. [Specification.md, section 5.1](../01_besoin/Specification.md#51-f01--stockage-chiffré-local)) au chargement et à la sauvegarde du fichier | Quelques secondes au maximum ; ponctuel et acceptable au regard du gain de sécurité |
 | RNF-003 | Temps de calcul local des indicateurs (jugement calculé à l'affichage) par projet, hors latence des appels réseau externes | Moins de 500 millisecondes par projet |
 | RNF-004 | Concurrence par défaut des appels lors d'une campagne d'audit (cf. [RG-017](./05_reglesGestion.md#audits-et-campagnes)) | 4 projets simultanés, valeur paramétrable, pour ménager les instances GitLab/Sonar et le proxy d'entreprise |
 | RNF-005 | Temps de réponse de la recherche transversale | Résultats affichés en moins d'une seconde, grâce à un index construit en mémoire à l'ouverture du fichier |
@@ -47,9 +47,9 @@ Chaque exigence non fonctionnelle porte un identifiant stable de la forme `RNF-N
 
 | identifiant | exigence |
 |---|---|
-| RNF-012 | Le fichier de données est chiffré au repos par Argon2id (dérivation de clé) puis AES-256-GCM (chiffrement authentifié), avec sel et IV aléatoires régénérés à chaque sauvegarde (cf. [Specification.md, section 5.1](./01_besoin/Specification.md#51-f01--stockage-chiffré-local)) |
+| RNF-012 | Le fichier de données est chiffré au repos par Argon2id (dérivation de clé) puis AES-256-GCM (chiffrement authentifié), avec sel et IV aléatoires régénérés à chaque sauvegarde (cf. [Specification.md, section 5.1](../01_besoin/Specification.md#51-f01--stockage-chiffré-local)) |
 | RNF-013 | Aucun credential n'est jamais persisté sur disque ni dans un stockage navigateur ; il vit exclusivement en mémoire volatile pour la durée de la session (cf. [RG-004](./05_reglesGestion.md#stockage-et-confidentialité-des-données)) |
-| RNF-014 | La session se verrouille automatiquement après un délai d'inactivité paramétrable (défaut 15 minutes, cf. [Specification.md, section 5.20](./01_besoin/Specification.md#520-f20--verrouillage-de-session)) ou sur action manuelle, avec effacement immédiat de la clé dérivée et des credentials en mémoire (cf. [RG-005](./05_reglesGestion.md#stockage-et-confidentialité-des-données)) |
+| RNF-014 | La session se verrouille automatiquement après un délai d'inactivité paramétrable (défaut 15 minutes, cf. [Specification.md, section 5.20](../01_besoin/Specification.md#520-f20--verrouillage-de-session)) ou sur action manuelle, avec effacement immédiat de la clé dérivée et des credentials en mémoire (cf. [RG-005](./05_reglesGestion.md#stockage-et-confidentialité-des-données)) |
 | RNF-015 | Une Content Security Policy stricte est appliquée (sans `unsafe-inline` ni `eval`) et aucune injection HTML dynamique n'est permise, pour limiter le risque de vol de credentials via une XSS |
 | RNF-016 | Les dépendances du projet sont verrouillées (fichier de lock) et auditées en intégration continue, quel que soit l'écosystème de dépendances confirmé à l'étape 6 (détail en [Analyse des dépendances vulnérables](./15_normesSecurite.md#analyse-des-dépendances-vulnérables), étape 10, et à l'étape 12 — intégration continue) |
 | RNF-017 | L'export en clair de la configuration exclut structurellement toute donnée personnelle ou sensible (membres connus, campagnes, brouillon, journal, vues enregistrées, cf. [RG-028](./05_reglesGestion.md#vues-alertes-export-et-import)) ; volet spécifique aux données personnelles détaillé en [RNF-027](#contraintes-réglementaires-et-légales) |
@@ -66,8 +66,8 @@ Chaque exigence non fonctionnelle porte un identifiant stable de la forme `RNF-N
 
 | identifiant | exigence |
 |---|---|
-| RNF-021 | L'application est distribuée comme application de bureau native, packagée pour Windows, macOS et Linux, quelle que soit la pile technique confirmée à l'étape 6 (Tauri mentionné à titre indicatif dans le dossier source, cf. [Specification.md, section 1.1](./01_besoin/Specification.md#11-architecture-retenue)) |
-| RNF-022 | Le fichier de données chiffré est portable indépendamment du système d'exploitation et de la machine (format d'enveloppe versionné, cf. [Specification.md, section 6.3](./01_besoin/Specification.md#63-enveloppe-chiffrée)), permettant son transfert d'un poste à l'autre |
+| RNF-021 | L'application est distribuée comme application de bureau native, packagée pour Windows, macOS et Linux, quelle que soit la pile technique confirmée à l'étape 6 (Tauri mentionné à titre indicatif dans le dossier source, cf. [Specification.md, section 1.1](../01_besoin/Specification.md#11-architecture-retenue)) |
+| RNF-022 | Le fichier de données chiffré est portable indépendamment du système d'exploitation et de la machine (format d'enveloppe versionné, cf. [Specification.md, section 6.3](../01_besoin/Specification.md#63-enveloppe-chiffrée)), permettant son transfert d'un poste à l'autre |
 | RNF-023 | Les accès réseau respectent la configuration proxy éventuelle du poste (`HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`) et prennent en charge un bundle d'autorité de certification interne pour l'inspection TLS |
 
 ## Internationalisation et localisation
@@ -100,6 +100,6 @@ La qualification juridique précise du traitement (responsable de traitement, ba
 | RNF-006, RNF-007, RNF-008 | US-025 ; échelle de volumétrie retenue à l'étape 4 |
 | RNF-009, RNF-010, RNF-011 | US-010, US-011, US-013 |
 | RNF-019, RNF-020 | Ensemble des écrans de restitution (Synthèse des audits, Fiche projet, Liste de travail) |
-| RNF-021, RNF-022, RNF-023 | Contrainte d'architecture desktop ([Specification.md, section 1.1](./01_besoin/Specification.md#11-architecture-retenue)) |
-| RNF-024, RNF-025, RNF-026, RNF-029 | Principe « Français intégral » ([Specification.md, section 1.2](./01_besoin/Specification.md#12-principes-de-conception)) |
+| RNF-021, RNF-022, RNF-023 | Contrainte d'architecture desktop ([Specification.md, section 1.1](../01_besoin/Specification.md#11-architecture-retenue)) |
+| RNF-024, RNF-025, RNF-026, RNF-029 | Principe « Français intégral » ([Specification.md, section 1.2](../01_besoin/Specification.md#12-principes-de-conception)) |
 | RNF-027, RNF-028 | [Éliminer les angles morts de sécurité liés aux membres non identifiés](./03_expressionBesoin.md#objectifs-mesurables-du-projet) ; US-022, US-023 |

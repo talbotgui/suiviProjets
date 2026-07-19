@@ -45,7 +45,7 @@ Composant transversal
 
 ## Règles de navigation
 
-- La sidebar (232px, cf. [maquette de référence](./01_besoin/Suivi%20Qualimetrie.dc.html)) reste visible en permanence dans le shell applicatif et matérialise l'écran actif ; elle donne accès direct à Accueil, Synthèse des audits, Synthèse graphique, Liste de travail, Audits, Administration et Paramétrage.
+- La sidebar (232px, cf. [maquette de référence](../01_besoin/Suivi%20Qualimetrie.dc.html)) reste visible en permanence dans le shell applicatif et matérialise l'écran actif ; elle donne accès direct à Accueil, Synthèse des audits, Synthèse graphique, Liste de travail, Audits, Administration et Paramétrage.
 - Dans l'arborescence ci-dessus, les éléments indentés sous Administration et Paramétrage sont des onglets d'un même écran (une seule ligne dans la matrice écrans / user stories ci-dessous) ; les éléments indentés sous Audits (Constitution de campagne, Tableau de bord d'exécution, Brouillon) sont trois écrans distincts, chacun recensé séparément dans cette matrice.
 - La barre supérieure, commune à tous les écrans du shell, affiche le nom du fichier chargé, le statut de sauvegarde, et donne accès à la recherche transversale, à la gestion des credentials et au verrouillage manuel.
 - Les écrans contextuels (Fiche projet, Comparaison entre deux audits) ne figurent pas dans la sidebar : ils s'ouvrent par navigation contextuelle (clic sur un projet, une alerte ou un point de graphique) et portent un bouton de retour explicite vers l'écran d'origine (Synthèse des audits, Synthèse graphique ou Liste de travail).
