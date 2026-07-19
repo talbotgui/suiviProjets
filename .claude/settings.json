@@ -12,6 +12,13 @@
       "Grep(*.pem)",
       "Read(*.key)",
       "Grep(*.key)"
+    ],
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.npmjs.com)",
+      "WebFetch(domain:tauri.app)",
+      "WebSearch",
+      "WebFetch(domain:aifluencyframework.org)"
     ]
   }
 }
