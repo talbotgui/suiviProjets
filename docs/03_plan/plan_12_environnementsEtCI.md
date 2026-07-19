@@ -1,0 +1,23 @@
+# Plan de mise en place
+
+## Sommaire
+
+1. [Objet du document](#objet-du-document)
+2. [Actions issues de l'étape 12 — Environnements, intégration continue et mise en production](#actions-issues-de-létape-12--environnements-intégration-continue-et-mise-en-production)
+
+## Objet du document
+
+Ce document trace, au fil des étapes de cadrage, les modifications techniques détectées durant les conversations et restant à réaliser après la rédaction des documents ([règle générale n°8](../00_init&prompt/00_promptInitial.md)). Chaque ligne précise l'action, le ou les fichiers concernés, l'étape d'origine, l'étape cible (lorsque le traitement est différé à une étape ultérieure connue) et le statut d'avancement. Une étape cible désigne la thématique de l'étape concernée (ex. « 12 » pour poste développeur/PIC/environnement de production), pas une garantie qu'une arborescence de code y sera créée : aucune des douze étapes de ce cadrage ne produit de code (cf. [préambule du prompt initial](../00_init&prompt/00_promptInitial.md)), si bien qu'une action qui en dépend reste différée jusqu'au démarrage effectif du développement, au-delà de ce cadrage documentaire.
+
+## Actions issues de l'étape 12 — Environnements, intégration continue et mise en production
+
+| action | fichier(s) concerné(s) | étape d'origine | étape cible | statut |
+|---|---|---|---|---|
+| Créer le workflow GitHub Actions complet (récupération du code, installation de l'outillage, analyse statique — sans revérification du formatage, cf. décision de cette étape —, tests unitaires et couverture, tests de bout en bout, SCA, build multiplateforme dont l'archive ZIP portable Windows, publication déclenchée par tag ou par `workflow_dispatch` créant lui-même le tag) | `.github/workflows/` (à créer) | [12](../02_documentation/18_pic.md#mise-en-place-du-pipeline) | démarrage effectif du développement | différé |
+| Générer et stocker en secret GitHub Actions la clé de signature des exécutables et du manifeste de mise à jour requise par le updater Tauri ; accorder au workflow de release la permission `contents: write` nécessaire à la création du tag et de la GitHub Release | secret et permissions GitHub Actions (à créer) | [12](../02_documentation/19_environnementProduction.md#stratégie-de-build-empaquetage-et-publication) | démarrage effectif du développement | différé |
+| Vérifier, lors de la mise en œuvre effective, la participation de l'archive ZIP portable Windows au mécanisme du updater Tauri (mise à jour automatique ou remplacement manuel de l'archive) | à vérifier (documentation Tauri, comportement observé) | [12](../02_documentation/19_environnementProduction.md#stratégie-de-build-empaquetage-et-publication) | démarrage effectif du développement | différé |
+| Configurer le plugin updater de Tauri (manifeste de version, fréquence de vérification, clé publique de vérification de signature) | `src-tauri/tauri.conf.json` (à créer) | [12](../02_documentation/19_environnementProduction.md#gestion-des-versions-et-des-mises-à-jour) | démarrage effectif du développement | différé |
+| Implémenter la fonction d'export d'un rapport de diagnostic local (journaux techniques récents, sans secret ni donnée personnelle) depuis l'écran de paramétrage | à définir (sous `src/`) | [12](../02_documentation/19_environnementProduction.md#journalisation-applicative-et-gestion-des-erreurs-en-production) | démarrage effectif du développement | différé |
+| Implémenter le gestionnaire global d'erreurs non gérées (panique du cœur natif, exception UI non interceptée), consignant dans le journal technique local sans jamais transmettre l'erreur à distance | à définir (`src/` et `src-tauri/src/`) | [12](../02_documentation/19_environnementProduction.md#journalisation-applicative-et-gestion-des-erreurs-en-production) | démarrage effectif du développement | différé |
+| Créer `.vscode/settings.json` (formatage à l'enregistrement pour Prettier et `rustfmt`, ESLint en validation continue) — devient le principal filet de sécurité de formatage côté éditeur, la CI ne revérifiant plus le formatage (cf. [décision de cette étape](../02_documentation/18_pic.md#mise-en-place-du-pipeline)) | `.vscode/settings.json` (à créer) | [12](../02_documentation/17_posteDeveloppeur.md#utilisation-de-vs-code) | démarrage effectif du développement — dépend de `.prettierrc`/`.eslintrc`, déjà tracés à l'étape 9 | différé |
+| Créer `.env.local.example` (gabarit documentant les variables d'environnement attendues, sans valeur réelle) pour faciliter la configuration initiale du poste développeur | `.env.local.example` (à créer) | [12](../02_documentation/17_posteDeveloppeur.md#variables-denvironnement) | démarrage effectif du développement | différé |
