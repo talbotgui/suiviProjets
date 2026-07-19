@@ -164,7 +164,12 @@ Une fois l'étape 12 validée, transpose chaque document normatif déjà produit
 
 ## Étape 14 — Revue complète
 Demande moi de tout relire puis demande moi une validation formelle.
-Ensuite, démarre un sous-agent pour relire toute la documentation, recroiser toutes les informations et lister les incohérences/doutes/questions que tu me présenteras.
+Ensuite, démarre un sous-agent pour
+- relire toute la documentation,
+- recroiser toutes les informations
+- vérifier particulièrement les liens entre document et les matrices
+- lister les incohérences/doutes/questions (que tu me présenteras)
+- lister les remarques présentes dans la documentation décrivant l'histoire de la construction du projet et pouvant être supprimées (exemple : "initialement envisagés côté cœur natif à l'étape 6, sont déplacés côté UI (TypeScript) à l'étape 13")
 
 ---
 
