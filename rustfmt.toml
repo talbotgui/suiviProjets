@@ -1,0 +1,12 @@
+# Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+# .claude/rules/01-usage-ia-et-conventions.md.
+#
+# Configuration rustfmt du cœur natif (cf. docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code).
+# Seules les options stables de rustfmt sont utilisées ici, la toolchain figée (rust-toolchain.toml) étant la
+# chaîne stable, sans composant nightly.
+edition = "2024"
+max_width = 100
+newline_style = "Unix"
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true

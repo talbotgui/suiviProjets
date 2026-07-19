@@ -11,14 +11,46 @@
       "Read(*.pem)",
       "Grep(*.pem)",
       "Read(*.key)",
-      "Grep(*.key)"
+      "Grep(*.key)",
+      "Read(*.sqm)",
+      "Grep(*.sqm)"
     ],
     "allow": [
-      "WebFetch(domain:github.com)",
+      "Bash(cargo check *)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo test *)",
+      "Bash(npx eslint *)",
+      "Bash(npx jest *)",
+      "Bash(npx prettier *)",
+      "Bash(cargo clippy *)",
+      "WebFetch(domain:aifluencyframework.org)",
       "WebFetch(domain:docs.npmjs.com)",
+      "WebFetch(domain:github.com)",
       "WebFetch(domain:tauri.app)",
-      "WebSearch",
-      "WebFetch(domain:aifluencyframework.org)"
+      "WebSearch"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/formater-et-analyser.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/journaliser-prompt.sh\""
+          }
+        ]
+      }
     ]
   }
 }

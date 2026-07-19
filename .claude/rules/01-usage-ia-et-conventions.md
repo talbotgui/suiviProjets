@@ -24,6 +24,7 @@ Synthèse actionnable de [01_modalitesUsageEtConventions.md](../../docs/02_docum
 
 - Une demande ambiguë appelle des questions avant toute production de contenu, jamais une hypothèse non vérifiée ([source](../../docs/02_documentation/01_modalitesUsageEtConventions.md#formulation-des-demandes-à-lia)).
 - Tout document ou code substantiellement généré ou assisté par l'IA porte une mention explicite de cette origine (en-tête de document, commentaire d'en-tête de fichier de code, message de commit) ([source](../../docs/02_documentation/01_modalitesUsageEtConventions.md#mention-de-lorigine-des-contenus)).
+- Dispense de cette mention en en-tête de fichier dans deux cas : fichier reproduisant tel quel, sans adaptation, la sortie brute d'un générateur officiel (`ng new`, `cargo init`, `tauri init`) ; fichier dont le format ne supporte aucun commentaire (ex. JSON strict), la mention en commit restant alors seule obligatoire (ajouté le 2026-07-19, à la suite d'incohérences constatées en relecture de la Phase 0, cf. [source](../../docs/02_documentation/01_modalitesUsageEtConventions.md#mention-de-lorigine-des-contenus)).
 
 ## Discernement
 

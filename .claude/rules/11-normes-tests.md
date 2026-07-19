@@ -38,6 +38,7 @@ Synthèse actionnable de [16_normesTests.md](../../docs/02_documentation/16_norm
 - Jeux de données de test exclusivement synthétiques/fictifs, jamais de donnée réelle de production ([source](../../docs/02_documentation/16_normesTests.md#gestion-des-données-de-test)).
 - Composants graphiques (UI de présentation) : pas de seuil de couverture par lignes ; suivre le **nombre de méthodes jamais appelées** (couverture par fonctions Jest/Istanbul) comme signal de scénario non couvert ([source](../../docs/02_documentation/16_normesTests.md#stratégie-de-couverture-de-code)).
 - Mesure : [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (Rust), couverture Istanbul intégrée à Jest (TypeScript).
+- Un seuil `coverageThreshold` Jest ciblé par motif de chemin n'est déclaré que si le périmètre correspondant contient déjà au moins un fichier réel : sinon `jest --coverage` échoue immédiatement (« Coverage data ... was not found »), même sans anomalie de couverture réelle ; l'activation doit être conditionnelle et automatique dès l'ajout des premiers fichiers réels (ajouté le 2026-07-19, échec constaté et corrigé en relecture de la Phase 0, cf. [source](../../docs/02_documentation/16_normesTests.md#stratégie-de-couverture-de-code)).
 
 ## Matrice de traçabilité
 

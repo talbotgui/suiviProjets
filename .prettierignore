@@ -1,0 +1,18 @@
+# Fichier ajouté en relecture de la Phase 0 (bootstrap) : sans ce fichier, `prettier --check .` remonte en
+# permanence des dizaines de documents Markdown préexistants (docs/) et des schémas générés par Tauri
+# (src-tauri/gen/schemas, déjà exclus du suivi de version par src-tauri/.gitignore), ce qui rend cette vérification
+# inexploitable pour détecter une régression réelle sur le code applicatif. Périmètre aligné sur les exclusions déjà
+# actées par eslint.config.js pour le même motif.
+#
+# La rédaction des documents Markdown suit ses propres règles, non celles de Prettier (cf.
+# docs/02_documentation/01_modalitesUsageEtConventions.md#règles-de-rédaction-des-documents-markdown) : un paragraphe
+# par ligne logique, sans reformatage automatique de la prose.
+docs/**
+
+# Artefacts de build/scaffolding, jamais suivis par Git (cf. .gitignore et src-tauri/.gitignore).
+dist/**
+.angular/**
+coverage/**
+node_modules/**
+src-tauri/target/**
+src-tauri/gen/**

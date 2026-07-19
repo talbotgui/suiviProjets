@@ -1,0 +1,51 @@
+# Squelette du pipeline d'intégration continue (Phase 0 — bootstrap du poste de développement et de l'outillage),
+# généré avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
+#
+# Périmètre volontairement limité, à ce stade, à la récupération du code et à l'installation de l'outillage
+# (cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline et
+# docs/03_plan/plan_13_developpement.md#phase-0--bootstrap-du-poste-de-développement-et-de-loutillage) :
+# aucune étape fonctionnelle (analyse statique, tests, couverture, tests de bout en bout, analyse des dépendances
+# vulnérables, build multiplateforme, publication) n'est ajoutée ici. Ces étapes sont différées à la Phase 10
+# (cf. docs/03_plan/plan_13_developpement.md#phase-10--intégration-continue-empaquetage-et-publication).
+name: Validation
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  installation-outillage:
+    name: Récupération du code et installation de l'outillage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml)
+        run: rustup show
+
+      - name: Installation des dépendances système Tauri (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            build-essential
+
+      - name: Installation des dépendances Rust verrouillées et compilation du cœur natif
+        working-directory: src-tauri
+        run: cargo build --locked

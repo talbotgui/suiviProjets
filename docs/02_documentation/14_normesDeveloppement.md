@@ -21,11 +21,14 @@ repo/
 │   └── app/
 │       ├── ecrans/            un dossier par écran de l'arborescence
 │       ├── composants/        composants réutilisables
-│       ├── campagne/          Orchestrateur de campagne, Connecteur croisé
-│       ├── jugement/          Moteur de jugement (fonctions pures)
-│       ├── etat/              Store d'état applicatif (Signals)
-│       ├── recherche/         Index de recherche transversale
-│       └── commandes/         client typé de la Façade de commandes
+│       └── services/          services applicatifs de l'interface, classés par caractère stateless/stateful
+│           ├── sansetat/      services sans état
+│           │   ├── jugement/      Moteur de jugement (fonctions pures)
+│           │   └── commandes/     client typé de la Façade de commandes
+│           └── avecetat/      services porteurs d'un état réactif
+│               ├── campagne/      Orchestrateur de campagne, Connecteur croisé
+│               ├── etat/          Store d'état applicatif (Signals)
+│               └── recherche/     Index de recherche transversale
 ├── src-tauri/                 cœur natif (Rust)
 │   └── src/
 │       ├── connecteurs/       gitlab.rs, sonar.rs
@@ -37,13 +40,20 @@ repo/
 
 - `ecrans/` : un dossier par écran de l'arborescence de navigation définie à [l'étape 5](./08_arborescenceNavigation.md#arborescence-des-écrans).
 - `composants/` : composants réutilisables, conformes à la charte d'ergonomie définie à [l'étape 5](./10_charteErgonomie.md#composants-dinterface-réutilisables).
+- `services/` : l'ensemble des services applicatifs de l'interface (au sens large : services Angular injectables comme classes utilitaires porteuses de fonctions pures), répartis en deux catégories mutuellement exclusives selon leur caractère stateless ou stateful, chacune conservant en son sein le même sous-regroupement fonctionnel qu'auparavant :
+  - `services/sansetat/` : services sans état, dont le résultat ne dépend que de leurs paramètres et de l'état du fichier de données au moment de l'appel, jamais d'un état interne conservé entre deux appels — `jugement/` (Moteur de jugement) et `commandes/` (client typé de la Façade de commandes) ;
+  - `services/avecetat/` : services porteurs d'un état interne conservé entre deux appels (état réactif exposé par Signals ou structure construite une fois puis réutilisée) — `campagne/` (Orchestrateur de campagne, Connecteur croisé), `etat/` (Store d'état applicatif) et `recherche/` (Index de recherche transversale).
 - `modele/` : structures de données définies à [l'étape 7](./12_modeleDonnees.md#entités-attributs-et-relations).
+
+Note (ajoutée le 2026-07-19) : la répartition ci-dessus remplace une organisation antérieure où ces cinq dossiers (`campagne/`, `jugement/`, `etat/`, `recherche/`, `commandes/`) étaient placés directement sous `src/app/`, sans distinction explicite entre services sans état et services porteurs d'un état. Cette évolution est une décision humaine issue de la relecture de la Phase 0 (bootstrap) : elle rend visible dès l'arborescence une propriété structurante de chaque service (absence ou présence d'état interne conservé entre deux appels), utile en particulier pour raisonner sur la testabilité et sur les risques de fuite d'état, sans modifier le contenu ni la responsabilité de chacun des cinq modules concernés ni leur sous-regroupement fonctionnel respectif.
 
 L'arborescence n'est volontairement pas symétrique entre les deux piles : `src/` est à la racine du dépôt comme dans un projet Angular/JS classique, tandis que le cœur natif est isolé dans `src-tauri/` avec son propre `src/`, `Cargo.toml` et `tauri.conf.json`. Cette disposition n'est pas un choix propre à ce projet mais la structure de scaffolding standard de [Tauri](https://v2.tauri.app/start/project-structure/) (générée par `npm create tauri-app`) : `src-tauri/` est le nom de répertoire que l'outillage Tauri (CLI, bundler) reconnaît nativement pour localiser le backend Rust à compiler et empaqueter, le lien entre les deux piles étant fait par le paramètre `frontendDist` de `tauri.conf.json`, qui pointe vers les assets frontend compilés.
 
 Chaque module correspond à un répertoire identifié, sans dépendance circulaire entre couches : un connecteur ne dépend jamais du moteur de persistance, et réciproquement, conformément à l'architecture en couches retenue à [l'étape 6](./11_architectureTechnique.md#style-architectural-retenu-et-justification).
 
 Un fichier de référence exemplaire, intégralement conforme aux règles de la section [Rigueur du typage et de la documentation](#rigueur-du-typage-et-de-la-documentation--typescript), est maintenu pour chaque pattern de fichier récurrent (un composant Angular, un service Angular, une classe utilitaire, un module Rust de connecteur) : il sert de gabarit concret à reproduire, plus fiable qu'une règle textuelle pour obtenir un style homogène d'une génération de code à l'autre, notamment lorsqu'elle est assistée par IA. La création de ces fichiers de référence est différée à l'étape 12 (poste développeur), une fois l'arborescence de code effectivement créée ; ce report est tracé dans le [plan de mise en place de l'étape 9](../03_plan/plan_09_normesDeveloppement.md#actions-issues-de-létape-9--normes-de-développement).
+
+- Nommage des fichiers de référence exemplaire : le nom de fichier porte systématiquement le motif `exemple-reference` (`kebab-case` côté Angular, ex. `exemple-reference.component.ts`) ou `exemple_reference` (`snake_case` côté Rust, ex. `exemple_reference.rs`), suivi du suffixe habituel du type de fichier concerné ; le fichier est placé dans le répertoire structurant qui accueillera le code fonctionnel réel du même pattern, jamais dans un répertoire séparé, et son commentaire d'en-tête explicite qu'il s'agit d'un gabarit non destiné à un usage fonctionnel réel (ajouté le 2026-07-19 : convention appliquée de façon cohérente dès les quatre premiers fichiers de référence de la Phase 0 mais jusque-là non formalisée, ce qui aurait pu conduire un futur ajout à s'en écarter sans le savoir).
 
 ## Conventions de nommage
 
@@ -58,6 +68,8 @@ Un fichier de référence exemplaire, intégralement conforme aux règles de la 
 | Références aux exigences dans le code | Commentaire renvoyant à l'identifiant stable (`US-NNN`, `RG-NNN`) au plus près du code qui l'implémente, lorsque la règle appliquée n'est pas évidente à la seule lecture du code |
 
 Ces conventions sont contrôlées par l'outillage d'analyse statique plutôt que laissées à la seule vigilance du développeur : `@typescript-eslint/naming-convention` côté TypeScript, lints de style par défaut du compilateur (`non_snake_case`, `non_camel_case_types`, etc.) côté Rust (cf. [Rigueur du typage et de la documentation](#rigueur-du-typage-et-de-la-documentation--typescript)).
+
+Note (ajoutée le 2026-07-19) : le fichier de synthèse [`.claude/rules/09-normes-developpement.md`](../../.claude/rules/09-normes-developpement.md) omettait le préfixe applicatif des classes de composants Angular pourtant déjà présent ci-dessus (`SqmFicheProjetComponent`), écart constaté en relecture de la Phase 0 (bootstrap) et corrigé dans ce même fichier de synthèse, ce dernier étant le seul chargé automatiquement en session et donc la seule source réellement consultée au quotidien.
 
 ## Stratégie de branches et de contribution Git
 
@@ -90,6 +102,9 @@ Les messages de commit de code applicatif suivent la convention [**Conventional 
 - Une fonction du Moteur de jugement (calcul d'un indicateur) reste pure, sans effet de bord, et testable indépendamment, conformément au découpage retenu à [l'étape 6](./11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités) et à [l'étape 8](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces).
 - Aucune valeur de seuil ou de référentiel n'est codée en dur : elle provient toujours de la branche `parametres`/`referentiels` du modèle de données définie à [l'étape 7](./12_modeleDonnees.md#entités-attributs-et-relations).
 - La complexité du code est surveillée par l'outillage d'analyse statique par défaut de chaque écosystème (Clippy, ESLint), sans seuil chiffré arbitraire supplémentaire à ce stade ; ce point sera réévalué si un cas concret le justifie.
+- Le hook de formatage/analyse statique et le périmètre d'extensions de fichiers qu'il couvre sont tenus à jour à chaque introduction d'un nouveau type de fichier de configuration versionné (ex. `*.js`, `*.yml`) : un fichier de configuration modifié en dehors du périmètre déclaré du hook échappe silencieusement au formatage/à l'analyse statique automatiques locaux (ajouté le 2026-07-19 : gabarits `.js` du projet — configuration ESLint et Jest — et workflow `.yml` de la Phase 0 constatés hors du périmètre initial du hook, corrigé).
+- L'exclusion Prettier (`.prettierignore`) est tenue alignée sur l'exclusion ESLint (`ignores` de `eslint.config.js`) dès la mise en place initiale des formateurs, plutôt que laissée par défaut : sans elle, `prettier --check` sur l'ensemble du dépôt remonte en permanence les documents Markdown (dont la rédaction suit ses propres règles, cf. [Règles de rédaction des documents Markdown](./01_modalitesUsageEtConventions.md#règles-de-rédaction-des-documents-markdown)) et les artefacts générés, rendant cette vérification inexploitable pour détecter une régression réelle sur le code applicatif (ajouté le 2026-07-19, constaté en relecture de la Phase 0).
+- Aucun fichier de note de travail personnelle non documenté (ex. mémo technique du développeur ou de l'IA sur un point d'attention) n'est déposé à la racine du dépôt ou dans un répertoire de code : un tel constat, une fois formulé, est soit versé directement dans `docs/04_rapports/rapportDeDeveloppement.md` (sous-section Codeur ou Relecteur de l'étape concernée), soit transformé en ajout de règle selon le présent modèle, jamais laissé sous forme de fichier isolé sans propriétaire ni durée de vie définie (ajouté le 2026-07-19, à la suite du constat d'un tel fichier, non documenté et partiellement inexact, découvert et supprimé en relecture de la Phase 0).
 
 ### Rigueur du typage et de la documentation — TypeScript
 
@@ -98,7 +113,7 @@ Les messages de commit de code applicatif suivent la convention [**Conventional 
 | Visibilité explicite (`public`, `private`, `protected`) sur tout membre de classe, y compris les propriétés promues dans le constructeur | [`@typescript-eslint/explicit-member-accessibility`](https://typescript-eslint.io/rules/explicit-member-accessibility/) |
 | Type de retour explicite sur toute fonction et méthode, y compris aux frontières de module | [`@typescript-eslint/explicit-function-return-type`](https://typescript-eslint.io/rules/explicit-function-return-type/), [`@typescript-eslint/explicit-module-boundary-types`](https://typescript-eslint.io/rules/explicit-module-boundary-types/) |
 | JSDoc présente sur toute classe et toute méthode | [eslint-plugin-jsdoc](https://github.com/gajus/eslint-plugin-jsdoc), règle `require-jsdoc` avec les contextes `ClassDeclaration` et `MethodDefinition` |
-| Aucune fonction ni constante-fonction déclarée en dehors d'une classe | règle ESLint dédiée à ce projet (`no-restricted-syntax` ciblant les déclarations de fonction et les fonctions fléchées au niveau `Program`), aucune règle générique existante ne couvrant ce cas |
+| Aucune fonction ni constante-fonction déclarée en dehors d'une classe | règle ESLint dédiée à ce projet (`no-restricted-syntax` ciblant les déclarations de fonction et les fonctions fléchées au niveau `Program`), aucune règle générique existante ne couvrant ce cas ; couverture à revérifier manuellement à chaque évolution de cette règle sur chacune des combinaisons déclaration/expression de fonction/fonction fléchée croisée avec absence d'export/export nommé/export par défaut, une règle initiale ne couvrant qu'une partie de ces combinaisons ayant laissé passer silencieusement une constante-fonction exportée nommément sous forme `function` et toute fonction exportée par défaut (trou constaté et corrigé en relecture de la Phase 0, ajouté le 2026-07-19) |
 | Fonctions utilitaires (résultat ne dépendant que des paramètres) regroupées en classes utilitaires, elles-mêmes rassemblées dans un répertoire dédié | organisation vérifiée en revue de code ; aucune règle générique de `typescript-eslint` ne contrôle un emplacement de fichier |
 | Aucun type `any`, explicite ou implicite | [`@typescript-eslint/no-explicit-any`](https://typescript-eslint.io/rules/no-explicit-any/) et option `noImplicitAny` de `tsconfig.json` |
 | Toute variable, tout paramètre et toute propriété de classe sont typés | options `noImplicitAny` et `strictPropertyInitialization` de `tsconfig.json` (mode strict) ; la règle `@typescript-eslint/typedef`, qui imposerait une annotation même là où le type est déjà inféré, est dépréciée par l'éditeur du plugin au profit de ces options du compilateur et n'est donc pas retenue |

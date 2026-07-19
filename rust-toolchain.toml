@@ -1,0 +1,8 @@
+# Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+# .claude/rules/01-usage-ia-et-conventions.md.
+#
+# Toolchain Rust figée pour l'ensemble du dépôt (cf. docs/02_documentation/14_normesDeveloppement.md#gestion-des-dépendances) :
+# version exacte et composants requis (rustfmt, clippy) déjà installés dans cet environnement de développement.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]

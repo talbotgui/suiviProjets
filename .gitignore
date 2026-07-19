@@ -13,6 +13,10 @@
 
 # Rust / Tauri build artefacts
 /src-tauri/target/
+# Schémas générés par la CLI Tauri (ex. lors de l'ajout de plugins) : artefacts régénérables, jamais suivis.
+# Reporté ici le 2026-07-19 depuis src-tauri/.gitignore (supprimé, cf. relecture de la Phase 0 : un seul fichier
+# .gitignore par dépôt Git, pratique standard, aucun outil Cargo/Tauri ne dépendant d'un .gitignore local).
+/src-tauri/gen/schemas
 
 # Environment files and secrets
 /.env
@@ -32,3 +36,20 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Journal local des prompts IA (cf. docs/02_documentation/17_posteDeveloppeur.md#traçabilité-des-échanges-avec-lia) :
+# strictement local, jamais transmis, jamais committé.
+/.claude/logs/
+
+# IDE et éditeurs (hors VS Code, déjà couvert explicitement par .vscode/*.json versionnés)
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Fichiers système
+.DS_Store
+Thumbs.db

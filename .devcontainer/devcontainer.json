@@ -1,4 +1,4 @@
 {
   "name": "suiviProjets",
-  "postCreateCommand": "mkdir -p ~/.claude/projects/-workspaces-suiviProjets && rm -rf ~/.claude/projects/-workspaces-suiviProjets/memory && ln -s ./.claude/memory ~/.claude/projects/-workspaces-suiviProjets/memory"
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y rustup libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev pkg-config file build-essential && rustup default stable && mkdir -p ~/.claude/projects/-workspaces-suiviProjets && rm -rf ~/.claude/projects/-workspaces-suiviProjets/memory && ln -s ./.claude/memory ~/.claude/projects/-workspaces-suiviProjets/memory"
 }

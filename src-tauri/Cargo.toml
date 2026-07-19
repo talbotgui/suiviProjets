@@ -1,0 +1,43 @@
+# Fichier généré par la commande `cargo init`/`tauri init` puis adapté avec l'assistance de l'IA (Claude Code),
+# conformément à la mention d'origine requise par .claude/rules/01-usage-ia-et-conventions.md.
+
+[package]
+name = "suivi_qualimetrie"
+version = "0.1.0"
+description = "Cœur natif (Rust/Tauri) de l'application de suivi de la qualimétrie logicielle (GitLab/SonarQube)."
+authors = ["TALBOT Guillaume <talbotgui@gmail.com>"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/talbotgui/suiviProjets"
+# Édition fixée explicitement plutôt que laissée à la valeur par défaut de Cargo (cf. docs/02_documentation/14_normesDeveloppement.md#gestion-des-dépendances) :
+# dernière édition stable disponible pour le compilateur installé (rustc 1.97.1, cf. rust-toolchain.toml), stabilisée depuis rustc 1.85.
+edition = "2024"
+rust-version = "1.85"
+
+# Voir https://doc.rust-lang.org/cargo/reference/manifest.html pour les autres clés disponibles.
+
+[lib]
+name = "suivi_qualimetrie_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3" }
+tauri-plugin-log = "2"
+
+# Rigueur du typage et de la documentation Rust (cf. docs/02_documentation/14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--rust).
+[lints.rust]
+# Visibilité la plus restrictive possible à chaque frontière de module : signale un `pub` non réellement
+# atteignable depuis la racine publique du crate (avertissement, revérifié en CI, cf. plan_09_normesDeveloppement.md).
+unreachable_pub = "warn"
+# Documentation Rustdoc (`///`) obligatoire sur tout élément public (avertissement, revérifié en CI).
+missing_docs = "warn"
+
+[lints.clippy]
+# Aucun contournement du système de types par une panique à la place d'un `Result`/`Option` explicite (erreur bloquante).
+unwrap_used = "deny"
+expect_used = "deny"

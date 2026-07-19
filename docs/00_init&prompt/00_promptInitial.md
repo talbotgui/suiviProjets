@@ -99,7 +99,8 @@ Rédige les documents décrivant l'architecture technique cible :
 - découpage en composants/modules et responsabilités de chacun ;
 - dépendances externes (API tierces, services externes) et leur intégration ;
 - stratégie d'évolutivité de l'architecture dans le temps ;
-- stratégie de gestion d'état et de communication entre les parties de l'application.
+- stratégie de gestion d'état et de communication entre les parties de l'application ;
+- identifiant applicatif définitif de la solution (nom de produit affiché, identifiant inversé de type reverse-DNS pour tout empaqueteur qui l'exige — ex. Tauri, mobile —, nom de paquet npm et de crate/module natif s'ils diffèrent) : fixé explicitement à cette étape plutôt que laissé à une décision arbitraire de l'IA lors du bootstrap de l'outillage, un tel identifiant engageant la configuration de l'empaqueteur, la publication et, potentiellement, un compte de plateforme applicative (enseignement de la Phase 0 du plan de développement d'un premier projet cadré par ce prompt, où cet identifiant manquant a dû être choisi arbitrairement au bootstrap, à confirmer ensuite par un humain).
 
 ## Étape 7 — Modèle de données
 Rédige les documents décrivant le modèle de données :
@@ -124,7 +125,8 @@ Rédige les normes de développement :
 - stratégie de branches et de contribution Git (workflow, convention de messages de commit, revue des pull requests) ;
 - gestion des dépendances (mise à jour des librairies, veille des vulnérabilités) et reproductibilité de l'environnement de compilation/exécution (versions figées du langage et de l'outillage, vérification stricte des verrous de dépendances à l'installation) ;
 - règles de qualité de code et de revue, en précisant l'articulation entre les contrôles locaux (hook, pre-commit) et les contrôles bloquants de l'intégration continue ;
-- fichiers de configuration d'éditeur partagés et indépendants du poste (réglages de base communs à tout type de fichier, extensions recommandées), tenus à jour au fil des choix technologiques de cette étape et des étapes précédentes.
+- fichiers de configuration d'éditeur partagés et indépendants du poste (réglages de base communs à tout type de fichier, extensions recommandées), tenus à jour au fil des choix technologiques de cette étape et des étapes précédentes ;
+- gabarit exact du commentaire de mention d'origine IA en en-tête de fichier de code (formulation, dispenses applicables — fichier de scaffolding non modifié issu d'un générateur officiel, format sans support de commentaire), et convention de nommage des fichiers de référence exemplaire (gabarits) par pattern de fichier récurrent : deux formats laissés à l'appréciation de l'IA lors du bootstrap d'un premier projet cadré par ce prompt, faute d'avoir été fixés ici, avec pour conséquence une application incohérente d'un fichier à l'autre, corrigée seulement en relecture (enseignement de la Phase 0 du plan de développement).
 
 ## Étape 10 — Normes de sécurité applicative
 Rédige les normes de sécurité à appliquer lors du développement :
@@ -142,7 +144,7 @@ Rédige les normes des tests automatisés :
 - tests de charge et de performance (en cohérence avec les exigences de performance de l'étape 4) ;
 - gestion des données de test (jeux de données, anonymisation) ;
 - recette et tests d'acceptation utilisateur (UAT) avant mise en production ;
-- stratégie de couverture de code (seuils visés, périmètre couvert et non couvert, et justification des exclusions) ;
+- stratégie de couverture de code (seuils visés, périmètre couvert et non couvert, et justification des exclusions), en précisant explicitement que tout outillage de couverture configuré par avance, avant l'existence du code qu'il mesure, doit activer chaque seuil par périmètre de façon conditionnelle à la présence d'au moins un fichier réel dans ce périmètre plutôt que sous une forme statique — un outil de couverture usuel pouvant faire échouer une vérification de couverture sur un périmètre encore vide, indépendamment de toute anomalie réelle (enseignement de la Phase 0 du plan de développement d'un premier projet cadré par ce prompt) ;
 - matrice de traçabilité reliant les modules/composants et les cas limites techniques de l'étape 8, ainsi que les exigences non fonctionnelles de performance et de scalabilité de l'étape 4, aux tests qui les couvrent (ou à leur exclusion justifiée) ; chaque périmètre cité dans la stratégie de couverture de code est en outre décrit par au moins un paragraphe de stratégie de test dans les chapitres précédents du document.
 
 ## Étape 12 — Environnements, intégration continue et mise en production

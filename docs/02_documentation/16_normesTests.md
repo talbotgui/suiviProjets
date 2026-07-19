@@ -88,6 +88,8 @@ La couverture est mesurée par [cargo-llvm-cov](https://github.com/taiki-e/cargo
 
 Pour les composants graphiques (écrans et composants de présentation), l'indicateur suivi n'est pas le pourcentage de lignes couvertes mais le **nombre de méthodes ou fonctions jamais appelées** par l'ensemble des tests (unitaires et de bout en bout), tel que restitué par le rapport de couverture par fonctions de Jest/Istanbul. Une méthode jamais appelée signale soit un scénario ou un cas d'usage de l'application non exercé par les tests existants, soit du code mort à retirer : cet indicateur se veut plus révélateur de la complétude des scénarios de test que la seule proportion de lignes exécutées, un pourcentage de lignes élevé pouvant masquer des branches ou des méthodes entières jamais sollicitées.
 
+Précision : un seuil `coverageThreshold` de Jest ciblé par motif de chemin sur un périmètre ne contenant encore aucun fichier réel fait échouer `jest --coverage` dès son exécution (« Coverage data for ... was not found »), y compris en l'absence de toute anomalie de couverture réelle. Un seuil par périmètre pré-configuré avant l'existence du code qu'il mesure n'est donc déclaré dans la configuration Jest que sous condition — activé automatiquement, sans intervention supplémentaire, dès qu'au moins un fichier réel apparaît sous le périmètre concerné — plutôt que sous une forme statique qui échouerait immédiatement sur un périmètre encore vide.
+
 ## Matrice de traçabilité
 
 | module / composant ([étape 8](./13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces)) | test(s) couvrant ou exclusion justifiée |

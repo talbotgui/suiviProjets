@@ -1,11 +1,11 @@
 {
-    "recommendations": [
-        "anthropic.claude-code",
-        "rust-lang.rust-analyzer",
-        "tamasfe.even-better-toml",
-        "angular.ng-template",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "editorconfig.editorconfig"
-    ]
+  "recommendations": [
+    "anthropic.claude-code",
+    "rust-lang.rust-analyzer",
+    "tamasfe.even-better-toml",
+    "angular.ng-template",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "editorconfig.editorconfig"
+  ]
 }

@@ -77,6 +77,10 @@ L'historique des sessions et les commits Git constituent la trace de référence
 
 Les documents et fichiers de code substantiellement générés ou fortement assistés par l'IA portent une mention explicite de cette origine : en en-tête ou à proximité du sommaire pour les documents, en commentaire d'en-tête de fichier pour le code, en complément de la mention systématique dans les messages de commit.
 
+Deux précisions :
+- un fichier reproduisant tel quel, sans aucune adaptation, la sortie brute d'un générateur officiel invoqué par l'IA (ex. `ng new`, `cargo init`, `tauri init`) est dispensé de cette mention, l'IA n'ayant fait qu'invoquer l'outil sans produire de contenu propre ; dès que ce fichier est adapté, complété ou corrigé au-delà de ce gabarit par défaut, la mention devient obligatoire ;
+- un fichier dont le format ne supporte structurellement aucun commentaire (ex. JSON strict) est dispensé de la mention en en-tête de fichier, faute de pouvoir la porter ; la mention systématique dans le message de commit qui l'introduit reste alors seule obligatoire et suffisante.
+
 ### Discernement
 
 #### Fiabilité et limites connues de l'IA
