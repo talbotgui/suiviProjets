@@ -39,6 +39,17 @@ thiserror = "2.0.19"
 chrono = "0.4.45"
 fs4 = { version = "0.13.1", features = ["sync"] }
 zeroize = "1"
+# Premier appel réseau réel du projet (Phase 2 : testerConnectivite, US-004) : respecte nativement le proxy du
+# poste (HTTP_PROXY/HTTPS_PROXY/NO_PROXY via Proxy::system(), activé par défaut), cf.
+# docs/02_documentation/17_posteDeveloppeur.md#variables-denvironnement.
+reqwest = { version = "0.12", default-features = false, features = ["json", "default-tls"] }
+
+[dev-dependencies]
+# Serveur HTTP simulé en boucle locale, seul moyen réaliste de tester la logique des connecteurs (en-têtes,
+# statuts, JSON) sans appel réseau réel vers une vraie instance (cf.
+# docs/02_documentation/16_normesTests.md#tests-unitaires).
+wiremock = "0.6"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 # Rigueur du typage et de la documentation Rust (cf. docs/02_documentation/14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--rust).
 [lints.rust]

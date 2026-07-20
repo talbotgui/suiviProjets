@@ -40,6 +40,10 @@ pub(crate) enum ErreurFacade {
     FichierVerrouille,
     /// Aucun fichier n'est actuellement ouvert dans la session.
     AucunFichierOuvert,
+    /// Un credential fourni est vide (RG-004) : revalidation côté cœur natif de la validation déjà effectuée côté
+    /// interface, cf. `docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties` (« aucune
+    /// confiance aveugle dans une donnée reçue via une commande »).
+    CredentialInvalide,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
 }

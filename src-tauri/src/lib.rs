@@ -6,8 +6,10 @@
 //! Bibliothèque native (cœur Tauri) de l'application de suivi de la qualimétrie logicielle.
 //!
 //! Phase 1 (socle de persistance et sécurité du fichier, cf. `docs/03_plan/plan_13_developpement.md`) : ce crate
-//! expose désormais les commandes de création, chargement, sauvegarde et verrouillage/déverrouillage du fichier
-//! de données chiffré (US-001, US-002, US-026), en plus du point d'entrée générique de la fenêtre Tauri.
+//! expose les commandes de création, chargement, sauvegarde et verrouillage/déverrouillage du fichier de données
+//! chiffré (US-001, US-002, US-026). Phase 2 (gestion des credentials) : s'y ajoutent les commandes de test de
+//! connectivité et de saisie en mémoire des credentials de session (US-003, US-004), en plus du point d'entrée
+//! générique de la fenêtre Tauri.
 
 mod commandes;
 mod connecteurs;
@@ -33,6 +35,8 @@ pub fn run() {
             commandes::fichier::sauvegarder_fichier,
             commandes::fichier::verrouiller_session,
             commandes::fichier::deverrouiller_session,
+            commandes::connectivite::tester_connectivite,
+            commandes::connectivite::definir_credentials,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
