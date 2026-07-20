@@ -5,15 +5,20 @@
 
 //! Bibliothèque native (cœur Tauri) de l'application de suivi de la qualimétrie logicielle.
 //!
-//! À ce stade du projet (Phase 0 — bootstrap du poste de développement et de l'outillage), ce crate ne porte
-//! encore aucune commande ni logique métier : il expose uniquement le point d'entrée générique nécessaire au
-//! lancement d'une fenêtre Tauri vide, socle des phases de développement fonctionnel ultérieures (cf.
-//! `docs/03_plan/plan_13_developpement.md`).
+//! Phase 1 (socle de persistance et sécurité du fichier, cf. `docs/03_plan/plan_13_developpement.md`) : ce crate
+//! expose désormais les commandes de création, chargement, sauvegarde et verrouillage/déverrouillage du fichier
+//! de données chiffré (US-001, US-002, US-026), en plus du point d'entrée générique de la fenêtre Tauri.
 
+mod commandes;
 mod connecteurs;
+mod modele;
+mod persistance;
+
+use commandes::etat_session::EtatSession;
 
 /// Démarre l'application Tauri : construit la fenêtre principale, installe le plugin de journalisation en mode
-/// développement, puis lance la boucle d'événements native.
+/// développement, enregistre l'état de session et les commandes de la Façade, puis lance la boucle d'événements
+/// native.
 ///
 /// Toute erreur fatale au démarrage est explicitement journalisée sur la sortie d'erreur avant l'arrêt du
 /// processus, plutôt que de recourir à `.unwrap()`/`.expect()` (interdits par les normes de développement du
@@ -21,6 +26,14 @@ mod connecteurs;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let resultat = tauri::Builder::default()
+        .manage(EtatSession::nouveau())
+        .invoke_handler(tauri::generate_handler![
+            commandes::fichier::creer_fichier,
+            commandes::fichier::charger_fichier,
+            commandes::fichier::sauvegarder_fichier,
+            commandes::fichier::verrouiller_session,
+            commandes::fichier::deverrouiller_session,
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

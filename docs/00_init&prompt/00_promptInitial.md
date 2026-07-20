@@ -71,7 +71,7 @@ Rédige les documents décrivant les exigences fonctionnelles :
 
 ## Étape 4 — Exigences non fonctionnelles
 Rédige les documents décrivant les exigences non fonctionnelles :
-- performance (temps de réponse, volumétrie attendue) ;
+- performance (temps de réponse, volumétrie attendue) ; lorsqu'un algorithme de dérivation de clé paramétrable est mentionné (ex. Argon2id), fixe la totalité de ses paramètres numériques (coût mémoire, nombre d'itérations, degré de parallélisme), et non une partie seulement, pour qu'aucun paramètre cryptographique ne soit laissé au choix de l'implémentation (enseignement de la Phase 1 du plan de développement d'un premier projet cadré par ce prompt : degré de parallélisme non fixé, contrairement au coût mémoire et au nombre d'itérations, laissé à une valeur par défaut choisie par l'implémentation) ;
 - scalabilité et montée en charge ;
 - disponibilité et tolérance aux pannes ;
 - sécurité (authentification, autorisation, protection des données) ;
@@ -108,11 +108,12 @@ Rédige les documents décrivant le modèle de données :
 - stratégie de persistance et de migration des données ;
 - stratégie de sauvegarde et de restauration des données ;
 - gouvernance et propriété des données (responsabilités par domaine de données) ;
-- règles de validation et de cohérence des données.
+- règles de validation et de cohérence des données ;
+- pour chaque valeur numérique par défaut nécessaire au fonctionnement mais non fixée par une règle de gestion ou une exigence non fonctionnelle (ex. nombre de sauvegardes de sécurité conservées, nombre d'échecs de déverrouillage consécutifs avant fermeture d'un fichier), fixe explicitement cette valeur par défaut dans le document normatif concerné plutôt que de la laisser être déduite, phase après phase, du seul jeu d'exemple livré avec la spécification (enseignement de la Phase 1 du plan de développement d'un premier projet cadré par ce prompt : deux valeurs distinctes reprises ainsi du même jeu d'exemple faute de valeur normative, avec le risque qu'une phase ultérieure fasse un choix différent pour un besoin similaire).
 
 ## Étape 8 — Conception détaillée de l'application
 Rédige la conception détaillée à partir des étapes précédentes :
-- détail des modules/composants et de leurs interfaces ;
+- détail des modules/composants et de leurs interfaces, en énumérant explicitement, nom par nom, l'intégralité des commandes de la Façade de commandes requises par la couverture des cas d'usage retenus à l'étape 3 — y compris les commandes de portée technique ou transverse (verrouillage/déverrouillage de session, migration) qu'il est facile d'omettre parce qu'elles ne correspondent à aucune donnée métier propre —, plutôt que de n'en citer qu'une partie à titre d'exemple en laissant l'implémentation déduire les commandes manquantes par symétrie (enseignement de la Phase 1 du plan de développement d'un premier projet cadré par ce prompt : la commande de déverrouillage de session, requise par un cas d'usage Must have, n'était nommée nulle part explicitement dans ce document) ;
 - séquences des scénarios fonctionnels principaux, en couvrant explicitement chacun des domaines de vigilance renforcée identifiés à l'étape 1, en plus des cas d'usage Must have transverses à plusieurs modules ;
 - gestion des erreurs et cas limites au niveau technique.
 
@@ -130,7 +131,7 @@ Rédige les normes de développement :
 
 ## Étape 10 — Normes de sécurité applicative
 Rédige les normes de sécurité à appliquer lors du développement :
-- gestion des secrets et des données sensibles ;
+- gestion des secrets et des données sensibles, en précisant explicitement, pour tout format binaire chiffré décrit ailleurs seulement par ses grandes composantes (ex. une enveloppe chiffrée de type magie/version/paramètres de dérivation/sel/IV/données), la largeur exacte et l'encodage retenus pour chaque composante dont la taille n'est pas fixée par construction, plutôt que de laisser l'implémentation inventer une convention non tracée ailleurs que dans un commentaire de code (enseignement de la Phase 1 du plan de développement d'un premier projet cadré par ce prompt : largeur du bloc « paramètres de dérivation de clé » non fixée par aucun document, obligeant l'implémentation à fixer elle-même cette largeur) ; préciser également, lorsqu'un mot de passe ou un secret utilisateur doit être ressaisi à intervalle régulier (ex. à chaque sauvegarde) alors qu'une clé qui en est dérivée est conservée en mémoire de session, la façon exacte dont ces deux exigences cohabitent (la ressaisie déclenche-t-elle systématiquement une nouvelle dérivation, ou la clé en cache est-elle réutilisée dans certains cas précis ?), pour éviter la tension apparente entre les deux constatée à cette même phase ;
 - contrôle des entrées et sorties (validation, échappement) ;
 - gestion des droits d'accès et des permissions ;
 - analyse des dépendances vulnérables (SCA - software composition analysis) ;

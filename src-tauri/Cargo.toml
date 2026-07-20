@@ -28,6 +28,17 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.3" }
 tauri-plugin-log = "2"
+argon2 = "0.5.3"
+aes-gcm = "0.10.3"
+pbkdf2 = "0.12.2"
+sha2 = "0.10.9"
+zstd = "0.13.3"
+uuid = { version = "1.24.0", features = ["v4", "serde"] }
+rand = "0.9.5"
+thiserror = "2.0.19"
+chrono = "0.4.45"
+fs4 = { version = "0.13.1", features = ["sync"] }
+zeroize = "1"
 
 # Rigueur du typage et de la documentation Rust (cf. docs/02_documentation/14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--rust).
 [lints.rust]

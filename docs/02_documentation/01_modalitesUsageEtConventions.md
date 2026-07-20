@@ -109,6 +109,8 @@ Aucune ligne de code produite par l'IA n'est intégrée sans avoir été relue e
 
 La relecture visuelle du code ou du texte ne suffit pas : le résultat doit être concrètement exécuté, testé ou vérifié avant d'être considéré comme acquis.
 
+Cette vérification concrète s'applique également au compte-rendu du Codeur lui-même : toute affirmation décrivant un mécanisme ou une répartition de responsabilité entre deux modules (par exemple, qu'un comptage ou une décision est confié à tel composant plutôt qu'à un autre) est confirmée par une lecture directe du code réellement produit, jamais acceptée sur la seule foi du texte du rapport (ajouté le 2026-07-20 : à la relecture de la Phase 1, le compte-rendu du Codeur affirmait que le comptage des échecs consécutifs de déverrouillage était confié au Store d'état applicatif de l'interface, alors que ce mécanisme était en réalité absent du code correspondant).
+
 #### Responsabilité humaine finale
 
 L'auteur humain reste seul responsable du contenu livré, quelle que soit la part de génération automatique par l'IA.

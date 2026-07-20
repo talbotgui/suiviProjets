@@ -82,6 +82,11 @@ Boucler les §2.2 et 2.3 jusqu'à arriver à la dernière étape du prompt de g�
 Le développement est initialement et totalement réalisé par l'IA.
 Tout le travail de documentation a mené à cela.
 
-Pour cela, créer une nouvelle session et y exécuter le prompt *00_promptDeveloppement.md*
+Pour cela, créer une nouvelle session et y copier/coller le prompt *00_promptDeveloppement.md* pour initialiser le développement.
+
+Puis, dans une nouvelle session à chaque fois, exécuter le prompt
+```
+La phase XX du prompt @docs/00_init&prompt/00_promptDeveloppement.md  est terminée. Démarre la phase suivante.
+```
 
 
