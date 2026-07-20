@@ -1,0 +1,29 @@
+.groupes-admin {
+  &__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__ligne {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  &__instance {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  &__erreur {
+    color: #b00020;
+  }
+
+  &__actions-formulaire {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+}

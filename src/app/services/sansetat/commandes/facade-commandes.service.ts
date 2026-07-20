@@ -1,22 +1,26 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Client typé de la Façade de commandes (Phase 2, US-003, US-004), frontière unique entre l'interface Angular et
-// le cœur natif Rust (cf. docs/02_documentation/11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités).
-// Périmètre de cette phase : uniquement les commandes de credentials (`testerConnectivite`, `definirCredentials`).
+// Client typé de la Façade de commandes (Phase 2, US-003, US-004 ; Phase 3, US-008), frontière unique entre
+// l'interface Angular et le cœur natif Rust (cf.
+// docs/02_documentation/11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités).
+// Périmètre de la Phase 2 : commandes de credentials (`testerConnectivite`, `definirCredentials`). Périmètre de
+// la Phase 3 : autocomplétion des branches d'un dépôt GitLab pour la ref auditée d'une source (`interrogerBranches`).
 // Classé sous `services/sansetat/` : aucun état interne n'est conservé entre deux appels de ce service.
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import type {
   ErreurConnecteur,
   Instance,
+  ResultatInterrogationBranches,
   ResultatTestConnectivite,
   VerdictConnectivite,
 } from './types-facade';
 
 /**
- * Client typé de la Façade de commandes, dédié en Phase 2 aux credentials de session (US-003, US-004). Chaque
- * méthode invoque une commande Tauri identique côté cœur natif (`tester_connectivite`, `definir_credentials`).
+ * Client typé de la Façade de commandes, dédié en Phase 2 aux credentials de session (US-003, US-004) et en
+ * Phase 3 à l'autocomplétion des branches (US-008). Chaque méthode invoque une commande Tauri identique côté
+ * cœur natif (`tester_connectivite`, `definir_credentials`, `interroger_branches`).
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeCommandesService {
@@ -57,6 +61,35 @@ export class FacadeCommandesService {
   }
 
   /**
+   * Interroge les branches d'un dépôt GitLab pour l'autocomplétion de la ref auditée d'une source (US-008). Le
+   * credential utilisé est celui déjà mémorisé côté cœur natif pour cette instance (`definirCredentials`) : il
+   * n'est jamais retransmis par cette méthode.
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param recherche - Terme de recherche optionnel, pour restreindre la liste retournée.
+   * @returns La liste des noms de branches en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerBranches(
+    instance: Instance,
+    idExterne: string,
+    recherche?: string,
+  ): Promise<ResultatInterrogationBranches> {
+    try {
+      const branches = await invoke<readonly string[]>('interroger_branches', {
+        instance,
+        idExterne,
+        recherche,
+      });
+      return { type: 'succes', branches };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+    }
+  }
+
+  /**
    * Vérifie, sans accès non sûr à la valeur reçue, qu'un rejet de la commande native correspond bien à une
    * anomalie de connectivité typée (RG-021) plutôt qu'à une valeur inattendue de la frontière IPC.
    * @param valeur - Valeur rejetée par `invoke`, de type `unknown` à cette frontière.
@@ -72,7 +105,8 @@ export class FacadeCommandesService {
       categorie === 'instanceInjoignable' ||
       categorie === 'delaiDepasse' ||
       categorie === 'reponseInattendue' ||
-      categorie === 'droitsInsuffisants'
+      categorie === 'droitsInsuffisants' ||
+      categorie === 'credentialAbsent'
     );
   }
 }

@@ -2,9 +2,10 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Types TypeScript mirroir des structures JSON échangées avec le cœur natif via la Façade de commandes (Phase 2,
-// US-003, US-004), alignés sur `src-tauri/src/modele/racine.rs` (`Instance`, `TypeInstance`) et
+// US-003, US-004 ; Phase 3, US-008), alignés sur `src-tauri/src/modele/racine.rs` (`Instance`, `TypeInstance`) et
 // `src-tauri/src/connecteurs/commun.rs` (`VerdictConnectivite`, `ErreurConnecteur`), tous deux sérialisés en
-// `camelCase` côté Rust (`serde(rename_all = "camelCase")`).
+// `camelCase` côté Rust (`serde(rename_all = "camelCase")`). `credentialAbsent` (Phase 3) est une extension
+// propre à `interrogerBranches`, hors catalogue RG-021 d'origine.
 
 /**
  * Type d'instance externe déclarée par un groupe (mirroir de `TypeInstance` côté cœur natif).
@@ -40,7 +41,8 @@ export type CategorieErreurConnecteur =
   | 'instanceInjoignable'
   | 'delaiDepasse'
   | 'reponseInattendue'
-  | 'droitsInsuffisants';
+  | 'droitsInsuffisants'
+  | 'credentialAbsent';
 
 /**
  * Anomalie typée d'un test de connectivité (US-004), mirroir de `ErreurConnecteur` côté cœur natif.
@@ -65,4 +67,13 @@ export interface VerdictConnectivite {
  */
 export type ResultatTestConnectivite =
   | { readonly type: 'succes'; readonly verdict: VerdictConnectivite }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * Résultat typé d'une interrogation des branches d'un dépôt GitLab, exposé par
+ * `FacadeCommandesService.interrogerBranches` (US-008) : union discriminée sur `type`, sur le modèle de
+ * {@link ResultatTestConnectivite}.
+ */
+export type ResultatInterrogationBranches =
+  | { readonly type: 'succes'; readonly branches: readonly string[] }
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };

@@ -1,0 +1,32 @@
+.sources-admin {
+  &__selecteurs {
+    display: flex;
+    gap: 1rem;
+  }
+
+  &__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__ligne {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  &__erreur {
+    color: #b00020;
+  }
+
+  &__avertissement {
+    color: #8a6100;
+  }
+
+  &__actions-formulaire {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+}

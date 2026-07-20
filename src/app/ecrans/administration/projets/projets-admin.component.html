@@ -1,0 +1,70 @@
+<section class="projets-admin">
+  <label class="projets-admin__selecteur-groupe">
+    Groupe
+    <select [ngModel]="groupeSelectionneId" (ngModelChange)="selectionnerGroupe($event)">
+      @if (!groupeSelectionneId) {
+        <option [ngValue]="null" disabled>Sélectionner un groupe</option>
+      }
+      @for (groupe of groupes(); track groupe.id) {
+        <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
+      }
+    </select>
+  </label>
+
+  @if (!groupeSelectionneId) {
+    <p class="projets-admin__vide">Sélectionnez un groupe pour gérer ses projets.</p>
+  } @else {
+    <header class="projets-admin__entete">
+      <h2>Projets</h2>
+      <button type="button" (click)="ouvrirCreation()">Créer un projet</button>
+    </header>
+
+    <ul class="projets-admin__liste">
+      @for (projet of projets(); track projet.id) {
+        <li class="projets-admin__ligne">
+          <span class="projets-admin__nom">{{ projet.nom }}</span>
+          <span class="projets-admin__description">{{ projet.description }}</span>
+          <span class="projets-admin__nombre-sources">{{ projet.sources.length }} source(s)</span>
+          <button type="button" (click)="ouvrirEdition(projet.id)">Modifier</button>
+          <button type="button" (click)="dupliquer(projet.id)">Dupliquer</button>
+          <button type="button" (click)="demanderSuppression(projet.id)">Supprimer</button>
+        </li>
+      } @empty {
+        <li class="projets-admin__vide">Aucun projet n'est encore défini pour ce groupe.</li>
+      }
+    </ul>
+
+    @if (projetASupprimerId) {
+      <app-confirmation-suppression
+        message="La suppression d'un projet entraîne la perte de son historique d'audits. Cette action est irréversible."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (formulaireVisible) {
+      <form class="projets-admin__formulaire" (ngSubmit)="enregistrer()">
+        <h3>{{ projetEnEditionId ? 'Modifier le projet' : 'Créer un projet' }}</h3>
+
+        @if (messageErreur) {
+          <p class="projets-admin__erreur" role="alert">{{ messageErreur }}</p>
+        }
+
+        <label>
+          Nom
+          <input type="text" name="nom" [(ngModel)]="nom" required />
+        </label>
+
+        <label>
+          Description
+          <textarea name="description" [(ngModel)]="description"></textarea>
+        </label>
+
+        <div class="projets-admin__actions-formulaire">
+          <button type="button" (click)="fermerFormulaire()">Annuler</button>
+          <button type="submit">Enregistrer</button>
+        </div>
+      </form>
+    }
+  }
+</section>

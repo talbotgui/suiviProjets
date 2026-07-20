@@ -95,6 +95,7 @@ describe('FacadeCommandesService', () => {
     'delaiDepasse',
     'reponseInattendue',
     'droitsInsuffisants',
+    'credentialAbsent',
   ] as const)('doit reconnaître la catégorie d’anomalie « %s »', async (categorie) => {
     invokeSimule.mockRejectedValue({ type: categorie });
 
@@ -111,5 +112,34 @@ describe('FacadeCommandesService', () => {
     expect(invokeSimule).toHaveBeenCalledWith('definir_credentials', {
       credentials: { 'instance-1': 'jeton-1' },
     });
+  });
+
+  it('doit invoquer interroger_branches avec l’instance, l’identifiant externe et le terme de recherche', async () => {
+    invokeSimule.mockResolvedValue(['main', 'develop']);
+
+    const resultat = await service.interrogerBranches(INSTANCE_GITLAB, '1234', 'dev');
+
+    expect(invokeSimule).toHaveBeenCalledWith('interroger_branches', {
+      instance: INSTANCE_GITLAB,
+      idExterne: '1234',
+      recherche: 'dev',
+    });
+    expect(resultat).toEqual({ type: 'succes', branches: ['main', 'develop'] });
+  });
+
+  it('doit convertir un rejet « credentialAbsent » en Résultat « echec » pour interroger_branches', async () => {
+    invokeSimule.mockRejectedValue({ type: 'credentialAbsent' });
+
+    const resultat = await service.interrogerBranches(INSTANCE_GITLAB, '1234');
+
+    expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'credentialAbsent' } });
+  });
+
+  it('doit convertir un rejet non structuré en anomalie « reponseInattendue » pour interroger_branches', async () => {
+    invokeSimule.mockRejectedValue('erreur non structurée');
+
+    const resultat = await service.interrogerBranches(INSTANCE_GITLAB, '1234');
+
+    expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'reponseInattendue' } });
   });
 });

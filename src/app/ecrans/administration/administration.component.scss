@@ -1,0 +1,12 @@
+.administration {
+  &__onglets {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  &__onglet--actif {
+    font-weight: bold;
+    text-decoration: underline;
+  }
+}

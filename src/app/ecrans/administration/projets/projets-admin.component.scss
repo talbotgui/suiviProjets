@@ -1,0 +1,23 @@
+.projets-admin {
+  &__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__ligne {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  &__erreur {
+    color: #b00020;
+  }
+
+  &__actions-formulaire {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+}

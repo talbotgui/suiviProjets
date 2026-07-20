@@ -1,0 +1,10 @@
+.confirmation-suppression {
+  border: 1px solid;
+  padding: 1rem;
+
+  &__actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+}

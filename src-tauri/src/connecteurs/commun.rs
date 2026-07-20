@@ -30,6 +30,10 @@ pub(crate) enum ErreurConnecteur {
     ReponseInattendue,
     /// Le credential est valide mais ne dispose pas des droits suffisants (statut 403).
     DroitsInsuffisants,
+    /// Aucun credential n'est actuellement détenu en mémoire pour l'instance demandée (Phase 3, autocomplétion
+    /// des branches, US-008) : catégorie propre à `interrogerBranches`, hors catalogue RG-021 d'origine qui ne
+    /// couvre que les anomalies d'exécution d'un audit.
+    CredentialAbsent,
 }
 
 /// Verdict d'un test de connectivité réussi (credential accepté par l'instance).

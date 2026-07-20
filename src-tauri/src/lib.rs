@@ -8,8 +8,10 @@
 //! Phase 1 (socle de persistance et sécurité du fichier, cf. `docs/03_plan/plan_13_developpement.md`) : ce crate
 //! expose les commandes de création, chargement, sauvegarde et verrouillage/déverrouillage du fichier de données
 //! chiffré (US-001, US-002, US-026). Phase 2 (gestion des credentials) : s'y ajoutent les commandes de test de
-//! connectivité et de saisie en mémoire des credentials de session (US-003, US-004), en plus du point d'entrée
-//! générique de la fenêtre Tauri.
+//! connectivité et de saisie en mémoire des credentials de session (US-003, US-004). Phase 3 (administration du
+//! modèle) : s'y ajoute l'interrogation des branches d'un dépôt GitLab pour l'autocomplétion de la ref auditée
+//! d'une source (US-008) ; le CRUD des groupes, projets et sources lui-même a lieu côté interface, sur les
+//! données déjà chargées en mémoire, et se persiste via la commande `sauvegarderFichier` existante.
 
 mod commandes;
 mod connecteurs;
@@ -37,6 +39,7 @@ pub fn run() {
             commandes::fichier::deverrouiller_session,
             commandes::connectivite::tester_connectivite,
             commandes::connectivite::definir_credentials,
+            commandes::connectivite::interroger_branches,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

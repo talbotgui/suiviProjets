@@ -1,0 +1,39 @@
+<section class="administration">
+  <h1>Administration</h1>
+
+  <nav class="administration__onglets">
+    <button
+      type="button"
+      [class.administration__onglet--actif]="ongletActif === 'groupes'"
+      (click)="selectionnerOnglet('groupes')"
+    >
+      Groupes
+    </button>
+    <button
+      type="button"
+      [class.administration__onglet--actif]="ongletActif === 'projets'"
+      (click)="selectionnerOnglet('projets')"
+    >
+      Projets
+    </button>
+    <button
+      type="button"
+      [class.administration__onglet--actif]="ongletActif === 'sources'"
+      (click)="selectionnerOnglet('sources')"
+    >
+      Sources
+    </button>
+  </nav>
+
+  @switch (ongletActif) {
+    @case ('groupes') {
+      <app-groupes-admin />
+    }
+    @case ('projets') {
+      <app-projets-admin />
+    }
+    @case ('sources') {
+      <app-sources-admin />
+    }
+  }
+</section>

@@ -110,6 +110,16 @@ impl EtatSession {
         deverrouiller_mutex(self.interieur.lock()).credentials.len()
     }
 
+    /// Credential actuellement détenu en mémoire pour l'instance donnée, `None` si aucun n'a été saisi pour cette
+    /// instance (Phase 3, `interrogerBranches`, US-008) : une copie éphémère est retournée, le credential n'étant
+    /// jamais exposé autrement qu'en en-tête HTTP vers l'instance concernée (RG-004).
+    pub(crate) fn credential(&self, instance_id: &str) -> Option<String> {
+        deverrouiller_mutex(self.interieur.lock())
+            .credentials
+            .get(instance_id)
+            .map(|jeton| jeton.to_string())
+    }
+
     /// Chemin du fichier actuellement ouvert, y compris lorsque la session est verrouillée.
     pub(crate) fn chemin_fichier(&self) -> Option<PathBuf> {
         deverrouiller_mutex(self.interieur.lock())
@@ -208,6 +218,28 @@ mod tests {
         )]));
 
         assert_eq!(etat.nombre_credentials(), 1);
+    }
+
+    #[test]
+    fn credential_retourne_none_pour_une_instance_sans_credential() {
+        let etat = EtatSession::nouveau();
+
+        assert_eq!(etat.credential("instance-inconnue"), None);
+    }
+
+    #[test]
+    fn credential_retourne_le_jeton_de_linstance_demandee() {
+        let etat = EtatSession::nouveau();
+        etat.definir_credentials(HashMap::from([(
+            "instance-1".to_string(),
+            "jeton-secret".to_string(),
+        )]));
+
+        assert_eq!(
+            etat.credential("instance-1"),
+            Some("jeton-secret".to_string())
+        );
+        assert_eq!(etat.credential("instance-2"), None);
     }
 
     #[test]

@@ -1,0 +1,126 @@
+<section class="sources-admin">
+  <div class="sources-admin__selecteurs">
+    <label>
+      Groupe
+      <select [ngModel]="groupeSelectionneId" (ngModelChange)="selectionnerGroupe($event)">
+        @if (!groupeSelectionneId) {
+          <option [ngValue]="null" disabled>Sélectionner un groupe</option>
+        }
+        @for (groupe of groupes(); track groupe.id) {
+          <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
+        }
+      </select>
+    </label>
+
+    @if (groupeSelectionneId) {
+      <label>
+        Projet
+        <select [ngModel]="projetSelectionneId" (ngModelChange)="selectionnerProjet($event)">
+          @if (!projetSelectionneId) {
+            <option [ngValue]="null" disabled>Sélectionner un projet</option>
+          }
+          @for (projet of projets(); track projet.id) {
+            <option [ngValue]="projet.id">{{ projet.nom }}</option>
+          }
+        </select>
+      </label>
+    }
+  </div>
+
+  @if (!projetSelectionneId) {
+    <p class="sources-admin__vide">Sélectionnez un groupe puis un projet pour gérer ses sources.</p>
+  } @else {
+    <header class="sources-admin__entete">
+      <h2>Sources</h2>
+      <button type="button" (click)="ouvrirCreation()">Créer une source</button>
+    </header>
+
+    <ul class="sources-admin__liste">
+      @for (source of sources(); track source.id) {
+        <li class="sources-admin__ligne">
+          <span class="sources-admin__type">{{ source.type }}</span>
+          <span class="sources-admin__id-externe">{{ source.idExterne }}</span>
+          <span class="sources-admin__ref-auditee">
+            {{ source.refAuditee ?? 'branche par défaut du dépôt (résolue à l’audit)' }}
+          </span>
+          <button type="button" (click)="ouvrirEdition(source.id)">Modifier</button>
+          <button type="button" (click)="demanderSuppression(source.id)">Supprimer</button>
+        </li>
+      } @empty {
+        <li class="sources-admin__vide">Aucune source n'est encore définie pour ce projet.</li>
+      }
+    </ul>
+
+    @if (sourceASupprimerId) {
+      <app-confirmation-suppression
+        message="Cette suppression est irréversible."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (formulaireVisible) {
+      <form class="sources-admin__formulaire" (ngSubmit)="enregistrer()">
+        <h3>{{ sourceEnEditionId ? 'Modifier la source' : 'Créer une source' }}</h3>
+
+        @if (messageErreur) {
+          <p class="sources-admin__erreur" role="alert">{{ messageErreur }}</p>
+        }
+
+        <label>
+          Type
+          <select [ngModel]="type" (ngModelChange)="changerType($event)" name="type">
+            @for (typeCandidat of typesSource; track typeCandidat) {
+              <option [ngValue]="typeCandidat">{{ typeCandidat }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Instance
+          <select name="instanceId" [(ngModel)]="instanceId">
+            <option value="" disabled>Sélectionner une instance</option>
+            @for (instance of instancesCompatibles(); track instance.id) {
+              <option [value]="instance.id">{{ instance.nom }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Identifiant externe
+          <input type="text" name="idExterne" [(ngModel)]="idExterne" required />
+        </label>
+
+        @if (type === typesSource[0]) {
+          <label>
+            Ref auditée (branche, tag ou SHA)
+            <input
+              type="text"
+              name="refAuditee"
+              [(ngModel)]="refAuditee"
+              (ngModelChange)="rechercherBranches()"
+              list="sources-admin-branches"
+              placeholder="Laisser vide pour la branche par défaut du dépôt"
+            />
+            <datalist id="sources-admin-branches">
+              @for (branche of suggestionsBranches; track branche) {
+                <option [value]="branche"></option>
+              }
+            </datalist>
+          </label>
+          @if (credentialAbsent) {
+            <p class="sources-admin__avertissement">
+              Aucun credential n'est mémorisé pour cette instance : saisissez-le depuis la Gestion
+              des credentials pour bénéficier de l'autocomplétion des branches.
+            </p>
+          }
+        }
+
+        <div class="sources-admin__actions-formulaire">
+          <button type="button" (click)="fermerFormulaire()">Annuler</button>
+          <button type="submit">Enregistrer</button>
+        </div>
+      </form>
+    }
+  }
+</section>

@@ -1,0 +1,9 @@
+<div class="confirmation-suppression" role="alertdialog" aria-modal="true">
+  <p class="confirmation-suppression__message">{{ message() }}</p>
+  <div class="confirmation-suppression__actions">
+    <button type="button" (click)="annuler()">Annuler</button>
+    <button type="button" class="confirmation-suppression__bouton-danger" (click)="confirmer()">
+      {{ libelleConfirmation() }}
+    </button>
+  </div>
+</div>
