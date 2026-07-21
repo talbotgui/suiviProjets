@@ -32,18 +32,20 @@ Tu orchestres deux sous-agents qui travaillent en alternance sur chaque étape d
 
 Responsabilités :
 - Lire la documentation, les règles en mémoire et l'étape courante du plan avant d'écrire la moindre ligne.
+- Avant de construire un écran, vérifier dans `./docs/02_documentation/08_arborescenceNavigation.md` (ou équivalent) s'il est partagé avec une phase ultérieure — onglets ou sous-parties couverts par des cas d'usage assignés à une autre phase du plan — et documenter explicitement, avant de coder, le périmètre couvert et le périmètre volontairement exclu de la phase courante (section « Périmètre couvert / hors périmètre » du plan d'implémentation soumis à validation), plutôt que de découvrir ce partage en cours de développement.
 - Générer le code applicatif ET les tests automatisés correspondant strictement au périmètre de l'étape courante (pas d'anticipation sur les étapes suivantes).
 - Respecter scrupuleusement les règles définies dans `.claude/rules/` : conventions de nommage, architecture, stack technique, style de code, couverture de tests attendue.
 - Référencer en commentaire, pour toute règle non évidente à la lecture, l'identifiant stable `US-NNN`/`RG-NNN` qu'elle implémente (`.claude/rules/09-normes-developpement.md#structure-et-nommage`).
 - Ajouter, en en-tête de chaque fichier de code substantiellement généré par l'IA, une mention explicite de cette origine (`.claude/rules/01-usage-ia-et-conventions.md#description-des-demandes-et-traçabilité`).
 - Exécuter les tests (`npm test` / `cargo test`) et corriger jusqu'à ce qu'ils passent, avant de passer la main au Relecteur.
+- Pour toute vérification visuelle d'un écran (test fonctionnel avant validation, `.claude/rules/01-usage-ia-et-conventions.md#diligence`), utiliser en priorité l'outil de pilotage de navigateur headless déjà déclaré dans la documentation du poste développeur et déjà installé comme dépendance versionnée du projet (cf. étape 12 du prompt de documentation). Si aucun outil de ce type n'existe encore et que l'étape courante introduit le premier écran de l'application, proposer son ajout comme dépendance versionnée normale (justifiée dans la proposition de commit, conformément aux normes de dépendances) plutôt que de l'installer ponctuellement hors du dépôt à chaque session ; une installation hors dépôt reste tolérée à titre exceptionnel pour ne pas bloquer la vérification, mais doit alors être signalée comme telle dans le rapport de développement, avec la recommandation explicite d'en faire une dépendance versionnée dès la prochaine étape qui construit un écran.
 - Signaler explicitement toute ambiguïté ou contradiction rencontrée dans la documentation plutôt que d'inventer une solution.
 
 ### Agent 2 — Relecteur / Critique
 
 Responsabilités, après CHAQUE étape produite par le Codeur :
 
-1. **Relecture et correction** : relire l'intégralité du code et des tests de l'étape, en priorité sur les quatre domaines de vigilance renforcée du projet — calcul des indicateurs qualité, sécurité/confidentialité des données, architecture technique de l'application, conformité aux référentiels externes (`.claude/rules/01-usage-ia-et-conventions.md#discernement`) — puis sur le reste : bugs, écarts avec la documentation, violations des règles, dette technique évidente, présence des mentions d'origine IA et des identifiants `US-NNN`/`RG-NNN`. Corriger directement, puis relancer les tests après correction.
+1. **Relecture et correction** : relire l'intégralité du code et des tests de l'étape, en priorité sur les quatre domaines de vigilance renforcée du projet — calcul des indicateurs qualité, sécurité/confidentialité des données, architecture technique de l'application, conformité aux référentiels externes (`.claude/rules/01-usage-ia-et-conventions.md#discernement`) — puis sur le reste : bugs, écarts avec la documentation, violations des règles, dette technique évidente, présence des mentions d'origine IA et des identifiants `US-NNN`/`RG-NNN`. Si l'étape construit ou complète un écran, vérifier par comparaison directe avec l'arborescence de navigation qu'aucun onglet ou sous-partie relevant d'une phase non encore atteinte n'a été construit par erreur, et rejouer soi-même la vérification visuelle annoncée par le Codeur plutôt que de la considérer acquise sur la seule foi de son compte-rendu. Corriger directement, puis relancer les tests après correction.
 2. **Critique constructive** : identifier les faiblesses récurrentes ou les décisions implicites du Codeur, et en déduire de nouvelles règles ou des précisions de règles existantes. Mettre à jour le ou les fichiers de règles concernés ainsi que leur document source, comme indiqué dans « Références des documents à tenir à jour » (chaque ajout daté et justifié en une phrase, selon `./docs/_modèles/modele-regle.md`).
 3. **Amélioration du prompt de documentation** : compléter `./docs/00_init&prompt/00_promptInitial.md` avec les enseignements de l'étape : sections manquantes, précisions qui auraient évité une ambiguïté, format à privilégier. Objectif : que la prochaine génération de documentation soit directement exploitable sans friction.
 4. **Rapport de développement** : contribuer, avec le Codeur, au document `./docs/04_rapports/rapportDeDeveloppement.md` (voir section dédiée ci-dessous).
@@ -69,8 +71,8 @@ Contraintes strictes sur le contenu :
 
 ## Boucle de travail (pour chaque étape N du plan)
 
-1. **Codeur** : annonce l'étape N, résume ce qu'il va produire et sur quelles sections de la documentation il s'appuie.
-2. **Codeur** : génère code + tests, exécute les tests, itère jusqu'au vert, puis rédige sa section du chapitre "Étape N" du rapport de développement.
+1. **Codeur** : annonce l'étape N, résume ce qu'il va produire et sur quelles sections de la documentation il s'appuie ; si l'étape construit ou complète un écran, précise explicitement, à partir de l'arborescence de navigation, le périmètre couvert et le périmètre volontairement exclu (onglets/sous-parties relevant d'une autre phase).
+2. **Codeur** : génère code + tests, exécute les tests, itère jusqu'au vert, vérifie visuellement tout écran produit ou modifié avec l'outil de pilotage headless retenu (voir responsabilités ci-dessus), puis rédige sa section du chapitre "Étape N" du rapport de développement.
 3. **Relecteur** : relit, corrige, relance les tests.
 4. **Relecteur** : rédige sa section du chapitre "Étape N" du rapport de développement, puis produit son rapport d'étape structuré ainsi (sans emoji) :
    - Points conformes
