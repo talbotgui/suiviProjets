@@ -1,12 +1,14 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Onglet Projets de l'écran Administration (US-007, Phase 3) : sélection d'un groupe, puis liste, création,
-// modification, duplication et suppression de ses projets. La politique IA (également portée par `Projet`) est
-// différée à la Phase 4 (US-024) : tout projet créé ou dupliqué ici porte l'interdiction par défaut (RG-014),
-// non modifiable depuis cet onglet.
+// Onglet Projets de l'écran Administration (US-007, Phase 3 ; US-024, Phase 4) : sélection d'un groupe, puis
+// liste, création, modification, duplication et suppression de ses projets, ainsi que le contrôle de la politique
+// IA de chaque projet (RG-014 à RG-016). Tout projet créé ou dupliqué porte toujours l'interdiction par défaut
+// (RG-014) ; le contrôle Politique IA permet ensuite de l'autoriser explicitement, avec ressaisie du mot de passe
+// du fichier à chaque bascule (RG-002), la commande native invoquée sauvegardant effectivement le fichier.
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import type { DonneesProjet } from '../../../services/avecetat/etat/donnees-application.service';
@@ -14,11 +16,13 @@ import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donne
 
 /**
  * Onglet Projets de l'écran Administration : sélection d'un groupe puis CRUD complet de ses projets, avec
- * duplication (US-007).
+ * duplication (US-007) et contrôle de la politique IA (US-024). L'origine consignée au journal (RG-023) pour la
+ * bascule de politique IA est fixée côté cœur natif (`Administration`), cette commande ne l'exposant pas en
+ * paramètre à la différence de `qualifierMembre`.
  */
 @Component({
   selector: 'app-projets-admin',
-  imports: [FormsModule, SqmConfirmationSuppressionComponent],
+  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
   templateUrl: './projets-admin.component.html',
   styleUrl: './projets-admin.component.scss',
 })
@@ -60,6 +64,22 @@ export class SqmProjetsAdminComponent {
    * Identifiant du projet dont la suppression est en cours de confirmation, `null` si aucune n'est en cours.
    */
   public projetASupprimerId: string | null = null;
+
+  /**
+   * Identifiant du projet dont la bascule de politique IA attend la ressaisie du mot de passe du fichier
+   * (RG-002), `null` si aucune bascule n'est en cours.
+   */
+  public projetPolitiqueIAEnAttenteId: string | null = null;
+
+  /**
+   * Message d'erreur de la dernière tentative de bascule de politique IA, `null` si aucune erreur en cours.
+   */
+  public messageErreurPolitiqueIA: string | null = null;
+
+  /**
+   * Indique qu'une bascule de politique IA est en cours, pour désactiver les actions concurrentes.
+   */
+  public politiqueIAEnCours = false;
 
   /**
    * Groupes disponibles pour la sélection.
@@ -180,5 +200,56 @@ export class SqmProjetsAdminComponent {
    */
   public annulerSuppression(): void {
     this.projetASupprimerId = null;
+  }
+
+  /**
+   * Ouvre la ressaisie du mot de passe du fichier avant de basculer la politique IA d'un projet (US-024, RG-002).
+   * @param projetId - Identifiant du projet concerné.
+   */
+  public demanderBasculePolitiqueIA(projetId: string): void {
+    this.messageErreurPolitiqueIA = null;
+    this.projetPolitiqueIAEnAttenteId = projetId;
+  }
+
+  /**
+   * Annule la bascule de politique IA demandée.
+   */
+  public annulerBasculePolitiqueIA(): void {
+    this.projetPolitiqueIAEnAttenteId = null;
+  }
+
+  /**
+   * Bascule la politique IA du projet désigné par {@link demanderBasculePolitiqueIA}, après confirmation du mot
+   * de passe (US-024, RG-014 à RG-016, RG-023).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerBasculePolitiqueIA(motDePasse: string): Promise<void> {
+    const projetId = this.projetPolitiqueIAEnAttenteId;
+    if (!this.groupeSelectionneId || !projetId) {
+      this.projetPolitiqueIAEnAttenteId = null;
+      return;
+    }
+    const projet = this.projets().find((candidat) => candidat.id === projetId);
+    if (!projet) {
+      this.projetPolitiqueIAEnAttenteId = null;
+      return;
+    }
+
+    this.politiqueIAEnCours = true;
+    const resultat = await this.donneesApplication.definirPolitiqueIA(
+      this.groupeSelectionneId,
+      projetId,
+      !projet.iaAutorisee,
+      motDePasse,
+    );
+    this.politiqueIAEnCours = false;
+    this.projetPolitiqueIAEnAttenteId = null;
+
+    if (resultat.type === 'echec') {
+      this.messageErreurPolitiqueIA =
+        resultat.anomalie.type === 'motDePasseOuFichierInvalide'
+          ? 'Mot de passe incorrect.'
+          : 'Une erreur inattendue est survenue lors de la bascule de la politique IA.';
+    }
   }
 }

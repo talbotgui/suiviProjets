@@ -8,9 +8,12 @@
 //!
 //! Périmètre de la Phase 1 (US-001, US-002, US-026 ; RG-001 à RG-005) : création, chargement et sauvegarde d'un
 //! fichier chiffré, migration de schéma, repli de dérivation de clé, sauvegardes de sécurité, détection de fichier
-//! verrouillé et nettoyage d'un fichier temporaire orphelin. Aucune logique de gestion (CRUD groupes/projets/
-//! sources, catalogue d'audit, moteur de jugement) n'est implémentée ici.
+//! verrouillé et nettoyage d'un fichier temporaire orphelin. Périmètre de la Phase 4 (US-022 à US-024 ; RG-006 à
+//! RG-008, RG-012, RG-014 à RG-016, RG-023) : qualification d'un membre connu d'un groupe et définition de la
+//! politique d'autorisation de l'IA d'un projet (`administration`), toutes deux opérant en mémoire sur une
+//! [`crate::modele::racine::DonneesRacine`] déjà chargée, sans toucher elles-mêmes le disque.
 
+pub(crate) mod administration;
 pub(crate) mod enveloppe;
 pub(crate) mod erreurs;
 pub(crate) mod kdf;

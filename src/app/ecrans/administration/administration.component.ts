@@ -1,10 +1,12 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Écran Administration (Phase 3 du plan de développement, US-006, US-007, US-008), à trois onglets conformément à
-// `docs/02_documentation/08_arborescenceNavigation.md` (une seule ligne de la matrice écrans/US pour cet écran).
-// Les sous-onglets « Membres connus » (sous Groupes) et « Politique IA » (sous Projets), également prévus par
-// l'arborescence de navigation, sont différés à la Phase 4 (US-023, US-024) et n'apparaissent pas ici.
+// Écran Administration (Phase 3 du plan de développement, US-006, US-007, US-008 ; Phase 4, US-022 à US-024), à
+// trois onglets conformément à `docs/02_documentation/08_arborescenceNavigation.md` (une seule ligne de la
+// matrice écrans/US pour cet écran). Le sous-onglet « Membres connus » (sous Groupes, US-022, US-023) est porté
+// par `SqmGroupesAdminComponent` ; le contrôle « Politique IA » (sous Projets, US-024) est porté par
+// `SqmProjetsAdminComponent`. Le sous-onglet « Annotations de groupe », également prévu par l'arborescence de
+// navigation, reste différé à la Phase 8 (US-020) et n'apparaît pas ici.
 import { Component } from '@angular/core';
 import { SqmGroupesAdminComponent } from './groupes/groupes-admin.component';
 import { SqmProjetsAdminComponent } from './projets/projets-admin.component';

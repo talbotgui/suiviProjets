@@ -1,0 +1,120 @@
+<section class="membres-connus-admin">
+  <label class="membres-connus-admin__selecteur-groupe">
+    Groupe
+    <select [ngModel]="groupeSelectionneId" (ngModelChange)="selectionnerGroupe($event)">
+      @if (!groupeSelectionneId) {
+        <option [ngValue]="null" disabled>Sélectionner un groupe</option>
+      }
+      @for (groupe of groupes(); track groupe.id) {
+        <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
+      }
+    </select>
+  </label>
+
+  @if (!groupeSelectionneId) {
+    <p class="membres-connus-admin__vide">Sélectionnez un groupe pour gérer ses membres connus.</p>
+  } @else {
+    <header class="membres-connus-admin__entete">
+      <h2>Membres connus</h2>
+      <button type="button" [disabled]="enCours" (click)="ouvrirCreation()">Créer une règle</button>
+    </header>
+
+    <ul class="membres-connus-admin__liste">
+      @for (regle of membresConnus(); track regle.id) {
+        <li
+          class="membres-connus-admin__ligne"
+          [class.membres-connus-admin__ligne--conflit]="estEnConflit(regle.id)"
+        >
+          <span class="membres-connus-admin__critere">{{ regle.critere }}</span>
+          <span class="membres-connus-admin__type">{{ regle.typeCritere }}</span>
+          <span class="membres-connus-admin__statut">{{ regle.statut }}</span>
+          @if (estEnConflit(regle.id)) {
+            <span class="membres-connus-admin__badge-conflit" role="alert">Conflit de règles</span>
+          }
+          <button type="button" [disabled]="enCours" (click)="ouvrirEdition(regle.id)">
+            Modifier
+          </button>
+          <button type="button" [disabled]="enCours" (click)="demanderSuppression(regle.id)">
+            Supprimer
+          </button>
+        </li>
+      } @empty {
+        <li class="membres-connus-admin__vide">
+          Aucune règle n'est encore définie pour ce groupe.
+        </li>
+      }
+    </ul>
+
+    @if (messageErreur) {
+      <p class="membres-connus-admin__erreur" role="alert">{{ messageErreur }}</p>
+    }
+
+    @if (membreASupprimerId && actionEnAttenteMotDePasse === null) {
+      <app-confirmation-suppression
+        message="La suppression d'une règle de membre connu est immédiate et irréversible."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse === 'enregistrement') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle."
+        (confirmee)="confirmerEnregistrement($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse === 'suppression') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette règle."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (formulaireVisible) {
+      <form class="membres-connus-admin__formulaire" (ngSubmit)="demanderEnregistrement()">
+        <h3>{{ membreEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}</h3>
+
+        <label>
+          Critère
+          <input type="text" name="critere" [(ngModel)]="critere" required />
+        </label>
+
+        <label>
+          Type de critère
+          <select name="typeCritere" [(ngModel)]="typeCritere">
+            @for (type of typesCritere; track type) {
+              <option [ngValue]="type">{{ type }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Statut
+          <select name="statut" [(ngModel)]="statut">
+            @for (statutPropose of statuts; track statutPropose) {
+              <option [ngValue]="statutPropose">{{ statutPropose }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Libellé
+          <input type="text" name="libelle" [(ngModel)]="libelle" />
+        </label>
+
+        <label>
+          Alias courriel
+          <input type="text" name="aliasEmail" [(ngModel)]="aliasEmail" />
+        </label>
+
+        <div class="membres-connus-admin__actions-formulaire">
+          <button type="button" (click)="fermerFormulaire()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+  }
+</section>

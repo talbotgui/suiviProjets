@@ -1,4 +1,4 @@
-.projets-admin {
+.membres-connus-admin {
   &__entete {
     display: flex;
     align-items: center;
@@ -9,14 +9,19 @@
     display: flex;
     gap: 1rem;
     align-items: center;
+
+    &--conflit {
+      outline: 1px solid #b06000;
+    }
+  }
+
+  &__badge-conflit {
+    color: #b06000;
+    font-weight: bold;
   }
 
   &__erreur {
     color: #b00020;
-  }
-
-  &__politique-ia {
-    font-style: italic;
   }
 
   &__actions-formulaire {

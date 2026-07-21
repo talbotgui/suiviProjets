@@ -1,23 +1,57 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Store d'état applicatif des données du fichier (Phase 3 du plan de développement, US-006, US-007, US-008).
-// Nom de service arbitraire (décision à signaler dans le rapport de développement, sur le modèle de la décision
-// similaire déjà prise pour `deverrouillerSession` en Phase 1) : `docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces`
-// ne nomme qu'un unique « Store d'état applicatif », déjà porté par `EtatSessionService` pour la session ; ce
-// service en est le pendant pour les données du fichier de données lui-même (groupes, projets, sources).
+// Store d'état applicatif des données du fichier (Phase 3 du plan de développement, US-006, US-007, US-008 ;
+// Phase 4, US-022 à US-024). Nom de service arbitraire (décision à signaler dans le rapport de développement, sur
+// le modèle de la décision similaire déjà prise pour `deverrouillerSession` en Phase 1) :
+// `docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces` ne nomme
+// qu'un unique « Store d'état applicatif », déjà porté par `EtatSessionService` pour la session ; ce service en
+// est le pendant pour les données du fichier de données lui-même (groupes, projets, sources, membres connus,
+// politique IA).
 //
-// Décision d'architecture (cf. rapport de développement de cette phase) : conformément à l'absence de toute
-// commande `creerGroupe`/`creerProjet`/`creerSource` dans la Façade de commandes documentée, le CRUD a lieu
-// entièrement ici, sur la racine déjà chargée en mémoire (obtenue par `creerFichier`/`chargerFichier`) ; la
-// persistance sur disque reste assurée par la commande `sauvegarderFichier` existante (Phase 1), qui réécrit la
-// racine intégralement (`docs/02_documentation/12_modeleDonnees.md#stratégie-de-persistance`). Chaque mutation
-// produit une nouvelle racine immuable plutôt que de modifier l'existante en place, pour rester cohérent avec les
-// Signals Angular (détection de changement par égalité de référence).
-import { Injectable, computed, signal } from '@angular/core';
+// Décision d'architecture (cf. rapport de développement de la Phase 3) : conformément à l'absence de toute
+// commande `creerGroupe`/`creerProjet`/`creerSource` dans la Façade de commandes documentée, le CRUD groupes/
+// projets/sources a lieu entièrement ici, sur la racine déjà chargée en mémoire (obtenue par
+// `creerFichier`/`chargerFichier`) ; la persistance sur disque reste assurée par la commande `sauvegarderFichier`
+// existante (Phase 1), qui réécrit la racine intégralement (`docs/02_documentation/12_modeleDonnees.md#stratégie-
+// de-persistance`). Chaque mutation produit une nouvelle racine immuable plutôt que de modifier l'existante en
+// place, pour rester cohérent avec les Signals Angular (détection de changement par égalité de référence).
+//
+// Décision d'architecture complémentaire (Phase 4, à signaler dans le rapport de développement de cette phase) :
+// `qualifierMembre` et `definirPolitiqueIA`, à la différence du CRUD groupes/projets/sources, sont des commandes
+// nommées de la Façade qui mutent puis sauvegardent elles-mêmes le fichier (cf. commentaire d'en-tête de
+// `commandes/administration.rs` côté cœur natif). Ce Store délègue leur appel `invoke` à
+// `FacadeAdministrationService` (`services/sansetat/commandes/`), un second client dédié de la Façade de
+// commandes, plutôt que d'invoquer `invoke` lui-même : la version initiale de ce Store appelait `invoke`
+// directement, au motif que le type `DonneesRacine` échangé, défini dans ce fichier, ne pouvait être importé
+// depuis `sansetat/commandes/` sans inverser le sens de dépendance autorisé entre les deux catégories de services
+// (`avecetat` → `sansetat`, jamais l'inverse) ; corrigé en revue (cf. rapport de développement de cette phase) en
+// rendant `FacadeAdministrationService` générique sur ce type plutôt qu'en le lui important directement, ce qui
+// restaure la frontière unique vers `invoke` documentée en en-tête de `FacadeCommandesService` sans jamais
+// inverser cette dépendance. Ce Store, qui possède déjà le cycle de vie de la racine (`chargerRacine`/mutations),
+// reste le seul point d'appel connaissant le type concret `DonneesRacine` transmis à ces paramètres de type ; il
+// en résulte que la Façade de commandes côté interface est répartie sur plusieurs services selon le type de
+// données échangé, à l'image du découpage déjà adopté côté cœur natif
+// (`commandes::fichier`/`commandes::connectivite`/`commandes::administration`, plusieurs modules Rust distincts).
+import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
+import { FacadeAdministrationService } from '../../sansetat/commandes/facade-administration.service';
 import type { Instance } from '../../sansetat/commandes/types-facade';
-import type { DonneesRacine, EntreeJournal, Groupe, Projet, Source } from './types-donnees';
+import { EtatSessionService } from './etat-session.service';
+import type {
+  CategorieErreurAdministration,
+  DonneesRacine,
+  ErreurAdministration,
+  EntreeJournal,
+  Groupe,
+  Projet,
+  ReponseQualificationMembre,
+  ResultatMutationAdministration,
+  ResultatQualificationMembre,
+  Source,
+  StatutMembre,
+  TypeCritereMembre,
+} from './types-donnees';
 import { TypeSource } from './types-donnees';
 
 /**
@@ -67,13 +101,39 @@ export interface DonneesSource {
 }
 
 /**
- * Store d'état applicatif des données du fichier actuellement chargé (Phase 3) : expose la racine courante en
- * lecture seule et l'ensemble des mutations CRUD sur les groupes, projets et sources (US-006, US-007, US-008).
- * Aucune de ces mutations n'écrit sur disque : la sauvegarde explicite (`sauvegarderFichier`, RG-002) reste une
- * action distincte, déclenchée par l'écran appelant.
+ * Données saisies pour qualifier un membre connu d'un groupe (US-022, US-023). `membreId` distingue la mise à jour
+ * d'une règle existante (fourni, désigne la règle éditée même si son critère change) de la création d'une
+ * nouvelle règle (absent, la règle est alors retrouvée par correspondance exacte de critère côté cœur natif).
+ */
+export interface DonneesMembreConnu {
+  /** Identifiant de la règle à mettre à jour, absent pour une création. */
+  readonly membreId?: string;
+  /** Motif de reconnaissance (login, email ou domaine selon `typeCritere`). */
+  readonly critere: string;
+  /** Type du critère de reconnaissance. */
+  readonly typeCritere: TypeCritereMembre;
+  /** Statut associé (interne, client, partenaire). */
+  readonly statut: StatutMembre;
+  /** Libellé lisible optionnel. */
+  readonly libelle?: string;
+  /** Alias courriel optionnel. */
+  readonly aliasEmail?: string;
+}
+
+/**
+ * Store d'état applicatif des données du fichier actuellement chargé (Phase 3, Phase 4) : expose la racine
+ * courante en lecture seule et l'ensemble des mutations CRUD sur les groupes, projets et sources (US-006, US-007,
+ * US-008). Ces mutations n'écrivent pas sur disque : la sauvegarde explicite (`sauvegarderFichier`, RG-002) reste
+ * une action distincte, déclenchée par l'écran appelant. `qualifierMembre` et `definirPolitiqueIA` (US-022 à
+ * US-024) dérogent à cette règle : elles délèguent à `FacadeAdministrationService` les commandes natives de même
+ * nom, qui mutent puis sauvegardent elles-mêmes le fichier (cf. commentaire d'en-tête de ce fichier).
  */
 @Injectable({ providedIn: 'root' })
 export class DonneesApplicationService {
+  private readonly etatSession: EtatSessionService = inject(EtatSessionService);
+  private readonly facadeAdministration: FacadeAdministrationService = inject(
+    FacadeAdministrationService,
+  );
   private readonly racineInterne: WritableSignal<DonneesRacine | null> = signal(null);
 
   /**
@@ -367,6 +427,164 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Qualifie un membre connu d'un groupe (US-022, US-023) : invoque la commande native `qualifierMembre`, qui
+   * ajoute ou met à jour la règle, consigne la modification au journal et sauvegarde effectivement le fichier
+   * (RG-002, RG-006 à RG-008, RG-012, RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant
+   * de ce Store. Le résultat est un Résultat typé plutôt qu'un rejet de Promise non typé, à traiter par un switch
+   * exhaustif sur son discriminant `type` (ex. `doublonUsernameMembreConnu` pour RG-008).
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param donnees - Critère, type, statut et identifiant de la règle à qualifier.
+   * @param origine - Origine consignée au journal (`Administration` depuis cet écran).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns En cas de succès, les identifiants des règles de membres connus du groupe désormais en conflit
+   * (RG-008, signalement non bloquant) ; l'anomalie typée en cas d'échec.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session (erreur
+   * de programmation de l'écran appelant, non une anomalie métier).
+   */
+  public async qualifierMembre(
+    groupeId: string,
+    donnees: DonneesMembreConnu,
+    origine: string,
+    motDePasse: string,
+  ): Promise<ResultatQualificationMembre> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const reponse = await this.facadeAdministration.qualifierMembre<
+        DonneesRacine,
+        ReponseQualificationMembre
+      >({
+        chemin,
+        donnees: racine,
+        groupeId,
+        membreId: donnees.membreId,
+        critere: donnees.critere,
+        typeCritere: donnees.typeCritere,
+        statut: donnees.statut,
+        libelle: donnees.libelle,
+        aliasEmail: donnees.aliasEmail,
+        origine,
+        motDePasse,
+      });
+      this.racineInterne.set(reponse.donnees);
+      return { type: 'succes', membresEnConflit: reponse.membresEnConflit };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Définit la politique d'autorisation de l'IA d'un projet (US-024) : invoque la commande native
+   * `definirPolitiqueIA`, qui consigne la modification au journal, crée l'annotation système sur autorisation
+   * (RG-015) et sauvegarde effectivement le fichier (RG-002, RG-023) avant de renvoyer la racine mise à jour,
+   * substituée à l'état courant de ce Store. Un appel redondant (valeur déjà en vigueur) n'écrit rien sur le
+   * disque côté cœur natif ; la racine renvoyée reste alors strictement identique.
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param projetId - Identifiant du projet concerné.
+   * @param iaAutorisee - Nouvelle valeur de la politique IA du projet.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirPolitiqueIA(
+    groupeId: string,
+    projetId: string,
+    iaAutorisee: boolean,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAdministration.definirPolitiqueIA<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        groupeId,
+        projetId,
+        iaAutorisee,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Supprime une règle de membre connu d'un groupe (US-023) : invoque la commande native `supprimerMembreConnu`,
+   * qui retire la règle, consigne la suppression au journal et sauvegarde effectivement le fichier (RG-002,
+   * RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param membreId - Identifiant de la règle à supprimer.
+   * @param origine - Origine consignée au journal (`Administration` depuis cet écran).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerMembreConnu(
+    groupeId: string,
+    membreId: string,
+    origine: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAdministration.supprimerMembreConnu<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        groupeId,
+        membreId,
+        origine,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Vérifie, sans accès non sûr à la valeur reçue, qu'un rejet d'une commande native d'administration correspond
+   * bien à une anomalie typée (`ErreurFacade` côté cœur natif) plutôt qu'à une valeur inattendue de la frontière
+   * IPC, sur le modèle de la méthode équivalente de `FacadeCommandesService`.
+   * @param valeur - Valeur rejetée par `invoke`, de type `unknown` à cette frontière.
+   * @returns L'anomalie typée, ou la catégorie `erreurInterne` par défaut si `valeur` ne correspond pas à la
+   * forme attendue.
+   */
+  private anomalieAdministration(valeur: unknown): ErreurAdministration {
+    const categories: readonly CategorieErreurAdministration[] = [
+      'groupeIntrouvable',
+      'projetIntrouvable',
+      'membreIntrouvable',
+      'doublonUsernameMembreConnu',
+      'fichierIntrouvable',
+      'motDePasseOuFichierInvalide',
+      'formatNonReconnu',
+      'versionSchemaSuperieure',
+      'fichierVerrouille',
+      'aucunFichierOuvert',
+      'credentialInvalide',
+      'erreurInterne',
+    ];
+    if (typeof valeur === 'object' && valeur !== null && 'type' in valeur) {
+      const categorie: unknown = valeur.type;
+      const trouvee = categories.find((candidate) => candidate === categorie);
+      if (trouvee) {
+        return { type: trouvee };
+      }
+    }
+    return { type: 'erreurInterne' };
+  }
+
+  /**
    * Construit l'entrée de journal (RG-023) consignant un changement de ref auditée.
    * @param groupeId - Identifiant du groupe de rattachement.
    * @param projetId - Identifiant du projet de rattachement.
@@ -447,6 +665,33 @@ export class DonneesApplicationService {
       throw new Error("Aucun fichier de données n'est chargé.");
     }
     this.racineInterne.set(mutateur(racine));
+  }
+
+  /**
+   * Racine actuellement chargée, requise avant l'invocation d'une commande native échangeant la racine complète.
+   * @returns La racine courante.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  private racineActuelle(): DonneesRacine {
+    const racine = this.racineInterne();
+    if (!racine) {
+      throw new Error("Aucun fichier de données n'est chargé.");
+    }
+    return racine;
+  }
+
+  /**
+   * Chemin du fichier actuellement ouvert, requis avant l'invocation d'une commande native qui sauvegarde
+   * effectivement sur le disque.
+   * @returns Le chemin du fichier courant.
+   * @throws {Error} Si aucun chemin de fichier n'est connu de la session (aucun fichier ouvert).
+   */
+  private cheminFichierActuel(): string {
+    const chemin = this.etatSession.cheminFichier();
+    if (!chemin) {
+      throw new Error("Aucun fichier n'est actuellement ouvert.");
+    }
+    return chemin;
   }
 
   /**

@@ -1,82 +1,106 @@
 <section class="groupes-admin">
-  <header class="groupes-admin__entete">
-    <h2>Groupes</h2>
-    <button type="button" (click)="ouvrirCreation()">Créer un groupe</button>
-  </header>
+  <nav class="groupes-admin__sous-onglets">
+    <button
+      type="button"
+      [class.groupes-admin__sous-onglet--actif]="sousOngletActif === 'groupes'"
+      (click)="selectionnerSousOnglet('groupes')"
+    >
+      Groupes
+    </button>
+    <button
+      type="button"
+      [class.groupes-admin__sous-onglet--actif]="sousOngletActif === 'membresConnus'"
+      (click)="selectionnerSousOnglet('membresConnus')"
+    >
+      Membres connus
+    </button>
+  </nav>
 
-  <ul class="groupes-admin__liste">
-    @for (groupe of groupes(); track groupe.id) {
-      <li class="groupes-admin__ligne">
-        <span class="groupes-admin__nom">{{ groupe.nom }}</span>
-        <span class="groupes-admin__description">{{ groupe.description }}</span>
-        <span class="groupes-admin__nombre-instances"
-          >{{ groupe.instances.length }} instance(s)</span
-        >
-        <button type="button" (click)="ouvrirEdition(groupe.id)">Modifier</button>
-        <button type="button" (click)="demanderSuppression(groupe.id)">Supprimer</button>
-      </li>
-    } @empty {
-      <li class="groupes-admin__vide">Aucun groupe n'est encore défini.</li>
-    }
-  </ul>
+  @switch (sousOngletActif) {
+    @case ('groupes') {
+      <header class="groupes-admin__entete">
+        <h2>Groupes</h2>
+        <button type="button" (click)="ouvrirCreation()">Créer un groupe</button>
+      </header>
 
-  @if (groupeASupprimerId) {
-    <app-confirmation-suppression
-      message="La suppression d'un groupe entraîne la perte de l'historique d'audits de tous ses projets. Cette action est irréversible."
-      (confirmee)="confirmerSuppression()"
-      (annulee)="annulerSuppression()"
-    />
-  }
+      <ul class="groupes-admin__liste">
+        @for (groupe of groupes(); track groupe.id) {
+          <li class="groupes-admin__ligne">
+            <span class="groupes-admin__nom">{{ groupe.nom }}</span>
+            <span class="groupes-admin__description">{{ groupe.description }}</span>
+            <span class="groupes-admin__nombre-instances"
+              >{{ groupe.instances.length }} instance(s)</span
+            >
+            <button type="button" (click)="ouvrirEdition(groupe.id)">Modifier</button>
+            <button type="button" (click)="demanderSuppression(groupe.id)">Supprimer</button>
+          </li>
+        } @empty {
+          <li class="groupes-admin__vide">Aucun groupe n'est encore défini.</li>
+        }
+      </ul>
 
-  @if (formulaireVisible) {
-    <form class="groupes-admin__formulaire" (ngSubmit)="enregistrer()">
-      <h3>{{ groupeEnEditionId ? 'Modifier le groupe' : 'Créer un groupe' }}</h3>
-
-      @if (messageErreur) {
-        <p class="groupes-admin__erreur" role="alert">{{ messageErreur }}</p>
+      @if (groupeASupprimerId) {
+        <app-confirmation-suppression
+          message="La suppression d'un groupe entraîne la perte de l'historique d'audits de tous ses projets. Cette action est irréversible."
+          (confirmee)="confirmerSuppression()"
+          (annulee)="annulerSuppression()"
+        />
       }
 
-      <label>
-        Nom
-        <input type="text" name="nom" [(ngModel)]="nom" required />
-      </label>
+      @if (formulaireVisible) {
+        <form class="groupes-admin__formulaire" (ngSubmit)="enregistrer()">
+          <h3>{{ groupeEnEditionId ? 'Modifier le groupe' : 'Créer un groupe' }}</h3>
 
-      <label>
-        Description
-        <textarea name="description" [(ngModel)]="description"></textarea>
-      </label>
+          @if (messageErreur) {
+            <p class="groupes-admin__erreur" role="alert">{{ messageErreur }}</p>
+          }
 
-      <fieldset class="groupes-admin__instances">
-        <legend>Instances GitLab/Sonar</legend>
-        @for (instance of instances; track instance.id) {
-          <div class="groupes-admin__instance">
-            <select [name]="'type-' + instance.id" [(ngModel)]="instance.type">
-              @for (type of typesInstance; track type) {
-                <option [value]="type">{{ type }}</option>
-              }
-            </select>
-            <input
-              type="text"
-              [name]="'nom-' + instance.id"
-              [(ngModel)]="instance.nom"
-              placeholder="Nom de l'instance"
-            />
-            <input
-              type="text"
-              [name]="'url-' + instance.id"
-              [(ngModel)]="instance.urlBase"
-              placeholder="URL de base"
-            />
-            <button type="button" (click)="supprimerInstance(instance.id)">Retirer</button>
+          <label>
+            Nom
+            <input type="text" name="nom" [(ngModel)]="nom" required />
+          </label>
+
+          <label>
+            Description
+            <textarea name="description" [(ngModel)]="description"></textarea>
+          </label>
+
+          <fieldset class="groupes-admin__instances">
+            <legend>Instances GitLab/Sonar</legend>
+            @for (instance of instances; track instance.id) {
+              <div class="groupes-admin__instance">
+                <select [name]="'type-' + instance.id" [(ngModel)]="instance.type">
+                  @for (type of typesInstance; track type) {
+                    <option [value]="type">{{ type }}</option>
+                  }
+                </select>
+                <input
+                  type="text"
+                  [name]="'nom-' + instance.id"
+                  [(ngModel)]="instance.nom"
+                  placeholder="Nom de l'instance"
+                />
+                <input
+                  type="text"
+                  [name]="'url-' + instance.id"
+                  [(ngModel)]="instance.urlBase"
+                  placeholder="URL de base"
+                />
+                <button type="button" (click)="supprimerInstance(instance.id)">Retirer</button>
+              </div>
+            }
+            <button type="button" (click)="ajouterInstance()">Ajouter une instance</button>
+          </fieldset>
+
+          <div class="groupes-admin__actions-formulaire">
+            <button type="button" (click)="fermerFormulaire()">Annuler</button>
+            <button type="submit">Enregistrer</button>
           </div>
-        }
-        <button type="button" (click)="ajouterInstance()">Ajouter une instance</button>
-      </fieldset>
-
-      <div class="groupes-admin__actions-formulaire">
-        <button type="button" (click)="fermerFormulaire()">Annuler</button>
-        <button type="submit">Enregistrer</button>
-      </div>
-    </form>
+        </form>
+      }
+    }
+    @case ('membresConnus') {
+      <app-membres-connus-admin />
+    }
   }
 </section>

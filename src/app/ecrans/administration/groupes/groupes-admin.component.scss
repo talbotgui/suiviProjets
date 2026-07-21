@@ -1,4 +1,14 @@
 .groupes-admin {
+  &__sous-onglets {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  &__sous-onglet--actif {
+    font-weight: bold;
+  }
+
   &__entete {
     display: flex;
     align-items: center;

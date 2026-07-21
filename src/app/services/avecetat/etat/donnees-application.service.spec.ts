@@ -1,11 +1,22 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { invoke } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../sansetat/commandes/types-facade';
 import { DonneesApplicationService } from './donnees-application.service';
-import type { DonneesGroupe, DonneesProjet, DonneesSource } from './donnees-application.service';
-import { TypeSource } from './types-donnees';
-import type { DonneesRacine } from './types-donnees';
+import type {
+  DonneesGroupe,
+  DonneesMembreConnu,
+  DonneesProjet,
+  DonneesSource,
+} from './donnees-application.service';
+import { EtatSessionService } from './etat-session.service';
+import { StatutMembre, TypeCritereMembre, TypeSource } from './types-donnees';
+import type { DonneesRacine, ReponseQualificationMembre } from './types-donnees';
+
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+
+const invokeSimule = jest.mocked(invoke);
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction
@@ -33,6 +44,21 @@ class DonneesDeTest {
       journal: [],
       vuesEnregistrees: [],
     };
+  }
+
+  /**
+   * Racine actuellement chargée dans le Store, sans recourir à une assertion de non-nullité (interdite par les
+   * normes de développement du projet) : lève une erreur explicite si aucune racine n'est chargée, ce qui ne doit
+   * jamais se produire dans ces tests (chargée systématiquement en `beforeEach`).
+   * @param service - Store d'état applicatif dont la racine est attendue.
+   * @returns La racine actuellement chargée.
+   */
+  public static racineActuelle(service: DonneesApplicationService): DonneesRacine {
+    const racine = service.racine();
+    if (!racine) {
+      throw new Error('racine attendue pour ce test');
+    }
+    return racine;
   }
 }
 
@@ -65,6 +91,7 @@ describe('DonneesApplicationService', () => {
   let service: DonneesApplicationService;
 
   beforeEach(() => {
+    invokeSimule.mockReset();
     TestBed.configureTestingModule({});
     service = TestBed.inject(DonneesApplicationService);
   });
@@ -87,6 +114,25 @@ describe('DonneesApplicationService', () => {
   describe('mutations sans fichier chargé', () => {
     it('lève une erreur explicite plutôt que de muter un état absent', () => {
       expect(() => service.creerGroupe(DONNEES_GROUPE)).toThrow();
+    });
+
+    it('rejette qualifierMembre si aucun chemin de fichier ne peut être transmis à la commande native', async () => {
+      service.chargerRacine(DonneesDeTest.racineVide());
+      const groupeId = service.creerGroupe(DONNEES_GROUPE);
+      // Aucun fichier ouvert dans EtatSessionService : `cheminFichier()` reste `null`.
+      await expect(
+        service.qualifierMembre(
+          groupeId,
+          {
+            critere: 'alice',
+            typeCritere: TypeCritereMembre.Username,
+            statut: StatutMembre.Interne,
+          },
+          'Administration',
+          'mot-de-passe',
+        ),
+      ).rejects.toThrow();
+      expect(invokeSimule).not.toHaveBeenCalled();
     });
   });
 
@@ -336,6 +382,170 @@ describe('DonneesApplicationService', () => {
       const entree = service.racine()?.journal[0];
       expect(entree?.avant).toBeNull();
       expect(entree?.apres).toBe('develop');
+    });
+  });
+
+  describe('membres connus et politique IA (Phase 4, US-022 à US-024)', () => {
+    let groupeId: string;
+    let projetId: string;
+    let etatSession: EtatSessionService;
+
+    const DONNEES_MEMBRE: DonneesMembreConnu = {
+      critere: 'alice',
+      typeCritere: TypeCritereMembre.Username,
+      statut: StatutMembre.Interne,
+    };
+
+    beforeEach(() => {
+      service.chargerRacine(DonneesDeTest.racineVide());
+      groupeId = service.creerGroupe(DONNEES_GROUPE);
+      projetId = service.creerProjet(groupeId, DONNEES_PROJET);
+      etatSession = TestBed.inject(EtatSessionService);
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+    });
+
+    it('invoque qualifier_membre avec les paramètres attendus et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 2 };
+      const reponse: ReponseQualificationMembre = {
+        donnees: racineMiseAJour,
+        membresEnConflit: [],
+      };
+      invokeSimule.mockResolvedValue(reponse);
+
+      const resultat = await service.qualifierMembre(
+        groupeId,
+        DONNEES_MEMBRE,
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('qualifier_membre', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        groupeId,
+        membreId: undefined,
+        critere: 'alice',
+        typeCritere: TypeCritereMembre.Username,
+        statut: StatutMembre.Interne,
+        libelle: undefined,
+        aliasEmail: undefined,
+        origine: 'Administration',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes', membresEnConflit: [] });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('remonte les identifiants en conflit renvoyés par la commande native (RG-008)', async () => {
+      const reponse: ReponseQualificationMembre = {
+        donnees: DonneesDeTest.racineActuelle(service),
+        membresEnConflit: ['m1', 'm2'],
+      };
+      invokeSimule.mockResolvedValue(reponse);
+
+      const resultat = await service.qualifierMembre(
+        groupeId,
+        DONNEES_MEMBRE,
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'succes', membresEnConflit: ['m1', 'm2'] });
+    });
+
+    it('convertit un rejet typé « doublonUsernameMembreConnu » en Résultat « echec » (RG-008)', async () => {
+      invokeSimule.mockRejectedValue({ type: 'doublonUsernameMembreConnu' });
+
+      const resultat = await service.qualifierMembre(
+        groupeId,
+        DONNEES_MEMBRE,
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'doublonUsernameMembreConnu' },
+      });
+      expect(service.racine()?.versionSchema).toBe(1);
+    });
+
+    it('convertit un rejet non structuré en anomalie « erreurInterne »', async () => {
+      invokeSimule.mockRejectedValue('erreur non structurée');
+
+      const resultat = await service.qualifierMembre(
+        groupeId,
+        DONNEES_MEMBRE,
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'erreurInterne' } });
+    });
+
+    it('invoque definir_politique_ia avec les paramètres attendus et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirPolitiqueIA(groupeId, projetId, true, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_politique_ia', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        groupeId,
+        projetId,
+        iaAutorisee: true,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « projetIntrouvable » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'projetIntrouvable' });
+
+      const resultat = await service.definirPolitiqueIA(groupeId, projetId, true, 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'projetIntrouvable' } });
+    });
+
+    it('invoque supprimer_membre_connu avec les paramètres attendus et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 4 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.supprimerMembreConnu(
+        groupeId,
+        'm1',
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('supprimer_membre_connu', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        groupeId,
+        membreId: 'm1',
+        origine: 'Administration',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « membreIntrouvable » en Résultat « echec » pour la suppression', async () => {
+      invokeSimule.mockRejectedValue({ type: 'membreIntrouvable' });
+
+      const resultat = await service.supprimerMembreConnu(
+        groupeId,
+        'm1',
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'membreIntrouvable' } });
     });
   });
 });

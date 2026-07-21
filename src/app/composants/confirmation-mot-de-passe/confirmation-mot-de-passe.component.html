@@ -1,0 +1,17 @@
+<div class="confirmation-mot-de-passe" role="alertdialog" aria-modal="true">
+  <p class="confirmation-mot-de-passe__message">{{ message() }}</p>
+  <label class="confirmation-mot-de-passe__champ">
+    Mot de passe du fichier
+    <input
+      type="password"
+      name="motDePasse"
+      [ngModel]="motDePasse()"
+      (ngModelChange)="motDePasse.set($event)"
+      required
+    />
+  </label>
+  <div class="confirmation-mot-de-passe__actions">
+    <button type="button" (click)="annuler()">Annuler</button>
+    <button type="button" (click)="confirmer()">Confirmer</button>
+  </div>
+</div>

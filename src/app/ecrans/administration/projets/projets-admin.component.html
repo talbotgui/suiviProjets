@@ -25,6 +25,16 @@
           <span class="projets-admin__nom">{{ projet.nom }}</span>
           <span class="projets-admin__description">{{ projet.description }}</span>
           <span class="projets-admin__nombre-sources">{{ projet.sources.length }} source(s)</span>
+          <span class="projets-admin__politique-ia">
+            {{ projet.iaAutorisee ? 'IA autorisée' : 'IA interdite' }}
+          </span>
+          <button
+            type="button"
+            [disabled]="politiqueIAEnCours"
+            (click)="demanderBasculePolitiqueIA(projet.id)"
+          >
+            {{ projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
+          </button>
           <button type="button" (click)="ouvrirEdition(projet.id)">Modifier</button>
           <button type="button" (click)="dupliquer(projet.id)">Dupliquer</button>
           <button type="button" (click)="demanderSuppression(projet.id)">Supprimer</button>
@@ -33,6 +43,18 @@
         <li class="projets-admin__vide">Aucun projet n'est encore défini pour ce groupe.</li>
       }
     </ul>
+
+    @if (messageErreurPolitiqueIA) {
+      <p class="projets-admin__erreur" role="alert">{{ messageErreurPolitiqueIA }}</p>
+    }
+
+    @if (projetPolitiqueIAEnAttenteId) {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour modifier la politique IA de ce projet."
+        (confirmee)="confirmerBasculePolitiqueIA($event)"
+        (annulee)="annulerBasculePolitiqueIA()"
+      />
+    }
 
     @if (projetASupprimerId) {
       <app-confirmation-suppression

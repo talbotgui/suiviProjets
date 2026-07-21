@@ -44,8 +44,29 @@ pub(crate) enum ErreurFacade {
     /// interface, cf. `docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties` (« aucune
     /// confiance aveugle dans une donnée reçue via une commande »).
     CredentialInvalide,
+    /// Le groupe désigné n'existe pas dans les données courantes (Phase 4, `qualifierMembre`/`definirPolitiqueIA`).
+    GroupeIntrouvable,
+    /// Le projet désigné n'existe pas dans les données courantes (Phase 4, `definirPolitiqueIA`).
+    ProjetIntrouvable,
+    /// La règle de membre connu désignée par son identifiant n'existe pas dans le groupe (Phase 4,
+    /// `qualifierMembre`).
+    MembreIntrouvable,
+    /// La règle soumise porte un doublon de username déjà utilisé par une autre règle du groupe (Phase 4, RG-008).
+    DoublonUsernameMembreConnu,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
+}
+
+impl From<crate::persistance::administration::ErreurAdministration> for ErreurFacade {
+    fn from(erreur: crate::persistance::administration::ErreurAdministration) -> Self {
+        use crate::persistance::administration::ErreurAdministration;
+        match erreur {
+            ErreurAdministration::GroupeIntrouvable => Self::GroupeIntrouvable,
+            ErreurAdministration::ProjetIntrouvable => Self::ProjetIntrouvable,
+            ErreurAdministration::MembreIntrouvable => Self::MembreIntrouvable,
+            ErreurAdministration::DoublonUsernameMembreConnu => Self::DoublonUsernameMembreConnu,
+        }
+    }
 }
 
 impl From<ErreurPersistance> for ErreurFacade {

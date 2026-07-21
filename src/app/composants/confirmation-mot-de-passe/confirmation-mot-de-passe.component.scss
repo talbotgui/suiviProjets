@@ -1,0 +1,15 @@
+.confirmation-mot-de-passe {
+  border: 1px solid;
+  padding: 1rem;
+
+  &__champ {
+    display: block;
+    margin: 0.5rem 0;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+}

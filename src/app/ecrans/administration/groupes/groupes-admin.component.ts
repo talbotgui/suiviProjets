@@ -1,9 +1,11 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Onglet Groupes de l'écran Administration (US-006, Phase 3) : liste, création, modification et suppression des
-// groupes, avec gestion inline de leurs instances GitLab/Sonar. La gestion des membres connus et des annotations
-// de groupe (également portées par `Groupe`) est différée à la Phase 4 (US-023) et n'est pas traitée ici.
+// Onglet Groupes de l'écran Administration (US-006, Phase 3 ; US-022, US-023, Phase 4) : sous-onglet Groupes
+// (liste, création, modification et suppression des groupes, avec gestion inline de leurs instances GitLab/Sonar)
+// et sous-onglet Membres connus (`SqmMembresConnusAdminComponent`, CRUD des règles d'identification des membres
+// d'un groupe, RG-006 à RG-008). Le sous-onglet Annotations de groupe (également porté par `Groupe`) est différé
+// à la Phase 8 (US-020) et n'est pas traité ici.
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -12,6 +14,7 @@ import type { DonneesGroupe } from '../../../services/avecetat/etat/donnees-appl
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
 import type { Instance } from '../../../services/sansetat/commandes/types-facade';
 import type { Groupe } from '../../../services/avecetat/etat/types-donnees';
+import { SqmMembresConnusAdminComponent } from './membres-connus/membres-connus-admin.component';
 
 /**
  * Instance en cours d'édition au sein du formulaire de groupe, dotée d'un identifiant local stable (généré à
@@ -22,18 +25,36 @@ interface InstanceEnEdition extends Instance {
 }
 
 /**
- * Onglet Groupes de l'écran Administration : CRUD complet des groupes, y compris leurs instances GitLab/Sonar
- * (US-006).
+ * Identifiant d'un sous-onglet de l'onglet Groupes (cf. `docs/02_documentation/08_arborescenceNavigation.md`).
+ */
+type SousOngletGroupes = 'groupes' | 'membresConnus';
+
+/**
+ * Onglet Groupes de l'écran Administration : deux sous-onglets, CRUD complet des groupes (US-006) et CRUD des
+ * membres connus du groupe sélectionné (US-022, US-023).
  */
 @Component({
   selector: 'app-groupes-admin',
-  imports: [FormsModule, SqmConfirmationSuppressionComponent],
+  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmMembresConnusAdminComponent],
   templateUrl: './groupes-admin.component.html',
   styleUrl: './groupes-admin.component.scss',
 })
 export class SqmGroupesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+
+  /**
+   * Sous-onglet actuellement affiché.
+   */
+  public sousOngletActif: SousOngletGroupes = 'groupes';
+
+  /**
+   * Sélectionne le sous-onglet à afficher.
+   * @param sousOnglet - Sous-onglet à activer.
+   */
+  public selectionnerSousOnglet(sousOnglet: SousOngletGroupes): void {
+    this.sousOngletActif = sousOnglet;
+  }
 
   /**
    * Types d'instance proposés au formulaire (GitLab, Sonar).

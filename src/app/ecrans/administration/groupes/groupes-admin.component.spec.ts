@@ -51,6 +51,16 @@ describe('SqmGroupesAdminComponent', () => {
     expect(composant.groupes()).toEqual([]);
   });
 
+  it('affiche le sous-onglet Groupes par défaut', () => {
+    expect(composant.sousOngletActif).toBe('groupes');
+  });
+
+  it('bascule vers le sous-onglet Membres connus (US-022, US-023)', () => {
+    composant.selectionnerSousOnglet('membresConnus');
+
+    expect(composant.sousOngletActif).toBe('membresConnus');
+  });
+
   it('refuse la création sans nom', () => {
     composant.ouvrirCreation();
     composant.nom = '   ';

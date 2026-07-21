@@ -11,7 +11,10 @@
 //! connectivité et de saisie en mémoire des credentials de session (US-003, US-004). Phase 3 (administration du
 //! modèle) : s'y ajoute l'interrogation des branches d'un dépôt GitLab pour l'autocomplétion de la ref auditée
 //! d'une source (US-008) ; le CRUD des groupes, projets et sources lui-même a lieu côté interface, sur les
-//! données déjà chargées en mémoire, et se persiste via la commande `sauvegarderFichier` existante.
+//! données déjà chargées en mémoire, et se persiste via la commande `sauvegarderFichier` existante. Phase 4
+//! (membres connus et politique IA) : s'y ajoutent `qualifierMembre` et `definirPolitiqueIA` (US-022 à US-024),
+//! qui mutent et sauvegardent elles-mêmes le fichier, à la différence du CRUD groupes/projets/sources de la
+//! Phase 3.
 
 mod commandes;
 mod connecteurs;
@@ -40,6 +43,9 @@ pub fn run() {
             commandes::connectivite::tester_connectivite,
             commandes::connectivite::definir_credentials,
             commandes::connectivite::interroger_branches,
+            commandes::administration::qualifier_membre,
+            commandes::administration::definir_politique_ia,
+            commandes::administration::supprimer_membre_connu,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
