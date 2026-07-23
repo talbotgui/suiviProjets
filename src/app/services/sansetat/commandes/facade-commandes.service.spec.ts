@@ -232,4 +232,34 @@ describe('FacadeCommandesService', () => {
       },
     );
   });
+
+  describe('interrogerDerniereAnalyse (Phase 5, incrément 3)', () => {
+    it('doit invoquer interroger_derniere_analyse avec l’instance et l’identifiant externe', async () => {
+      invokeSimule.mockResolvedValue('2026-07-08T10:15:00+0000');
+
+      const resultat = await service.interrogerDerniereAnalyse(INSTANCE_SONAR, 'proj-key');
+
+      expect(invokeSimule).toHaveBeenCalledWith('interroger_derniere_analyse', {
+        instance: INSTANCE_SONAR,
+        idExterne: 'proj-key',
+      });
+      expect(resultat).toEqual({ type: 'succes', resultat: '2026-07-08T10:15:00+0000' });
+    });
+
+    it('doit remonter `null` pour un projet jamais analysé', async () => {
+      invokeSimule.mockResolvedValue(null);
+
+      const resultat = await service.interrogerDerniereAnalyse(INSTANCE_SONAR, 'proj-key');
+
+      expect(resultat).toEqual({ type: 'succes', resultat: null });
+    });
+
+    it('doit convertir un rejet typé « droitsInsuffisants » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'droitsInsuffisants' });
+
+      const resultat = await service.interrogerDerniereAnalyse(INSTANCE_SONAR, 'proj-key');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'droitsInsuffisants' } });
+    });
+  });
 });

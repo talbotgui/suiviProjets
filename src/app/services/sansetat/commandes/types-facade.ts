@@ -306,3 +306,14 @@ export interface ResultatSonarNcloc {
 export type ResultatInterrogationNcloc =
   | { readonly type: 'succes'; readonly resultat: ResultatSonarNcloc }
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * Résultat typé de `FacadeCommandesService.interrogerDerniereAnalyse` (Phase 5, incrément 3) : date de la
+ * dernière analyse Sonar d'un projet, `null` si celui-ci n'a jamais été analysé. Donnée intermédiaire consommée
+ * par le Connecteur croisé (`ConnecteurCroiseUtils.calculerFraicheurSonar`), n'appartenant à aucune variante du
+ * catalogue figé des résultats d'audit et donc jamais persistée seule, sur le modèle de
+ * {@link ResultatInterrogationBranches}.
+ */
+export type ResultatInterrogationDerniereAnalyse =
+  | { readonly type: 'succes'; readonly resultat: string | null }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };

@@ -7,8 +7,9 @@
 // Périmètre de la Phase 2 : commandes de credentials (`testerConnectivite`, `definirCredentials`). Périmètre de
 // la Phase 3 : autocomplétion des branches d'un dépôt GitLab pour la ref auditée d'une source (`interrogerBranches`).
 // Périmètre de la Phase 5, incrément 1 : dix opérations d'interrogation des indicateurs GitLab/Sonar déterministes
-// du Moteur d'audit. Classé sous `services/sansetat/` : aucun état interne n'est conservé entre deux appels de ce
-// service.
+// du Moteur d'audit. Périmètre de l'incrément 3 : `interrogerDerniereAnalyse`, donnée intermédiaire consommée par
+// le Connecteur croisé (`services/avecetat/campagne/connecteur-croise.utils.ts`). Classé sous `services/sansetat/`
+// : aucun état interne n'est conservé entre deux appels de ce service.
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import type {
@@ -22,6 +23,7 @@ import type {
   ResultatInterrogationBranches,
   ResultatInterrogationContributeurs,
   ResultatInterrogationCouverture,
+  ResultatInterrogationDerniereAnalyse,
   ResultatInterrogationDette,
   ResultatInterrogationMembres,
   ResultatInterrogationMergeRequests,
@@ -326,6 +328,34 @@ export class FacadeCommandesService {
       sourceId,
       idExterne,
     );
+  }
+
+  /**
+   * Interroge la date de la dernière analyse Sonar d'un projet (Phase 5, incrément 3), donnée intermédiaire
+   * consommée par le Connecteur croisé (`ConnecteurCroiseUtils.calculerFraicheurSonar`). À la différence des dix
+   * méthodes d'interrogation précédentes, ne reçoit pas `sourceId` : cette donnée n'appartient à aucune variante
+   * du catalogue figé des résultats d'audit et n'est donc jamais destinée à être persistée seule.
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns La date de dernière analyse (`null` si le projet n'a jamais été analysé) en cas de succès, ou
+   * l'anomalie typée en cas d'échec.
+   */
+  public async interrogerDerniereAnalyse(
+    instance: Instance,
+    idExterne: string,
+  ): Promise<ResultatInterrogationDerniereAnalyse> {
+    try {
+      const resultat = await invoke<string | null>('interroger_derniere_analyse', {
+        instance,
+        idExterne,
+      });
+      return { type: 'succes', resultat };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+    }
   }
 
   /**

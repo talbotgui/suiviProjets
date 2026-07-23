@@ -25,6 +25,11 @@
 //! sur le gabarit exact de `qualifierMembre`/`definirPolitiqueIA` de `administration.rs` (chemin, données
 //! complètes, champs métier, mot de passe, sauvegarde effective, racine mise à jour renvoyée), chacune déléguant
 //! l'intégralité de sa logique de mutation à `persistance::audit`, déjà couvert par ses propres tests unitaires.
+//!
+//! Périmètre de l'incrément 3 : `interrogerDerniereAnalyse`, donnée intermédiaire (date de dernière analyse
+//! Sonar) consommée par le Connecteur croisé (UI, `calculerFraicheurSonar`), n'appartenant à aucune variante du
+//! catalogue figé des résultats d'audit et donc jamais persistée seule — signature allégée sans `sourceId` par
+//! rapport aux dix commandes d'interrogation de l'incrément 1.
 
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
@@ -338,6 +343,38 @@ pub(crate) async fn interroger_ncloc(
                 &instance.url_base,
                 &credential,
                 &source_id,
+                &id_externe,
+                client_http(),
+            )
+            .await
+        }
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+    }
+}
+
+/// Interroge la date de la dernière analyse Sonar d'un projet (Phase 5, incrément 3), donnée intermédiaire
+/// consommée par `calculerFraicheurSonar` (Connecteur croisé, UI). À la différence des dix opérations
+/// d'interrogation précédentes, ne reçoit pas `sourceId` : cette donnée n'appartient à aucune variante du
+/// catalogue figé des résultats d'audit et n'est donc jamais destinée à être persistée seule (cf.
+/// `src-tauri/src/connecteurs/sonar.rs`, module `interroger_derniere_analyse`).
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::CredentialAbsent`] si aucun credential n'a été saisi pour cette instance ; les autres
+/// catégories de [`ErreurConnecteur`] en cas d'échec de l'appel réseau. Un projet jamais analysé n'est pas une
+/// erreur : `Ok(None)`.
+#[tauri::command]
+pub(crate) async fn interroger_derniere_analyse(
+    instance: Instance,
+    id_externe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<Option<String>, ErreurConnecteur> {
+    let credential = credential_instance(&instance, &etat)?;
+    match instance.type_instance {
+        TypeInstance::Sonar => {
+            sonar::interroger_derniere_analyse(
+                &instance.url_base,
+                &credential,
                 &id_externe,
                 client_http(),
             )

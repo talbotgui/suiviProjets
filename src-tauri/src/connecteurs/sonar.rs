@@ -326,6 +326,75 @@ pub(crate) async fn interroger_ncloc(
     })
 }
 
+/// Une analyse Sonar, réduite au seul champ exploité par `interroger_derniere_analyse`.
+#[derive(Debug, Deserialize)]
+struct Analyse {
+    date: String,
+}
+
+/// Réponse du point d'API `project_analyses/search` de Sonar.
+#[derive(Debug, Deserialize)]
+struct ReponseAnalyses {
+    #[serde(default)]
+    analyses: Vec<Analyse>,
+}
+
+/// Interroge la date de la dernière analyse Sonar d'un projet (Phase 5, incrément 3), donnée intermédiaire
+/// consommée par `calculerFraicheurSonar` (Connecteur croisé, UI) : n'appartient à aucune variante du catalogue
+/// figé des résultats d'audit (`docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`),
+/// à la différence des cinq opérations Sonar précédentes, et n'est donc jamais persistée seule.
+///
+/// Utilise `project_analyses/search` plutôt que `measures/component` (déjà mobilisé par les cinq opérations
+/// précédentes) : ce point d'API est spécifiquement dédié à l'historique des analyses d'un projet, plus approprié
+/// pour cette seule donnée qu'un détournement du point d'API de mesures.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::AuthentificationRefusee`] (401), [`ErreurConnecteur::DroitsInsuffisants`] (403),
+/// [`ErreurConnecteur::ReponseInattendue`] pour tout autre statut ou composant Sonar inconnu ; délai/injoignabilité
+/// selon [`erreur_depuis_reqwest`]. Un tableau d'analyses vide (projet jamais analysé) n'est pas une erreur : elle
+/// se traduit par un retour `Ok(None)`.
+pub(crate) async fn interroger_derniere_analyse(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    client: &reqwest::Client,
+) -> Result<Option<String>, ErreurConnecteur> {
+    let url = format!(
+        "{}/api/project_analyses/search",
+        url_base.trim_end_matches('/')
+    );
+    let reponse = client
+        .get(url)
+        .bearer_auth(credential)
+        .query(&[("project", id_externe), ("ps", "1")])
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+
+    let statut = reponse.status();
+    if statut.as_u16() == 401 {
+        return Err(ErreurConnecteur::AuthentificationRefusee);
+    }
+    if statut.as_u16() == 403 {
+        return Err(ErreurConnecteur::DroitsInsuffisants);
+    }
+    if !statut.is_success() {
+        return Err(ErreurConnecteur::ReponseInattendue);
+    }
+
+    let reponse = reponse
+        .json::<ReponseAnalyses>()
+        .await
+        .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+
+    Ok(reponse
+        .analyses
+        .into_iter()
+        .next()
+        .map(|analyse| analyse.date))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -717,5 +786,110 @@ mod tests {
         assert_eq!(resultat.ncloc, 84210);
         assert!(resultat.par_langage.is_empty());
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_derniere_analyse_reussit_avec_une_analyse() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .and(header("Authorization", "Bearer jeton-valide"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "analyses": [{ "date": "2026-07-08T10:15:00+0000" }]
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_derniere_analyse(
+            &serveur.uri(),
+            "jeton-valide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(resultat, Ok(Some("2026-07-08T10:15:00+0000".to_string())));
+    }
+
+    #[tokio::test]
+    async fn interroger_derniere_analyse_retourne_absent_si_jamais_analyse() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "analyses": [] })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_derniere_analyse(
+            &serveur.uri(),
+            "jeton-valide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(resultat, Ok(None));
+    }
+
+    #[tokio::test]
+    async fn interroger_derniere_analyse_signale_authentification_refusee() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_derniere_analyse(
+            &serveur.uri(),
+            "jeton-invalide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(resultat, Err(ErreurConnecteur::AuthentificationRefusee));
+    }
+
+    #[tokio::test]
+    async fn interroger_derniere_analyse_signale_des_droits_insuffisants() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_derniere_analyse(
+            &serveur.uri(),
+            "jeton-limite",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(resultat, Err(ErreurConnecteur::DroitsInsuffisants));
+    }
+
+    #[tokio::test]
+    async fn interroger_derniere_analyse_signale_une_reponse_inattendue() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("pas du json"))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_derniere_analyse(
+            &serveur.uri(),
+            "jeton",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(resultat, Err(ErreurConnecteur::ReponseInattendue));
     }
 }

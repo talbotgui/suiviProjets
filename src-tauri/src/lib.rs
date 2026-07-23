@@ -60,6 +60,7 @@ pub fn run() {
             commandes::audit::interroger_couverture,
             commandes::audit::interroger_notes,
             commandes::audit::interroger_ncloc,
+            commandes::audit::interroger_derniere_analyse,
             commandes::audit::enregistrer_brouillon,
             commandes::audit::integrer_brouillon,
             commandes::audit::rejeter_brouillon,
