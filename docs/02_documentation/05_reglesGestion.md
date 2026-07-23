@@ -25,7 +25,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | Synthèse graphique | Évolution des indicateurs dans le temps, annotations et changements de seuils | RG-011, RG-022, RG-023, RG-027 |
 | Fiche projet (et comparaison entre deux audits) | Détail complet d'un projet, historique, différentiel entre deux dates | RG-006, RG-009, RG-010, RG-011, RG-013, RG-014, RG-015, RG-016, RG-022, RG-023 |
 | Liste de travail | Agrégation des alertes actives et suivi de leur traitement | RG-009, RG-010, RG-026, RG-027 |
-| Écran de paramétrage | Seuils, référentiels, journal des modifications, purge, export/import de configuration | RG-003, RG-012, RG-022, RG-023, RG-024, RG-025, RG-028, RG-029 |
+| Écran de paramétrage | Seuils, référentiels, journal des modifications, purge, export/import de configuration | RG-003, RG-012, RG-022, RG-023, RG-024, RG-025, RG-028, RG-029, RG-030 |
 | Écran de verrouillage | Verrouillage de session sur inactivité ou action manuelle | RG-004, RG-005 |
 
 ## Règles de gestion par domaine fonctionnel
@@ -55,7 +55,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
 |---|---|---|---|
 | RG-011 | Les résultats d'audit ne contiennent jamais de verdict (statut d'obsolescence, statut de membre, badge, classe de taille) ; seuls les constats bruts sont stockés, tout jugement étant calculé à l'affichage à partir des seuils et référentiels courants | Brouillon, Synthèse des audits, Fiche projet, Synthèse graphique | À chaque restitution d'un indicateur calculé |
-| RG-012 | Modifier un seuil, une règle de dépendance, une règle de marqueur IA ou qualifier un membre requalifie instantanément tout l'historique affiché, sans nouvel audit | Administration, Écran de paramétrage | Immédiatement après la modification |
+| RG-012 | Modifier un seuil, une règle de dépendance, une règle de marqueur IA, le motif de nommage des branches ou qualifier un membre requalifie instantanément tout l'historique affiché, sans nouvel audit | Administration, Écran de paramétrage | Immédiatement après la modification |
 | RG-013 | Un badge SONAR_KO est déclenché lorsque l'écart entre la date du dernier commit et la date de la dernière analyse Sonar dépasse la tolérance paramétrable ; il grise l'ensemble des métriques Sonar de l'audit concerné | Synthèse des audits, Fiche projet | Restitution des indicateurs Sonar d'un projet |
 | RG-014 | Chaque projet porte un indicateur d'autorisation de l'usage de l'IA, interdit par défaut ; l'absence de valeur du champ vaut interdit | Administration, Fiche projet | Création d'un projet, restitution de sa politique IA |
 | RG-015 | Le passage de la politique IA d'un projet à autorisé est horodaté et crée automatiquement une annotation système non supprimable | Administration, Fiche projet | Modification de la politique IA d'un projet |
@@ -75,10 +75,11 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 
 | identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
 |---|---|---|---|
-| RG-022 | Les seuils de couleur, les bornes de classe de taille, la tolérance de fraîcheur Sonar et les référentiels de dépendances et de marqueurs IA définis au paramétrage s'appliquent uniformément à tous les écrans de restitution | Écran de paramétrage, Synthèse des audits, Synthèse graphique, Fiche projet | Restitution de tout indicateur calculé |
-| RG-023 | Toute modification d'une donnée de jugement — seuil, référentiel de dépendances, référentiel de marqueurs IA, qualification d'un membre, politique IA d'un projet, ref auditée d'une source (périmètre complet de [F21](../01_besoin/Specification.md#521-f21--journal-des-modifications-de-paramétrage)) — est consignée dans le journal des modifications, avec horodatage, valeur avant/après et origine de la modification | Écran de paramétrage, Synthèse graphique, Fiche projet, Administration | À chaque modification d'une donnée de jugement |
+| RG-022 | Les seuils de couleur, les bornes de classe de taille, la tolérance de fraîcheur Sonar et les référentiels de dépendances, de marqueurs IA et de nommage des branches définis au paramétrage s'appliquent uniformément à tous les écrans de restitution | Écran de paramétrage, Synthèse des audits, Synthèse graphique, Fiche projet | Restitution de tout indicateur calculé |
+| RG-023 | Toute modification d'une donnée de jugement — seuil, référentiel de dépendances, référentiel de marqueurs IA, référentiel de nommage des branches, qualification d'un membre, politique IA d'un projet, ref auditée d'une source (périmètre complet de [F21](../01_besoin/Specification.md#521-f21--journal-des-modifications-de-paramétrage), étendu au motif de nommage des branches) — est consignée dans le journal des modifications, avec horodatage, valeur avant/après et origine de la modification | Écran de paramétrage, Synthèse graphique, Fiche projet, Administration | À chaque modification d'une donnée de jugement |
 | RG-024 | La purge par densité conserve le premier audit de chaque projet, puis un audit au minimum [tous les sept jours](../01_besoin/Specification.md#519-f19--purge-des-audits) parmi les audits rapprochés ; le premier et le dernier audit de chaque projet sont toujours conservés | Écran de paramétrage (purge) | Exécution d'une purge par densité |
 | RG-025 | La purge par âge, [au-delà de six mois](../01_besoin/Specification.md#519-f19--purge-des-audits), est toujours proposée avec prévisualisation du volume libéré et n'est jamais déclenchée automatiquement ; l'utilisateur choisit entre suppression et agrégation mensuelle | Écran de paramétrage (purge) | Proposition ou déclenchement d'une purge par âge |
+| RG-030 | La conformité de nommage d'une branche d'un dépôt GitLab audité n'est jamais stockée comme un constat d'audit : elle est calculée à l'affichage par confrontation du nom de branche constaté au motif d'expression régulière paramétrable `referentiels.motifNommageBranches`, initialisé par défaut à une valeur représentant la convention Gitflow | Écran de paramétrage | Restitution de l'indicateur de nommage d'une branche, modification du motif |
 
 ### Vues, alertes, export et import
 
@@ -122,3 +123,4 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-027 | [US-028](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-028 | [US-029](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-029 | [US-030](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-030 | [US-033](./04_casUsage.md#cas-dusage--user-stories) |

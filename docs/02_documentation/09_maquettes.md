@@ -116,7 +116,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | écran | zone | composants / actions |
 |---|---|---|
 | Paramétrage | Seuils de couleur | Seuils de chaque indicateur de la synthèse et seuils spécifiques (vitalité, bornes de taille, fraîcheur Sonar, activité sans qualité, matérialité du brouillon, fraîcheur d'audit) |
-| Paramétrage | Référentiels | Référentiel des dépendances (motif, versions, statut) et référentiel des marqueurs IA |
+| Paramétrage | Référentiels | Référentiel des dépendances (motif, versions, statut), référentiel des marqueurs IA, et motif de nommage des branches (expression régulière unique, initialisée à la convention Gitflow) |
 | Paramétrage | Réglages applicatifs | Délai de verrouillage, concurrence d'audit, proxy optionnel, nombre de sauvegardes de sécurité |
 | Paramétrage | Accès complémentaires | Journal des modifications, purge des audits, export/import de configuration |
 

@@ -28,6 +28,7 @@ Ce modèle de données reprend et formalise la structure déjà posée par le do
 | Résultat | `type` (discriminant `origine.nature`), `sourceId` (selon type), `refEffective`/`shaTete` (résultats issus de GitLab), attributs propres au type | Appartient à un Audit ; le catalogue figé des types et de leurs attributs est documenté en [Specification.md, section 5.5](../01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs) ; ne contient jamais de verdict calculé ([RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)) |
 | RegleDependance | `id`, `motif`, `versions[]` (`motifVersion`, `statut`) | Élément des Référentiels (branche `referentiels.reglesDependances`, partageable, exportée en clair) |
 | RegleMarqueurIA | `id`, `motif`, `typeCorrespondance`, `portee`, `nature`, `outil` | Élément des Référentiels (branche `referentiels.reglesMarqueursIA`, partageable, exportée en clair) |
+| MotifNommageBranches | `motif` (chaîne, expression régulière) | Attribut scalaire des Référentiels (branche `referentiels.motifNommageBranches`, partageable, exportée en clair) ; à la différence de RegleDependance/RegleMarqueurIA, ce n'est pas une liste d'entités mais une valeur unique, initialisée par défaut à la convention Gitflow (cf. [RG-030](./05_reglesGestion.md#seuils-référentiels-et-historisation)) |
 | Paramètres | `seuils` (vitalité, taille de dépôt, couverture, fraîcheur Sonar, activité sans qualité, fraîcheur d'audit, MR ouvertes, couleurs de violations, matérialité du brouillon), `verrouillage`, `audit` (concurrence, fenêtres), `proxy`, `sauvegarde` (nombre de sauvegardes de sécurité) | Occurrence unique à la racine ; seule la sous-branche `seuils` est exportée en clair |
 | Campagne | `id`, `date`, `perimetre[]` (identifiants de Projet), `verdicts[]` (`projetId`, `statut`, `dureeMs` optionnel, `anomalies[]` optionnel) | Référence les Projet de son périmètre |
 | Brouillon | `campagneId`, `creeLe`, `resultatsParProjet[]` (`projetId`, `audit`, `statut`, `motifRejet` optionnel, `aberrations[]` optionnel) | Occurrence unique et nullable à la racine ; référence la Campagne dont il est issu |
@@ -39,7 +40,8 @@ Ce modèle de données reprend et formalise la structure déjà posée par le do
 
 - Toute entité identifiée porte un UUID v4 généré à la création et jamais réutilisé ni modifié (cf. [Specification.md, section 6.2](../01_besoin/Specification.md#62-règles-transverses)).
 - Un Résultat n'existe que rattaché à un Audit ; son champ `type` détermine le schéma de ses attributs et appartient au catalogue figé documenté dans le dossier de besoin.
-- Aucun Résultat ne contient de champ de statut ou de verdict calculé : seuls des constats bruts y figurent ([RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)).
+- Aucun Résultat ne contient de champ de statut ou de verdict calculé : seuls des constats bruts y figurent ([RG-011](./05_reglesGestion.md#constat-jugement-et-politique-ia)). En particulier, un Résultat `gitlab.branches` ne stocke que le nom de chaque branche (et les autres constats bruts associés) : sa conformité de nommage n'y figure jamais, elle est calculée à l'affichage par confrontation avec `referentiels.motifNommageBranches` courant ([RG-030](./05_reglesGestion.md#seuils-référentiels-et-historisation)).
+- `referentiels.motifNommageBranches` n'est jamais vide : une valeur par défaut représentant la convention Gitflow est appliquée à la création du fichier de données et ne peut être vidée, seulement remplacée par un autre motif.
 - Une Source référence une Instance appartenant au même Groupe que son Projet.
 - L'absence de `refAuditee` sur une Source n'est pas une valeur ambiguë : elle signifie explicitement « branche par défaut du dépôt », résolue à chaque audit et jamais figée en avance.
 - Au sein d'un même Groupe, deux `MembreConnu` de `typeCritere` `username` ne peuvent porter le même `critere` (doublon bloqué à la saisie, cf. [RG-008](./05_reglesGestion.md#membres-et-sécurité-des-accès)).
@@ -68,7 +70,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | Groupe, Instance, MembreConnu, Annotation (portée groupe) | Camille (utilisateur unique) | Création, mise à jour et suppression via l'administration ; les membres connus ne sont jamais partagés hors de l'application |
 | Projet, Source, Annotation (portée projet) | Camille | Idem, cycle de vie lié à celui du Groupe parent |
 | Audit, Résultat, Campagne, Brouillon | UI (orchestrateur de campagne), écrits sur disque par le cœur natif (moteur de persistance) | Produits automatiquement lors d'une campagne ; intégrés ou rejetés par Camille depuis le brouillon, jamais modifiés manuellement après intégration à l'historique |
-| Référentiels (`reglesDependances`, `reglesMarqueursIA`), Paramètres (`seuils`) | Camille | Édités depuis le paramétrage ; seule portion du modèle destinée au partage entre installations (export en clair) |
+| Référentiels (`reglesDependances`, `reglesMarqueursIA`, `motifNommageBranches`), Paramètres (`seuils`) | Camille | Édités depuis le paramétrage ; seule portion du modèle destinée au partage entre installations (export en clair) |
 | TraitementAlerte, VueEnregistrée | Camille | Données de travail personnelles, jamais exportées |
 | EntréeJournal | Cœur natif | Écriture automatique en append-only à chaque modification d'une donnée de jugement ; lecture seule pour Camille |
 
@@ -85,6 +87,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | `cleAlerte` respecte le motif `type_alerte|projetId|discriminant` | TraitementAlerte |
 | `versionFiltres` est un entier positif correspondant à un schéma de filtres connu de l'écran concerné | VueEnregistrée |
 | L'export en clair ne contient que `parametres.seuils` et `referentiels` | Contrôle transverse à l'export de configuration |
+| `referentiels.motifNommageBranches` est une expression régulière syntaxiquement valide, jamais vide (valeur par défaut Gitflow appliquée à la création du fichier) | Référentiels |
 
 ## Matrice de traçabilité
 
@@ -97,7 +100,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | Campagne | [RG-017](./05_reglesGestion.md#audits-et-campagnes), [RG-018](./05_reglesGestion.md#audits-et-campagnes), [RG-021](./05_reglesGestion.md#audits-et-campagnes) |
 | Brouillon | [RG-019](./05_reglesGestion.md#audits-et-campagnes), [RG-020](./05_reglesGestion.md#audits-et-campagnes) |
 | Audit | [RG-024](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-025](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
-| Référentiels, Paramètres (seuils) | [RG-012](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-022](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
+| Référentiels, Paramètres (seuils) | [RG-012](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-022](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-030](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
 | EntréeJournal | [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
 | TraitementAlerte | [RG-026](./05_reglesGestion.md#vues-alertes-export-et-import) |
 | VueEnregistrée | [RG-027](./05_reglesGestion.md#vues-alertes-export-et-import) |

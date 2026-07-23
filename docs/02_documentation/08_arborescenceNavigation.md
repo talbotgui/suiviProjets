@@ -31,7 +31,7 @@ Shell applicatif (après ouverture d'un fichier — sidebar persistante + barre 
 │   ├── Projets (dont Politique IA)
 │   └── Sources (dont ref auditée)
 ├── Paramétrage
-│   ├── Seuils et référentiels (dépendances, marqueurs IA)
+│   ├── Seuils et référentiels (dépendances, marqueurs IA, nommage des branches)
 │   ├── Journal des modifications
 │   ├── Purge des audits
 │   └── Export / Import de configuration
