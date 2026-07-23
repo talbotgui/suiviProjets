@@ -33,6 +33,7 @@ Synthèse actionnable de [14_normesDeveloppement.md](../../docs/02_documentation
 - Une fonction du Moteur de jugement reste pure, sans effet de bord.
 - Périmètre d'extensions couvert par le hook de formatage/analyse statique tenu à jour à chaque nouveau type de fichier de configuration versionné, sous peine de le laisser échapper silencieusement à l'automatisme local (ajouté le 2026-07-19 : `*.js`/`*.yml` initialement absents du hook, corrigé, cf. [source](../../docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code)).
 - Exclusion Prettier (`.prettierignore`) tenue alignée sur l'exclusion ESLint dès la mise en place initiale des formateurs, pour que `prettier --check` reste exploitable sur le code applicatif plutôt que noyé par les documents Markdown et artefacts générés (ajouté le 2026-07-19, cf. [source](../../docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code)).
+- Vérification de types complète du projet (`npm run typecheck`, soit `tsc --noEmit` sur le périmètre de `tsconfig.spec.json`) ajoutée au hook de fin de tour d'édition pour tout fichier `*.ts`, en complément de Prettier/ESLint : détecte des anomalies invisibles à l'analyse fichier par fichier d'ESLint, comme une mutation directe d'une propriété `readonly` définie dans un fichier tiers (ajouté le 2026-07-23 : cas constaté en relecture de la Phase 4 sur un fichier de test de la Phase 3, cf. [source](../../docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code)).
 
 ### Rigueur TypeScript
 

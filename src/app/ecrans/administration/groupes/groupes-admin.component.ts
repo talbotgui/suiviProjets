@@ -18,10 +18,14 @@ import { SqmMembresConnusAdminComponent } from './membres-connus/membres-connus-
 
 /**
  * Instance en cours d'édition au sein du formulaire de groupe, dotée d'un identifiant local stable (généré à
- * l'ajout) permettant de l'associer à sa ligne de formulaire indépendamment de son identifiant définitif.
+ * l'ajout) permettant de l'associer à sa ligne de formulaire indépendamment de son identifiant définitif. Les
+ * champs sont volontairement modifiables ici, à la différence d'`Instance`, pour permettre leur liaison directe
+ * (`[(ngModel)]`) aux champs de saisie du formulaire.
  */
-interface InstanceEnEdition extends Instance {
-  readonly id: string;
+interface InstanceEnEdition extends Omit<Instance, 'type' | 'nom' | 'urlBase'> {
+  type: TypeInstance;
+  nom: string;
+  urlBase: string;
 }
 
 /**

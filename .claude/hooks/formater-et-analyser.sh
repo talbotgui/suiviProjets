@@ -9,13 +9,19 @@
 # Fonctionnement : lit sur l'entrée standard l'événement JSON transmis par Claude Code (champ
 # .tool_input.file_path), puis choisit l'outil à appliquer selon l'extension du fichier modifié :
 #   - *.rs                      : rustfmt puis cargo clippy (portée du crate src-tauri) ;
-#   - *.ts/.html                 : prettier --write puis eslint --fix ;
+#   - *.ts/.html                 : prettier --write puis eslint --fix ; pour *.ts uniquement, vérification de
+#     types complète du projet (`npm run typecheck`), qui détecte des anomalies invisibles à l'analyse fichier par
+#     fichier d'ESLint (ex. mutation d'une propriété `readonly` définie dans un autre fichier) ;
 #   - *.scss/*.json/*.js/*.yml/*.yaml : prettier --write uniquement (pas de portée eslint.config.js sur ces
 #     extensions, cf. bloc `files: ['**/*.ts']` de eslint.config.js).
 #
 # Ajout en relecture (Phase 0) : *.js/*.yml/*.yaml manquaient à l'origine, ce qui laissait les fichiers de
 # configuration racine correspondants (ex. eslint.config.js, jest.config.js, .github/workflows/*.yml) hors de tout
 # formatage automatique local.
+#
+# Ajout en relecture (Phase 4) : `npm run typecheck` manquait à l'origine, ce qui a laissé passer inaperçue une
+# mutation directe de deux propriétés `readonly` dans un fichier de test de la Phase 3, non détectable par
+# ESLint seul (cf. docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code).
 #
 # Ce hook reste un contrôle de confort local, au plus tôt : l'intégration continue (cf.
 # docs/02_documentation/18_pic.md#mise-en-place-du-pipeline) reste le niveau de vérité bloquant pour l'analyse
@@ -41,6 +47,11 @@ case "$fichier" in
     case "$fichier" in
       *.ts | *.html)
         (cd "$racine_depot" && npx --no-install eslint --fix "$fichier") 2>&1 | sed 's/^/[hook eslint] /' >&2 || true
+        ;;
+    esac
+    case "$fichier" in
+      *.ts)
+        (cd "$racine_depot" && npm run --silent typecheck) 2>&1 | sed 's/^/[hook typecheck] /' >&2 || true
         ;;
     esac
     ;;
