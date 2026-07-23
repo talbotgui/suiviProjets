@@ -256,8 +256,9 @@ export interface ResultatBrouillonProjet {
   /** Motif de rejet, si le résultat a été écarté. */
   readonly motifRejet?: string;
   /**
-   * Variations aberrantes détectées par rapport au dernier audit intégré (RG-020, toujours vide avant sa mise
-   * en œuvre à un incrément ultérieur de la Phase 5).
+   * Variations aberrantes détectées par rapport au dernier audit intégré (RG-020, produites par
+   * `OrchestrateurCampagneService`/`AberrationUtils` depuis la Phase 5, incrément 4 ; forme non typée ici,
+   * cf. `services/avecetat/campagne/aberration.utils.ts`).
    */
   readonly aberrations?: readonly unknown[];
 }
