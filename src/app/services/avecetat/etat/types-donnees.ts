@@ -8,13 +8,17 @@
 // autorisée par le découpage en couches du projet, cf.
 // `docs/02_documentation/14_normesDeveloppement.md#structuration-du-code-et-découpage-en-couches`).
 //
-// Les branches dont le contenu détaillé relève d'une phase ultérieure (référentiels, seuils, campagnes, brouillon,
-// journal hors ajout, vues enregistrées, audits) sont typées de façon minimale ou en `unknown`, à l'identique de la
-// décision de modélisation déjà prise côté Rust (`serde_json::Value`, cf. commentaire d'en-tête de
-// `modele/racine.rs`) : elles ne sont jamais interprétées ici, seulement conservées telles quelles lors des
-// mutations du Store afin de préserver un round-trip fidèle vers `sauvegarderFichier`. `MembreConnu` et
-// `Annotation` sont désormais typées intégralement (Phase 4), les annotations de portée groupe et le détail du
-// calcul du premier commit interne restant hors périmètre (respectivement Phase 8 et Phase 5).
+// Les branches dont le contenu détaillé relève d'une phase ultérieure (référentiels, seuils, journal hors ajout,
+// vues enregistrées) sont typées de façon minimale ou en `unknown`, à l'identique de la décision de modélisation
+// déjà prise côté Rust (`serde_json::Value`, cf. commentaire d'en-tête de `modele/racine.rs`) : elles ne sont
+// jamais interprétées ici, seulement conservées telles quelles lors des mutations du Store afin de préserver un
+// round-trip fidèle vers `sauvegarderFichier`. `MembreConnu` et `Annotation` sont typées intégralement depuis la
+// Phase 4, `Campagne`/`Verdict`/`Brouillon`/`ResultatBrouillonProjet` le sont depuis la Phase 5 (incrément 2),
+// leurs commandes de la Façade échangeant désormais ces types comme paramètres explicites. Le contenu détaillé
+// d'un `Audit` (`resultats`, catalogue figé des indicateurs) reste en `unknown` : ces valeurs ne sont ni
+// construites ni interprétées côté interface avant le Moteur de jugement (Phase 6), seulement transmises telles
+// quelles par l'Orchestrateur de campagne (incrément ultérieur). Les annotations de portée groupe et le détail du
+// calcul du premier commit interne restent hors périmètre (respectivement Phase 8 et Phase 5).
 import type { Instance } from '../../sansetat/commandes/types-facade';
 
 /**
@@ -130,8 +134,8 @@ export interface Projet {
    * (RG-015).
    */
   readonly annotations: readonly Annotation[];
-  /** Historique des audits du projet (hors périmètre de l'Administration, Phase 5). */
-  readonly audits: readonly unknown[];
+  /** Historique des audits du projet. */
+  readonly audits: readonly Audit[];
 }
 
 /**
@@ -180,6 +184,98 @@ export interface EntreeJournal {
 }
 
 /**
+ * Historique d'audit d'un projet : un ensemble de constats bruts obtenus à une date donnée, mirroir de `Audit`
+ * côté cœur natif. `resultats` (catalogue figé des types d'indicateurs) reste en `unknown` : ni construit ni
+ * interprété côté interface avant le Moteur de jugement (Phase 6).
+ */
+export interface Audit {
+  /** Identifiant UUID v4 de l'audit. */
+  readonly id: string;
+  /** Date de réalisation de l'audit. */
+  readonly date: string;
+  /** Identifiant de la campagne qui a produit cet audit. */
+  readonly campagneId: string;
+  /** Résultats typés obtenus (catalogue figé, hors périmètre d'interprétation de l'interface avant la Phase 6). */
+  readonly resultats: readonly unknown[];
+}
+
+/**
+ * Statut d'exécution d'un projet au sein d'une campagne (mirroir de `StatutVerdict` côté cœur natif). `rejete`
+ * n'est atteint qu'après traitement du brouillon (Phase 5, incrément 2), jamais à l'enregistrement initial de la
+ * campagne.
+ */
+export type StatutVerdict = 'succes' | 'echec' | 'ignore' | 'rejete';
+
+/**
+ * Verdict d'exécution d'un projet au sein d'une campagne, mirroir de `Verdict` côté cœur natif.
+ */
+export interface Verdict {
+  /** Identifiant du projet concerné. */
+  readonly projetId: string;
+  /** Statut d'exécution. */
+  readonly statut: StatutVerdict;
+  /** Durée d'exécution en millisecondes, si le projet a été traité. */
+  readonly dureeMs?: number;
+  /** Anomalies rencontrées, si le traitement a échoué (catalogue RG-021, non interprété ici). */
+  readonly anomalies?: readonly unknown[];
+  /** Motif de rejet, si le projet a été rejeté depuis le brouillon (Phase 5, incrément 2). */
+  readonly motifRejet?: string;
+}
+
+/**
+ * Trace d'exécution d'une campagne d'audit, mirroir de `Campagne` côté cœur natif.
+ */
+export interface Campagne {
+  /** Identifiant UUID v4 de la campagne. */
+  readonly id: string;
+  /** Date de lancement de la campagne. */
+  readonly date: string;
+  /** Identifiants des projets du périmètre de la campagne. */
+  readonly perimetre: readonly string[];
+  /** Verdicts d'exécution par projet. */
+  readonly verdicts: readonly Verdict[];
+}
+
+/**
+ * Statut d'un résultat de brouillon au sein de la zone de validation courante, mirroir de `StatutResultatBrouillon`
+ * côté cœur natif (Phase 5, incrément 2).
+ */
+export type StatutResultatBrouillon = 'enAttente' | 'integre' | 'rejete';
+
+/**
+ * Résultat en attente de validation pour un projet, au sein du brouillon courant, mirroir de
+ * `ResultatBrouillonProjet` côté cœur natif.
+ */
+export interface ResultatBrouillonProjet {
+  /** Identifiant du projet concerné. */
+  readonly projetId: string;
+  /** Audit produit, en attente d'intégration à l'historique du projet. */
+  readonly audit: Audit;
+  /** Statut du résultat au sein du brouillon. */
+  readonly statut: StatutResultatBrouillon;
+  /** Motif de rejet, si le résultat a été écarté. */
+  readonly motifRejet?: string;
+  /**
+   * Variations aberrantes détectées par rapport au dernier audit intégré (RG-020, toujours vide avant sa mise
+   * en œuvre à un incrément ultérieur de la Phase 5).
+   */
+  readonly aberrations?: readonly unknown[];
+}
+
+/**
+ * Zone de validation courante des résultats d'une campagne, au plus une occurrence (nullable) à la racine,
+ * mirroir de `Brouillon` côté cœur natif.
+ */
+export interface Brouillon {
+  /** Identifiant de la campagne dont ce brouillon est issu. */
+  readonly campagneId: string;
+  /** Date de création du brouillon. */
+  readonly creeLe: string;
+  /** Résultats en attente de validation, par projet. */
+  readonly resultatsParProjet: readonly ResultatBrouillonProjet[];
+}
+
+/**
  * Métadonnées de suivi de la racine du document, mirroir de `Meta` côté cœur natif.
  */
 export interface Meta {
@@ -194,8 +290,8 @@ export interface Meta {
 /**
  * Racine du document JSON en clair, mirroir de `DonneesRacine` côté cœur natif, telle que retournée par
  * `creerFichier`/`chargerFichier` et attendue par `sauvegarderFichier`. Les branches non interprétées par
- * l'Administration (référentiels, paramètres, campagnes, brouillon, journal hors ajout, vues enregistrées) sont
- * typées en `unknown`/tableau générique afin de n'être jamais perdues lors d'une mutation du Store.
+ * l'interface (référentiels, paramètres, journal hors ajout, vues enregistrées) sont typées en `unknown`/tableau
+ * générique afin de n'être jamais perdues lors d'une mutation du Store.
  */
 export interface DonneesRacine {
   /** Version du schéma de données. */
@@ -208,10 +304,10 @@ export interface DonneesRacine {
   readonly referentiels: unknown;
   /** Seuils et réglages applicatifs (hors périmètre de l'Administration, Phase 3). */
   readonly parametres: unknown;
-  /** Traces d'exécution des campagnes d'audit (hors périmètre de l'Administration, Phase 3). */
-  readonly campagnes: readonly unknown[];
-  /** Zone de validation courante, au plus une occurrence (hors périmètre de l'Administration, Phase 3). */
-  readonly brouillon: unknown;
+  /** Traces d'exécution des campagnes d'audit. */
+  readonly campagnes: readonly Campagne[];
+  /** Zone de validation courante, au plus une occurrence. */
+  readonly brouillon: Brouillon | null;
   /** Statuts vu/traité par clé d'alerte stable (hors périmètre de l'Administration, Phase 3). */
   readonly traitementsAlertes: readonly unknown[];
   /** Journal append-only des modifications de paramétrage (RG-023). */
@@ -232,16 +328,20 @@ export interface ReponseQualificationMembre {
 }
 
 /**
- * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (mirroir de
- * `ErreurFacade` côté cœur natif, étendu par la Phase 4 des seules catégories métier propres à ces commandes ;
- * les catégories techniques héritées des commandes de fichier de la Phase 1 y figurent également, ces commandes
- * pouvant en hériter via la sauvegarde qu'elles déclenchent).
+ * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (Phase 4) et par
+ * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2), mirroir de `ErreurFacade`
+ * côté cœur natif, étendu des seules catégories métier propres à ces commandes ; les catégories techniques
+ * héritées des commandes de fichier de la Phase 1 y figurent également, ces commandes pouvant en hériter via la
+ * sauvegarde qu'elles déclenchent.
  */
 export type CategorieErreurAdministration =
   | 'groupeIntrouvable'
   | 'projetIntrouvable'
   | 'membreIntrouvable'
   | 'doublonUsernameMembreConnu'
+  | 'brouillonDejaExistant'
+  | 'aucunBrouillonCourant'
+  | 'projetAbsentDuBrouillon'
   | 'fichierIntrouvable'
   | 'motDePasseOuFichierInvalide'
   | 'formatNonReconnu'

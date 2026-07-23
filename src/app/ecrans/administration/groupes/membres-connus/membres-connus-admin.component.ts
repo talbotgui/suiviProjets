@@ -326,6 +326,9 @@ export class SqmMembresConnusAdminComponent {
       case 'motDePasseOuFichierInvalide':
         return 'Mot de passe incorrect.';
       case 'projetIntrouvable':
+      case 'brouillonDejaExistant':
+      case 'aucunBrouillonCourant':
+      case 'projetAbsentDuBrouillon':
       case 'fichierIntrouvable':
       case 'formatNonReconnu':
       case 'versionSchemaSuperieure':

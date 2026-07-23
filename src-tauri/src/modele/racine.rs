@@ -14,6 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// Version de schéma courante de l'application, incrémentée à chaque évolution structurelle du modèle de données.
 /// La migration d'un fichier plus ancien se fonde exclusivement sur `versionSchema`, jamais sur une horloge
@@ -245,12 +246,325 @@ pub(crate) struct Source {
     pub(crate) ref_auditee: Option<String>,
 }
 
-/// Résultat typé d'un audit, dont le catalogue figé (`origine.nature`) est défini en
-/// `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs` et relève du Moteur d'audit
-/// (Phase 5, hors périmètre de la Phase 1) : représenté ici par une valeur JSON générique afin de préserver un
-/// round-trip fidèle sans dupliquer ce catalogue par anticipation. Aucun verdict calculé n'y figure jamais
-/// (RG-011).
-pub(crate) type Resultat = Value;
+/// Résultat typé d'un audit, catalogue figé défini en
+/// `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs` (Phase 5, Moteur d'audit) : une
+/// variante par type de résultat (discriminant JSON `type`, valeurs à point telles que `gitlab.dependances`,
+/// nécessitant un `#[serde(rename = "...")]` explicite par variante plutôt qu'un `rename_all` global). Chaque
+/// charge utile ne porte que des constats bruts, jamais un verdict calculé (RG-011) : la classification (statut
+/// d'obsolescence, badge, etc.) relève exclusivement du Moteur de jugement (UI), à partir des seuils et
+/// référentiels courants.
+///
+/// `GitlabDependances` et `GitlabMarqueursIa` (Phase 5, incrément 1) : forme figée d'après l'exemple de référence
+/// `docs/01_besoin/exemple-donnees.json`, conservée dès maintenant pour la fidélité de round-trip, mais aucune
+/// fonction du Connecteur GitLab ne produit encore ces deux variantes à ce stade (parseur de manifestes de
+/// dépendances et heuristique de détection de marqueurs IA différés, non spécifiés par la documentation source).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type")]
+pub(crate) enum Resultat {
+    /// Constat brut des dépendances déclarées par les manifestes du dépôt (production différée, cf. commentaire
+    /// ci-dessus).
+    #[serde(rename = "gitlab.dependances")]
+    GitlabDependances(ResultatGitlabDependances),
+    /// Constat brut de l'état des branches du dépôt (production différée : critère de nommage conforme et
+    /// détection de rebase non spécifiés par la documentation source).
+    #[serde(rename = "gitlab.branches")]
+    GitlabBranches(ResultatGitlabBranches),
+    /// Constat brut de la vitalité du dépôt (date du dernier commit sur la ref auditée).
+    #[serde(rename = "gitlab.vitalite")]
+    GitlabVitalite(ResultatGitlabVitalite),
+    /// Constat brut des contributeurs distincts sur la fenêtre glissante.
+    #[serde(rename = "gitlab.contributeurs")]
+    GitlabContributeurs(ResultatGitlabContributeurs),
+    /// Constat brut de la taille du dépôt.
+    #[serde(rename = "gitlab.taille_depot")]
+    GitlabTailleDepot(ResultatGitlabTailleDepot),
+    /// Constat brut des demandes de fusion ouvertes.
+    #[serde(rename = "gitlab.merge_requests")]
+    GitlabMergeRequests(ResultatGitlabMergeRequests),
+    /// Constat brut des marqueurs d'outils IA détectés dans l'arborescence (production différée, cf. commentaire
+    /// ci-dessus).
+    #[serde(rename = "gitlab.marqueurs_ia")]
+    GitlabMarqueursIa(ResultatGitlabMarqueursIa),
+    /// Constat brut des membres du dépôt.
+    #[serde(rename = "gitlab.membres")]
+    GitlabMembres(ResultatGitlabMembres),
+    /// Constat brut des violations Sonar par sévérité.
+    #[serde(rename = "sonar.violations")]
+    SonarViolations(ResultatSonarViolations),
+    /// Constat brut de la dette technique Sonar.
+    #[serde(rename = "sonar.dette")]
+    SonarDette(ResultatSonarDette),
+    /// Constat brut de la couverture de tests Sonar.
+    #[serde(rename = "sonar.couverture")]
+    SonarCouverture(ResultatSonarCouverture),
+    /// Constat brut des notes Sonar par axe.
+    #[serde(rename = "sonar.notes")]
+    SonarNotes(ResultatSonarNotes),
+    /// Constat brut du volume de code Sonar.
+    #[serde(rename = "sonar.ncloc")]
+    SonarNcloc(ResultatSonarNcloc),
+    /// Résultat croisé de fraîcheur Sonar (calculé côté UI, Connecteur croisé).
+    #[serde(rename = "croise.fraicheur_sonar")]
+    CroiseFraicheurSonar(ResultatCroiseFraicheurSonar),
+    /// Résultat croisé d'activité sans qualité (calculé côté UI, Connecteur croisé).
+    #[serde(rename = "croise.activite_sans_qualite")]
+    CroiseActiviteSansQualite(ResultatCroiseActiviteSansQualite),
+    /// Résultat croisé d'IA sur le nouveau code (calculé côté UI, Connecteur croisé).
+    #[serde(rename = "croise.ia_nouveau_code")]
+    CroiseIaNouveauCode(ResultatCroiseIaNouveauCode),
+}
+
+/// Dépendance déclarée par un manifeste (référence unique + version), sans jugement d'obsolescence (RG-011).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Dependance {
+    /// Référence unique de la dépendance (ex. coordonnées Maven, nom de paquet npm).
+    pub(crate) reference: String,
+    /// Version déclarée.
+    pub(crate) version: String,
+    /// Chemin du manifeste d'où provient cette dépendance.
+    pub(crate) manifeste: String,
+}
+
+/// Constat brut de `gitlab.dependances` (production différée, cf. [`Resultat::GitlabDependances`]).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabDependances {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    #[serde(default)]
+    pub(crate) dependances: Vec<Dependance>,
+}
+
+/// État d'une branche du dépôt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Branche {
+    pub(crate) nom: String,
+    /// `#[serde(rename = "avecMR")]` explicite : la conversion `camelCase` par défaut de `avec_mr` produirait
+    /// `avecMr` (une seule lettre capitalisée), alors que l'exemple de référence `docs/01_besoin/exemple-donnees.json`
+    /// porte `avecMR` (sigle « MR » de « Merge Request » entièrement capitalisé) ; divergence détectée en relecture
+    /// de la Phase 5, incrément 1, avant toute production réelle de cette variante par le Connecteur GitLab.
+    #[serde(rename = "avecMR")]
+    pub(crate) avec_mr: bool,
+    pub(crate) rebasee: bool,
+    pub(crate) nommage_conforme: bool,
+    pub(crate) dernier_commit_le: String,
+}
+
+/// Constat brut de `gitlab.branches` (production différée, cf. [`Resultat::GitlabBranches`]).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabBranches {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    #[serde(default)]
+    pub(crate) branches: Vec<Branche>,
+}
+
+/// Constat brut de `gitlab.vitalite`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabVitalite {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    pub(crate) dernier_commit_le: String,
+}
+
+/// Contributeur distinct détecté sur la fenêtre glissante.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Contributeur {
+    pub(crate) email: String,
+    pub(crate) nom: String,
+    pub(crate) nombre_commits: u32,
+}
+
+/// Constat brut de `gitlab.contributeurs`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabContributeurs {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    pub(crate) fenetre_jours: u32,
+    #[serde(default)]
+    pub(crate) contributeurs: Vec<Contributeur>,
+}
+
+/// Constat brut de `gitlab.taille_depot`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabTailleDepot {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    pub(crate) taille_octets: u64,
+}
+
+/// Demande de fusion ouverte.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MergeRequestOuverte {
+    pub(crate) iid: u64,
+    pub(crate) titre: String,
+    pub(crate) cree_le: String,
+    pub(crate) en_conflit: bool,
+}
+
+/// Constat brut de `gitlab.merge_requests`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabMergeRequests {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    #[serde(default)]
+    pub(crate) mr_ouvertes: Vec<MergeRequestOuverte>,
+}
+
+/// Marqueur d'outil IA détecté dans l'arborescence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Marqueur {
+    pub(crate) chemin: String,
+    pub(crate) nature: String,
+    pub(crate) outil: String,
+}
+
+/// Constat brut de `gitlab.marqueurs_ia` (production différée, cf. [`Resultat::GitlabMarqueursIa`]).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabMarqueursIa {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    #[serde(default)]
+    pub(crate) marqueurs: Vec<Marqueur>,
+}
+
+/// Membre du dépôt (droits d'accès GitLab, distinct des membres connus RG-006 à RG-008).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MembreGitlab {
+    pub(crate) username: String,
+    pub(crate) nom: String,
+    pub(crate) niveau_acces: u32,
+    pub(crate) herite: bool,
+    #[serde(default)]
+    pub(crate) email_public: Option<String>,
+}
+
+/// Constat brut de `gitlab.membres`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatGitlabMembres {
+    pub(crate) source_id: String,
+    pub(crate) ref_effective: String,
+    pub(crate) sha_tete: String,
+    #[serde(default)]
+    pub(crate) membres: Vec<MembreGitlab>,
+}
+
+/// Répartition des violations Sonar par sévérité.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ParSeverite {
+    pub(crate) bloquant: u32,
+    pub(crate) critique: u32,
+    pub(crate) majeur: u32,
+    pub(crate) mineur: u32,
+    pub(crate) info: u32,
+}
+
+/// Constat brut de `sonar.violations`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatSonarViolations {
+    pub(crate) source_id: String,
+    pub(crate) par_severite: ParSeverite,
+    pub(crate) nouvelles_violations: u32,
+}
+
+/// Constat brut de `sonar.dette`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatSonarDette {
+    pub(crate) source_id: String,
+    pub(crate) dette_minutes: u64,
+    pub(crate) ratio_dette: f64,
+}
+
+/// Constat brut de `sonar.couverture`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatSonarCouverture {
+    pub(crate) source_id: String,
+    pub(crate) couverture: f64,
+    pub(crate) couverture_nouveau_code: f64,
+}
+
+/// Constat brut de `sonar.notes` (notes A–E des quatre axes, stockées ici en valeur numérique 1.0–5.0 ; la
+/// conversion en lettre colorée relève du Moteur de jugement, RG-011).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatSonarNotes {
+    pub(crate) source_id: String,
+    pub(crate) fiabilite: f64,
+    pub(crate) securite: f64,
+    pub(crate) maintenabilite: f64,
+    pub(crate) revue_securite: f64,
+}
+
+/// Constat brut de `sonar.ncloc`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatSonarNcloc {
+    pub(crate) source_id: String,
+    pub(crate) ncloc: u64,
+    #[serde(default)]
+    pub(crate) par_langage: HashMap<String, u64>,
+}
+
+/// Constat brut de `croise.fraicheur_sonar` (calculé côté UI, Connecteur croisé, à partir des résultats GitLab et
+/// Sonar déjà obtenus pour le même audit).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatCroiseFraicheurSonar {
+    #[serde(default)]
+    pub(crate) dernier_commit_le: Option<String>,
+    #[serde(default)]
+    pub(crate) derniere_analyse_le: Option<String>,
+    pub(crate) aucune_analyse: bool,
+}
+
+/// Constat brut de `croise.activite_sans_qualite` (calculé côté UI, Connecteur croisé).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatCroiseActiviteSansQualite {
+    pub(crate) nombre_commits: u32,
+    pub(crate) nouvelles_violations: u32,
+    pub(crate) evaluable: bool,
+}
+
+/// Constat brut de `croise.ia_nouveau_code` (calculé côté UI, Connecteur croisé ; aucun verdict automatique,
+/// simple juxtaposition des séries, cf. `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResultatCroiseIaNouveauCode {
+    pub(crate) marqueurs_presents: bool,
+    #[serde(default)]
+    pub(crate) outils_detectes: Vec<String>,
+    #[serde(default)]
+    pub(crate) couverture_nouveau_code: Option<f64>,
+    #[serde(default)]
+    pub(crate) nouvelles_violations: Option<u32>,
+    #[serde(default)]
+    pub(crate) duplication_nouveau_code: Option<f64>,
+}
 
 /// Historique d'audit d'un projet : un ensemble de constats bruts obtenus à une date donnée.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -443,14 +757,38 @@ pub(crate) struct Parametres {
 pub(crate) struct Verdict {
     /// Identifiant du projet concerné.
     pub(crate) projet_id: String,
-    /// Statut d'exécution (catalogue détaillé hors périmètre de la Phase 1, cf. RG-017 à RG-021).
-    pub(crate) statut: String,
+    /// Statut d'exécution.
+    pub(crate) statut: StatutVerdict,
     /// Durée d'exécution en millisecondes, si le projet a été traité.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) duree_ms: Option<u64>,
     /// Anomalies rencontrées, si le traitement a échoué (catalogue RG-021, hors périmètre de la Phase 1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) anomalies: Option<Vec<Value>>,
+    /// Motif de rejet, si le projet a été rejeté depuis le brouillon (Phase 5, incrément 2). Répercuté ici depuis
+    /// `ResultatBrouillonProjet.motifRejet` au moment du rejet plutôt qu'au moment de la purge du brouillon, pour
+    /// que le motif reste consultable même après la disparition de ce dernier
+    /// (`docs/01_besoin/Specification.md#59-f09--brouillon-daudit-et-validation-avant-intégration` : « rejette...
+    /// motif optionnel consigné »).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) motif_rejet: Option<String>,
+}
+
+/// Statut d'exécution d'un projet au sein d'une campagne (catalogue figé,
+/// `docs/01_besoin/Specification.md#57-f07--audit-partiel-et-reprise-sur-échec` : « verdict par projet (succès /
+/// échec / ignoré / rejeté) »). `Rejete` n'est atteint qu'après traitement du brouillon (Phase 5, incrément 2),
+/// jamais à l'enregistrement initial de la campagne.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum StatutVerdict {
+    /// Le projet a été audité avec succès.
+    Succes,
+    /// L'audit du projet a échoué (anomalie technique, cf. `anomalies`).
+    Echec,
+    /// Le projet n'a pas été traité (campagne annulée avant son tour, RG-018).
+    Ignore,
+    /// Le résultat produit pour ce projet a été rejeté depuis le brouillon plutôt qu'intégré à l'historique.
+    Rejete,
 }
 
 /// Trace d'exécution d'une campagne d'audit.
@@ -477,14 +815,29 @@ pub(crate) struct ResultatBrouillonProjet {
     pub(crate) projet_id: String,
     /// Audit produit, en attente d'intégration à l'historique du projet.
     pub(crate) audit: Audit,
-    /// Statut du résultat au sein du brouillon (catalogue hors périmètre de la Phase 1, cf. RG-019, RG-020).
-    pub(crate) statut: String,
+    /// Statut du résultat au sein du brouillon.
+    pub(crate) statut: StatutResultatBrouillon,
     /// Motif de rejet, si le résultat a été écarté.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) motif_rejet: Option<String>,
-    /// Variations aberrantes détectées par rapport au dernier audit intégré (RG-020).
+    /// Variations aberrantes détectées par rapport au dernier audit intégré (RG-020, détection différée à un
+    /// incrément ultérieur de la Phase 5, faute de seuil de matérialité chiffré dans la documentation source, cf.
+    /// commentaire du champ `seuils` de `Parametres`) : toujours vide dans cet incrément.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) aberrations: Option<Vec<Value>>,
+}
+
+/// Statut d'un résultat de brouillon au sein de la zone de validation courante (RG-019, RG-020 ; F09 : « intègre
+/// tout, intègre projet par projet, ou rejette »).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum StatutResultatBrouillon {
+    /// Résultat produit par la campagne, pas encore traité par l'utilisateur.
+    EnAttente,
+    /// Résultat intégré à l'historique du projet concerné.
+    Integre,
+    /// Résultat rejeté, jamais ajouté à l'historique du projet concerné.
+    Rejete,
 }
 
 /// Zone de validation courante des résultats d'une campagne, au plus une occurrence (nullable) à la racine.
@@ -632,12 +985,11 @@ mod tests {
                     id: "10000000-0000-4000-8000-000000000001".to_string(),
                     date: "2026-06-05".to_string(),
                     campagne_id: "e0000000-0000-4000-8000-000000000001".to_string(),
-                    resultats: vec![serde_json::json!({
-                        "type": "gitlab.vitalite",
-                        "sourceId": "f0000000-0000-4000-8000-000000000001",
-                        "refEffective": "develop",
-                        "shaTete": "8c1d0e44",
-                        "dernierCommitLe": "2026-06-05"
+                    resultats: vec![Resultat::GitlabVitalite(ResultatGitlabVitalite {
+                        source_id: "f0000000-0000-4000-8000-000000000001".to_string(),
+                        ref_effective: "develop".to_string(),
+                        sha_tete: "8c1d0e44".to_string(),
+                        dernier_commit_le: "2026-06-05".to_string(),
                     })],
                 }],
             }],
@@ -648,9 +1000,10 @@ mod tests {
             perimetre: vec!["d0000000-0000-4000-8000-000000000001".to_string()],
             verdicts: vec![Verdict {
                 projet_id: "d0000000-0000-4000-8000-000000000001".to_string(),
-                statut: "succes".to_string(),
+                statut: StatutVerdict::Succes,
                 duree_ms: Some(12400),
                 anomalies: None,
+                motif_rejet: None,
             }],
         });
 
@@ -658,6 +1011,40 @@ mod tests {
         let relue: DonneesRacine = serde_json::from_str(&json)?;
 
         assert_eq!(racine, relue);
+        Ok(())
+    }
+
+    #[test]
+    fn resultat_gitlab_branches_desserialise_le_champ_avec_mr_du_jeu_de_reference()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Extrait exact de docs/01_besoin/exemple-donnees.json (résultat gitlab.branches) : vérifie que le champ
+        // `avecMR` (sigle « MR » entièrement capitalisé) est bien reconnu, à la différence de la conversion
+        // `camelCase` par défaut de `avec_mr`, qui produirait `avecMr` (une seule lettre capitalisée).
+        let resultat: Resultat = serde_json::from_str(
+            r#"{
+                "type": "gitlab.branches",
+                "sourceId": "f0000000-0000-4000-8000-000000000001",
+                "refEffective": "develop",
+                "shaTete": "8c1d0e44",
+                "branches": [
+                    {
+                        "nom": "feature/paiement-sepa",
+                        "avecMR": true,
+                        "rebasee": false,
+                        "nommageConforme": true,
+                        "dernierCommitLe": "2026-06-05"
+                    }
+                ]
+            }"#,
+        )?;
+
+        let Resultat::GitlabBranches(resultat) = resultat else {
+            return Err("variante GitlabBranches attendue".into());
+        };
+        assert!(resultat.branches[0].avec_mr);
+
+        let json = serde_json::to_string(&resultat)?;
+        assert!(json.contains("\"avecMR\":true"));
         Ok(())
     }
 }

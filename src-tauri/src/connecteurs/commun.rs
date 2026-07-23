@@ -15,13 +15,17 @@ use std::time::Duration;
 /// ce test ponctuel de credential.
 const DELAI_REQUETE: Duration = Duration::from_secs(10);
 
-/// Catégorie d'anomalie pouvant survenir lors d'un test de connectivité, alignée sur le sous-ensemble pertinent des
-/// catégories fixes de RG-021 (« ref introuvable » n'est pas applicable à un simple test de connectivité).
+/// Catégorie d'anomalie pouvant survenir lors d'un appel à une instance GitLab ou Sonar, alignée sur le catalogue
+/// figé RG-021 (`docs/02_documentation/05_reglesGestion.md#audits-et-campagnes`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum ErreurConnecteur {
     /// Le credential fourni a été rejeté par l'instance (statut 401, ou jeton explicitement invalide).
     AuthentificationRefusee,
+    /// La ref auditée (branche, tag ou SHA) n'existe pas sur la source au moment de l'audit (Phase 5, Moteur
+    /// d'audit) : catégorie RG-021 non mobilisée par le seul test de connectivité ou l'autocomplétion des branches
+    /// des phases précédentes, d'où son absence jusqu'ici.
+    RefIntrouvable,
     /// L'instance n'a pas pu être jointe (résolution DNS, connexion refusée, etc.).
     InstanceInjoignable,
     /// L'instance n'a pas répondu dans le délai imparti.

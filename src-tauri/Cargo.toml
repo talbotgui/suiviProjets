@@ -43,6 +43,10 @@ zeroize = "1"
 # poste (HTTP_PROXY/HTTPS_PROXY/NO_PROXY via Proxy::system(), activé par défaut), cf.
 # docs/02_documentation/17_posteDeveloppeur.md#variables-denvironnement.
 reqwest = { version = "0.12", default-features = false, features = ["json", "default-tls"] }
+# Déjà présent transitivement via reqwest (aucune empreinte nouvelle sur l'arbre de dépendances) : réutilisé en
+# dépendance directe pour l'encodage sûr d'un segment de chemin d'URL (nom de branche pouvant contenir `/`), requis
+# par le Connecteur GitLab pour résoudre la ref effectivement auditée (Phase 5, Moteur d'audit).
+url = "2"
 
 [dev-dependencies]
 # Serveur HTTP simulé en boucle locale, seul moyen réaliste de tester la logique des connecteurs (en-têtes,

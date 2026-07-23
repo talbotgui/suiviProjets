@@ -1,26 +1,49 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Client typé de la Façade de commandes (Phase 2, US-003, US-004 ; Phase 3, US-008), frontière unique entre
-// l'interface Angular et le cœur natif Rust (cf.
+// Client typé de la Façade de commandes (Phase 2, US-003, US-004 ; Phase 3, US-008 ; Phase 5, US-009), frontière
+// unique entre l'interface Angular et le cœur natif Rust (cf.
 // docs/02_documentation/11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités).
 // Périmètre de la Phase 2 : commandes de credentials (`testerConnectivite`, `definirCredentials`). Périmètre de
 // la Phase 3 : autocomplétion des branches d'un dépôt GitLab pour la ref auditée d'une source (`interrogerBranches`).
-// Classé sous `services/sansetat/` : aucun état interne n'est conservé entre deux appels de ce service.
+// Périmètre de la Phase 5, incrément 1 : dix opérations d'interrogation des indicateurs GitLab/Sonar déterministes
+// du Moteur d'audit. Classé sous `services/sansetat/` : aucun état interne n'est conservé entre deux appels de ce
+// service.
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import type {
   ErreurConnecteur,
   Instance,
+  ResultatGitlabContributeurs,
+  ResultatGitlabMembres,
+  ResultatGitlabMergeRequests,
+  ResultatGitlabTailleDepot,
+  ResultatGitlabVitalite,
   ResultatInterrogationBranches,
+  ResultatInterrogationContributeurs,
+  ResultatInterrogationCouverture,
+  ResultatInterrogationDette,
+  ResultatInterrogationMembres,
+  ResultatInterrogationMergeRequests,
+  ResultatInterrogationNcloc,
+  ResultatInterrogationNotes,
+  ResultatInterrogationTailleDepot,
+  ResultatInterrogationVitalite,
+  ResultatInterrogationViolations,
+  ResultatSonarCouverture,
+  ResultatSonarDette,
+  ResultatSonarNcloc,
+  ResultatSonarNotes,
+  ResultatSonarViolations,
   ResultatTestConnectivite,
   VerdictConnectivite,
 } from './types-facade';
 
 /**
- * Client typé de la Façade de commandes, dédié en Phase 2 aux credentials de session (US-003, US-004) et en
- * Phase 3 à l'autocomplétion des branches (US-008). Chaque méthode invoque une commande Tauri identique côté
- * cœur natif (`tester_connectivite`, `definir_credentials`, `interroger_branches`).
+ * Client typé de la Façade de commandes, dédié en Phase 2 aux credentials de session (US-003, US-004), en
+ * Phase 3 à l'autocomplétion des branches (US-008), et en Phase 5 (incrément 1) à dix opérations d'interrogation
+ * des indicateurs GitLab/Sonar du Moteur d'audit (US-009). Chaque méthode invoque une commande Tauri identique
+ * côté cœur natif (`tester_connectivite`, `definir_credentials`, `interroger_branches`, `interroger_vitalite`, …).
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeCommandesService {
@@ -90,6 +113,291 @@ export class FacadeCommandesService {
   }
 
   /**
+   * Interroge la vitalité d'un dépôt GitLab, c'est-à-dire la date du dernier commit sur la ref auditée (US-009).
+   * Le credential utilisé est celui déjà mémorisé côté cœur natif pour cette instance (`definirCredentials`).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerVitalite(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationVitalite> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabVitalite>(
+      'interroger_vitalite',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge la taille d'un dépôt GitLab en octets (US-009).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerTailleDepot(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationTailleDepot> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabTailleDepot>(
+      'interroger_taille_depot',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge les contributeurs distincts sur la fenêtre glissante d'un dépôt GitLab (US-009).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerContributeurs(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationContributeurs> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabContributeurs>(
+      'interroger_contributeurs',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge les demandes de fusion ouvertes d'un dépôt GitLab (US-009).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerMergeRequests(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationMergeRequests> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabMergeRequests>(
+      'interroger_merge_requests',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge les membres d'un dépôt GitLab (US-009).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerMembres(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationMembres> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabMembres>(
+      'interroger_membres',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge les violations Sonar par sévérité (US-009).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerViolations(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+  ): Promise<ResultatInterrogationViolations> {
+    return this.interrogerIndicateurSonar<ResultatSonarViolations>(
+      'interroger_violations',
+      instance,
+      sourceId,
+      idExterne,
+    );
+  }
+
+  /**
+   * Interroge la dette technique Sonar (US-009).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerDette(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+  ): Promise<ResultatInterrogationDette> {
+    return this.interrogerIndicateurSonar<ResultatSonarDette>(
+      'interroger_dette',
+      instance,
+      sourceId,
+      idExterne,
+    );
+  }
+
+  /**
+   * Interroge la couverture de tests Sonar (US-009).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerCouverture(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+  ): Promise<ResultatInterrogationCouverture> {
+    return this.interrogerIndicateurSonar<ResultatSonarCouverture>(
+      'interroger_couverture',
+      instance,
+      sourceId,
+      idExterne,
+    );
+  }
+
+  /**
+   * Interroge les notes Sonar des quatre axes (US-009).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerNotes(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+  ): Promise<ResultatInterrogationNotes> {
+    return this.interrogerIndicateurSonar<ResultatSonarNotes>(
+      'interroger_notes',
+      instance,
+      sourceId,
+      idExterne,
+    );
+  }
+
+  /**
+   * Interroge le volume de code Sonar (US-009).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerNcloc(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+  ): Promise<ResultatInterrogationNcloc> {
+    return this.interrogerIndicateurSonar<ResultatSonarNcloc>(
+      'interroger_ncloc',
+      instance,
+      sourceId,
+      idExterne,
+    );
+  }
+
+  /**
+   * Factorise l'appel des cinq commandes d'interrogation d'indicateur GitLab de cette phase, identiques hormis le
+   * nom de la commande invoquée et la ref auditée transmise.
+   * @param commande - Nom de la commande Tauri à invoquer (`snake_case`).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  private async interrogerIndicateurGitlab<TResultat>(
+    commande: string,
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<
+    | { readonly type: 'succes'; readonly resultat: TResultat }
+    | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
+  > {
+    try {
+      const resultat = await invoke<TResultat>(commande, {
+        instance,
+        sourceId,
+        idExterne,
+        refAuditee,
+      });
+      return { type: 'succes', resultat };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+    }
+  }
+
+  /**
+   * Factorise l'appel des cinq commandes d'interrogation d'indicateur Sonar de cette phase, identiques hormis le
+   * nom de la commande invoquée.
+   * @param commande - Nom de la commande Tauri à invoquer (`snake_case`).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  private async interrogerIndicateurSonar<TResultat>(
+    commande: string,
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+  ): Promise<
+    | { readonly type: 'succes'; readonly resultat: TResultat }
+    | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
+  > {
+    try {
+      const resultat = await invoke<TResultat>(commande, {
+        instance,
+        sourceId,
+        idExterne,
+      });
+      return { type: 'succes', resultat };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+    }
+  }
+
+  /**
    * Vérifie, sans accès non sûr à la valeur reçue, qu'un rejet de la commande native correspond bien à une
    * anomalie de connectivité typée (RG-021) plutôt qu'à une valeur inattendue de la frontière IPC.
    * @param valeur - Valeur rejetée par `invoke`, de type `unknown` à cette frontière.
@@ -102,6 +410,7 @@ export class FacadeCommandesService {
     const categorie: unknown = valeur.type;
     return (
       categorie === 'authentificationRefusee' ||
+      categorie === 'refIntrouvable' ||
       categorie === 'instanceInjoignable' ||
       categorie === 'delaiDepasse' ||
       categorie === 'reponseInattendue' ||

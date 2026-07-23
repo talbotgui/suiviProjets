@@ -17,6 +17,13 @@ const INSTANCE_GITLAB: Instance = {
   urlBase: 'https://gitlab.exemple.test',
 };
 
+const INSTANCE_SONAR: Instance = {
+  id: 'instance-2',
+  type: TypeInstance.Sonar,
+  nom: 'Sonar interne',
+  urlBase: 'https://sonar.exemple.test',
+};
+
 describe('FacadeCommandesService', () => {
   let service: FacadeCommandesService;
 
@@ -141,5 +148,88 @@ describe('FacadeCommandesService', () => {
     const resultat = await service.interrogerBranches(INSTANCE_GITLAB, '1234');
 
     expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'reponseInattendue' } });
+  });
+
+  describe('opérations d’interrogation d’indicateurs GitLab (Phase 5)', () => {
+    it.each([
+      ['interrogerVitalite', 'interroger_vitalite'],
+      ['interrogerTailleDepot', 'interroger_taille_depot'],
+      ['interrogerContributeurs', 'interroger_contributeurs'],
+      ['interrogerMergeRequests', 'interroger_merge_requests'],
+      ['interrogerMembres', 'interroger_membres'],
+    ] as const)(
+      '%s doit invoquer %s avec l’instance, la source, l’identifiant externe et la ref auditée',
+      async (methode, commande) => {
+        invokeSimule.mockResolvedValue({ sourceId: 'source-1' });
+
+        const resultat = await service[methode](INSTANCE_GITLAB, 'source-1', '1234', 'develop');
+
+        expect(invokeSimule).toHaveBeenCalledWith(commande, {
+          instance: INSTANCE_GITLAB,
+          sourceId: 'source-1',
+          idExterne: '1234',
+          refAuditee: 'develop',
+        });
+        expect(resultat).toEqual({ type: 'succes', resultat: { sourceId: 'source-1' } });
+      },
+    );
+
+    it.each([
+      'interrogerVitalite',
+      'interrogerTailleDepot',
+      'interrogerContributeurs',
+      'interrogerMergeRequests',
+      'interrogerMembres',
+    ] as const)(
+      '%s doit convertir un rejet « refIntrouvable » en Résultat « echec »',
+      async (methode) => {
+        invokeSimule.mockRejectedValue({ type: 'refIntrouvable' });
+
+        const resultat = await service[methode](INSTANCE_GITLAB, 'source-1', '1234');
+
+        expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'refIntrouvable' } });
+      },
+    );
+  });
+
+  describe('opérations d’interrogation d’indicateurs Sonar (Phase 5)', () => {
+    it.each([
+      ['interrogerViolations', 'interroger_violations'],
+      ['interrogerDette', 'interroger_dette'],
+      ['interrogerCouverture', 'interroger_couverture'],
+      ['interrogerNotes', 'interroger_notes'],
+      ['interrogerNcloc', 'interroger_ncloc'],
+    ] as const)(
+      '%s doit invoquer %s avec l’instance, la source et l’identifiant externe',
+      async (methode, commande) => {
+        invokeSimule.mockResolvedValue({ sourceId: 'source-2' });
+
+        const resultat = await service[methode](INSTANCE_SONAR, 'source-2', 'proj-key');
+
+        expect(invokeSimule).toHaveBeenCalledWith(commande, {
+          instance: INSTANCE_SONAR,
+          sourceId: 'source-2',
+          idExterne: 'proj-key',
+        });
+        expect(resultat).toEqual({ type: 'succes', resultat: { sourceId: 'source-2' } });
+      },
+    );
+
+    it.each([
+      'interrogerViolations',
+      'interrogerDette',
+      'interrogerCouverture',
+      'interrogerNotes',
+      'interrogerNcloc',
+    ] as const)(
+      '%s doit convertir un rejet non structuré en anomalie « reponseInattendue »',
+      async (methode) => {
+        invokeSimule.mockRejectedValue('erreur non structurée');
+
+        const resultat = await service[methode](INSTANCE_SONAR, 'source-2', 'proj-key');
+
+        expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'reponseInattendue' } });
+      },
+    );
   });
 });

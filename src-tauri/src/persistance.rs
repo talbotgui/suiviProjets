@@ -10,10 +10,12 @@
 //! fichier chiffré, migration de schéma, repli de dérivation de clé, sauvegardes de sécurité, détection de fichier
 //! verrouillé et nettoyage d'un fichier temporaire orphelin. Périmètre de la Phase 4 (US-022 à US-024 ; RG-006 à
 //! RG-008, RG-012, RG-014 à RG-016, RG-023) : qualification d'un membre connu d'un groupe et définition de la
-//! politique d'autorisation de l'IA d'un projet (`administration`), toutes deux opérant en mémoire sur une
-//! [`crate::modele::racine::DonneesRacine`] déjà chargée, sans toucher elles-mêmes le disque.
+//! politique d'autorisation de l'IA d'un projet (`administration`). Périmètre de la Phase 5, incrément 2
+//! (US-014 ; RG-019) : cycle de vie du brouillon d'une campagne (`audit`). Ces modules opèrent tous en mémoire sur
+//! une [`crate::modele::racine::DonneesRacine`] déjà chargée, sans toucher elles-mêmes le disque.
 
 pub(crate) mod administration;
+pub(crate) mod audit;
 pub(crate) mod enveloppe;
 pub(crate) mod erreurs;
 pub(crate) mod kdf;

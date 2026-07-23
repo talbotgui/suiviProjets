@@ -53,6 +53,15 @@ pub(crate) enum ErreurFacade {
     MembreIntrouvable,
     /// La règle soumise porte un doublon de username déjà utilisé par une autre règle du groupe (Phase 4, RG-008).
     DoublonUsernameMembreConnu,
+    /// Un brouillon existe déjà et doit être traité avant d'en enregistrer un nouveau (Phase 5, incrément 2,
+    /// `enregistrerBrouillon`, RG-019).
+    BrouillonDejaExistant,
+    /// Aucun brouillon n'est actuellement en attente de traitement (Phase 5, incrément 2, `integrerBrouillon`/
+    /// `rejeterBrouillon`).
+    AucunBrouillonCourant,
+    /// Le projet désigné ne fait pas partie du brouillon courant (Phase 5, incrément 2, `integrerBrouillon`/
+    /// `rejeterBrouillon`).
+    ProjetAbsentDuBrouillon,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
 }
@@ -65,6 +74,18 @@ impl From<crate::persistance::administration::ErreurAdministration> for ErreurFa
             ErreurAdministration::ProjetIntrouvable => Self::ProjetIntrouvable,
             ErreurAdministration::MembreIntrouvable => Self::MembreIntrouvable,
             ErreurAdministration::DoublonUsernameMembreConnu => Self::DoublonUsernameMembreConnu,
+        }
+    }
+}
+
+impl From<crate::persistance::audit::ErreurAudit> for ErreurFacade {
+    fn from(erreur: crate::persistance::audit::ErreurAudit) -> Self {
+        use crate::persistance::audit::ErreurAudit;
+        match erreur {
+            ErreurAudit::BrouillonDejaExistant => Self::BrouillonDejaExistant,
+            ErreurAudit::AucunBrouillonCourant => Self::AucunBrouillonCourant,
+            ErreurAudit::ProjetAbsentDuBrouillon => Self::ProjetAbsentDuBrouillon,
+            ErreurAudit::ProjetIntrouvable => Self::ProjetIntrouvable,
         }
     }
 }

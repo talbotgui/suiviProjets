@@ -46,11 +46,13 @@ import type {
   Groupe,
   Projet,
   ReponseQualificationMembre,
+  ResultatBrouillonProjet,
   ResultatMutationAdministration,
   ResultatQualificationMembre,
   Source,
   StatutMembre,
   TypeCritereMembre,
+  Verdict,
 } from './types-donnees';
 import { TypeSource } from './types-donnees';
 
@@ -552,6 +554,122 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Enregistre les résultats d'une campagne dans la zone de brouillon (US-009, US-014) : invoque la commande
+   * native `enregistrerBrouillon`, qui refuse tant qu'un brouillon existant n'a pas été traité (RG-019), puis
+   * sauvegarde effectivement le fichier (RG-002) avant de renvoyer la racine mise à jour, substituée à l'état
+   * courant de ce Store.
+   * @param campagneId - Identifiant de la campagne dont ce brouillon est issu.
+   * @param date - Date de lancement de la campagne.
+   * @param perimetre - Identifiants des projets du périmètre de la campagne.
+   * @param verdicts - Verdicts d'exécution par projet, y compris les projets échoués ou ignorés (RG-018).
+   * @param resultatsParProjet - Résultats en attente de validation, par projet.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async enregistrerBrouillon(
+    campagneId: string,
+    date: string,
+    perimetre: readonly string[],
+    verdicts: readonly Verdict[],
+    resultatsParProjet: readonly ResultatBrouillonProjet[],
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAdministration.enregistrerBrouillon<
+        DonneesRacine,
+        Verdict,
+        ResultatBrouillonProjet,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        campagneId,
+        date,
+        perimetre,
+        verdicts,
+        resultatsParProjet,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Intègre à l'historique des projets concernés tout ou partie des résultats en attente du brouillon courant
+   * (US-014) : invoque la commande native `integrerBrouillon`, qui sauvegarde effectivement le fichier (RG-002)
+   * avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param selection - Identifiants des projets ciblés ; absent = l'intégralité des entrées encore en attente du
+   * brouillon (F09 : « intègre tout »).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async integrerBrouillon(
+    selection: readonly string[] | undefined,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAdministration.integrerBrouillon<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        selection,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Rejette tout ou partie des résultats en attente du brouillon courant, sans jamais les ajouter à l'historique
+   * du projet concerné (US-014) : invoque la commande native `rejeterBrouillon`, qui sauvegarde effectivement le
+   * fichier (RG-002) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param selection - Identifiants des projets ciblés ; absent = l'intégralité des entrées encore en attente du
+   * brouillon (F09 : « rejette »).
+   * @param motif - Motif de rejet optionnel, consigné sur la trace durable de la campagne.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async rejeterBrouillon(
+    selection: readonly string[] | undefined,
+    motif: string | undefined,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAdministration.rejeterBrouillon<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        selection,
+        motif,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Vérifie, sans accès non sûr à la valeur reçue, qu'un rejet d'une commande native d'administration correspond
    * bien à une anomalie typée (`ErreurFacade` côté cœur natif) plutôt qu'à une valeur inattendue de la frontière
    * IPC, sur le modèle de la méthode équivalente de `FacadeCommandesService`.
@@ -565,6 +683,9 @@ export class DonneesApplicationService {
       'projetIntrouvable',
       'membreIntrouvable',
       'doublonUsernameMembreConnu',
+      'brouillonDejaExistant',
+      'aucunBrouillonCourant',
+      'projetAbsentDuBrouillon',
       'fichierIntrouvable',
       'motDePasseOuFichierInvalide',
       'formatNonReconnu',

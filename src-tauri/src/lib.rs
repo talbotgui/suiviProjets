@@ -14,7 +14,11 @@
 //! données déjà chargées en mémoire, et se persiste via la commande `sauvegarderFichier` existante. Phase 4
 //! (membres connus et politique IA) : s'y ajoutent `qualifierMembre` et `definirPolitiqueIA` (US-022 à US-024),
 //! qui mutent et sauvegardent elles-mêmes le fichier, à la différence du CRUD groupes/projets/sources de la
-//! Phase 3.
+//! Phase 3. Phase 5, incrément 1 (Moteur d'audit) : s'y ajoutent dix commandes d'interrogation d'indicateurs
+//! GitLab/Sonar (US-009), qui ne mutent ni ne sauvegardent le fichier — leur résultat est destiné à être assemblé
+//! côté interface par l'Orchestrateur de campagne, différé à un incrément ultérieur. Phase 5, incrément 2: s'y
+//! ajoutent `enregistrerBrouillon`, `integrerBrouillon` et `rejeterBrouillon` (US-014, RG-019), qui mutent et
+//! sauvegardent elles-mêmes le fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`.
 
 mod commandes;
 mod connecteurs;
@@ -46,6 +50,19 @@ pub fn run() {
             commandes::administration::qualifier_membre,
             commandes::administration::definir_politique_ia,
             commandes::administration::supprimer_membre_connu,
+            commandes::audit::interroger_vitalite,
+            commandes::audit::interroger_taille_depot,
+            commandes::audit::interroger_contributeurs,
+            commandes::audit::interroger_merge_requests,
+            commandes::audit::interroger_membres,
+            commandes::audit::interroger_violations,
+            commandes::audit::interroger_dette,
+            commandes::audit::interroger_couverture,
+            commandes::audit::interroger_notes,
+            commandes::audit::interroger_ncloc,
+            commandes::audit::enregistrer_brouillon,
+            commandes::audit::integrer_brouillon,
+            commandes::audit::rejeter_brouillon,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

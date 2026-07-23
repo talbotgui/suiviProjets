@@ -92,11 +92,54 @@ export interface ParametresSuppressionMembreConnu<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `enregistrerBrouillon` (US-009, US-014, Phase 5 incrément 2),
+ * génériques sur le type concret de la racine échangée et des deux structures propres au brouillon (`TVerdict`,
+ * `TResultatBrouillonProjet`), pour ne jamais importer ces types depuis `services/avecetat/etat/`.
+ */
+export interface ParametresEnregistrementBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Identifiant de la campagne dont ce brouillon est issu. */
+  readonly campagneId: string;
+  /** Date de lancement de la campagne. */
+  readonly date: string;
+  /** Identifiants des projets du périmètre de la campagne. */
+  readonly perimetre: readonly string[];
+  /** Verdicts d'exécution par projet, y compris les projets échoués ou ignorés (RG-018). */
+  readonly verdicts: readonly TVerdict[];
+  /** Résultats en attente de validation, par projet. */
+  readonly resultatsParProjet: readonly TResultatBrouillonProjet[];
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis aux commandes natives `integrerBrouillon`/`rejeterBrouillon` (US-014, Phase 5 incrément 2),
+ * génériques sur le type concret de la racine échangée (`TDonnees`).
+ */
+export interface ParametresResolutionBrouillon<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Identifiants des projets ciblés ; absent = l'intégralité des entrées encore en attente du brouillon. */
+  readonly selection?: readonly string[];
+  /** Motif de rejet optionnel (ignoré par `integrerBrouillon`). */
+  readonly motif?: string;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
  * Client typé de la Façade de commandes, dédié en Phase 4 à la qualification des membres connus d'un groupe et à
- * la politique d'autorisation de l'IA d'un projet (US-022 à US-024). Chaque méthode invoque une commande Tauri
- * identique côté cœur natif (`qualifier_membre`, `definir_politique_ia`, `supprimer_membre_connu`) et reste
- * générique sur le type concret de la racine échangée (cf. commentaire d'en-tête de ce fichier) : c'est
- * l'appelant (`DonneesApplicationService`) qui porte la connaissance du type `DonneesRacine`.
+ * la politique d'autorisation de l'IA d'un projet (US-022 à US-024), et en Phase 5 (incrément 2) au cycle de vie
+ * du brouillon d'une campagne (US-014). Chaque méthode invoque une commande Tauri identique côté cœur natif
+ * (`qualifier_membre`, `definir_politique_ia`, `supprimer_membre_connu`, `enregistrer_brouillon`,
+ * `integrer_brouillon`, `rejeter_brouillon`) et reste générique sur le type concret de la racine échangée (cf.
+ * commentaire d'en-tête de ce fichier) : c'est l'appelant (`DonneesApplicationService`) qui porte la connaissance
+ * du type `DonneesRacine`.
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeAdministrationService {
@@ -134,5 +177,41 @@ export class FacadeAdministrationService {
     parametres: ParametresSuppressionMembreConnu<TDonnees>,
   ): Promise<TReponse> {
     return invoke<TReponse>('supprimer_membre_connu', { ...parametres });
+  }
+
+  /**
+   * Enregistre les résultats d'une campagne dans la zone de brouillon, sauvegarde le fichier (US-009, US-014,
+   * RG-019).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresEnregistrementBrouillon}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async enregistrerBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet, TReponse>(
+    parametres: ParametresEnregistrementBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('enregistrer_brouillon', { ...parametres });
+  }
+
+  /**
+   * Intègre à l'historique des projets concernés tout ou partie des résultats en attente du brouillon courant,
+   * sauvegarde le fichier (US-014).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresResolutionBrouillon}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async integrerBrouillon<TDonnees, TReponse>(
+    parametres: Omit<ParametresResolutionBrouillon<TDonnees>, 'motif'>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('integrer_brouillon', { ...parametres });
+  }
+
+  /**
+   * Rejette tout ou partie des résultats en attente du brouillon courant, sans jamais les ajouter à l'historique
+   * du projet concerné, sauvegarde le fichier (US-014).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresResolutionBrouillon}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async rejeterBrouillon<TDonnees, TReponse>(
+    parametres: ParametresResolutionBrouillon<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('rejeter_brouillon', { ...parametres });
   }
 }

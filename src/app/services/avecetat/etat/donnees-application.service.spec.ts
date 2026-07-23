@@ -12,7 +12,12 @@ import type {
 } from './donnees-application.service';
 import { EtatSessionService } from './etat-session.service';
 import { StatutMembre, TypeCritereMembre, TypeSource } from './types-donnees';
-import type { DonneesRacine, ReponseQualificationMembre } from './types-donnees';
+import type {
+  DonneesRacine,
+  ReponseQualificationMembre,
+  ResultatBrouillonProjet,
+  Verdict,
+} from './types-donnees';
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
 
@@ -546,6 +551,141 @@ describe('DonneesApplicationService', () => {
       );
 
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'membreIntrouvable' } });
+    });
+  });
+
+  describe('cycle de vie du brouillon (Phase 5, incrément 2, US-014)', () => {
+    let etatSession: EtatSessionService;
+
+    const VERDICT_SUCCES: Verdict = {
+      projetId: 'projet-1',
+      statut: 'succes',
+      dureeMs: 1200,
+    };
+
+    const RESULTAT_EN_ATTENTE: ResultatBrouillonProjet = {
+      projetId: 'projet-1',
+      audit: { id: 'audit-1', date: '2026-07-23', campagneId: 'campagne-1', resultats: [] },
+      statut: 'enAttente',
+    };
+
+    beforeEach(() => {
+      service.chargerRacine(DonneesDeTest.racineVide());
+      etatSession = TestBed.inject(EtatSessionService);
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+    });
+
+    it('invoque enregistrer_brouillon avec les paramètres attendus et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 2 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.enregistrerBrouillon(
+        'campagne-1',
+        '2026-07-23',
+        ['projet-1'],
+        [VERDICT_SUCCES],
+        [RESULTAT_EN_ATTENTE],
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('enregistrer_brouillon', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        campagneId: 'campagne-1',
+        date: '2026-07-23',
+        perimetre: ['projet-1'],
+        verdicts: [VERDICT_SUCCES],
+        resultatsParProjet: [RESULTAT_EN_ATTENTE],
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « brouillonDejaExistant » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'brouillonDejaExistant' });
+
+      const resultat = await service.enregistrerBrouillon(
+        'campagne-1',
+        '2026-07-23',
+        ['projet-1'],
+        [VERDICT_SUCCES],
+        [RESULTAT_EN_ATTENTE],
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'brouillonDejaExistant' } });
+    });
+
+    it('invoque integrer_brouillon avec la sélection fournie et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.integrerBrouillon(['projet-1'], 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('integrer_brouillon', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        selection: ['projet-1'],
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque integrer_brouillon sans sélection pour intégrer tout le brouillon', async () => {
+      invokeSimule.mockResolvedValue(DonneesDeTest.racineActuelle(service));
+
+      await service.integrerBrouillon(undefined, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'integrer_brouillon',
+        expect.objectContaining({ selection: undefined }),
+      );
+    });
+
+    it('convertit un rejet typé « aucunBrouillonCourant » en Résultat « echec » pour l’intégration', async () => {
+      invokeSimule.mockRejectedValue({ type: 'aucunBrouillonCourant' });
+
+      const resultat = await service.integrerBrouillon(undefined, 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'aucunBrouillonCourant' } });
+    });
+
+    it('invoque rejeter_brouillon avec le motif fourni et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 4 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.rejeterBrouillon(
+        ['projet-1'],
+        'Mauvaise ref auditée',
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('rejeter_brouillon', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        selection: ['projet-1'],
+        motif: 'Mauvaise ref auditée',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « projetAbsentDuBrouillon » en Résultat « echec » pour le rejet', async () => {
+      invokeSimule.mockRejectedValue({ type: 'projetAbsentDuBrouillon' });
+
+      const resultat = await service.rejeterBrouillon(
+        ['projet-inconnu'],
+        undefined,
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'projetAbsentDuBrouillon' } });
     });
   });
 });
