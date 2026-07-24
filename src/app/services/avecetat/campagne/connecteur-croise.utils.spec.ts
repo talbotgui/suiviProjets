@@ -3,6 +3,8 @@
 import { ConnecteurCroiseUtils } from './connecteur-croise.utils';
 import type {
   ResultatGitlabContributeurs,
+  ResultatGitlabMarqueursIa,
+  ResultatSonarCouverture,
   ResultatSonarViolations,
 } from '../../sansetat/commandes/types-facade';
 
@@ -112,6 +114,91 @@ describe('ConnecteurCroiseUtils', () => {
         nombreCommits: 0,
         nouvellesViolations: 0,
         evaluable: false,
+      });
+    });
+  });
+
+  describe('calculerIaNouveauCode', () => {
+    const MARQUEURS: ResultatGitlabMarqueursIa = {
+      sourceId: 'source-1',
+      refEffective: 'develop',
+      shaTete: '8c1d0e44',
+      marqueurs: [
+        { chemin: 'CLAUDE.md', nature: 'fichier', outil: 'claude' },
+        { chemin: '.claude', nature: 'repertoire', outil: 'claude' },
+        { chemin: '.cursorrules', nature: 'fichier', outil: 'cursor' },
+      ],
+    };
+
+    const COUVERTURE: ResultatSonarCouverture = {
+      sourceId: 'source-2',
+      couverture: 82,
+      couvertureNouveauCode: 91,
+      duplicationNouveauCode: 3.5,
+    };
+
+    it('doit juxtaposer les séries et dédupliquer les outils détectés', () => {
+      const resultat = ConnecteurCroiseUtils.calculerIaNouveauCode(
+        MARQUEURS,
+        COUVERTURE,
+        VIOLATIONS,
+      );
+
+      expect(resultat).toEqual({
+        marqueursPresents: true,
+        outilsDetectes: ['claude', 'cursor'],
+        couvertureNouveauCode: 91,
+        nouvellesViolations: 9,
+        duplicationNouveauCode: 3.5,
+      });
+    });
+
+    it("doit signaler l'absence de marqueurs si aucun n'est détecté", () => {
+      const marqueursVides: ResultatGitlabMarqueursIa = { ...MARQUEURS, marqueurs: [] };
+
+      const resultat = ConnecteurCroiseUtils.calculerIaNouveauCode(
+        marqueursVides,
+        COUVERTURE,
+        VIOLATIONS,
+      );
+
+      expect(resultat.marqueursPresents).toBe(false);
+      expect(resultat.outilsDetectes).toEqual([]);
+    });
+
+    it("doit rester cohérent si les marqueurs IA n'ont pas pu être obtenus", () => {
+      const resultat = ConnecteurCroiseUtils.calculerIaNouveauCode(
+        undefined,
+        COUVERTURE,
+        VIOLATIONS,
+      );
+
+      expect(resultat.marqueursPresents).toBe(false);
+      expect(resultat.outilsDetectes).toEqual([]);
+      expect(resultat.couvertureNouveauCode).toBe(91);
+    });
+
+    it("doit rester cohérent si les métriques Sonar n'ont pas pu être obtenues", () => {
+      const resultat = ConnecteurCroiseUtils.calculerIaNouveauCode(MARQUEURS, undefined, undefined);
+
+      expect(resultat).toEqual({
+        marqueursPresents: true,
+        outilsDetectes: ['claude', 'cursor'],
+        couvertureNouveauCode: undefined,
+        nouvellesViolations: undefined,
+        duplicationNouveauCode: undefined,
+      });
+    });
+
+    it('doit rester cohérent si tout est absent', () => {
+      const resultat = ConnecteurCroiseUtils.calculerIaNouveauCode(undefined, undefined, undefined);
+
+      expect(resultat).toEqual({
+        marqueursPresents: false,
+        outilsDetectes: [],
+        couvertureNouveauCode: undefined,
+        nouvellesViolations: undefined,
+        duplicationNouveauCode: undefined,
       });
     });
   });

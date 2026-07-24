@@ -178,6 +178,7 @@ const REPONSES_PAR_DEFAUT: Readonly<Record<string, unknown>> = {
     mrOuvertes: [],
   },
   interroger_membres: { sourceId: 'src', refEffective: 'main', shaTete: 'abc', membres: [] },
+  interroger_marqueurs_ia: { sourceId: 'src', refEffective: 'main', shaTete: 'abc', marqueurs: [] },
   interroger_violations: {
     sourceId: 'src',
     parSeverite: { bloquant: 0, critique: 0, majeur: 0, mineur: 0, info: 0 },
@@ -212,7 +213,7 @@ describe('OrchestrateurCampagneService', () => {
   let service: OrchestrateurCampagneService;
   let donneesApplicationMock: {
     groupes: jest.Mock<readonly Groupe[], []>;
-    racine: jest.Mock<{ readonly parametres: unknown }, []>;
+    racine: jest.Mock<{ readonly parametres: unknown; readonly referentiels: unknown }, []>;
     enregistrerBrouillon: MockEnregistrerBrouillon;
   };
 
@@ -235,7 +236,7 @@ describe('OrchestrateurCampagneService', () => {
     enregistrerBrouillon.mockResolvedValue({ type: 'succes' });
     donneesApplicationMock = {
       groupes: jest.fn(() => []),
-      racine: jest.fn(() => ({ parametres: {} })),
+      racine: jest.fn(() => ({ parametres: {}, referentiels: {} })),
       enregistrerBrouillon,
     };
     TestBed.configureTestingModule({
@@ -299,6 +300,77 @@ describe('OrchestrateurCampagneService', () => {
           expect.objectContaining({ type: 'sonar.couverture' }),
           expect.objectContaining({ type: 'croise.fraicheur_sonar' }),
           expect.objectContaining({ type: 'croise.activite_sans_qualite' }),
+          expect.objectContaining({ type: 'gitlab.marqueurs_ia' }),
+          expect.objectContaining({ type: 'croise.ia_nouveau_code' }),
+        ]),
+      );
+    });
+
+    it('doit transmettre le référentiel de marqueurs IA à interroger_marqueurs_ia et calculer le constat croisé', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.sourceGitlab('source-1'),
+        DonneesDeTest.sourceSonar('source-2'),
+      ]);
+      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+      donneesApplicationMock.racine.mockReturnValue({
+        parametres: {},
+        referentiels: {
+          reglesMarqueursIA: [
+            {
+              motif: 'CLAUDE.md',
+              typeCorrespondance: 'exact',
+              portee: 'partout',
+              nature: 'fichier',
+              outil: 'claude',
+            },
+            // Entrée malformée (typeCorrespondance inconnue), doit être ignorée silencieusement.
+            {
+              motif: 'X',
+              typeCorrespondance: 'invalide',
+              portee: 'racine',
+              nature: 'fichier',
+              outil: 'x',
+            },
+          ],
+        },
+      });
+      invokeSimule.mockImplementation((commande: string) => {
+        if (commande === 'interroger_marqueurs_ia') {
+          return Promise.resolve({
+            sourceId: 'source-1',
+            refEffective: 'main',
+            shaTete: 'abc',
+            marqueurs: [{ chemin: 'CLAUDE.md', nature: 'fichier', outil: 'claude' }],
+          });
+        }
+        return Promise.resolve(REPONSES_PAR_DEFAUT[commande]);
+      });
+
+      await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'interroger_marqueurs_ia',
+        expect.objectContaining({
+          reglesMarqueursIa: [
+            {
+              motif: 'CLAUDE.md',
+              typeCorrespondance: 'exact',
+              portee: 'partout',
+              nature: 'fichier',
+              outil: 'claude',
+            },
+          ],
+        }),
+      );
+      const resultatsParProjet = donneesApplicationMock.enregistrerBrouillon.mock.calls[0][4];
+      const resultats: readonly unknown[] = resultatsParProjet[0].audit.resultats;
+      expect(resultats).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'croise.ia_nouveau_code',
+            marqueursPresents: true,
+            outilsDetectes: ['claude'],
+          }),
         ]),
       );
     });
@@ -416,7 +488,7 @@ describe('OrchestrateurCampagneService', () => {
       const progressionProjet = etatSession.progressionCampagne()?.projets['projet-1'];
       expect(progressionProjet?.statut).toBe('echoue');
       expect(progressionProjet?.dureeMs).toBeGreaterThanOrEqual(0);
-      expect(progressionProjet?.motifEchec).toBe('gitlab.membres : instanceInjoignable');
+      expect(progressionProjet?.motifEchec).toBe('gitlab.marqueurs_ia : instanceInjoignable');
     });
 
     it('ne doit pas interroger un indicateur désactivé pour le groupe et ne pas le proposer au brouillon', async () => {
@@ -455,6 +527,7 @@ describe('OrchestrateurCampagneService', () => {
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
       donneesApplicationMock.racine.mockReturnValue({
         parametres: { seuils: { materialiteBrouillon: { variationRelative: 0.1 } } },
+        referentiels: {},
       });
       invokeSimule.mockImplementation((commande: string) => {
         if (commande === 'interroger_taille_depot') {
@@ -505,7 +578,10 @@ describe('OrchestrateurCampagneService', () => {
         DonneesDeTest.projet(id, [DonneesDeTest.sourceGitlab(`${id}-source`)]),
       );
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
-      donneesApplicationMock.racine.mockReturnValue({ parametres: { audit: { concurrence: 2 } } });
+      donneesApplicationMock.racine.mockReturnValue({
+        parametres: { audit: { concurrence: 2 } },
+        referentiels: {},
+      });
 
       await service.lancerCampagne(
         projets.map((projet) => projet.id),
@@ -525,7 +601,10 @@ describe('OrchestrateurCampagneService', () => {
         DonneesDeTest.projet(id, [DonneesDeTest.sourceGitlab(`${id}-source`)]),
       );
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
-      donneesApplicationMock.racine.mockReturnValue({ parametres: { audit: { concurrence: 1 } } });
+      donneesApplicationMock.racine.mockReturnValue({
+        parametres: { audit: { concurrence: 1 } },
+        referentiels: {},
+      });
       const etatSession = TestBed.inject(EtatSessionService);
 
       const promesse = service.lancerCampagne(

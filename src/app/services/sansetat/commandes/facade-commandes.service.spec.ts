@@ -54,13 +54,16 @@ describe('FacadeCommandesService', () => {
   });
 
   it('doit convertir un rejet typé en Résultat « echec »', async () => {
-    invokeSimule.mockRejectedValue({ type: 'authentificationRefusee' });
+    invokeSimule.mockRejectedValue({
+      type: 'authentificationRefusee',
+      message: 'Statut HTTP 401 reçu',
+    });
 
     const resultat = await service.testerConnectivite(INSTANCE_GITLAB, 'jeton-invalide');
 
     expect(resultat).toEqual({
       type: 'echec',
-      anomalie: { type: 'authentificationRefusee' },
+      anomalie: { type: 'authentificationRefusee', message: 'Statut HTTP 401 reçu' },
     });
   });
 
@@ -71,7 +74,10 @@ describe('FacadeCommandesService', () => {
 
     expect(resultat).toEqual({
       type: 'echec',
-      anomalie: { type: 'reponseInattendue' },
+      anomalie: {
+        type: 'reponseInattendue',
+        message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+      },
     });
   });
 
@@ -82,18 +88,24 @@ describe('FacadeCommandesService', () => {
 
     expect(resultat).toEqual({
       type: 'echec',
-      anomalie: { type: 'reponseInattendue' },
+      anomalie: {
+        type: 'reponseInattendue',
+        message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+      },
     });
   });
 
   it('doit convertir un rejet à catégorie inconnue en anomalie « reponseInattendue »', async () => {
-    invokeSimule.mockRejectedValue({ type: 'categorieInconnue' });
+    invokeSimule.mockRejectedValue({ type: 'categorieInconnue', message: 'peu importe' });
 
     const resultat = await service.testerConnectivite(INSTANCE_GITLAB, 'jeton');
 
     expect(resultat).toEqual({
       type: 'echec',
-      anomalie: { type: 'reponseInattendue' },
+      anomalie: {
+        type: 'reponseInattendue',
+        message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+      },
     });
   });
 
@@ -104,11 +116,14 @@ describe('FacadeCommandesService', () => {
     'droitsInsuffisants',
     'credentialAbsent',
   ] as const)('doit reconnaître la catégorie d’anomalie « %s »', async (categorie) => {
-    invokeSimule.mockRejectedValue({ type: categorie });
+    invokeSimule.mockRejectedValue({ type: categorie, message: 'diagnostic' });
 
     const resultat = await service.testerConnectivite(INSTANCE_GITLAB, 'jeton');
 
-    expect(resultat).toEqual({ type: 'echec', anomalie: { type: categorie } });
+    expect(resultat).toEqual({
+      type: 'echec',
+      anomalie: { type: categorie, message: 'diagnostic' },
+    });
   });
 
   it('doit invoquer definir_credentials avec la map de credentials fournie', async () => {
@@ -135,11 +150,20 @@ describe('FacadeCommandesService', () => {
   });
 
   it('doit convertir un rejet « credentialAbsent » en Résultat « echec » pour interroger_branches', async () => {
-    invokeSimule.mockRejectedValue({ type: 'credentialAbsent' });
+    invokeSimule.mockRejectedValue({
+      type: 'credentialAbsent',
+      message: 'Aucun credential en mémoire pour cette instance',
+    });
 
     const resultat = await service.interrogerBranches(INSTANCE_GITLAB, '1234');
 
-    expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'credentialAbsent' } });
+    expect(resultat).toEqual({
+      type: 'echec',
+      anomalie: {
+        type: 'credentialAbsent',
+        message: 'Aucun credential en mémoire pour cette instance',
+      },
+    });
   });
 
   it('doit convertir un rejet non structuré en anomalie « reponseInattendue » pour interroger_branches', async () => {
@@ -147,7 +171,13 @@ describe('FacadeCommandesService', () => {
 
     const resultat = await service.interrogerBranches(INSTANCE_GITLAB, '1234');
 
-    expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'reponseInattendue' } });
+    expect(resultat).toEqual({
+      type: 'echec',
+      anomalie: {
+        type: 'reponseInattendue',
+        message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+      },
+    });
   });
 
   describe('opérations d’interrogation d’indicateurs GitLab (Phase 5)', () => {
@@ -183,13 +213,95 @@ describe('FacadeCommandesService', () => {
     ] as const)(
       '%s doit convertir un rejet « refIntrouvable » en Résultat « echec »',
       async (methode) => {
-        invokeSimule.mockRejectedValue({ type: 'refIntrouvable' });
+        invokeSimule.mockRejectedValue({
+          type: 'refIntrouvable',
+          message: 'Statut HTTP 404 reçu',
+        });
 
         const resultat = await service[methode](INSTANCE_GITLAB, 'source-1', '1234');
 
-        expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'refIntrouvable' } });
+        expect(resultat).toEqual({
+          type: 'echec',
+          anomalie: { type: 'refIntrouvable', message: 'Statut HTTP 404 reçu' },
+        });
       },
     );
+  });
+
+  describe('interrogerMarqueursIa (Phase 5, incrément 7)', () => {
+    const REGLE = {
+      motif: 'CLAUDE.md',
+      typeCorrespondance: 'exact' as const,
+      portee: 'partout' as const,
+      nature: 'fichier' as const,
+      outil: 'claude',
+    };
+
+    it('doit invoquer interroger_marqueurs_ia avec la clé reglesMarqueursIa (et non reglesMarqueursIA)', async () => {
+      invokeSimule.mockResolvedValue({
+        sourceId: 'source-1',
+        refEffective: 'main',
+        shaTete: 'abc',
+        marqueurs: [{ chemin: 'CLAUDE.md', nature: 'fichier', outil: 'claude' }],
+      });
+
+      const resultat = await service.interrogerMarqueursIa(
+        INSTANCE_GITLAB,
+        'source-1',
+        '1234',
+        [REGLE],
+        'develop',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('interroger_marqueurs_ia', {
+        instance: INSTANCE_GITLAB,
+        sourceId: 'source-1',
+        idExterne: '1234',
+        reglesMarqueursIa: [REGLE],
+        refAuditee: 'develop',
+      });
+      expect(resultat).toEqual({
+        type: 'succes',
+        resultat: {
+          sourceId: 'source-1',
+          refEffective: 'main',
+          shaTete: 'abc',
+          marqueurs: [{ chemin: 'CLAUDE.md', nature: 'fichier', outil: 'claude' }],
+        },
+      });
+    });
+
+    it('doit convertir un rejet typé en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({
+        type: 'instanceInjoignable',
+        message: 'connection refused',
+      });
+
+      const resultat = await service.interrogerMarqueursIa(INSTANCE_GITLAB, 'source-1', '1234', [
+        REGLE,
+      ]);
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'instanceInjoignable', message: 'connection refused' },
+      });
+    });
+
+    it('doit convertir un rejet non structuré en anomalie « reponseInattendue »', async () => {
+      invokeSimule.mockRejectedValue('erreur non structurée');
+
+      const resultat = await service.interrogerMarqueursIa(INSTANCE_GITLAB, 'source-1', '1234', [
+        REGLE,
+      ]);
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      });
+    });
   });
 
   describe('opérations d’interrogation d’indicateurs Sonar (Phase 5)', () => {
@@ -228,7 +340,13 @@ describe('FacadeCommandesService', () => {
 
         const resultat = await service[methode](INSTANCE_SONAR, 'source-2', 'proj-key');
 
-        expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'reponseInattendue' } });
+        expect(resultat).toEqual({
+          type: 'echec',
+          anomalie: {
+            type: 'reponseInattendue',
+            message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+          },
+        });
       },
     );
   });
@@ -255,11 +373,17 @@ describe('FacadeCommandesService', () => {
     });
 
     it('doit convertir un rejet typé « droitsInsuffisants » en Résultat « echec »', async () => {
-      invokeSimule.mockRejectedValue({ type: 'droitsInsuffisants' });
+      invokeSimule.mockRejectedValue({
+        type: 'droitsInsuffisants',
+        message: 'Statut HTTP 403 reçu',
+      });
 
       const resultat = await service.interrogerDerniereAnalyse(INSTANCE_SONAR, 'proj-key');
 
-      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'droitsInsuffisants' } });
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'droitsInsuffisants', message: 'Statut HTTP 403 reçu' },
+      });
     });
   });
 });

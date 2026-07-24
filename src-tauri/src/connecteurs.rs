@@ -12,3 +12,6 @@ pub(crate) mod commun;
 pub(crate) mod exemple_reference;
 pub(crate) mod gitlab;
 pub(crate) mod sonar;
+
+#[cfg(test)]
+mod tests_integration_reelle;

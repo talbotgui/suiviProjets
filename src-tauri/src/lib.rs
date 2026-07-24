@@ -18,7 +18,10 @@
 //! GitLab/Sonar (US-009), qui ne mutent ni ne sauvegardent le fichier — leur résultat est destiné à être assemblé
 //! côté interface par l'Orchestrateur de campagne, différé à un incrément ultérieur. Phase 5, incrément 2: s'y
 //! ajoutent `enregistrerBrouillon`, `integrerBrouillon` et `rejeterBrouillon` (US-014, RG-019), qui mutent et
-//! sauvegardent elles-mêmes le fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`.
+//! sauvegardent elles-mêmes le fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`. Phase 5,
+//! incrément 7 : s'y ajoute `interrogerMarqueursIa` (US-009, F18, RG-021), différée depuis l'incrément 1, qui
+//! détecte les marqueurs d'outils IA de l'arborescence d'un dépôt GitLab par correspondance avec le référentiel
+//! `reglesMarqueursIA` transmis en paramètre.
 
 mod commandes;
 mod connecteurs;
@@ -55,6 +58,7 @@ pub fn run() {
             commandes::audit::interroger_contributeurs,
             commandes::audit::interroger_merge_requests,
             commandes::audit::interroger_membres,
+            commandes::audit::interroger_marqueurs_ia,
             commandes::audit::interroger_violations,
             commandes::audit::interroger_dette,
             commandes::audit::interroger_couverture,

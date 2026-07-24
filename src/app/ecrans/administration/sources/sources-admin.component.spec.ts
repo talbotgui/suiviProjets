@@ -196,9 +196,13 @@ describe('SqmSourcesAdminComponent', () => {
   it("signale l'absence de credential plutôt que de proposer des branches (US-008)", async () => {
     jest.useFakeTimers();
     const facade = TestBed.inject(FacadeCommandesService);
-    jest
-      .spyOn(facade, 'interrogerBranches')
-      .mockResolvedValue({ type: 'echec', anomalie: { type: 'credentialAbsent' } });
+    jest.spyOn(facade, 'interrogerBranches').mockResolvedValue({
+      type: 'echec',
+      anomalie: {
+        type: 'credentialAbsent',
+        message: 'Aucun credential en mémoire pour cette instance',
+      },
+    });
 
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
     composant.selectionnerGroupe(groupeId);

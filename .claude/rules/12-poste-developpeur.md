@@ -11,7 +11,7 @@ Synthèse actionnable de [17_posteDeveloppeur.md](../../docs/02_documentation/17
 ## Variables d'environnement
 
 - `RUST_LOG` : verbosité des journaux du cœur natif en développement.
-- `SQM_TEST_GITLAB_URL`/`SQM_TEST_GITLAB_TOKEN`, `SQM_TEST_SONAR_URL`/`SQM_TEST_SONAR_TOKEN` : credentials des tests d'intégration hors CI.
+- `SQM_TEST_GITLAB_URL`/`SQM_TEST_GITLAB_TOKEN`/`SQM_TEST_GITLAB_PROJET_ID`, `SQM_TEST_SONAR_URL`/`SQM_TEST_SONAR_TOKEN`/`SQM_TEST_SONAR_PROJET_CLE` : credentials et projet réel des tests d'intégration hors CI.
 - `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` : proxy respecté par le client HTTP du cœur natif.
 - `TAURI_SIGNING_PRIVATE_KEY`/`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` : optionnelles, build signé local uniquement.
 - Toutes définies via `.env.local` (jamais committé) ou variables de session shell ([source](../../docs/02_documentation/17_posteDeveloppeur.md#variables-denvironnement)).

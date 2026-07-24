@@ -23,9 +23,9 @@
 //     (`AberrationUtils`).
 //   - Un projet est « succès » dès qu'au moins un résultat exploitable a été obtenu (résultats partiels conservés,
 //     anomalies des appels échoués consignées) ; « échec » seulement si aucun résultat n'a pu être obtenu.
-//   - `interrogerDependances`, `interrogerMarqueursIa` et `gitlab.branches` restent différés (connecteurs non
-//     livrés) : simplement absents des appels effectués ici, comme `croise.ia_nouveau_code` (bloqué sur
-//     `gitlab.marqueurs_ia`).
+//   - `interrogerDependances` et `gitlab.branches` restent différés (connecteurs non livrés) : simplement absents
+//     des appels effectués ici. `interrogerMarqueursIa` et `croise.ia_nouveau_code` sont livrés à l'incrément 7
+//     (référentiel `reglesMarqueursIA` extrait via `extraireReglesMarqueursIa`, jamais persisté par ce service).
 //   - Le rapport d'anomalies détaillé (F08, RG-021 : catégorie/message/action suggérée/regroupement) reste un
 //     incrément ultérieur ; les anomalies sont collectées ici sous une forme minimale (`{ indicateur, sourceId,
 //     anomalie }`), décision arbitraire documentée dans le rapport de développement de cette phase.
@@ -34,7 +34,9 @@ import { EMPTY, firstValueFrom, from } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import type {
   ErreurConnecteur,
+  RegleMarqueurIA,
   ResultatGitlabContributeurs,
+  ResultatGitlabMarqueursIa,
   ResultatGitlabTailleDepot,
   ResultatGitlabVitalite,
   ResultatSonarCouverture,
@@ -234,6 +236,7 @@ export class OrchestrateurCampagneService {
     let couverture: ResultatSonarCouverture | undefined;
     let ncloc: ResultatSonarNcloc | undefined;
     let derniereAnalyse: string | null | undefined;
+    let marqueursIa: ResultatGitlabMarqueursIa | undefined;
 
     for (const source of resolution.projet.sources) {
       const instance = resolution.groupe.instances.find(
@@ -322,6 +325,23 @@ export class OrchestrateurCampagneService {
         );
         dernierMotifEchec =
           this.integrer(reponseMembres, resultats, anomalies) ?? dernierMotifEchec;
+
+        const reponseMarqueursIa = await this.executerIndicateur(
+          'gitlab.marqueurs_ia',
+          resolution.groupe.indicateursDesactives,
+          source.id,
+          () =>
+            this.facadeCommandes.interrogerMarqueursIa(
+              instance,
+              source.id,
+              source.idExterne,
+              this.extraireReglesMarqueursIa(),
+              source.refAuditee,
+            ),
+        );
+        dernierMotifEchec =
+          this.integrer(reponseMarqueursIa, resultats, anomalies) ?? dernierMotifEchec;
+        marqueursIa = reponseMarqueursIa.resultatBrut;
       } else {
         const reponseViolations = await this.executerIndicateur(
           'sonar.violations',
@@ -414,6 +434,15 @@ export class OrchestrateurCampagneService {
       resultats.push({
         type: 'croise.activite_sans_qualite',
         ...ConnecteurCroiseUtils.calculerActiviteSansQualite(contributeurs, violations),
+      });
+    }
+    if (
+      !resolution.groupe.indicateursDesactives.includes('croise.ia_nouveau_code') &&
+      (marqueursIa !== undefined || couverture !== undefined || violations !== undefined)
+    ) {
+      resultats.push({
+        type: 'croise.ia_nouveau_code',
+        ...ConnecteurCroiseUtils.calculerIaNouveauCode(marqueursIa, couverture, violations),
       });
     }
 
@@ -664,5 +693,54 @@ export class OrchestrateurCampagneService {
       courant = courant[cle];
     }
     return courant;
+  }
+
+  /**
+   * Extrait le référentiel de règles de détection des marqueurs IA (`referentiels.reglesMarqueursIA`, F18), sans
+   * accès non sûr à la racine `unknown` (`referentiels` reste une donnée générique côté cœur natif, hors périmètre
+   * de l'Administration/Paramétrage, Phase 3/7). Toute entrée ne correspondant pas à la forme attendue est ignorée
+   * silencieusement plutôt que de faire échouer l'audit du projet.
+   * @returns Les règles valides du référentiel, tableau vide si absent ou malformé.
+   */
+  private extraireReglesMarqueursIa(): readonly RegleMarqueurIA[] {
+    const referentiels = this.donneesApplication.racine()?.referentiels;
+    if (!this.estObjetIndexable(referentiels)) {
+      return [];
+    }
+    const regles = referentiels['reglesMarqueursIA'];
+    if (!Array.isArray(regles)) {
+      return [];
+    }
+    const reglesValides: RegleMarqueurIA[] = [];
+    for (const regle of regles) {
+      const regleValide = this.validerRegleMarqueurIa(regle);
+      if (regleValide !== undefined) {
+        reglesValides.push(regleValide);
+      }
+    }
+    return reglesValides;
+  }
+
+  /**
+   * Valide qu'une entrée brute du référentiel de marqueurs IA correspond à la forme attendue de `RegleMarqueurIA`,
+   * sans assertion `as` non justifiée.
+   * @param valeur - Entrée brute du référentiel, de type `unknown`.
+   * @returns La règle validée, `undefined` si `valeur` ne correspond pas à la forme attendue.
+   */
+  private validerRegleMarqueurIa(valeur: unknown): RegleMarqueurIA | undefined {
+    if (!this.estObjetIndexable(valeur)) {
+      return undefined;
+    }
+    const { motif, typeCorrespondance, portee, nature, outil } = valeur;
+    if (
+      typeof motif !== 'string' ||
+      typeof outil !== 'string' ||
+      (typeCorrespondance !== 'exact' && typeCorrespondance !== 'motif') ||
+      (portee !== 'racine' && portee !== 'partout') ||
+      (nature !== 'fichier' && nature !== 'repertoire')
+    ) {
+      return undefined;
+    }
+    return { motif, typeCorrespondance, portee, nature, outil };
   }
 }

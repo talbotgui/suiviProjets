@@ -6,8 +6,9 @@
 //! Périmètre de l'incrément 1 : dix opérations d'interrogation des indicateurs GitLab/Sonar déterministes, sans
 //! heuristique à inventer, cf.
 //! `docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces`.
-//! `interrogerDependances`, `interrogerBranches` (usage F05, distinct de l'autocomplétion `interrogerBranches` de
-//! `connectivite.rs`, US-008) et `interrogerMarqueursIa` restent différées à un incrément ultérieur.
+//! `interrogerDependances` et `interrogerBranches` (usage F05, distinct de l'autocomplétion `interrogerBranches` de
+//! `connectivite.rs`, US-008) restent différées à un incrément ultérieur ; `interrogerMarqueursIa`, elle aussi
+//! différée à l'incrément 1, est livrée depuis l'incrément 7 (US-009, F18, RG-021).
 //!
 //! Chaque commande d'interrogation reçoit `sourceId` en paramètre explicite plutôt que de le déduire d'un contexte
 //! de fichier chargé (à la différence des commandes de `administration.rs`, qui reçoivent la racine complète du
@@ -34,12 +35,13 @@
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
 use crate::connecteurs::commun::{ErreurConnecteur, client_http};
+use crate::connecteurs::gitlab::RegleMarqueurIA;
 use crate::connecteurs::{gitlab, sonar};
 use crate::modele::racine::{
     DonneesRacine, Instance, ResultatBrouillonProjet, ResultatGitlabContributeurs,
-    ResultatGitlabMembres, ResultatGitlabMergeRequests, ResultatGitlabTailleDepot,
-    ResultatGitlabVitalite, ResultatSonarCouverture, ResultatSonarDette, ResultatSonarNcloc,
-    ResultatSonarNotes, ResultatSonarViolations, TypeInstance, Verdict,
+    ResultatGitlabMarqueursIa, ResultatGitlabMembres, ResultatGitlabMergeRequests,
+    ResultatGitlabTailleDepot, ResultatGitlabVitalite, ResultatSonarCouverture, ResultatSonarDette,
+    ResultatSonarNcloc, ResultatSonarNotes, ResultatSonarViolations, TypeInstance, Verdict,
 };
 use crate::persistance::audit;
 use crate::persistance::moteur;
@@ -53,7 +55,9 @@ fn credential_instance(
     etat: &EtatSession,
 ) -> Result<String, ErreurConnecteur> {
     etat.credential(&instance.id)
-        .ok_or(ErreurConnecteur::CredentialAbsent)
+        .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
+            message: "Aucun credential en mémoire pour cette instance".to_string(),
+        })
 }
 
 /// Interroge la vitalité d'un dépôt GitLab, c'est-à-dire la date du dernier commit sur la ref auditée (US-009,
@@ -85,7 +89,9 @@ pub(crate) async fn interroger_vitalite(
             .await
         }
         // Défense en profondeur : cette commande n'a de sens que pour une instance GitLab.
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -115,7 +121,9 @@ pub(crate) async fn interroger_taille_depot(
             )
             .await
         }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -146,7 +154,9 @@ pub(crate) async fn interroger_contributeurs(
             )
             .await
         }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -176,7 +186,9 @@ pub(crate) async fn interroger_merge_requests(
             )
             .await
         }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -206,7 +218,48 @@ pub(crate) async fn interroger_membres(
             )
             .await
         }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
+    }
+}
+
+/// Interroge les marqueurs d'outils IA détectés dans l'arborescence complète de la ref auditée d'un dépôt GitLab
+/// (US-009, F18, RG-021), par correspondance avec le référentiel `reglesMarqueursIA` transmis explicitement par
+/// l'appelant plutôt que lu depuis le fichier de données par cette commande elle-même : c'est l'Orchestrateur de
+/// campagne (UI), seul appelant prévu, qui connaît déjà `Referentiels.reglesMarqueursIA` via le Store d'état
+/// applicatif, sur le même principe que `sourceId`/`idExterne` pour les neuf autres commandes d'interrogation de
+/// ce module (cf. en-tête de module).
+///
+/// # Erreurs
+///
+/// Voir [`interroger_vitalite`].
+#[tauri::command]
+pub(crate) async fn interroger_marqueurs_ia(
+    instance: Instance,
+    source_id: String,
+    id_externe: String,
+    ref_auditee: Option<String>,
+    regles_marqueurs_ia: Vec<RegleMarqueurIA>,
+    etat: State<'_, EtatSession>,
+) -> Result<ResultatGitlabMarqueursIa, ErreurConnecteur> {
+    let credential = credential_instance(&instance, &etat)?;
+    match instance.type_instance {
+        TypeInstance::Gitlab => {
+            gitlab::interroger_marqueurs_ia(
+                &instance.url_base,
+                &credential,
+                &source_id,
+                &id_externe,
+                ref_auditee.as_deref(),
+                &regles_marqueurs_ia,
+                client_http(),
+            )
+            .await
+        }
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -236,7 +289,9 @@ pub(crate) async fn interroger_violations(
             .await
         }
         // Défense en profondeur : cette commande n'a de sens que pour une instance Sonar.
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -264,7 +319,9 @@ pub(crate) async fn interroger_dette(
             )
             .await
         }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -292,7 +349,9 @@ pub(crate) async fn interroger_couverture(
             )
             .await
         }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -320,7 +379,9 @@ pub(crate) async fn interroger_notes(
             )
             .await
         }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -348,7 +409,9 @@ pub(crate) async fn interroger_ncloc(
             )
             .await
         }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 
@@ -380,7 +443,9 @@ pub(crate) async fn interroger_derniere_analyse(
             )
             .await
         }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }
 

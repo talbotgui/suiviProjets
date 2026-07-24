@@ -1,0 +1,104 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+
+.brouillon {
+  &__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__erreur {
+    color: #b00020;
+    font-weight: bold;
+  }
+
+  &__vide {
+    color: #666;
+  }
+
+  &__actions-globales {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin: 1rem 0;
+  }
+
+  &__projets {
+    list-style: none;
+    padding: 0;
+  }
+
+  &__projet {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  &__projet-entete {
+    font-weight: bold;
+  }
+
+  &__aberrations {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+  }
+
+  &__aberration {
+    color: #b00020;
+    font-weight: bold;
+  }
+
+  &__ecarts {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+    color: #444;
+  }
+
+  &__projet-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  &__rapport-anomalies {
+    margin-top: 1.5rem;
+  }
+
+  &__anomalies {
+    list-style: none;
+    padding: 0;
+  }
+
+  &__anomalie {
+    border: 1px solid #eec;
+    background: #fffaf0;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  &__anomalie-entete {
+    margin: 0 0 0.25rem;
+  }
+
+  &__anomalie-action {
+    color: #444;
+    margin: 0 0 0.25rem;
+  }
+
+  &__anomalie-projet {
+    margin-right: 0.5rem;
+
+    &::after {
+      content: ',';
+    }
+
+    &:last-child::after {
+      content: '';
+    }
+  }
+}

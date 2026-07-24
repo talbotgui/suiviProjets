@@ -9,12 +9,14 @@
 // structure déjà fixée en Phase 0 (cf. README.md de ce dossier), aux côtés du futur Orchestrateur de campagne, son
 // seul appelant prévu (incrément ultérieur).
 //
-// Périmètre de cet incrément : `calculerFraicheurSonar` et `calculerActiviteSansQualite`, seuls des trois calculs
-// du catalogue figé (`docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`) intégralement
-// calculables à partir des indicateurs déjà construits aux incréments 1 et 3 (le second nécessitant l'exposition
-// de la date de dernière analyse Sonar, ajoutée à cet incrément via `interrogerDerniereAnalyse`).
-// `calculerIaNouveauCode` reste différé : il dépend de `gitlab.marqueurs_ia`, dont la production reste
-// elle-même différée (heuristique de détection non spécifiée par la documentation source).
+// Périmètre des incréments 3 et 7 : les trois calculs du catalogue figé
+// (`docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`) sont désormais tous livrés.
+// `calculerFraicheurSonar` et `calculerActiviteSansQualite` datent de l'incrément 3 (le second nécessitant
+// l'exposition de la date de dernière analyse Sonar via `interrogerDerniereAnalyse`). `calculerIaNouveauCode`
+// (incrément 7) dépendait de `gitlab.marqueurs_ia`, produit à ce même incrément par une opération dédiée du
+// Connecteur GitLab (correspondance avec le référentiel paramétrable `reglesMarqueursIA`, F18) : la documentation
+// source spécifie en réalité précisément ce mécanisme (motif, type de correspondance, portée, nature),
+// contrairement à ce que les incréments précédents avaient supposé.
 //
 // Chaque fonction reste pure (résultat ne dépendant que de ses paramètres, RG-011 : aucun verdict n'y est jamais
 // calculé, seul le constat brut structurel — présence des sources, date d'une éventuelle analyse) ; les seuils
@@ -23,6 +25,8 @@
 // générique par décision de modélisation actée dès la Phase 1.
 import type {
   ResultatGitlabContributeurs,
+  ResultatGitlabMarqueursIa,
+  ResultatSonarCouverture,
   ResultatSonarViolations,
 } from '../../sansetat/commandes/types-facade';
 
@@ -42,6 +46,19 @@ export interface ResultatCroiseActiviteSansQualite {
   readonly nombreCommits: number;
   readonly nouvellesViolations: number;
   readonly evaluable: boolean;
+}
+
+/**
+ * Constat brut de `croise.ia_nouveau_code` (mirroir de `ResultatCroiseIaNouveauCode` côté cœur natif, Phase 5
+ * incrément 7) : simple juxtaposition des séries, aucun verdict automatique (RG-011), cf.
+ * `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`.
+ */
+export interface ResultatCroiseIaNouveauCode {
+  readonly marqueursPresents: boolean;
+  readonly outilsDetectes: readonly string[];
+  readonly couvertureNouveauCode?: number;
+  readonly nouvellesViolations?: number;
+  readonly duplicationNouveauCode?: number;
 }
 
 /**
@@ -100,6 +117,34 @@ export class ConnecteurCroiseUtils {
       nombreCommits,
       nouvellesViolations: violations?.nouvellesViolations ?? 0,
       evaluable: contributeurs !== undefined && violations !== undefined,
+    };
+  }
+
+  /**
+   * Calcule le constat brut d'IA et qualité du nouveau code (`croise.ia_nouveau_code`) à partir des marqueurs
+   * d'outils IA détectés dans l'arborescence (`gitlab.marqueurs_ia`) et des métriques de nouveau code Sonar
+   * (`sonar.couverture.couvertureNouveauCode`/`duplicationNouveauCode`, `sonar.violations.nouvellesViolations`).
+   * Simple juxtaposition de séries : aucun verdict n'est calculé ici (RG-011), la présentation par projet à
+   * politique IA autorisée relevant exclusivement de l'écran de restitution (Phase 6, F12).
+   * @param marqueursIa - Constat brut des marqueurs IA détectés, absent si cet indicateur n'a pas pu être obtenu.
+   * @param couverture - Constat brut de couverture Sonar, absent si cet indicateur n'a pas pu être obtenu.
+   * @param violations - Constat brut des violations Sonar, absent si cet indicateur n'a pas pu être obtenu.
+   * @returns Le constat brut d'IA et qualité du nouveau code.
+   */
+  public static calculerIaNouveauCode(
+    marqueursIa: ResultatGitlabMarqueursIa | undefined,
+    couverture: ResultatSonarCouverture | undefined,
+    violations: ResultatSonarViolations | undefined,
+  ): ResultatCroiseIaNouveauCode {
+    const outilsDetectes = Array.from(
+      new Set((marqueursIa?.marqueurs ?? []).map((marqueur) => marqueur.outil)),
+    );
+    return {
+      marqueursPresents: outilsDetectes.length > 0,
+      outilsDetectes,
+      couvertureNouveauCode: couverture?.couvertureNouveauCode,
+      nouvellesViolations: violations?.nouvellesViolations,
+      duplicationNouveauCode: couverture?.duplicationNouveauCode,
     };
   }
 }

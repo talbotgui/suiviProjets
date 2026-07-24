@@ -1,0 +1,137 @@
+<section class="brouillon">
+  <header class="brouillon__entete">
+    <h2>Brouillon de campagne</h2>
+  </header>
+
+  @if (messageErreur !== null) {
+    <p class="brouillon__erreur" role="alert">{{ messageErreur }}</p>
+  }
+
+  @if (!brouillonPresent()) {
+    <p class="brouillon__vide">
+      Aucun brouillon en attente : vous pouvez constituer une nouvelle campagne.
+    </p>
+  } @else {
+    <div class="brouillon__actions-globales">
+      <label>
+        <input type="checkbox" [checked]="estToutSelectionne()" (change)="basculerTout()" />
+        Tout sélectionner
+      </label>
+      <button type="button" [disabled]="enCours" (click)="demanderIntegrerTout()">
+        Intégrer tout
+      </button>
+      <button
+        type="button"
+        [disabled]="enCours || selectionProjetIds.size === 0"
+        (click)="demanderIntegrerSelection()"
+      >
+        Intégrer la sélection
+      </button>
+      <input
+        type="text"
+        placeholder="Motif de rejet (optionnel)"
+        [(ngModel)]="motifRejet"
+        [disabled]="enCours"
+      />
+      <button
+        type="button"
+        [disabled]="enCours || selectionProjetIds.size === 0"
+        (click)="demanderRejeterSelection()"
+      >
+        Rejeter la sélection
+      </button>
+    </div>
+
+    <ul class="brouillon__projets">
+      @for (entree of entrees(); track entree.projetId) {
+        <li class="brouillon__projet">
+          <label class="brouillon__projet-entete">
+            <input
+              type="checkbox"
+              [checked]="estSelectionne(entree.projetId)"
+              (change)="basculerSelection(entree.projetId)"
+            />
+            {{ nomProjet(entree.projetId) }}
+          </label>
+
+          @if (aberrations(entree).length > 0) {
+            <ul class="brouillon__aberrations">
+              @for (aberration of aberrations(entree); track aberration.indicateur) {
+                <li class="brouillon__aberration" role="alert">
+                  Valeur aberrante — {{ aberration.indicateur }} : {{ aberration.ancienneValeur }} →
+                  {{ aberration.nouvelleValeur }}
+                </li>
+              }
+            </ul>
+          }
+
+          @if (ecarts(entree).length > 0) {
+            <ul class="brouillon__ecarts">
+              @for (ecart of ecarts(entree); track ecart.indicateur + ecart.libelle) {
+                <li class="brouillon__ecart">
+                  {{ ecart.libelle }} : {{ ecart.ancienneValeur }} → {{ ecart.nouvelleValeur }}
+                </li>
+              }
+            </ul>
+          }
+
+          <div class="brouillon__projet-actions">
+            <button
+              type="button"
+              [disabled]="enCours"
+              (click)="demanderIntegrerUnique(entree.projetId)"
+            >
+              Intégrer
+            </button>
+            <button
+              type="button"
+              [disabled]="enCours"
+              (click)="demanderRejeterUnique(entree.projetId)"
+            >
+              Rejeter
+            </button>
+          </div>
+        </li>
+      } @empty {
+        <li class="brouillon__vide">Toutes les entrées de ce brouillon ont déjà été traitées.</li>
+      }
+    </ul>
+
+    @if (actionEnAttente !== null) {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer cette décision."
+        (confirmee)="confirmerAction($event)"
+        (annulee)="annulerAction()"
+      />
+    }
+
+    <section class="brouillon__rapport-anomalies">
+      <h3>Rapport d'anomalies techniques</h3>
+      @if (anomalies().length === 0) {
+        <p class="brouillon__vide">Aucune anomalie technique pour cette campagne.</p>
+      } @else {
+        <ul class="brouillon__anomalies">
+          @for (groupe of anomalies(); track groupe.categorie + (groupe.instanceId ?? '')) {
+            <li class="brouillon__anomalie">
+              <p class="brouillon__anomalie-entete">
+                <strong>{{ groupe.libelleCategorie }}</strong>
+                — {{ groupe.instanceNom }} ({{ groupe.projets.length }} projet(s))
+              </p>
+              <p class="brouillon__anomalie-action">{{ groupe.actionSuggeree }}</p>
+              <details class="brouillon__anomalie-message">
+                <summary>Message technique</summary>
+                <p>{{ groupe.message }}</p>
+              </details>
+              <p class="brouillon__anomalie-projets">
+                Projets concernés :
+                @for (projet of groupe.projets; track projet.projetId) {
+                  <span class="brouillon__anomalie-projet">{{ projet.projetNom }}</span>
+                }
+              </p>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</section>

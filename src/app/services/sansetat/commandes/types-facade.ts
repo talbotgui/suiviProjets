@@ -10,8 +10,8 @@
 // Périmètre de la Phase 5, incrément 1 : les dix charges utiles et résultats typés des opérations d'interrogation
 // GitLab/Sonar ne nécessitant qu'un appel API déterministe (`interrogerVitalite`, `interrogerTailleDepot`,
 // `interrogerContributeurs`, `interrogerMergeRequests`, `interrogerMembres`, `interrogerViolations`,
-// `interrogerDette`, `interrogerCouverture`, `interrogerNotes`, `interrogerNcloc`). `interrogerDependances` et
-// `interrogerMarqueursIa` restent différées à un incrément ultérieur.
+// `interrogerDette`, `interrogerCouverture`, `interrogerNotes`, `interrogerNcloc`). `interrogerDependances` reste
+// différée à un incrément ultérieur. `interrogerMarqueursIa` est livrée à l'incrément 7 (cf. plus bas).
 
 /**
  * Type d'instance externe déclarée par un groupe (mirroir de `TypeInstance` côté cœur natif).
@@ -53,11 +53,16 @@ export type CategorieErreurConnecteur =
   | 'credentialAbsent';
 
 /**
- * Anomalie typée d'un test de connectivité (US-004), mirroir de `ErreurConnecteur` côté cœur natif.
+ * Anomalie typée d'un test de connectivité (US-004) ou d'un audit (Phase 5), mirroir de `ErreurConnecteur` côté
+ * cœur natif. Le champ `message` (Phase 5, incrément 6, F08/RG-021) porte un diagnostic technique structurel
+ * (statut HTTP, texte d'erreur réseau ou de désérialisation) : il ne contient jamais de credential ni de jeton,
+ * conformément à `docs/02_documentation/15_normesSecurite.md#journalisation-des-événements-sensibles`.
  */
 export interface ErreurConnecteur {
   /** Catégorie de l'anomalie. */
   readonly type: CategorieErreurConnecteur;
+  /** Message technique brut, destiné à un affichage repliable (F08). */
+  readonly message: string;
 }
 
 /**
@@ -254,12 +259,16 @@ export type ResultatInterrogationDette =
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**
- * Constat brut de `sonar.couverture` (mirroir de `ResultatSonarCouverture` côté cœur natif).
+ * Constat brut de `sonar.couverture` (mirroir de `ResultatSonarCouverture` côté cœur natif). `duplicationNouveauCode`
+ * (`new_duplicated_lines_density`, Phase 5 incrément 7) est absent si Sonar ne retourne pas cette métrique pour le
+ * projet (jamais analysé en incrémental, ou instance ne l'exposant pas) : consommé par
+ * `ConnecteurCroiseUtils.calculerIaNouveauCode`, jamais par une anomalie.
  */
 export interface ResultatSonarCouverture {
   readonly sourceId: string;
   readonly couverture: number;
   readonly couvertureNouveauCode: number;
+  readonly duplicationNouveauCode?: number;
 }
 
 /**
@@ -316,4 +325,64 @@ export type ResultatInterrogationNcloc =
  */
 export type ResultatInterrogationDerniereAnalyse =
   | { readonly type: 'succes'; readonly resultat: string | null }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * Type de correspondance d'une règle de détection de marqueur IA (F18), mirroir de `TypeCorrespondanceMarqueur`
+ * côté cœur natif : `exact` (égalité stricte du nom) ou `motif` (glob simple, seul `*` étant spécial).
+ */
+export type TypeCorrespondanceMarqueur = 'exact' | 'motif';
+
+/**
+ * Portée d'une règle de détection de marqueur IA (F18) : `racine` (uniquement à la racine du dépôt) ou `partout`
+ * (à toute profondeur de l'arborescence).
+ */
+export type PorteeMarqueur = 'racine' | 'partout';
+
+/**
+ * Nature d'une entrée de l'arborescence ciblée par une règle de détection de marqueur IA (F18) : `fichier`
+ * (`blob` côté API GitLab) ou `repertoire` (`tree`).
+ */
+export type NatureMarqueur = 'fichier' | 'repertoire';
+
+/**
+ * Règle de détection d'un marqueur d'outil IA (F18), élément de `referentiels.reglesMarqueursIA`, mirroir de
+ * `RegleMarqueurIA` côté cœur natif. Transmise telle quelle en paramètre de `interrogerMarqueursIa` : le cœur
+ * natif ne persiste jamais ce référentiel lui-même (`Referentiels.reglesMarqueursIA` reste une donnée générique
+ * côté cœur natif, hors périmètre de l'Administration/Paramétrage, Phase 3/7), seule l'interface le détient.
+ */
+export interface RegleMarqueurIA {
+  readonly motif: string;
+  readonly typeCorrespondance: TypeCorrespondanceMarqueur;
+  readonly portee: PorteeMarqueur;
+  readonly nature: NatureMarqueur;
+  readonly outil: string;
+}
+
+/**
+ * Marqueur d'outil IA détecté dans l'arborescence (mirroir de `Marqueur` côté cœur natif).
+ */
+export interface Marqueur {
+  readonly chemin: string;
+  readonly nature: string;
+  readonly outil: string;
+}
+
+/**
+ * Constat brut de `gitlab.marqueurs_ia` (mirroir de `ResultatGitlabMarqueursIa` côté cœur natif, Phase 5
+ * incrément 7).
+ */
+export interface ResultatGitlabMarqueursIa {
+  readonly sourceId: string;
+  readonly refEffective: string;
+  readonly shaTete: string;
+  readonly marqueurs: readonly Marqueur[];
+}
+
+/**
+ * Résultat typé de `FacadeCommandesService.interrogerMarqueursIa` (US-009, F18, Phase 5 incrément 7), sur le
+ * modèle de {@link ResultatInterrogationBranches}.
+ */
+export type ResultatInterrogationMarqueursIa =
+  | { readonly type: 'succes'; readonly resultat: ResultatGitlabMarqueursIa }
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };

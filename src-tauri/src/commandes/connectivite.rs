@@ -79,9 +79,11 @@ pub(crate) async fn interroger_branches(
     recherche: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<Vec<String>, ErreurConnecteur> {
-    let credential = etat
-        .credential(&instance.id)
-        .ok_or(ErreurConnecteur::CredentialAbsent)?;
+    let credential =
+        etat.credential(&instance.id)
+            .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
+                message: "Aucun credential en mémoire pour cette instance".to_string(),
+            })?;
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_branches(
@@ -95,6 +97,8 @@ pub(crate) async fn interroger_branches(
         }
         // Défense en profondeur : une source `projetSonar` n'a pas de branches, l'UI ne devrait jamais invoquer
         // cette commande pour une instance Sonar.
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue),
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
     }
 }

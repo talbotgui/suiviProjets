@@ -17,7 +17,7 @@
 // (RG-002, mot de passe incorrect) n'est aujourd'hui pas re-signalé après cette navigation — limitation connue, à
 // traiter par un incrément ultérieur (écran Brouillon).
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import type { Groupe } from '../../../services/avecetat/etat/types-donnees';
@@ -38,7 +38,7 @@ const ANCIEN_JOURS_PAR_DEFAUT = 30;
  */
 @Component({
   selector: 'app-constitution-campagne',
-  imports: [SqmConfirmationMotDePasseComponent],
+  imports: [SqmConfirmationMotDePasseComponent, RouterLink],
   templateUrl: './constitution-campagne.component.html',
   styleUrl: './constitution-campagne.component.scss',
 })

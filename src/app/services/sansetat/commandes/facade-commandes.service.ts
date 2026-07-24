@@ -15,7 +15,9 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   ErreurConnecteur,
   Instance,
+  RegleMarqueurIA,
   ResultatGitlabContributeurs,
+  ResultatGitlabMarqueursIa,
   ResultatGitlabMembres,
   ResultatGitlabMergeRequests,
   ResultatGitlabTailleDepot,
@@ -25,6 +27,7 @@ import type {
   ResultatInterrogationCouverture,
   ResultatInterrogationDerniereAnalyse,
   ResultatInterrogationDette,
+  ResultatInterrogationMarqueursIa,
   ResultatInterrogationMembres,
   ResultatInterrogationMergeRequests,
   ResultatInterrogationNcloc,
@@ -71,7 +74,13 @@ export class FacadeCommandesService {
       if (this.estErreurConnecteur(erreur)) {
         return { type: 'echec', anomalie: erreur };
       }
-      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
     }
   }
 
@@ -110,7 +119,13 @@ export class FacadeCommandesService {
       if (this.estErreurConnecteur(erreur)) {
         return { type: 'echec', anomalie: erreur };
       }
-      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
     }
   }
 
@@ -228,6 +243,51 @@ export class FacadeCommandesService {
       idExterne,
       refAuditee,
     );
+  }
+
+  /**
+   * Interroge les marqueurs d'outils IA détectés dans l'arborescence d'un dépôt GitLab (US-009, F18, Phase 5
+   * incrément 7), par correspondance avec le référentiel `reglesMarqueursIA` transmis par l'appelant (le cœur
+   * natif ne le persiste jamais lui-même).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param reglesMarqueursIA - Référentiel de règles de détection (`referentiels.reglesMarqueursIA`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerMarqueursIa(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    reglesMarqueursIA: readonly RegleMarqueurIA[],
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationMarqueursIa> {
+    try {
+      // Nom de clé IPC `reglesMarqueursIa` (et non `reglesMarqueursIA`) : la conversion snake_case -> camelCase
+      // appliquée par Tauri au paramètre Rust `regles_marqueurs_ia` ne capitalise que la première lettre de
+      // chaque segment (« Ia », pas « IA »), comme déjà constaté pour `avec_mr` -> `avecMr` (Phase 5, incrément 1,
+      // cf. commentaire de `Branche.avec_mr` dans `src-tauri/src/modele/racine.rs`).
+      const resultat = await invoke<ResultatGitlabMarqueursIa>('interroger_marqueurs_ia', {
+        instance,
+        sourceId,
+        idExterne,
+        reglesMarqueursIa: reglesMarqueursIA,
+        refAuditee,
+      });
+      return { type: 'succes', resultat };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
+    }
   }
 
   /**
@@ -354,7 +414,13 @@ export class FacadeCommandesService {
       if (this.estErreurConnecteur(erreur)) {
         return { type: 'echec', anomalie: erreur };
       }
-      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
     }
   }
 
@@ -390,7 +456,13 @@ export class FacadeCommandesService {
       if (this.estErreurConnecteur(erreur)) {
         return { type: 'echec', anomalie: erreur };
       }
-      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
     }
   }
 
@@ -423,7 +495,13 @@ export class FacadeCommandesService {
       if (this.estErreurConnecteur(erreur)) {
         return { type: 'echec', anomalie: erreur };
       }
-      return { type: 'echec', anomalie: { type: 'reponseInattendue' } };
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
     }
   }
 
@@ -434,18 +512,24 @@ export class FacadeCommandesService {
    * @returns `true` si `valeur` correspond à la forme attendue d'une {@link ErreurConnecteur}.
    */
   private estErreurConnecteur(valeur: unknown): valeur is ErreurConnecteur {
-    if (typeof valeur !== 'object' || valeur === null || !('type' in valeur)) {
+    if (
+      typeof valeur !== 'object' ||
+      valeur === null ||
+      !('type' in valeur) ||
+      !('message' in valeur)
+    ) {
       return false;
     }
     const categorie: unknown = valeur.type;
     return (
-      categorie === 'authentificationRefusee' ||
-      categorie === 'refIntrouvable' ||
-      categorie === 'instanceInjoignable' ||
-      categorie === 'delaiDepasse' ||
-      categorie === 'reponseInattendue' ||
-      categorie === 'droitsInsuffisants' ||
-      categorie === 'credentialAbsent'
+      typeof valeur.message === 'string' &&
+      (categorie === 'authentificationRefusee' ||
+        categorie === 'refIntrouvable' ||
+        categorie === 'instanceInjoignable' ||
+        categorie === 'delaiDepasse' ||
+        categorie === 'reponseInattendue' ||
+        categorie === 'droitsInsuffisants' ||
+        categorie === 'credentialAbsent')
     );
   }
 }

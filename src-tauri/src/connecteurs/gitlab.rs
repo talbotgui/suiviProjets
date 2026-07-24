@@ -6,9 +6,12 @@
 //! (`docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces`) —
 //! `interrogerVitalite`, `interrogerTailleDepot`, `interrogerContributeurs`, `interrogerMergeRequests`,
 //! `interrogerMembres` — chacune ne nécessitant qu'un appel à une API GitLab déterministe, sans heuristique à
-//! inventer. `interrogerDependances` (parseur de manifestes multi-écosystèmes) et `interrogerMarqueursIa`
-//! (heuristique de détection, à articuler avec `Referentiels.reglesMarqueursIa`) restent hors périmètre, différées
-//! à un incrément ultérieur, faute de spécification suffisante dans la documentation source à ce stade.
+//! inventer. `interrogerDependances` (parseur de manifestes multi-écosystèmes) reste hors périmètre, différée à un
+//! incrément ultérieur, faute de spécification suffisante dans la documentation source à ce stade.
+//! `interrogerMarqueursIa` (US-009, F18, RG-021), différée à la Phase 5, incrément 1, est livrée depuis l'incrément
+//! 7 : détection des marqueurs d'outils IA dans l'arborescence complète de la ref auditée, par correspondance avec
+//! le référentiel `Referentiels.reglesMarqueursIA` transmis en paramètre (jamais lu depuis le fichier de données
+//! par le Connecteur lui-même).
 //!
 //! Décision arbitraire (cf. rapport de développement de cette phase) : le délai de requête reste le délai fixe
 //! partagé de `commun.rs` (`client_http()`) plutôt que le délai configurable envisagé par
@@ -17,10 +20,11 @@
 
 use super::commun::{ErreurConnecteur, VerdictConnectivite, erreur_depuis_reqwest};
 use crate::modele::racine::{
-    Contributeur, MembreGitlab, MergeRequestOuverte, ResultatGitlabContributeurs,
-    ResultatGitlabMembres, ResultatGitlabMergeRequests, ResultatGitlabTailleDepot,
-    ResultatGitlabVitalite,
+    Contributeur, Marqueur, MembreGitlab, MergeRequestOuverte, ResultatGitlabContributeurs,
+    ResultatGitlabMarqueursIa, ResultatGitlabMembres, ResultatGitlabMergeRequests,
+    ResultatGitlabTailleDepot, ResultatGitlabVitalite,
 };
+use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -61,19 +65,26 @@ pub(crate) async fn tester_connectivite(
 
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
 
-    let corps = reponse
-        .json::<ReponseTokenSelf>()
-        .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+    let corps = reponse.json::<ReponseTokenSelf>().await.map_err(|erreur| {
+        ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        }
+    })?;
     let portee_excessive = corps.scopes.iter().any(|scope| scope != PORTEE_MINIMALE);
     Ok(VerdictConnectivite { portee_excessive })
 }
@@ -125,19 +136,27 @@ pub(crate) async fn interroger_branches(
 
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
 
     let corps = reponse
         .json::<Vec<ReponseBranche>>()
         .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
     Ok(corps.into_iter().map(|branche| branche.name).collect())
 }
 
@@ -157,6 +176,242 @@ const MAX_PAGES_CONTRIBUTEURS: u32 = 20;
 /// `parametres.audit.fenetreContributeursJours` explicite, aucune règle de gestion consultée ne fixant cette
 /// valeur (décision arbitraire, cf. rapport de développement de cette phase).
 const FENETRE_CONTRIBUTEURS_JOURS: u32 = 90;
+
+/// Nombre maximal de pages parcourues lors de la récupération de l'arborescence complète d'un dépôt
+/// (`interrogerMarqueursIa`) : borne de sécurité arbitraire (cf. rapport de développement de cette phase), sur le
+/// même principe que [`MAX_PAGES_CONTRIBUTEURS`] ; au-delà, un dépôt à très fort volume de fichiers verrait sa
+/// détection de marqueurs IA limitée aux premières entrées plutôt que de générer un nombre d'appels illimité.
+const MAX_PAGES_ARBORESCENCE: u32 = 50;
+
+/// Type de correspondance d'une règle de détection de marqueur IA (`Referentiels.reglesMarqueursIA`), cf.
+/// `docs/01_besoin/Specification.md#518-f18--politique-ia`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum TypeCorrespondanceMarqueur {
+    /// Égalité stricte (sensible à la casse) entre le basename de l'entrée et le motif de la règle.
+    Exact,
+    /// Motif de type glob simple où `*` est le seul caractère spécial.
+    Motif,
+}
+
+/// Portée d'une règle de détection de marqueur IA : profondeur de l'arborescence à laquelle elle s'applique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum PorteeMarqueur {
+    /// La règle ne s'applique qu'aux entrées directement à la racine du dépôt (aucun `/` dans leur chemin).
+    Racine,
+    /// La règle s'applique à toute profondeur de l'arborescence.
+    Partout,
+}
+
+/// Nature d'une entrée de l'arborescence GitLab à laquelle s'applique une règle de détection de marqueur IA, ainsi
+/// que du [`Marqueur`] produit en sortie (`type: "blob"` = fichier, `type: "tree"` = répertoire).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum NatureMarqueur {
+    /// Entrée de type `blob` (fichier) de l'API GitLab.
+    Fichier,
+    /// Entrée de type `tree` (répertoire) de l'API GitLab.
+    Repertoire,
+}
+
+impl NatureMarqueur {
+    /// Traduit le discriminant `type` (`"blob"` | `"tree"`) d'une entrée d'arborescence GitLab en [`NatureMarqueur`],
+    /// `None` pour toute autre valeur (ex. `"commit"`, sous-module Git), ignorée par l'algorithme de correspondance.
+    fn depuis_type_gitlab(type_entree: &str) -> Option<Self> {
+        match type_entree {
+            "blob" => Some(Self::Fichier),
+            "tree" => Some(Self::Repertoire),
+            _ => None,
+        }
+    }
+
+    /// Représentation `String` attendue par [`Marqueur::nature`] (schéma déjà figé, `docs/01_besoin/exemple-donnees.json`).
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Fichier => "fichier",
+            Self::Repertoire => "repertoire",
+        }
+    }
+}
+
+/// Règle de détection d'un marqueur d'outil IA (`Referentiels.reglesMarqueursIA`), reçue en paramètre de
+/// `interroger_marqueurs_ia` : jamais persistée telle quelle par le cœur natif (la persistance du référentiel
+/// reste `Vec<serde_json::Value>` dans `crate::modele::racine::Referentiels`, cf. Phase 7, hors périmètre), donc
+/// `Deserialize` uniquement.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RegleMarqueurIA {
+    /// Motif à comparer au basename de l'entrée (dernier segment du chemin, séparateur `/`).
+    pub(crate) motif: String,
+    /// Type de correspondance appliqué au `motif` ci-dessus.
+    pub(crate) type_correspondance: TypeCorrespondanceMarqueur,
+    /// Profondeur de l'arborescence à laquelle la règle s'applique.
+    pub(crate) portee: PorteeMarqueur,
+    /// Nature (fichier/répertoire) des entrées auxquelles la règle s'applique.
+    pub(crate) nature: NatureMarqueur,
+    /// Outil IA signalé par cette règle lorsqu'elle correspond (ex. `"claude"`, `"aider"`).
+    pub(crate) outil: String,
+}
+
+/// Entrée de l'arborescence d'un dépôt GitLab (`GET .../repository/tree`), réduite aux champs exploités par
+/// `interroger_marqueurs_ia`.
+#[derive(Debug, Deserialize)]
+struct ReponseEntreeArborescence {
+    /// Chemin complet de l'entrée, relatif à la racine du dépôt (jamais de `/` en tête).
+    path: String,
+    /// Discriminant `"blob"` (fichier) ou `"tree"` (répertoire) de l'API GitLab.
+    #[serde(rename = "type")]
+    type_entree: String,
+}
+
+/// Basename d'un chemin d'arborescence (dernier segment, séparateur `/`), tel qu'exigé par l'algorithme de
+/// correspondance de `interroger_marqueurs_ia` (cf. en-tête de module).
+fn basename(chemin: &str) -> &str {
+    chemin.rsplit('/').next().unwrap_or(chemin)
+}
+
+/// Construit une expression régulière à partir d'un motif de type glob simple où `*` est le seul caractère
+/// spécial : chaque segment séparé par `*` est échappé littéralement (`regex::escape`), les segments sont
+/// rejoints par `.*`, puis le tout est ancré (`^...$`), sensible à la casse — algorithme figé (cf. compte-rendu de
+/// développement de cette phase), à ne pas réinterpréter.
+fn regex_depuis_motif_glob(motif: &str) -> Result<Regex, ErreurConnecteur> {
+    let motif_regex: String = motif
+        .split('*')
+        .map(regex::escape)
+        .collect::<Vec<_>>()
+        .join(".*");
+    Regex::new(&format!("^{motif_regex}$")).map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+        message: format!("Motif de marqueur IA invalide (« {motif} ») : {erreur}"),
+    })
+}
+
+/// Applique l'algorithme de correspondance de `interroger_marqueurs_ia` (US-009, F18, RG-021) à une arborescence
+/// déjà récupérée : pour chaque entrée et chaque règle, filtre par nature puis par portée, compare le basename de
+/// l'entrée au motif de la règle selon son type de correspondance, et produit un [`Marqueur`] par couple
+/// entrée/règle correspondante — pas de déduplication supplémentaire (algorithme figé, cf. en-tête de module).
+fn detecter_marqueurs(
+    entrees: &[ReponseEntreeArborescence],
+    regles: &[RegleMarqueurIA],
+) -> Result<Vec<Marqueur>, ErreurConnecteur> {
+    // Motifs de type "motif" (glob) précompilés une seule fois, alignés par index sur `regles`, plutôt que
+    // recompilés à chaque entrée de l'arborescence.
+    let motifs_compiles: Vec<Option<Regex>> = regles
+        .iter()
+        .map(|regle| match regle.type_correspondance {
+            TypeCorrespondanceMarqueur::Motif => regex_depuis_motif_glob(&regle.motif).map(Some),
+            TypeCorrespondanceMarqueur::Exact => Ok(None),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut marqueurs = Vec::new();
+    for entree in entrees {
+        let Some(nature_entree) = NatureMarqueur::depuis_type_gitlab(&entree.type_entree) else {
+            continue;
+        };
+        let nom = basename(&entree.path);
+
+        for (regle, motif_compile) in regles.iter().zip(&motifs_compiles) {
+            if regle.nature != nature_entree {
+                continue;
+            }
+            if regle.portee == PorteeMarqueur::Racine && entree.path.contains('/') {
+                continue;
+            }
+            let correspond = match motif_compile {
+                Some(regex) => regex.is_match(nom),
+                None => nom == regle.motif,
+            };
+            if correspond {
+                marqueurs.push(Marqueur {
+                    chemin: entree.path.clone(),
+                    nature: nature_entree.as_str().to_string(),
+                    outil: regle.outil.clone(),
+                });
+            }
+        }
+    }
+    Ok(marqueurs)
+}
+
+/// Interroge les marqueurs d'outils IA détectés dans l'arborescence complète de la ref auditée d'un dépôt GitLab
+/// (US-009, F18, RG-021), par correspondance avec le référentiel `regles` (`Referentiels.reglesMarqueursIA`)
+/// transmis par l'appelant : récupère l'arborescence complète, paginée (`recursive=true`), jusqu'à épuisement ou
+/// [`MAX_PAGES_ARBORESCENCE`], puis applique [`detecter_marqueurs`].
+///
+/// # Erreurs
+///
+/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux appels de pagination de l'arborescence.
+/// [`ErreurConnecteur::ReponseInattendue`] également si une règle `motif` porte un motif glob invalide (cas
+/// resté théorique : tout motif littéral échappé produit une expression régulière valide).
+pub(crate) async fn interroger_marqueurs_ia(
+    url_base: &str,
+    credential: &str,
+    source_id: &str,
+    id_externe: &str,
+    ref_auditee: Option<&str>,
+    regles: &[RegleMarqueurIA],
+    client: &reqwest::Client,
+) -> Result<ResultatGitlabMarqueursIa, ErreurConnecteur> {
+    let resolue =
+        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+
+    let mut entrees = Vec::new();
+    for page in 1..=MAX_PAGES_ARBORESCENCE {
+        let url = format!(
+            "{}/api/v4/projects/{}/repository/tree",
+            url_base.trim_end_matches('/'),
+            id_externe
+        );
+        let reponse = client
+            .get(url)
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("ref", resolue.ref_effective.as_str()),
+                ("recursive", "true"),
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        let page_entrees = reponse
+            .json::<Vec<ReponseEntreeArborescence>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_entrees.is_empty() {
+            break;
+        }
+        entrees.extend(page_entrees);
+    }
+
+    let marqueurs = detecter_marqueurs(&entrees, regles)?;
+
+    Ok(ResultatGitlabMarqueursIa {
+        source_id: source_id.to_string(),
+        ref_effective: resolue.ref_effective,
+        sha_tete: resolue.sha_tete,
+        marqueurs,
+    })
+}
 
 /// Ref effectivement auditée et SHA du commit de tête associé, résolus une fois par appel d'indicateur GitLab
 /// (traçabilité et reproductibilité, cf. `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`
@@ -208,9 +463,13 @@ fn url_commit_ref(
         url_base.trim_end_matches('/'),
         id_externe
     ))
-    .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+    .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+        message: erreur.to_string(),
+    })?;
     url.path_segments_mut()
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?
+        .map_err(|_| ErreurConnecteur::ReponseInattendue {
+            message: "URL de base non segmentable (schéma opaque)".to_string(),
+        })?
         .push(ref_effective);
     Ok(url)
 }
@@ -248,20 +507,30 @@ async fn resoudre_ref_effective(
                 .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
             let statut = reponse.status();
             if statut.as_u16() == 401 {
-                return Err(ErreurConnecteur::AuthentificationRefusee);
+                return Err(ErreurConnecteur::AuthentificationRefusee {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
             }
             if statut.as_u16() == 403 {
-                return Err(ErreurConnecteur::DroitsInsuffisants);
+                return Err(ErreurConnecteur::DroitsInsuffisants {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
             }
             if !statut.is_success() {
-                return Err(ErreurConnecteur::ReponseInattendue);
+                return Err(ErreurConnecteur::ReponseInattendue {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
             }
             reponse
                 .json::<ReponseProjet>()
                 .await
-                .map_err(|_| ErreurConnecteur::ReponseInattendue)?
+                .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                    message: erreur.to_string(),
+                })?
                 .default_branch
-                .ok_or(ErreurConnecteur::ReponseInattendue)?
+                .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
+                    message: "Champ default_branch absent de la réponse".to_string(),
+                })?
         }
     };
 
@@ -274,21 +543,30 @@ async fn resoudre_ref_effective(
         .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 404 {
-        return Err(ErreurConnecteur::RefIntrouvable);
+        return Err(ErreurConnecteur::RefIntrouvable {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
-    let commit = reponse
-        .json::<ReponseCommit>()
-        .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+    let commit = reponse.json::<ReponseCommit>().await.map_err(|erreur| {
+        ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        }
+    })?;
 
     Ok(RefResolue {
         ref_effective,
@@ -350,20 +628,30 @@ pub(crate) async fn interroger_taille_depot(
         .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     let taille_octets = reponse
         .json::<ReponseProjet>()
         .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?
         .statistics
-        .ok_or(ErreurConnecteur::ReponseInattendue)?
+        .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
+            message: "Champ statistics absent de la réponse".to_string(),
+        })?
         .repository_size;
 
     Ok(ResultatGitlabTailleDepot {
@@ -416,18 +704,26 @@ pub(crate) async fn interroger_contributeurs(
             .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
         let statut = reponse.status();
         if statut.as_u16() == 401 {
-            return Err(ErreurConnecteur::AuthentificationRefusee);
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
         }
         if statut.as_u16() == 403 {
-            return Err(ErreurConnecteur::DroitsInsuffisants);
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
         }
         if !statut.is_success() {
-            return Err(ErreurConnecteur::ReponseInattendue);
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
         }
         let commits = reponse
             .json::<Vec<ReponseCommit>>()
             .await
-            .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
         if commits.is_empty() {
             break;
         }
@@ -499,18 +795,26 @@ pub(crate) async fn interroger_merge_requests(
         .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     let mr_ouvertes = reponse
         .json::<Vec<ReponseMergeRequest>>()
         .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?
         .into_iter()
         .map(|mr| MergeRequestOuverte {
             iid: mr.iid,
@@ -574,18 +878,26 @@ pub(crate) async fn interroger_membres(
                 .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
             let statut = reponse.status();
             if statut.as_u16() == 401 {
-                return Err(ErreurConnecteur::AuthentificationRefusee);
+                return Err(ErreurConnecteur::AuthentificationRefusee {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
             }
             if statut.as_u16() == 403 {
-                return Err(ErreurConnecteur::DroitsInsuffisants);
+                return Err(ErreurConnecteur::DroitsInsuffisants {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
             }
             if !statut.is_success() {
-                return Err(ErreurConnecteur::ReponseInattendue);
+                return Err(ErreurConnecteur::ReponseInattendue {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
             }
             reponse
                 .json::<Vec<ReponseMembre>>()
                 .await
-                .map_err(|_| ErreurConnecteur::ReponseInattendue)
+                .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                    message: erreur.to_string(),
+                })
         }
     };
 
@@ -688,7 +1000,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -703,7 +1018,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton-limite", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::DroitsInsuffisants));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
     }
 
     #[tokio::test]
@@ -718,7 +1036,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -733,7 +1054,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::DelaiDepasse));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
     }
 
     #[tokio::test]
@@ -742,7 +1066,10 @@ mod tests {
         let verdict =
             tester_connectivite("http://127.0.0.1:1", "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::InstanceInjoignable));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::InstanceInjoignable { .. })
+        ));
     }
 
     #[tokio::test]
@@ -760,7 +1087,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -835,7 +1165,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(branches, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            branches,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -856,7 +1189,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(branches, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            branches,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -877,7 +1213,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(branches, Err(ErreurConnecteur::DroitsInsuffisants));
+        assert!(matches!(
+            branches,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
     }
 
     #[tokio::test]
@@ -966,7 +1305,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -990,7 +1332,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::RefIntrouvable));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::RefIntrouvable { .. })
+        ));
     }
 
     #[tokio::test]
@@ -1012,7 +1357,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -1034,7 +1382,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::DroitsInsuffisants));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
     }
 
     #[tokio::test]
@@ -1056,7 +1407,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -1126,7 +1480,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::DroitsInsuffisants));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
     }
 
     #[tokio::test]
@@ -1266,5 +1623,406 @@ mod tests {
                     && membre.email_public.is_none())
         );
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn tester_connectivite_porte_un_message_technique_non_vide_sur_authentification_refusee()
+    {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/personal_access_tokens/self"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let verdict =
+            tester_connectivite(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
+
+        match verdict {
+            Err(ErreurConnecteur::AuthentificationRefusee { message }) => {
+                assert!(!message.is_empty());
+                assert!(message.contains("401"));
+            }
+            _ => panic!("attendu une anomalie AuthentificationRefusee avec message"),
+        }
+    }
+
+    /// Construit une règle de détection de marqueur IA pour les tests, sans passer par la désérialisation JSON.
+    fn regle(
+        motif: &str,
+        type_correspondance: TypeCorrespondanceMarqueur,
+        portee: PorteeMarqueur,
+        nature: NatureMarqueur,
+        outil: &str,
+    ) -> RegleMarqueurIA {
+        RegleMarqueurIA {
+            motif: motif.to_string(),
+            type_correspondance,
+            portee,
+            nature,
+            outil: outil.to_string(),
+        }
+    }
+
+    /// Monte le mock de résolution de ref commun à tous les tests de `interroger_marqueurs_ia` (résolution de la
+    /// ref explicite `develop` sur le projet `1234`).
+    async fn monter_mock_resolution_ref(serveur: &MockServer) {
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits/develop"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "8c1d0e44",
+                "committed_date": "2026-06-05T10:00:00Z"
+            })))
+            .mount(serveur)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_detecte_un_fichier_exact_partout_en_sous_dossier()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": "sous-dossier/CLAUDE.md", "type": "blob" },
+                { "path": "README.md", "type": "blob" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            "CLAUDE.md",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Partout,
+            NatureMarqueur::Fichier,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.marqueurs.len(), 1);
+        assert_eq!(resultat.marqueurs[0].chemin, "sous-dossier/CLAUDE.md");
+        assert_eq!(resultat.marqueurs[0].nature, "fichier");
+        assert_eq!(resultat.marqueurs[0].outil, "claude");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_ignore_un_repertoire_exact_racine_hors_racine()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": ".claude", "type": "tree" },
+                { "path": "sous-dossier/.claude", "type": "tree" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            ".claude",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Racine,
+            NatureMarqueur::Repertoire,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.marqueurs.len(), 1);
+        assert_eq!(resultat.marqueurs[0].chemin, ".claude");
+        assert_eq!(resultat.marqueurs[0].nature, "repertoire");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_detecte_un_motif_glob_avec_etoile()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": ".aider.conf.yml", "type": "blob" },
+                { "path": "autre.yml", "type": "blob" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            ".aider*",
+            TypeCorrespondanceMarqueur::Motif,
+            PorteeMarqueur::Racine,
+            NatureMarqueur::Fichier,
+            "aider",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.marqueurs.len(), 1);
+        assert_eq!(resultat.marqueurs[0].chemin, ".aider.conf.yml");
+        assert_eq!(resultat.marqueurs[0].outil, "aider");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_ne_detecte_rien_sans_correspondance()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": "src/main.rs", "type": "blob" },
+                { "path": "src", "type": "tree" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            "CLAUDE.md",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Partout,
+            NatureMarqueur::Fichier,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert!(resultat.marqueurs.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_agrege_plusieurs_pages_avant_la_page_vide()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": "CLAUDE.md", "type": "blob" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": "sous-dossier/CLAUDE.md", "type": "blob" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "3"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            "CLAUDE.md",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Partout,
+            NatureMarqueur::Fichier,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.marqueurs.len(), 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_signale_authentification_refusee_sur_larborescence() {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            "CLAUDE.md",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Partout,
+            NatureMarqueur::Fichier,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-invalide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_signale_des_droits_insuffisants_sur_larborescence() {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            "CLAUDE.md",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Partout,
+            NatureMarqueur::Fichier,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton-limite",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_marqueurs_ia_signale_un_delai_depasse_sur_larborescence() {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(500)))
+            .mount(&serveur)
+            .await;
+
+        let regles = vec![regle(
+            "CLAUDE.md",
+            TypeCorrespondanceMarqueur::Exact,
+            PorteeMarqueur::Partout,
+            NatureMarqueur::Fichier,
+            "claude",
+        )];
+
+        let resultat = interroger_marqueurs_ia(
+            &serveur.uri(),
+            "jeton",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &regles,
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
     }
 }

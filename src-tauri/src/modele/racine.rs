@@ -19,7 +19,11 @@ use std::collections::HashMap;
 /// Version de schéma courante de l'application, incrémentée à chaque évolution structurelle du modèle de données.
 /// La migration d'un fichier plus ancien se fonde exclusivement sur `versionSchema`, jamais sur une horloge
 /// (cf. `docs/02_documentation/13_conceptionDetaillee.md#gestion-des-erreurs-et-cas-limites-au-niveau-technique`).
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 1;
+///
+/// Passage de `1` à `2` (Phase 5, incrément 7) : ajout du champ optionnel `duplicationNouveauCode` sur
+/// [`ResultatSonarCouverture`] (`sonar.couverture`) ; voir la première étape réelle enregistrée dans
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 2;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -254,10 +258,11 @@ pub(crate) struct Source {
 /// d'obsolescence, badge, etc.) relève exclusivement du Moteur de jugement (UI), à partir des seuils et
 /// référentiels courants.
 ///
-/// `GitlabDependances` et `GitlabMarqueursIa` (Phase 5, incrément 1) : forme figée d'après l'exemple de référence
+/// `GitlabDependances` (Phase 5, incrément 1) : forme figée d'après l'exemple de référence
 /// `docs/01_besoin/exemple-donnees.json`, conservée dès maintenant pour la fidélité de round-trip, mais aucune
-/// fonction du Connecteur GitLab ne produit encore ces deux variantes à ce stade (parseur de manifestes de
-/// dépendances et heuristique de détection de marqueurs IA différés, non spécifiés par la documentation source).
+/// fonction du Connecteur GitLab ne produit encore cette variante à ce stade (parseur de manifestes de
+/// dépendances multi-écosystèmes, non spécifié par la documentation source). `GitlabMarqueursIa`, en revanche, est
+/// produite depuis la Phase 5, incrément 7 par `interroger_marqueurs_ia` (cf. `crate::connecteurs::gitlab`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub(crate) enum Resultat {
@@ -281,8 +286,7 @@ pub(crate) enum Resultat {
     /// Constat brut des demandes de fusion ouvertes.
     #[serde(rename = "gitlab.merge_requests")]
     GitlabMergeRequests(ResultatGitlabMergeRequests),
-    /// Constat brut des marqueurs d'outils IA détectés dans l'arborescence (production différée, cf. commentaire
-    /// ci-dessus).
+    /// Constat brut des marqueurs d'outils IA détectés dans l'arborescence.
     #[serde(rename = "gitlab.marqueurs_ia")]
     GitlabMarqueursIa(ResultatGitlabMarqueursIa),
     /// Constat brut des membres du dépôt.
@@ -435,7 +439,8 @@ pub(crate) struct Marqueur {
     pub(crate) outil: String,
 }
 
-/// Constat brut de `gitlab.marqueurs_ia` (production différée, cf. [`Resultat::GitlabMarqueursIa`]).
+/// Constat brut de `gitlab.marqueurs_ia` (produit par `crate::connecteurs::gitlab::interroger_marqueurs_ia`,
+/// Phase 5, incrément 7 ; cf. [`Resultat::GitlabMarqueursIa`]).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ResultatGitlabMarqueursIa {
@@ -505,6 +510,15 @@ pub(crate) struct ResultatSonarCouverture {
     pub(crate) source_id: String,
     pub(crate) couverture: f64,
     pub(crate) couverture_nouveau_code: f64,
+    /// Densité de duplication du nouveau code (métrique Sonar `new_duplicated_lines_density`), l'une des données
+    /// combinées par `croise.ia_nouveau_code` (Phase 5, incrément 7, cf.
+    /// `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`). Optionnelle : `None` si
+    /// Sonar ne retourne pas cette métrique (ex. aucune nouvelle ligne de code depuis la période de référence),
+    /// sur le modèle des autres champs optionnels déjà présents dans ce fichier
+    /// (ex. [`ResultatCroiseFraicheurSonar::derniere_analyse_le`]) ; son absence n'est jamais une anomalie
+    /// « réponse inattendue ».
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) duplication_nouveau_code: Option<f64>,
 }
 
 /// Constat brut de `sonar.notes` (notes A–E des quatre axes, stockées ici en valeur numérique 1.0–5.0 ; la
@@ -650,7 +664,13 @@ pub(crate) struct Referentiels {
     #[serde(default)]
     pub(crate) regles_dependances: Vec<Value>,
     /// Règles de détection des marqueurs d'outils IA.
-    #[serde(default)]
+    ///
+    /// `#[serde(rename = "reglesMarqueursIA")]` explicite : la conversion `camelCase` par défaut de
+    /// `regles_marqueurs_ia` produirait `reglesMarqueursIa` (seule la première lettre de chaque segment
+    /// capitalisée), alors que `docs/01_besoin/exemple-donnees.json` porte `reglesMarqueursIA` (sigle « IA »
+    /// entièrement capitalisé) ; même défaut que celui déjà corrigé sur `Branche.avec_mr` (Phase 5, incrément 1),
+    /// détecté ici en préparant `interroger_marqueurs_ia` (Phase 5, incrément 7).
+    #[serde(default, rename = "reglesMarqueursIA")]
     pub(crate) regles_marqueurs_ia: Vec<Value>,
 }
 
@@ -1045,6 +1065,47 @@ mod tests {
 
         let json = serde_json::to_string(&resultat)?;
         assert!(json.contains("\"avecMR\":true"));
+        Ok(())
+    }
+
+    #[test]
+    fn referentiels_desserialise_et_reserialise_regles_marqueurs_ia_avec_le_sigle_capitalise()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Non-régression (détecté en préparant `interroger_marqueurs_ia`, Phase 5, incrément 7) : le champ porte
+        // `#[serde(rename = "reglesMarqueursIA")]` explicite, sur le modèle d'`avecMR` ci-dessus. Sans ce rename,
+        // la conversion `camelCase` par défaut de `regles_marqueurs_ia` produirait `reglesMarqueursIa` (seule la
+        // première lettre de chaque segment capitalisée), incompatible avec la clé
+        // `reglesMarqueursIA` de `docs/01_besoin/exemple-donnees.json`.
+        let referentiels: Referentiels = serde_json::from_str(
+            r#"{
+                "reglesMarqueursIA": [
+                    { "id": "r1", "motif": "CLAUDE.md", "typeCorrespondance": "exact", "portee": "partout", "nature": "fichier", "outil": "claude" }
+                ]
+            }"#,
+        )?;
+        assert_eq!(referentiels.regles_marqueurs_ia.len(), 1);
+
+        let json = serde_json::to_string(&referentiels)?;
+        assert!(json.contains("\"reglesMarqueursIA\":"));
+        assert!(!json.contains("\"reglesMarqueursIa\":"));
+        Ok(())
+    }
+
+    #[test]
+    fn resultat_sonar_couverture_historique_sans_duplication_nouveau_code_se_desserialise_a_none()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document historique antérieur à la migration 1 -> 2 (Phase 5, incrément 7) : le champ
+        // `duplicationNouveauCode` est absent, la désérialisation ne doit ni échouer ni le confondre avec une
+        // anomalie, mais produire `None` (cf. `#[serde(default)]`).
+        let resultat: ResultatSonarCouverture = serde_json::from_str(
+            r#"{
+                "sourceId": "source-2",
+                "couverture": 61.2,
+                "couvertureNouveauCode": 71.0
+            }"#,
+        )?;
+
+        assert_eq!(resultat.duplication_nouveau_code, None);
         Ok(())
     }
 }

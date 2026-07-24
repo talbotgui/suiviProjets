@@ -47,6 +47,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "def
 # dépendance directe pour l'encodage sûr d'un segment de chemin d'URL (nom de branche pouvant contenir `/`), requis
 # par le Connecteur GitLab pour résoudre la ref effectivement auditée (Phase 5, Moteur d'audit).
 url = "2"
+# Déjà présent transitivement via tauri-utils (aucune empreinte nouvelle sur l'arbre de dépendances) : réutilisé en
+# dépendance directe pour convertir un motif glob simple (`*` seul caractère spécial) en expression régulière
+# ancrée, requis par `interroger_marqueurs_ia` du Connecteur GitLab (Phase 5, incrément 7, US-009, F18).
+regex = "1"
 
 [dev-dependencies]
 # Serveur HTTP simulé en boucle locale, seul moyen réaliste de tester la logique des connecteurs (en-têtes,

@@ -55,23 +55,31 @@ pub(crate) async fn tester_connectivite(
 
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
 
     let corps = reponse
         .json::<ReponseValidation>()
         .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
 
     if corps.valid {
         Ok(VerdictConnectivite {
             portee_excessive: false,
         })
     } else {
-        Err(ErreurConnecteur::AuthentificationRefusee)
+        Err(ErreurConnecteur::AuthentificationRefusee {
+            message: "Jeton invalide (authentication/validate)".to_string(),
+        })
     }
 }
 
@@ -122,19 +130,27 @@ async fn recuperer_mesures(
 
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
 
     Ok(reponse
         .json::<ReponseMeasuresComponent>()
         .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?
         .component
         .measures)
 }
@@ -152,7 +168,9 @@ fn valeur<'a>(mesures: &'a [Mesure], cle: &str) -> Option<&'a str> {
 fn valeur_numerique_requise(mesures: &[Mesure], cle: &str) -> Result<f64, ErreurConnecteur> {
     valeur(mesures, cle)
         .and_then(|valeur| valeur.parse().ok())
-        .ok_or(ErreurConnecteur::ReponseInattendue)
+        .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
+            message: format!("Métrique Sonar « {cle} » absente ou non numérique"),
+        })
 }
 
 /// Valeur d'une métrique de comptage, `0` par défaut si la métrique est absente (aucune violation détectée dans
@@ -225,7 +243,11 @@ pub(crate) async fn interroger_dette(
     })
 }
 
-/// Interroge la couverture de tests Sonar (US-009, `sonar.couverture`).
+/// Interroge la couverture de tests Sonar (US-009, `sonar.couverture`), ainsi que la densité de duplication du
+/// nouveau code (`new_duplicated_lines_density`, Phase 5, incrément 7), l'une des données combinées par
+/// `croise.ia_nouveau_code` (cf. `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`).
+/// Cette dernière métrique reste optionnelle : son absence de la réponse Sonar (ex. aucune nouvelle ligne de code)
+/// se traduit par `None`, jamais par une anomalie « réponse inattendue ».
 ///
 /// # Erreurs
 ///
@@ -241,7 +263,7 @@ pub(crate) async fn interroger_couverture(
         url_base,
         credential,
         id_externe,
-        "coverage,new_coverage",
+        "coverage,new_coverage,new_duplicated_lines_density",
         client,
     )
     .await?;
@@ -250,6 +272,8 @@ pub(crate) async fn interroger_couverture(
         source_id: source_id.to_string(),
         couverture: valeur_numerique_requise(&mesures, "coverage")?,
         couverture_nouveau_code: valeur_numerique_requise(&mesures, "new_coverage")?,
+        duplication_nouveau_code: valeur(&mesures, "new_duplicated_lines_density")
+            .and_then(|valeur| valeur.parse().ok()),
     })
 }
 
@@ -374,19 +398,26 @@ pub(crate) async fn interroger_derniere_analyse(
 
     let statut = reponse.status();
     if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee);
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants);
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
     if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue);
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
     }
 
-    let reponse = reponse
-        .json::<ReponseAnalyses>()
-        .await
-        .map_err(|_| ErreurConnecteur::ReponseInattendue)?;
+    let reponse = reponse.json::<ReponseAnalyses>().await.map_err(|erreur| {
+        ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        }
+    })?;
 
     Ok(reponse
         .analyses
@@ -448,7 +479,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -463,7 +497,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -478,7 +515,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -493,7 +533,10 @@ mod tests {
         let verdict =
             tester_connectivite(&serveur.uri(), "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::DelaiDepasse));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
     }
 
     #[tokio::test]
@@ -502,7 +545,10 @@ mod tests {
         let verdict =
             tester_connectivite("http://127.0.0.1:1", "jeton", &client_test_delai_court()).await;
 
-        assert_eq!(verdict, Err(ErreurConnecteur::InstanceInjoignable));
+        assert!(matches!(
+            verdict,
+            Err(ErreurConnecteur::InstanceInjoignable { .. })
+        ));
     }
 
     #[tokio::test]
@@ -629,7 +675,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -641,7 +690,8 @@ mod tests {
                 "component": {
                     "measures": [
                         { "metric": "coverage", "value": "61.2" },
-                        { "metric": "new_coverage", "value": "71.0" }
+                        { "metric": "new_coverage", "value": "71.0" },
+                        { "metric": "new_duplicated_lines_density", "value": "4.5" }
                     ]
                 }
             })))
@@ -663,8 +713,41 @@ mod tests {
                 source_id: "source-2".to_string(),
                 couverture: 61.2,
                 couverture_nouveau_code: 71.0,
+                duplication_nouveau_code: Some(4.5),
             })
         );
+    }
+
+    #[tokio::test]
+    async fn interroger_couverture_peuple_duplication_nouveau_code_absente_a_none()
+    -> Result<(), ErreurConnecteur> {
+        // La métrique `new_duplicated_lines_density` est optionnelle (Phase 5, incrément 7) : son absence de la
+        // réponse Sonar simulée ne doit provoquer aucune anomalie « réponse inattendue », seulement un `None`.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/measures/component"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "component": {
+                    "measures": [
+                        { "metric": "coverage", "value": "61.2" },
+                        { "metric": "new_coverage", "value": "71.0" }
+                    ]
+                }
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_couverture(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-2",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.duplication_nouveau_code, None);
+        Ok(())
     }
 
     #[tokio::test]
@@ -687,7 +770,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
     }
 
     #[tokio::test]
@@ -850,7 +936,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::AuthentificationRefusee));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
     }
 
     #[tokio::test]
@@ -870,7 +959,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::DroitsInsuffisants));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
     }
 
     #[tokio::test]
@@ -890,6 +982,36 @@ mod tests {
         )
         .await;
 
-        assert_eq!(resultat, Err(ErreurConnecteur::ReponseInattendue));
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_dette_porte_un_message_technique_non_vide_sur_authentification_refusee() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/measures/component"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dette(
+            &serveur.uri(),
+            "jeton-invalide",
+            "source-2",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        match resultat {
+            Err(ErreurConnecteur::AuthentificationRefusee { message }) => {
+                assert!(!message.is_empty());
+                assert!(message.contains("401"));
+            }
+            _ => panic!("attendu une anomalie AuthentificationRefusee avec message"),
+        }
     }
 }
