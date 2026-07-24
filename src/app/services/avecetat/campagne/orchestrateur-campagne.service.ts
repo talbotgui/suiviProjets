@@ -1,31 +1,35 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Orchestrateur de campagne (UI, Phase 5, incrément 4), tel que défini à l'étape 6
+// Orchestrateur de campagne (UI, Phase 5, incréments 4 et 5), tel que défini à l'étape 6
 // (cf. docs/02_documentation/11_architectureTechnique.md#découpage-en-composantsmodules-et-responsabilités) :
 // planifie l'interrogation des sources d'un périmètre de projets avec une concurrence limitée (RG-017), gère
 // l'annulation propre (RG-018) et alimente le brouillon existant (`DonneesApplicationService.enregistrerBrouillon`,
 // Phase 5 incrément 2) en invoquant le Connecteur GitLab et le Connecteur Sonar via `FacadeCommandesService`
 // (Phase 5 incrément 1), et le Connecteur croisé (`ConnecteurCroiseUtils`, Phase 5 incrément 3). Classé sous
-// `services/avecetat/campagne/` conformément à la structure fixée en Phase 0 (cf. README.md de ce dossier) :
-// porte un état interne (progression réactive de la campagne en cours), à la différence du Connecteur croisé,
-// pur.
+// `services/avecetat/campagne/` conformément à la structure fixée en Phase 0 (cf. README.md de ce dossier).
 //
-// Périmètre de cet incrément (cœur uniquement, décisions actées lors d'une session de clarification préalable
-// avec l'utilisateur, cf. rapport de développement de cette phase) :
-//   - RG-020 (détection d'aberrations) est traitée ici, pour les 3 indicateurs documentés (`AberrationUtils`).
+// Décision d'architecture (incrément 5, corrigeant l'incrément 4) : la progression réactive d'une campagne en
+// cours n'est plus un signal interne de ce service, mais vit directement dans `EtatSessionService`
+// (`services/avecetat/etat/etat-session.service.ts`), conformément au texte de la conception détaillée
+// (`docs/02_documentation/13_conceptionDetaillee.md`, séquence « Réaliser une campagne d'audit » : « l'Orchestrateur
+// de campagne met à jour l'état de progression directement dans le Store d'état applicatif »). Ce service reste
+// donc, à la différence du Connecteur croisé (pur), porteur d'un unique état interne non partagé
+// (`annulationDemandee`, un simple drapeau de contrôle du pipeline RxJS, jamais lu par un écran).
+//
+// Périmètre acté aux incréments 4/5 (décisions actées lors de sessions de clarification préalables avec
+// l'utilisateur, cf. rapport de développement de cette phase) :
+//   - RG-020 (détection d'aberrations) est traitée depuis l'incrément 4, pour les 3 indicateurs documentés
+//     (`AberrationUtils`).
 //   - Un projet est « succès » dès qu'au moins un résultat exploitable a été obtenu (résultats partiels conservés,
 //     anomalies des appels échoués consignées) ; « échec » seulement si aucun résultat n'a pu être obtenu.
 //   - `interrogerDependances`, `interrogerMarqueursIa` et `gitlab.branches` restent différés (connecteurs non
 //     livrés) : simplement absents des appels effectués ici, comme `croise.ia_nouveau_code` (bloqué sur
 //     `gitlab.marqueurs_ia`).
-//   - Aucun écran (Constitution de campagne, Tableau de bord, Brouillon) : seul l'état réactif de progression est
-//     exposé, sans consommateur avant un incrément ultérieur.
 //   - Le rapport d'anomalies détaillé (F08, RG-021 : catégorie/message/action suggérée/regroupement) reste un
 //     incrément ultérieur ; les anomalies sont collectées ici sous une forme minimale (`{ indicateur, sourceId,
 //     anomalie }`), décision arbitraire documentée dans le rapport de développement de cette phase.
-import { Injectable, inject, signal } from '@angular/core';
-import type { Signal, WritableSignal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { EMPTY, firstValueFrom, from } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import type {
@@ -70,24 +74,6 @@ const CONCURRENCE_PAR_DEFAUT = 4;
 const VARIATION_RELATIVE_PAR_DEFAUT = 0.1;
 
 /**
- * Statut d'exécution d'un projet au sein de la progression réactive locale d'une campagne en cours (mirroir
- * partiel de `StatutVerdict`, complété de `enCours`, propre à cet état transitoire jamais persisté, cf.
- * `docs/02_documentation/11_architectureTechnique.md` : « la progression... est un état réactif local »).
- */
-export type StatutExecutionProjet = 'enAttente' | 'enCours' | 'termine' | 'echoue' | 'ignore';
-
-/**
- * Progression réactive locale d'une campagne en cours ou terminée, exposée par `OrchestrateurCampagneService.
- * progression`.
- */
-export interface ProgressionCampagne {
-  /** Identifiants des projets du périmètre de la campagne, dans l'ordre demandé. */
-  readonly perimetre: readonly string[];
-  /** Statut d'exécution courant de chaque projet du périmètre. */
-  readonly statutsParProjet: Readonly<Record<string, StatutExecutionProjet>>;
-}
-
-/**
  * Estimation du coût et des credentials manquants d'un périmètre de campagne (US-012), retournée par
  * `constituerCampagne`.
  */
@@ -112,15 +98,7 @@ export class OrchestrateurCampagneService {
     inject(DonneesApplicationService);
   private readonly etatSession: EtatSessionService = inject(EtatSessionService);
 
-  private readonly progressionInterne: WritableSignal<ProgressionCampagne | null> = signal(null);
   private annulationDemandee = false;
-
-  /**
-   * Progression réactive locale de la campagne en cours (ou de la dernière campagne exécutée), `null` si aucune
-   * campagne n'a encore été lancée depuis le chargement de l'application.
-   */
-  public readonly progression: Signal<ProgressionCampagne | null> =
-    this.progressionInterne.asReadonly();
 
   /**
    * Estime le coût prévisionnel d'un périmètre de campagne et contrôle la présence en mémoire des credentials
@@ -165,10 +143,7 @@ export class OrchestrateurCampagneService {
     motDePasse: string,
   ): Promise<ResultatMutationAdministration> {
     this.annulationDemandee = false;
-    this.progressionInterne.set({
-      perimetre,
-      statutsParProjet: Object.fromEntries(perimetre.map((projetId) => [projetId, 'enAttente'])),
-    });
+    this.etatSession.demarrerProgressionCampagne(perimetre);
 
     const campagneId = crypto.randomUUID();
     const concurrence = this.extraireConcurrence();
@@ -190,7 +165,7 @@ export class OrchestrateurCampagneService {
     const verdicts: Verdict[] = perimetre.map((projetId) => {
       const resultat = projetsTraites.get(projetId);
       if (resultat === undefined) {
-        this.mettreAJourProgression(projetId, 'ignore');
+        this.etatSession.mettreAJourProgressionProjet(projetId, { statut: 'ignore' });
         return { projetId, statut: 'ignore' };
       }
       return resultat.verdict;
@@ -237,15 +212,21 @@ export class OrchestrateurCampagneService {
     readonly verdict: Verdict;
     readonly resultatBrouillon?: ResultatBrouillonProjet;
   }> {
-    this.mettreAJourProgression(projetId, 'enCours');
+    const debut = Date.now();
+    this.etatSession.mettreAJourProgressionProjet(projetId, { statut: 'enCours' });
     const resolution = this.resoudreProjetEtGroupe(this.donneesApplication.groupes(), projetId);
     if (resolution === undefined) {
-      this.mettreAJourProgression(projetId, 'echoue');
+      this.etatSession.mettreAJourProgressionProjet(projetId, {
+        statut: 'echoue',
+        dureeMs: Date.now() - debut,
+        motifEchec: 'Projet introuvable dans les groupes actuels',
+      });
       return { projetId, verdict: { projetId, statut: 'echec' } };
     }
 
     const resultats: unknown[] = [];
     const anomalies: unknown[] = [];
+    let dernierMotifEchec: string | undefined;
     let vitalite: ResultatGitlabVitalite | undefined;
     let tailleDepot: ResultatGitlabTailleDepot | undefined;
     let contributeurs: ResultatGitlabContributeurs | undefined;
@@ -261,6 +242,9 @@ export class OrchestrateurCampagneService {
       if (instance === undefined) {
         continue;
       }
+      this.etatSession.mettreAJourProgressionProjet(projetId, {
+        connecteurActif: source.type === TypeSource.DepotGitlab ? 'gitlab' : 'sonar',
+      });
       if (source.type === TypeSource.DepotGitlab) {
         const reponseVitalite = await this.executerIndicateur(
           'gitlab.vitalite',
@@ -274,7 +258,8 @@ export class OrchestrateurCampagneService {
               source.refAuditee,
             ),
         );
-        this.integrer(reponseVitalite, resultats, anomalies);
+        dernierMotifEchec =
+          this.integrer(reponseVitalite, resultats, anomalies) ?? dernierMotifEchec;
         vitalite = reponseVitalite.resultatBrut;
 
         const reponseTaille = await this.executerIndicateur(
@@ -289,7 +274,7 @@ export class OrchestrateurCampagneService {
               source.refAuditee,
             ),
         );
-        this.integrer(reponseTaille, resultats, anomalies);
+        dernierMotifEchec = this.integrer(reponseTaille, resultats, anomalies) ?? dernierMotifEchec;
         tailleDepot = reponseTaille.resultatBrut;
 
         const reponseContributeurs = await this.executerIndicateur(
@@ -304,7 +289,8 @@ export class OrchestrateurCampagneService {
               source.refAuditee,
             ),
         );
-        this.integrer(reponseContributeurs, resultats, anomalies);
+        dernierMotifEchec =
+          this.integrer(reponseContributeurs, resultats, anomalies) ?? dernierMotifEchec;
         contributeurs = reponseContributeurs.resultatBrut;
 
         const reponseMergeRequests = await this.executerIndicateur(
@@ -319,7 +305,8 @@ export class OrchestrateurCampagneService {
               source.refAuditee,
             ),
         );
-        this.integrer(reponseMergeRequests, resultats, anomalies);
+        dernierMotifEchec =
+          this.integrer(reponseMergeRequests, resultats, anomalies) ?? dernierMotifEchec;
 
         const reponseMembres = await this.executerIndicateur(
           'gitlab.membres',
@@ -333,7 +320,8 @@ export class OrchestrateurCampagneService {
               source.refAuditee,
             ),
         );
-        this.integrer(reponseMembres, resultats, anomalies);
+        dernierMotifEchec =
+          this.integrer(reponseMembres, resultats, anomalies) ?? dernierMotifEchec;
       } else {
         const reponseViolations = await this.executerIndicateur(
           'sonar.violations',
@@ -341,7 +329,8 @@ export class OrchestrateurCampagneService {
           source.id,
           () => this.facadeCommandes.interrogerViolations(instance, source.id, source.idExterne),
         );
-        this.integrer(reponseViolations, resultats, anomalies);
+        dernierMotifEchec =
+          this.integrer(reponseViolations, resultats, anomalies) ?? dernierMotifEchec;
         violations = reponseViolations.resultatBrut;
 
         const reponseDette = await this.executerIndicateur(
@@ -350,7 +339,7 @@ export class OrchestrateurCampagneService {
           source.id,
           () => this.facadeCommandes.interrogerDette(instance, source.id, source.idExterne),
         );
-        this.integrer(reponseDette, resultats, anomalies);
+        dernierMotifEchec = this.integrer(reponseDette, resultats, anomalies) ?? dernierMotifEchec;
 
         const reponseCouverture = await this.executerIndicateur(
           'sonar.couverture',
@@ -358,7 +347,8 @@ export class OrchestrateurCampagneService {
           source.id,
           () => this.facadeCommandes.interrogerCouverture(instance, source.id, source.idExterne),
         );
-        this.integrer(reponseCouverture, resultats, anomalies);
+        dernierMotifEchec =
+          this.integrer(reponseCouverture, resultats, anomalies) ?? dernierMotifEchec;
         couverture = reponseCouverture.resultatBrut;
 
         const reponseNotes = await this.executerIndicateur(
@@ -367,7 +357,7 @@ export class OrchestrateurCampagneService {
           source.id,
           () => this.facadeCommandes.interrogerNotes(instance, source.id, source.idExterne),
         );
-        this.integrer(reponseNotes, resultats, anomalies);
+        dernierMotifEchec = this.integrer(reponseNotes, resultats, anomalies) ?? dernierMotifEchec;
 
         const reponseNcloc = await this.executerIndicateur(
           'sonar.ncloc',
@@ -375,7 +365,7 @@ export class OrchestrateurCampagneService {
           source.id,
           () => this.facadeCommandes.interrogerNcloc(instance, source.id, source.idExterne),
         );
-        this.integrer(reponseNcloc, resultats, anomalies);
+        dernierMotifEchec = this.integrer(reponseNcloc, resultats, anomalies) ?? dernierMotifEchec;
         ncloc = reponseNcloc.resultatBrut;
 
         if (!resolution.groupe.indicateursDesactives.includes('croise.fraicheur_sonar')) {
@@ -391,6 +381,7 @@ export class OrchestrateurCampagneService {
               sourceId: source.id,
               anomalie: reponseDerniereAnalyse.anomalie,
             });
+            dernierMotifEchec = `croise.fraicheur_sonar : ${reponseDerniereAnalyse.anomalie.type}`;
           }
         }
       }
@@ -427,7 +418,11 @@ export class OrchestrateurCampagneService {
     }
 
     if (resultats.length === 0) {
-      this.mettreAJourProgression(projetId, 'echoue');
+      this.etatSession.mettreAJourProgressionProjet(projetId, {
+        statut: 'echoue',
+        dureeMs: Date.now() - debut,
+        motifEchec: dernierMotifEchec ?? 'Aucun résultat obtenu',
+      });
       return { projetId, verdict: { projetId, statut: 'echec', anomalies } };
     }
 
@@ -443,7 +438,11 @@ export class OrchestrateurCampagneService {
       this.extraireVariationRelative(),
     );
 
-    this.mettreAJourProgression(projetId, 'termine');
+    this.etatSession.mettreAJourProgressionProjet(projetId, {
+      statut: 'termine',
+      dureeMs: Date.now() - debut,
+      nombreResultats: resultats.length,
+    });
     const auditId = crypto.randomUUID();
     return {
       projetId,
@@ -488,6 +487,7 @@ export class OrchestrateurCampagneService {
     readonly resultatBrut?: TResultat;
     readonly resultatTague?: Record<string, unknown>;
     readonly anomalieEntree?: Record<string, unknown>;
+    readonly motif?: string;
   }> {
     if (indicateursDesactives.includes(tag)) {
       return {};
@@ -496,7 +496,10 @@ export class OrchestrateurCampagneService {
     if (reponse.type === 'succes') {
       return { resultatBrut: reponse.resultat, resultatTague: { type: tag, ...reponse.resultat } };
     }
-    return { anomalieEntree: { indicateur: tag, sourceId, anomalie: reponse.anomalie } };
+    return {
+      anomalieEntree: { indicateur: tag, sourceId, anomalie: reponse.anomalie },
+      motif: `${tag} : ${reponse.anomalie.type}`,
+    };
   }
 
   /**
@@ -505,23 +508,27 @@ export class OrchestrateurCampagneService {
    * @param reponse - Résultat retourné par {@link executerIndicateur}.
    * @param reponse.resultatTague - Résultat tagué à ajouter, absent si désactivé ou en échec.
    * @param reponse.anomalieEntree - Anomalie à ajouter, absente si désactivé ou en succès.
+   * @param reponse.motif - Motif court de l'échec, absent si désactivé ou en succès.
    * @param resultats - Tableau local des résultats tagués déjà obtenus pour ce projet.
    * @param anomalies - Tableau local des anomalies déjà rencontrées pour ce projet.
+   * @returns Le motif court de cet appel s'il a échoué, `undefined` sinon (désactivé ou succès).
    */
   private integrer(
     reponse: {
       readonly resultatTague?: Record<string, unknown>;
       readonly anomalieEntree?: Record<string, unknown>;
+      readonly motif?: string;
     },
     resultats: unknown[],
     anomalies: unknown[],
-  ): void {
+  ): string | undefined {
     if (reponse.resultatTague !== undefined) {
       resultats.push(reponse.resultatTague);
     }
     if (reponse.anomalieEntree !== undefined) {
       anomalies.push(reponse.anomalieEntree);
     }
+    return reponse.motif;
   }
 
   /**
@@ -657,22 +664,5 @@ export class OrchestrateurCampagneService {
       courant = courant[cle];
     }
     return courant;
-  }
-
-  /**
-   * Met à jour le statut d'exécution d'un projet au sein de la progression réactive locale, sans effet si aucune
-   * campagne n'est en cours (garde défensive, ne devrait pas survenir dans le flux normal).
-   * @param projetId - Identifiant du projet concerné.
-   * @param statut - Nouveau statut d'exécution.
-   */
-  private mettreAJourProgression(projetId: string, statut: StatutExecutionProjet): void {
-    const progression = this.progressionInterne();
-    if (progression === null) {
-      return;
-    }
-    this.progressionInterne.set({
-      ...progression,
-      statutsParProjet: { ...progression.statutsParProjet, [projetId]: statut },
-    });
   }
 }

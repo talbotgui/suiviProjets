@@ -1,0 +1,61 @@
+.constitution-campagne {
+  &__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__bandeau-blocage {
+    color: #b00020;
+    font-weight: bold;
+  }
+
+  &__raccourcis {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin: 1rem 0;
+  }
+
+  &__groupes {
+    list-style: none;
+    padding: 0;
+  }
+
+  &__groupe {
+    margin-bottom: 0.75rem;
+  }
+
+  &__groupe-entete {
+    font-weight: bold;
+  }
+
+  &__projets {
+    list-style: none;
+    padding-left: 1.5rem;
+  }
+
+  &__recapitulatif {
+    margin: 1rem 0;
+  }
+
+  &__credentials-manquants {
+    color: #b06000;
+  }
+
+  &__credential-manquant {
+    margin-right: 0.5rem;
+
+    &::after {
+      content: ',';
+    }
+
+    &:last-child::after {
+      content: '';
+    }
+  }
+
+  &__vide {
+    color: #666;
+  }
+}

@@ -105,4 +105,70 @@ describe('EtatSessionService', () => {
 
     expect(service.echecsDeverrouillage()).toBe(0);
   });
+
+  describe('progression de campagne (Phase 5, incrément 4)', () => {
+    it('doit démarrer sans progression', () => {
+      expect(service.progressionCampagne()).toBeNull();
+    });
+
+    it('doit initialiser tous les projets du périmètre à « enAttente »', () => {
+      service.demarrerProgressionCampagne(['projet-1', 'projet-2']);
+
+      const progression = service.progressionCampagne();
+      expect(progression?.perimetre).toEqual(['projet-1', 'projet-2']);
+      expect(progression?.projets).toEqual({
+        'projet-1': { statut: 'enAttente' },
+        'projet-2': { statut: 'enAttente' },
+      });
+    });
+
+    it("doit fusionner les mises à jour d'un projet sans affecter les autres", () => {
+      service.demarrerProgressionCampagne(['projet-1', 'projet-2']);
+
+      service.mettreAJourProgressionProjet('projet-1', {
+        statut: 'enCours',
+        connecteurActif: 'gitlab',
+      });
+
+      const progression = service.progressionCampagne();
+      expect(progression?.projets['projet-1']).toEqual({
+        statut: 'enCours',
+        connecteurActif: 'gitlab',
+      });
+      expect(progression?.projets['projet-2']).toEqual({ statut: 'enAttente' });
+    });
+
+    it('doit fusionner deux mises à jour successives du même projet plutôt que de les remplacer', () => {
+      service.demarrerProgressionCampagne(['projet-1']);
+
+      service.mettreAJourProgressionProjet('projet-1', {
+        statut: 'enCours',
+        connecteurActif: 'sonar',
+      });
+      service.mettreAJourProgressionProjet('projet-1', { statut: 'termine', dureeMs: 1_200 });
+
+      expect(service.progressionCampagne()?.projets['projet-1']).toEqual({
+        statut: 'termine',
+        connecteurActif: 'sonar',
+        dureeMs: 1_200,
+      });
+    });
+
+    it("ne doit rien faire si aucune campagne n'est en cours", () => {
+      service.mettreAJourProgressionProjet('projet-1', { statut: 'enCours' });
+
+      expect(service.progressionCampagne()).toBeNull();
+    });
+
+    it('doit remplacer intégralement la progression précédente au démarrage d’une nouvelle campagne', () => {
+      service.demarrerProgressionCampagne(['projet-1']);
+      service.mettreAJourProgressionProjet('projet-1', { statut: 'termine', dureeMs: 500 });
+
+      service.demarrerProgressionCampagne(['projet-2']);
+
+      expect(service.progressionCampagne()?.projets).toEqual({
+        'projet-2': { statut: 'enAttente' },
+      });
+    });
+  });
 });

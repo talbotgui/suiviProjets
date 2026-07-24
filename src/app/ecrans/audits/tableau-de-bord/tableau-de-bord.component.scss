@@ -1,0 +1,65 @@
+.tableau-de-bord {
+  &__vide {
+    color: #666;
+  }
+
+  &__entete {
+    margin-bottom: 1rem;
+  }
+
+  &__barre-progression {
+    width: 100%;
+    height: 0.75rem;
+    background: #e0e0e0;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+
+  &__barre-progression-remplissage {
+    height: 100%;
+    background: #2e7d32;
+  }
+
+  &__tableau {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  &__ligne--active {
+    background: #e3f2fd;
+  }
+
+  // Modificateurs en camelCase (plutôt que le kebab-case BEM habituel de ce dépôt) : générés par interpolation
+  // directe des valeurs de l'union TypeScript StatutExecutionProjet dans le template, sans transformation.
+  &__badge {
+    padding: 0.125rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.85rem;
+
+    &--termine {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+
+    &--echoue {
+      background: #ffcdd2;
+      color: #b00020;
+    }
+
+    &--enCours {
+      background: #bbdefb;
+      color: #0d47a1;
+    }
+
+    &--enAttente {
+      background: #eeeeee;
+      color: #616161;
+    }
+
+    &--ignore {
+      background: #eeeeee;
+      color: #616161;
+    }
+  }
+}

@@ -303,6 +303,29 @@ describe('OrchestrateurCampagneService', () => {
       );
     });
 
+    it('doit renseigner la progression du Store (connecteur actif observé puis durée finale) pour un projet réussi', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.sourceGitlab('source-1'),
+        DonneesDeTest.sourceSonar('source-2'),
+      ]);
+      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+      const connecteursObserves: ('gitlab' | 'sonar' | undefined)[] = [];
+      const etatSession = TestBed.inject(EtatSessionService);
+      invokeSimule.mockImplementation((commande: string) => {
+        connecteursObserves.push(
+          etatSession.progressionCampagne()?.projets['projet-1']?.connecteurActif,
+        );
+        return Promise.resolve(REPONSES_PAR_DEFAUT[commande]);
+      });
+
+      await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+      expect(connecteursObserves).toEqual(expect.arrayContaining(['gitlab', 'sonar']));
+      const progressionFinale = etatSession.progressionCampagne()?.projets['projet-1'];
+      expect(progressionFinale?.statut).toBe('termine');
+      expect(progressionFinale?.dureeMs).toBeGreaterThanOrEqual(0);
+    });
+
     it(
       'doit considérer une confirmation Sonar « jamais analysé » comme un résultat exploitable à elle seule ' +
         '(décision arbitraire de relecture, cf. rapport de développement)',
@@ -382,12 +405,18 @@ describe('OrchestrateurCampagneService', () => {
         Promise.reject(UtilitairesTest.erreurConnecteur('instanceInjoignable')),
       );
 
+      const etatSession = TestBed.inject(EtatSessionService);
+
       await service.lancerCampagne(['projet-1'], 'mot-de-passe');
 
       const [, , , verdicts, resultatsParProjet] =
         donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
       expect(verdicts[0].statut).toBe('echec');
       expect(resultatsParProjet).toEqual([]);
+      const progressionProjet = etatSession.progressionCampagne()?.projets['projet-1'];
+      expect(progressionProjet?.statut).toBe('echoue');
+      expect(progressionProjet?.dureeMs).toBeGreaterThanOrEqual(0);
+      expect(progressionProjet?.motifEchec).toBe('gitlab.membres : instanceInjoignable');
     });
 
     it('ne doit pas interroger un indicateur désactivé pour le groupe et ne pas le proposer au brouillon', async () => {
@@ -497,6 +526,7 @@ describe('OrchestrateurCampagneService', () => {
       );
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
       donneesApplicationMock.racine.mockReturnValue({ parametres: { audit: { concurrence: 1 } } });
+      const etatSession = TestBed.inject(EtatSessionService);
 
       const promesse = service.lancerCampagne(
         projets.map((projet) => projet.id),
@@ -510,6 +540,10 @@ describe('OrchestrateurCampagneService', () => {
       const statuts: readonly string[] = verdicts.map((verdict: Verdict) => verdict.statut);
       expect(statuts[0]).toBe('succes');
       expect(statuts.slice(1)).toEqual(['ignore', 'ignore']);
+      const progressionCampagne = etatSession.progressionCampagne();
+      expect(progressionCampagne?.projets['p1']?.statut).toBe('termine');
+      expect(progressionCampagne?.projets['p2']?.statut).toBe('ignore');
+      expect(progressionCampagne?.projets['p3']?.statut).toBe('ignore');
     }, 10_000);
   });
 });

@@ -1,0 +1,94 @@
+<section class="constitution-campagne">
+  <header class="constitution-campagne__entete">
+    <h2>Constitution de campagne</h2>
+  </header>
+
+  @if (brouillonEnAttente()) {
+    <p class="constitution-campagne__bandeau-blocage" role="alert">
+      Un brouillon de la dernière campagne reste à traiter (intégré ou rejeté) avant de pouvoir en
+      lancer une nouvelle.
+    </p>
+  } @else {
+    <div class="constitution-campagne__raccourcis">
+      <label class="constitution-campagne__tout">
+        <input
+          type="checkbox"
+          [checked]="estToutSelectionne()"
+          [indeterminate]="estPartiellementSelectionne()"
+          (change)="basculerTout()"
+        />
+        Tout sélectionner
+      </label>
+      <button type="button" (click)="appliquerRaccourciEchecs()">
+        Rejouer les échecs de la dernière campagne
+      </button>
+      <button type="button" (click)="appliquerRaccourciNonAudites()">
+        Projets non audités depuis longtemps
+      </button>
+    </div>
+
+    <ul class="constitution-campagne__groupes">
+      @for (groupe of groupes(); track groupe.id) {
+        <li class="constitution-campagne__groupe">
+          <label class="constitution-campagne__groupe-entete">
+            <input
+              type="checkbox"
+              [checked]="estGroupeIntegralementSelectionne(groupe)"
+              [indeterminate]="estGroupePartiellementSelectionne(groupe)"
+              (change)="basculerGroupe(groupe)"
+            />
+            {{ groupe.nom }}
+          </label>
+          <ul class="constitution-campagne__projets">
+            @for (projet of groupe.projets; track projet.id) {
+              <li class="constitution-campagne__projet">
+                <label>
+                  <input
+                    type="checkbox"
+                    [checked]="estProjetSelectionne(projet.id)"
+                    (change)="basculerProjet(projet.id)"
+                  />
+                  {{ projet.nom }}
+                </label>
+              </li>
+            } @empty {
+              <li class="constitution-campagne__vide">Aucun projet dans ce groupe.</li>
+            }
+          </ul>
+        </li>
+      } @empty {
+        <li class="constitution-campagne__vide">Aucun groupe n'est encore défini.</li>
+      }
+    </ul>
+
+    <section class="constitution-campagne__recapitulatif">
+      <h3>Récapitulatif</h3>
+      <p>
+        {{ recapitulatif().nombreProjets }} projet(s),
+        {{ recapitulatif().nombreInstances }} instance(s).
+      </p>
+      @if (recapitulatif().credentialsManquants.length > 0) {
+        <p class="constitution-campagne__credentials-manquants">
+          Credentials manquants pour :
+          @for (instanceId of recapitulatif().credentialsManquants; track instanceId) {
+            <span class="constitution-campagne__credential-manquant">{{
+              nomInstance(instanceId)
+            }}</span>
+          }
+        </p>
+      }
+    </section>
+
+    <button type="button" [disabled]="selectionProjetIds.size === 0" (click)="demanderLancement()">
+      Lancer la campagne
+    </button>
+
+    @if (confirmationMotDePasseVisible) {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour lancer cette campagne et pouvoir en enregistrer les résultats."
+        (confirmee)="confirmerLancement($event)"
+        (annulee)="annulerLancement()"
+      />
+    }
+  }
+</section>

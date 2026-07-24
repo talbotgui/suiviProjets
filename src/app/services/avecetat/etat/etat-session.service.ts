@@ -30,6 +30,48 @@ export enum EtatFichier {
 export type CredentialsEnMemoire = Readonly<Record<string, string>>;
 
 /**
+ * Statut d'exécution d'un projet au sein de la progression réactive locale d'une campagne en cours (Phase 5,
+ * incrément 4 ; mirroir partiel de `StatutVerdict` côté cœur natif, complété de `enCours`, propre à cet état
+ * transitoire jamais persisté).
+ */
+export type StatutExecutionProjet = 'enAttente' | 'enCours' | 'termine' | 'echoue' | 'ignore';
+
+/**
+ * Progression d'un projet au sein d'une campagne en cours (Phase 5, incrément 5) : connecteur actif, durée
+ * écoulée, nombre de résultats obtenus et motif court d'échec, affichés par le Tableau de bord d'exécution sur le
+ * modèle de la maquette de référence (`docs/01_besoin/Suivi Qualimetrie.dc.html`, section « Tableau de bord
+ * d'audit » : « Terminé (nombre de résultats), Échoué (motif court, encart dépliable) »,
+ * `docs/01_besoin/Specification.md#56-f06--tableau-de-bord-dexécution-daudit`).
+ */
+export interface ProgressionProjet {
+  /** Statut d'exécution courant. */
+  readonly statut: StatutExecutionProjet;
+  /** Connecteur actuellement interrogé, uniquement pertinent lorsque `statut` vaut `enCours`. */
+  readonly connecteurActif?: 'gitlab' | 'sonar';
+  /** Durée écoulée en millisecondes, connue une fois `statut` à `termine` ou `echoue`. */
+  readonly dureeMs?: number;
+  /** Nombre de résultats obtenus, connu une fois `statut` à `termine`. */
+  readonly nombreResultats?: number;
+  /** Motif court du dernier échec rencontré, connu une fois `statut` à `echoue`. */
+  readonly motifEchec?: string;
+}
+
+/**
+ * Progression réactive locale d'une campagne en cours ou terminée (Phase 5, incrément 4), mise à jour directement
+ * dans ce Store d'état applicatif par `OrchestrateurCampagneService`, conformément à
+ * `docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces` (« la
+ * progression... est un état réactif local », jamais persistée).
+ */
+export interface ProgressionCampagne {
+  /** Identifiants des projets du périmètre de la campagne, dans l'ordre demandé. */
+  readonly perimetre: readonly string[];
+  /** Date de lancement de la campagne (ISO 8601). */
+  readonly dateDebut: string;
+  /** Progression de chaque projet du périmètre. */
+  readonly projets: Readonly<Record<string, ProgressionProjet>>;
+}
+
+/**
  * Store d'état applicatif de la session : fichier ouvert/verrouillé/fermé, emplacement des credentials en mémoire,
  * marqueur de présence d'une clé de session côté cœur natif, et purge complète invoquée au verrouillage comme à la
  * fermeture (RG-004, RG-005). La clé dérivée elle-même ne transite jamais vers l'interface (RG-002) : seul un
@@ -42,6 +84,8 @@ export class EtatSessionService {
   private readonly credentialsInterne: WritableSignal<CredentialsEnMemoire | null> = signal(null);
   private readonly cleSessionPresenteInterne: WritableSignal<boolean> = signal(false);
   private readonly echecsDeverrouillageInterne: WritableSignal<number> = signal(0);
+  private readonly progressionCampagneInterne: WritableSignal<ProgressionCampagne | null> =
+    signal(null);
 
   /**
    * État courant du fichier de données (fermé, ouvert, verrouillé), exposé en lecture seule.
@@ -74,6 +118,13 @@ export class EtatSessionService {
     this.echecsDeverrouillageInterne.asReadonly();
 
   /**
+   * Progression réactive locale de la campagne en cours (ou de la dernière campagne exécutée), `null` si aucune
+   * campagne n'a encore été lancée depuis le chargement de l'application (Phase 5, incrément 4).
+   */
+  public readonly progressionCampagne: Signal<ProgressionCampagne | null> =
+    this.progressionCampagneInterne.asReadonly();
+
+  /**
    * Marque l'ouverture d'un fichier (création ou chargement réussi) : passe en état ouvert, mémorise le chemin et
    * marque la présence d'une clé de session.
    * @param cheminFichier - Chemin du fichier désormais ouvert.
@@ -91,6 +142,47 @@ export class EtatSessionService {
    */
   public definirCredentials(credentials: CredentialsEnMemoire): void {
     this.credentialsInterne.set(credentials);
+  }
+
+  /**
+   * Démarre la progression réactive locale d'une nouvelle campagne (Phase 5, incrément 4) : tous les projets du
+   * périmètre initialisés au statut `enAttente`. Remplace toute progression précédente (campagne antérieure déjà
+   * terminée).
+   * @param perimetre - Identifiants des projets du périmètre de la campagne qui commence.
+   */
+  public demarrerProgressionCampagne(perimetre: readonly string[]): void {
+    this.progressionCampagneInterne.set({
+      perimetre,
+      dateDebut: new Date().toISOString(),
+      projets: Object.fromEntries(perimetre.map((projetId) => [projetId, { statut: 'enAttente' }])),
+    });
+  }
+
+  /**
+   * Met à jour la progression d'un projet au sein de la campagne en cours (Phase 5, incrément 4), en fusionnant
+   * les champs fournis à l'entrée déjà existante. Sans effet si aucune campagne n'est en cours (garde défensive,
+   * ne devrait pas survenir dans le flux normal de `OrchestrateurCampagneService`).
+   * @param projetId - Identifiant du projet concerné.
+   * @param misesAJour - Champs de {@link ProgressionProjet} à fusionner dans l'entrée existante.
+   */
+  public mettreAJourProgressionProjet(
+    projetId: string,
+    misesAJour: Partial<ProgressionProjet>,
+  ): void {
+    const progression = this.progressionCampagneInterne();
+    if (progression === null) {
+      return;
+    }
+    const entreeCourante: ProgressionProjet = progression.projets[projetId] ?? {
+      statut: 'enAttente',
+    };
+    this.progressionCampagneInterne.set({
+      ...progression,
+      projets: {
+        ...progression.projets,
+        [projetId]: { ...entreeCourante, ...misesAJour },
+      },
+    });
   }
 
   /**
