@@ -1,0 +1,140 @@
+# Workflow généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+# .claude/rules/01-usage-ia-et-conventions.md.
+#
+# Périmètre couvert dès maintenant, sur déclenchement manuel uniquement (cf. échanges de cadrage) :
+# build du livrable Windows (installeur .msi/.exe NSIS + archive .zip portable), création du tag de version et
+# publication d'une GitHub Release associée avec changelog dérivé des Conventional Commits, conformément à
+# docs/02_documentation/19_environnementProduction.md#stratégie-de-build-empaquetage-et-publication.
+#
+# Explicitement hors périmètre à ce stade (décision humaine actée le 2026-07-24, faute du plugin
+# tauri-plugin-updater dans src-tauri/Cargo.toml à ce jour) : signature des exécutables et génération du
+# manifeste de mise à jour de l'updater Tauri (bundle.createUpdaterArtifacts). À ajouter lors de la mise en place
+# effective de l'updater (Phase 10, cf. docs/03_plan/plan_13_developpement.md#phase-10--intégration-continue-empaquetage-et-publication),
+# avec le secret TAURI_SIGNING_PRIVATE_KEY.
+#
+# Déclenchement par tag Git poussé par le développeur (cf. stratégie documentée) non couvert ici : seul le
+# déclenchement manuel workflow_dispatch a été demandé à ce stade.
+name: Publication Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Numéro de version à publier (SemVer, sans préfixe v), ex. 0.2.0'
+        required: true
+        type: string
+
+jobs:
+  verification-version:
+    name: Vérification du numéro de version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Contrôle du format SemVer
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Le numéro de version '${{ inputs.version }}' ne respecte pas le format SemVer attendu (X.Y.Z)."
+            exit 1
+          fi
+
+      # Le numéro de version saisi doit correspondre à celui déjà committé dans tauri.conf.json et Cargo.toml
+      # (bump de version fait par le développeur, cf. docs/02_documentation/19_environnementProduction.md#gestion-des-versions-et-des-mises-à-jour) :
+      # ce workflow ne modifie jamais ces fichiers lui-même, pour ne jamais publier une Release dont le numéro de
+      # version diverge silencieusement du code réellement figé dans l'historique Git.
+      - name: Contrôle de cohérence avec la version committée (tauri.conf.json, Cargo.toml)
+        run: |
+          version_tauri=$(node -pe "require('./src-tauri/tauri.conf.json').version")
+          version_cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          if [[ "$version_tauri" != "${{ inputs.version }}" || "$version_cargo" != "${{ inputs.version }}" ]]; then
+            echo "::error::Version demandée '${{ inputs.version }}' ≠ version committée (tauri.conf.json: $version_tauri, Cargo.toml: $version_cargo). Committer d'abord le bump de version sur les deux fichiers."
+            exit 1
+          fi
+
+      - name: Calcul du nom de tag
+        id: tag
+        run: echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    name: Génération du livrable Windows
+    needs: verification-version
+    runs-on: windows-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml)
+        run: rustup show
+
+      - name: 'Build de l''installeur (.msi, .exe NSIS) via Tauri (bundle.targets: "all" de tauri.conf.json)'
+        run: npm run tauri build
+
+      - name: Constitution de l'archive .zip portable (exécutable autonome, sans installation)
+        run: |
+          $version = "${{ inputs.version }}"
+          $exeSource = "src-tauri/target/release/suivi_qualimetrie.exe"
+          $stagingDir = "src-tauri/target/release/bundle/portable/SuiviQualimetrie-$version-portable"
+          New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+          Copy-Item $exeSource -Destination "$stagingDir/SuiviQualimetrie.exe"
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath "src-tauri/target/release/bundle/portable/SuiviQualimetrie-$version-portable.zip"
+
+      - name: Archivage temporaire des livrables (avant publication de la Release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: livrable-windows-${{ inputs.version }}
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/portable/*.zip
+          retention-days: 7
+
+  publication-release:
+    name: Création du tag et publication de la GitHub Release
+    needs: [verification-version, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Récupération du code (historique complet pour le changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Récupération des livrables Windows générés
+        uses: actions/download-artifact@v4
+        with:
+          name: livrable-windows-${{ inputs.version }}
+          path: livrables
+
+      - name: Création et publication du tag de version
+        env:
+          TAG: ${{ needs.verification-version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Version $TAG"
+          git push origin "$TAG"
+
+      - name: Publication de la GitHub Release avec changelog Conventional Commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.verification-version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            livrables/msi/*.msi \
+            livrables/nsis/*.exe \
+            livrables/portable/*.zip
