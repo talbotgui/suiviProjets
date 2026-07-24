@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "tauri": "tauri",
     "watch": "ng build --watch --configuration development",
     "test": "jest",
     "test:coverage": "jest --coverage",
