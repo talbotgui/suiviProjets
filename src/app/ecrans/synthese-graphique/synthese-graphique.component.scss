@@ -1,0 +1,79 @@
+.synthese-graphique {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.synthese-graphique__filtres {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.synthese-graphique__select {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+}
+
+.synthese-graphique__export {
+  margin-left: auto;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #1a56db;
+  background-color: #fff;
+  color: #1a56db;
+  cursor: pointer;
+}
+
+.synthese-graphique__export:hover {
+  background-color: #eef3ff;
+}
+
+.synthese-graphique__export:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
+}
+
+.synthese-graphique__projets {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+
+.synthese-graphique__projets-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.synthese-graphique__projets-actions button {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.synthese-graphique__projets-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.synthese-graphique__projet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.synthese-graphique__aucun-projet {
+  font-size: 0.8rem;
+  color: #666;
+}

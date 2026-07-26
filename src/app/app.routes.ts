@@ -8,6 +8,7 @@ import { SqmTableauDeBordComponent } from './ecrans/audits/tableau-de-bord/table
 import { SqmComparaisonAuditsComponent } from './ecrans/comparaison-audits/comparaison-audits.component';
 import { SqmFicheProjetComponent } from './ecrans/fiche-projet/fiche-projet.component';
 import { SqmSyntheseAuditsComponent } from './ecrans/synthese-audits/synthese-audits.component';
+import { SqmSyntheseGraphiqueComponent } from './ecrans/synthese-graphique/synthese-graphique.component';
 
 // Toutes les routes de l'application sont désormais des routes enfants de `ShellComponent` (Phase 6, incrément 3),
 // qui porte la sidebar et la barre supérieure communes (`docs/02_documentation/08_arborescenceNavigation.md`) :
@@ -27,6 +28,9 @@ import { SqmSyntheseAuditsComponent } from './ecrans/synthese-audits/synthese-au
 // sur le modèle exact de `fiche-projet/:projetId` : le lien d'action « Comparer à un autre audit » de
 // `SqmFicheProjetComponent` pointait déjà vers cette route par anticipation depuis l'incrément 5.
 //
+// Route `synthese-graphique` ajoutée à la Phase 6, incrément 7 (US-016, `SqmSyntheseGraphiqueComponent`), sur le
+// modèle exact de `synthese-audits` (route enfant sans paramètre, entrée de sidebar désormais active).
+//
 // Note de relecture (décision toujours provisoire, comme l'était déjà la précédente redirection vers
 // `administration`, cf. `docs/04_rapports/rapportDeDeveloppement.md#étape-3--administration-du-modèle`) :
 // `08_arborescenceNavigation.md` documente `Accueil` (résumé) comme un écran de la sidebar du shell, mais fait
@@ -42,6 +46,7 @@ export const routes: Routes = [
     children: [
       { path: 'accueil', component: SqmAccueilComponent },
       { path: 'synthese-audits', component: SqmSyntheseAuditsComponent },
+      { path: 'synthese-graphique', component: SqmSyntheseGraphiqueComponent },
       { path: 'fiche-projet/:projetId', component: SqmFicheProjetComponent },
       { path: 'comparaison-audits/:projetId', component: SqmComparaisonAuditsComponent },
       { path: 'administration', component: SqmAdministrationComponent },

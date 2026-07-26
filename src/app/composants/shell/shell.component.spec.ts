@@ -97,6 +97,7 @@ describe('SqmShellComponent', () => {
     expect(element.textContent).toContain('Administration');
     expect(element.textContent).toContain('Audits');
     expect(element.textContent).toContain('Synthèse des audits');
+    expect(element.textContent).toContain('Synthèse graphique');
     expect(element.querySelector('router-outlet')).not.toBeNull();
   });
 
@@ -105,10 +106,10 @@ describe('SqmShellComponent', () => {
     fixture.detectChanges();
     const element = DomTestUtils.obtenirElementNatif(fixture);
 
-    // Synthèse graphique, Liste de travail, Paramétrage (Synthèse des audits est désormais interactive depuis la
-    // Phase 6, incrément 4).
+    // Liste de travail, Paramétrage (Synthèse des audits depuis la Phase 6 incrément 4 et Synthèse graphique
+    // depuis la Phase 6 incrément 7 sont désormais interactives).
     const entreesAVenir = element.querySelectorAll('[aria-disabled="true"]');
-    expect(entreesAVenir.length).toBe(3);
+    expect(entreesAVenir.length).toBe(2);
   });
 
   it('navigue vers Synthèse des audits au clic sur l’entrée de sidebar correspondante', async () => {
@@ -124,6 +125,21 @@ describe('SqmShellComponent', () => {
     await fixture.whenStable();
 
     expect(router.url).toBe('/synthese-audits');
+  });
+
+  it('navigue vers Synthèse graphique au clic sur l’entrée de sidebar correspondante', async () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    const lien = Array.from(element.querySelectorAll('a.shell__lien')).find((candidat) =>
+      candidat.textContent?.includes('Synthèse graphique'),
+    );
+    expect(lien).not.toBeUndefined();
+    lien?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/synthese-graphique');
   });
 
   it('affiche un libellé de repli quand aucun fichier n’est chargé', () => {

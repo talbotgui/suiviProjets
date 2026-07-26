@@ -1,0 +1,41 @@
+<!-- État particulier (docs/02_documentation/09_maquettes.md#états-particuliers) : aucune donnée disponible sur la
+     période/le filtre choisi -> message explicite, jamais un graphique vide silencieux. -->
+@if (aucuneDonnee()) {
+  <p class="graphique-evolution__vide" role="status">{{ messageAucuneDonnee() }}</p>
+} @else {
+  <div class="graphique-evolution__barre-outils">
+    <div
+      class="graphique-evolution__legende"
+      role="group"
+      aria-label="Séries activables/désactivables"
+    >
+      @for (serie of series(); track serie.id) {
+        <button
+          type="button"
+          class="graphique-evolution__bouton-serie"
+          [class.graphique-evolution__bouton-serie--inactive]="!serieActive(serie.id)"
+          [style.--couleur-serie]="serie.couleur"
+          [attr.aria-pressed]="serieActive(serie.id)"
+          (click)="basculerSerie(serie.id)"
+        >
+          <span class="graphique-evolution__pastille" aria-hidden="true"></span>
+          {{ serie.libelle }}
+        </button>
+      }
+    </div>
+
+    <div class="graphique-evolution__zoom" role="group" aria-label="Zoom temporel">
+      <button type="button" (click)="zoomerAvant()">Zoom avant</button>
+      <button type="button" (click)="zoomerArriere()">Zoom arrière</button>
+      <button type="button" (click)="reinitialiserZoom()">Réinitialiser le zoom</button>
+    </div>
+  </div>
+
+  <div class="graphique-evolution__zone">
+    <canvas
+      #canvas
+      aria-label="Graphique d'évolution des indicateurs sélectionnés"
+      role="img"
+    ></canvas>
+  </div>
+}

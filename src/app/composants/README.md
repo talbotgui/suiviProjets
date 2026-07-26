@@ -9,3 +9,5 @@ Depuis la Phase 6 (incrément 2), il porte les trois premiers composants transve
 Depuis la Phase 6 (incrément 3), il porte également `shell/` (sidebar et barre supérieure communes à tous les écrans, `<router-outlet>` enfant).
 
 Depuis la Phase 6 (incrément 4), il porte `tableau-dense/` : composant générique (première colonne fixe au défilement horizontal, tri et filtres accessibles au clavier, ligne activable, RG-013 grisage de cellule isolée), consommé par l'écran Synthèse des audits (US-015).
+
+Depuis la Phase 6 (incrément 7), il porte également `graphique-evolution/` : composant générique de graphique d'évolution (zoom temporel, séries activables/désactivables individuellement via une légende HTML accessible au clavier, lignes verticales étiquetées pour les annotations et les changements de seuil, message explicite en l'absence de donnée), consommé par l'écran Synthèse graphique (US-016). Construit directement sur `chart.js` (complété de `chartjs-plugin-zoom` et `chartjs-plugin-annotation`), sans abstraction Angular intermédiaire, sur le même principe que l'appel direct à `html-to-image` déjà retenu par les écrans de restitution de cette phase.

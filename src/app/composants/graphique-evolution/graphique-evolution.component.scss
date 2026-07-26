@@ -1,0 +1,77 @@
+.graphique-evolution__vide {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+}
+
+.graphique-evolution__barre-outils {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.graphique-evolution__legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.graphique-evolution__bouton-serie {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.graphique-evolution__bouton-serie--inactive {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.graphique-evolution__bouton-serie:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
+}
+
+.graphique-evolution__pastille {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background-color: var(--couleur-serie, #999);
+}
+
+.graphique-evolution__zoom {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.graphique-evolution__zoom button {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.graphique-evolution__zoom button:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
+}
+
+.graphique-evolution__zone {
+  position: relative;
+  height: 380px;
+}

@@ -25,10 +25,15 @@
       <span>Synthèse des audits</span>
     </a>
 
-    <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
-      <span aria-hidden="true">📈</span>
+    <a
+      class="shell__lien"
+      routerLink="/synthese-graphique"
+      routerLinkActive="shell__lien--actif"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
+      <span aria-hidden="true">▧</span>
       <span>Synthèse graphique</span>
-    </span>
+    </a>
 
     <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
       <span aria-hidden="true">⚑</span>

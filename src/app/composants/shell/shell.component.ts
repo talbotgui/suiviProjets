@@ -11,9 +11,9 @@
 // - La sidebar reprend l'ordre exact des sept entrées énuméré par `08_arborescenceNavigation.md#règles-de-
 //   navigation` (Accueil, Synthèse des audits, Synthèse graphique, Liste de travail, Audits, Administration,
 //   Paramétrage). Seules les entrées dont l'écran existe déjà (Accueil, Synthèse des audits depuis la Phase 6
-//   incrément 4, Audits, Administration) portent une navigation active ; les trois autres, dont l'écran n'est pas
-//   encore construit (incrément 7 de ce plan pour Synthèse graphique, hors Phase 6 pour Liste de travail et
-//   Paramétrage), sont rendues non interactives (`aria-disabled`, sur le modèle de la section « À VENIR » de la
+//   incrément 4, Synthèse graphique depuis la Phase 6 incrément 7, Audits, Administration) portent une navigation
+//   active ; les deux entrées restantes, dont l'écran n'est pas encore construit (Liste de travail et Paramétrage,
+//   hors Phase 6), sont rendues non interactives (`aria-disabled`, sur le modèle de la section « À VENIR » de la
 //   maquette de référence) plutôt que de pointer vers une route inexistante : ce choix respecte le critère de
 //   sortie de chaque incrément (« navigation shell fonctionnelle entre tous les écrans EXISTANTS »).
 // - L'entrée « Audits » applique la règle de routage intelligent documentée par `08_arborescenceNavigation.md`

@@ -63,6 +63,8 @@ L'IA peut rédiger les documents de cadrage et produire du code, avec une superv
 
 L'IA n'exécute jamais elle-même : les commandes git (cf. règles générales), le déploiement en production, l'envoi de communications externes, la suppression de données, et plus généralement toute opération irréversible ou affectant des systèmes partagés. Ces opérations restent de la seule responsabilité humaine, même lorsque l'IA a préparé ou proposé le contenu de l'action.
 
+Le garde-fou technique de configuration bloquant les commandes git pour l'IA ne filtre que les commandes dont le premier mot est `git` ; une commande composée où `git` apparaît de façon non initiale (par exemple une substitution de processus au sein d'une commande `diff`) n'est pas interceptée par ce seul motif de refus et s'exécute malgré l'interdiction. Tant que ce motif n'est pas renforcé, la relecture de toute commande shell avant soumission reste nécessaire pour l'absence de tout appel git imbriqué (ajouté le 2026-07-26 : contournement constaté en relecture de la Phase 6 incrément 7, une commande combinant `diff` et un appel git imbriqué exécutée par erreur par le Relecteur malgré l'interdiction explicite et malgré le garde-fou déjà en place).
+
 ### Description
 
 #### Formulation des demandes à l'IA
@@ -110,6 +112,8 @@ Aucune ligne de code produite par l'IA n'est intégrée sans avoir été relue e
 La relecture visuelle du code ou du texte ne suffit pas : le résultat doit être concrètement exécuté, testé ou vérifié avant d'être considéré comme acquis.
 
 Cette vérification concrète s'applique également au compte-rendu du Codeur lui-même : toute affirmation décrivant un mécanisme ou une répartition de responsabilité entre deux modules (par exemple, qu'un comptage ou une décision est confié à tel composant plutôt qu'à un autre) est confirmée par une lecture directe du code réellement produit, jamais acceptée sur la seule foi du texte du rapport (ajouté le 2026-07-20 : à la relecture de la Phase 1, le compte-rendu du Codeur affirmait que le comptage des échecs consécutifs de déverrouillage était confié au Store d'état applicatif de l'interface, alors que ce mécanisme était en réalité absent du code correspondant).
+
+Une affirmation portant sur une correction de configuration (par exemple l'ajustement d'un seuil d'avertissement de build) est vérifiée par comparaison directe avec la liste réelle des fichiers modifiés de l'incrément, et non simplement rejouée en observant un comportement qui peut déjà être conforme pour une autre raison (ajouté le 2026-07-26 : à la relecture de la Phase 6 incrément 7, le compte-rendu du Codeur affirmait qu'un seuil de taille de fascicule avait été ajusté à cet incrément, alors que le fichier de configuration concerné n'apparaissait pas parmi les fichiers effectivement modifiés constatés à la relecture).
 
 #### Responsabilité humaine finale
 

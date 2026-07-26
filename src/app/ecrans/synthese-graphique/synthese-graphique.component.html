@@ -1,0 +1,61 @@
+<div class="synthese-graphique" #conteneurExport>
+  <div class="synthese-graphique__filtres">
+    <select
+      #selectGroupe
+      class="synthese-graphique__select"
+      aria-label="Filtrer par groupe"
+      (change)="onChangerGroupe(selectGroupe.value)"
+    >
+      <option value="">Tous les groupes</option>
+      @for (groupe of groupesDisponibles(); track groupe.id) {
+        <option [value]="groupe.id">{{ groupe.nom }}</option>
+      }
+    </select>
+
+    <select
+      #selectIndicateur
+      class="synthese-graphique__select"
+      aria-label="Filtrer par type d'indicateur"
+      (change)="onChangerIndicateur(selectIndicateur.value)"
+    >
+      @for (indicateur of indicateursDisponibles(); track indicateur.cle) {
+        <option [value]="indicateur.cle" [selected]="indicateur.cle === filtreIndicateur()">
+          {{ indicateur.libelle }}
+        </option>
+      }
+    </select>
+
+    <button type="button" class="synthese-graphique__export" (click)="exporterPng()">
+      Exporter en PNG
+    </button>
+  </div>
+
+  <fieldset class="synthese-graphique__projets">
+    <legend>Projets</legend>
+    <div class="synthese-graphique__projets-actions">
+      <button type="button" (click)="toutSelectionner()">Tout sélectionner</button>
+      <button type="button" (click)="toutDeselectionner()">Tout désélectionner</button>
+    </div>
+    <div class="synthese-graphique__projets-liste">
+      @for (projet of projetsDisponibles(); track projet.id) {
+        <label class="synthese-graphique__projet">
+          <input
+            type="checkbox"
+            [checked]="projetRetenu(projet.id)"
+            (change)="basculerProjet(projet.id)"
+          />
+          {{ projet.nom }}
+        </label>
+      }
+      @if (projetsDisponibles().length === 0) {
+        <p class="synthese-graphique__aucun-projet">Aucun projet disponible pour ce groupe.</p>
+      }
+    </div>
+  </fieldset>
+
+  <app-graphique-evolution
+    [series]="series()"
+    [lignesVerticales]="lignesVerticales()"
+    [messageAucuneDonnee]="messageAucuneDonnee()"
+  />
+</div>
