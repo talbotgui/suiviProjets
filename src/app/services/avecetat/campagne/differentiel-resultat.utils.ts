@@ -114,8 +114,8 @@ export class DifferentielResultatUtils {
 
   /**
    * Retrouve, sans accès non sûr à la valeur reçue, l'entrée d'un tableau de résultats bruts (`Audit.resultats`,
-   * typé `unknown` côté interface) portant le tag `Resultat` demandé, sur le modèle de
-   * `OrchestrateurCampagneService.estResultatTague`.
+   * union discriminée `Resultat` côté interface depuis la Phase 6, incrément 1, mais transmise ici en paramètre
+   * `readonly unknown[]` pour rester générique sur le tag recherché) portant le tag `Resultat` demandé.
    * @param resultats - Résultats bruts d'un audit.
    * @param tag - Tag `Resultat` recherché.
    * @returns Le résultat trouvé, `undefined` si absent.

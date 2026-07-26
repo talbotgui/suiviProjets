@@ -1,0 +1,44 @@
+// Couleurs choisies pour respecter un contraste minimal WCAG 2.1 AA (texte sur fond) entre le libellé et le fond de
+// la pastille, cf. docs/02_documentation/10_charteErgonomie.md#rappel-des-exigences-daccessibilité.
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+
+  &__pastille {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+  }
+
+  &--vert {
+    background-color: #e6f4ea;
+    color: #1e7d32;
+
+    .badge__pastille {
+      background-color: #1e7d32;
+    }
+  }
+
+  &--orange {
+    background-color: #fff4e0;
+    color: #8a5300;
+
+    .badge__pastille {
+      background-color: #8a5300;
+    }
+  }
+
+  &--rouge {
+    background-color: #fdeceb;
+    color: #b3261e;
+
+    .badge__pastille {
+      background-color: #b3261e;
+    }
+  }
+}

@@ -1,0 +1,143 @@
+// Couleurs alignées sur les mêmes tons que `badge.component.scss`/`bandeau-alerte.component.scss` (cohérence
+// visuelle transverse), contraste vérifié WCAG 2.1 AA (cf. docs/02_documentation/10_charteErgonomie.md#rappel-des-
+// exigences-daccessibilité).
+.tableau-dense__conteneur {
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background-color: #fff;
+}
+
+.tableau-dense {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.tableau-dense__entete,
+.tableau-dense__cellule-filtre,
+.tableau-dense__cellule {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  background-color: #fff;
+}
+
+.tableau-dense__entete {
+  background-color: #f7f7f7;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #555;
+}
+
+.tableau-dense__cellule-filtre {
+  background-color: #f7f7f7;
+}
+
+.tableau-dense__bouton-tri {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tableau-dense__bouton-tri:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
+}
+
+.tableau-dense__label-filtre {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.tableau-dense__champ-filtre {
+  width: 100%;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+// Colonne fixe au défilement horizontal (charte d'ergonomie, tableau dense) : appliquée à la fois aux en-têtes et
+// aux cellules de la colonne d'indice 0.
+.tableau-dense__cellule--fixe {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.tableau-dense__ligne {
+  cursor: pointer;
+}
+
+.tableau-dense__ligne:hover {
+  background-color: #f5f8ff;
+}
+
+.tableau-dense__ligne:hover .tableau-dense__cellule--fixe {
+  background-color: #f5f8ff;
+}
+
+.tableau-dense__ligne:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: -2px;
+}
+
+.tableau-dense__ligne--grisee {
+  color: #888;
+}
+
+.tableau-dense__ligne--grisee .tableau-dense__cellule {
+  background-color: #fafafa;
+}
+
+// RG-013 : grisage d'une cellule isolée (ex. métriques Sonar d'une ligne SONAR_KO), indépendant du grisage de ligne
+// ci-dessus (ex. ligne « jamais audité »).
+.tableau-dense__cellule--grisee {
+  opacity: 0.55;
+}
+
+.tableau-dense__ligne--desactivee {
+  cursor: default;
+}
+
+.tableau-dense__texte-couleur {
+  font-weight: 700;
+}
+
+.tableau-dense__texte-couleur--vert {
+  color: #1e7d32;
+}
+
+.tableau-dense__texte-couleur--orange {
+  color: #8a5300;
+}
+
+.tableau-dense__texte-couleur--rouge {
+  color: #b3261e;
+}
+
+.tableau-dense__icone {
+  margin-left: 0.3rem;
+}
+
+.tableau-dense__vide {
+  padding: 1rem;
+  text-align: center;
+  color: #777;
+}

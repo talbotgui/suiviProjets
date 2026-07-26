@@ -1,0 +1,196 @@
+.fiche-projet {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fiche-projet__etat-vide {
+  padding: 1rem;
+  color: #666;
+}
+
+.fiche-projet__entete {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fiche-projet__fil-ariane {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.fiche-projet__description {
+  font-size: 0.95rem;
+}
+
+.fiche-projet__ref-auditee {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.fiche-projet__badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fiche-projet__reserve-ia {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #b45309;
+}
+
+.fiche-projet__metadonnees {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+}
+
+.fiche-projet__metadonnee {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background-color: #f5f5f5;
+}
+
+.fiche-projet__metadonnee--echec {
+  background-color: #fde8e8;
+}
+
+.fiche-projet__metadonnee-libelle {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.fiche-projet__metadonnee-valeur {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fiche-projet__anomalie {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #dc2626;
+  background-color: #fef2f2;
+}
+
+.fiche-projet__anomalie-titre {
+  font-weight: 600;
+}
+
+.fiche-projet__anomalie-note {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.fiche-projet__anomalie-liste {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fiche-projet__anomalie-action {
+  font-size: 0.85rem;
+  color: #1a56db;
+}
+
+.fiche-projet__corps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.fiche-projet__colonne {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fiche-projet__bloc-sonar--grise {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.fiche-projet__legende-sonar-ko {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #b45309;
+}
+
+.fiche-projet__ligne-indicateur {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fiche-projet__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.fiche-projet__table th,
+.fiche-projet__table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.fiche-projet__table-caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.fiche-projet__liste {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.fiche-projet__ligne--inconnu {
+  background-color: #fde8e8;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+}
+
+.fiche-projet__note-qualification {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.fiche-projet__actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.fiche-projet__action {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #1a56db;
+  background-color: #fff;
+  color: #1a56db;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.fiche-projet__action:hover {
+  background-color: #eef3ff;
+}
+
+.fiche-projet__action:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
+}

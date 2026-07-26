@@ -2,24 +2,288 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Types TypeScript mirroir de la racine du document JSON en clair (Phase 3, US-006, US-007, US-008 ; Phase 4,
-// US-022 à US-024), alignés sur `src-tauri/src/modele/racine.rs`, tous deux sérialisés en `camelCase` côté Rust
-// (`serde(rename_all = "camelCase")`). Réutilise `Instance`/`TypeInstance`, déjà définis dans
+// US-022 à US-024 ; Phase 6, incrément 1), alignés sur `src-tauri/src/modele/racine.rs`, tous deux sérialisés en
+// `camelCase` côté Rust (`serde(rename_all = "camelCase")`). Réutilise `Instance`/`TypeInstance` et les 13
+// interfaces `Resultat*` du catalogue figé (hors les 3 résultats croisés, calculés côté UI), déjà définies dans
 // `services/sansetat/commandes/types-facade.ts`, plutôt que de les dupliquer (dépendance `avecetat` → `sansetat`
 // autorisée par le découpage en couches du projet, cf.
-// `docs/02_documentation/14_normesDeveloppement.md#structuration-du-code-et-découpage-en-couches`).
+// `docs/02_documentation/14_normesDeveloppement.md#structuration-du-code-et-découpage-en-couches`). Réutilise de
+// même les 3 interfaces `ResultatCroise*`, déjà définies dans `services/avecetat/campagne/connecteur-croise.
+// utils.ts` (Connecteur croisé) : dépendance `avecetat/etat` → `avecetat/campagne` sans cycle (`connecteur-croise.
+// utils.ts` n'importe rien de `services/avecetat/etat/`), retenue plutôt qu'une duplication des 3 interfaces.
 //
-// Les branches dont le contenu détaillé relève d'une phase ultérieure (référentiels, seuils, journal hors ajout,
-// vues enregistrées) sont typées de façon minimale ou en `unknown`, à l'identique de la décision de modélisation
-// déjà prise côté Rust (`serde_json::Value`, cf. commentaire d'en-tête de `modele/racine.rs`) : elles ne sont
-// jamais interprétées ici, seulement conservées telles quelles lors des mutations du Store afin de préserver un
-// round-trip fidèle vers `sauvegarderFichier`. `MembreConnu` et `Annotation` sont typées intégralement depuis la
-// Phase 4, `Campagne`/`Verdict`/`Brouillon`/`ResultatBrouillonProjet` le sont depuis la Phase 5 (incrément 2),
-// leurs commandes de la Façade échangeant désormais ces types comme paramètres explicites. Le contenu détaillé
-// d'un `Audit` (`resultats`, catalogue figé des indicateurs) reste en `unknown` : ces valeurs ne sont ni
-// construites ni interprétées côté interface avant le Moteur de jugement (Phase 6), seulement transmises telles
-// quelles par l'Orchestrateur de campagne (incrément ultérieur). Les annotations de portée groupe et le détail du
-// calcul du premier commit interne restent hors périmètre (respectivement Phase 8 et Phase 5).
-import type { Instance } from '../../sansetat/commandes/types-facade';
+// Périmètre de la Phase 6, incrément 1 : `referentiels` et `parametres.seuils` sont désormais typés (mirroir
+// strict de `Referentiels` côté cœur natif pour le premier, reprise exacte des clés confirmées dans
+// `docs/01_besoin/exemple-donnees.json` pour le second), de même que `resultats` (union discriminée `Resultat`,
+// 16 variantes) et `premierCommitInterne`/`traitementsAlertes`. Les autres sous-branches de `parametres`
+// (`verrouillage`, `audit`, `proxy`, `sauvegarde`) et le contenu des règles de `referentiels.reglesDependances`/
+// `referentiels.reglesMarqueursIA` restent en `unknown`, à l'identique de la décision de modélisation prise côté
+// Rust (`serde_json::Value`, cf. commentaire d'en-tête de `modele/racine.rs`) : hors périmètre exact de cet
+// incrément (non énuméré par la conception détaillée), non interprétées ici, seulement conservées telles quelles
+// lors des mutations du Store afin de préserver un round-trip fidèle vers `sauvegarderFichier`. `MembreConnu` et
+// `Annotation` sont typées intégralement depuis la Phase 4, `Campagne`/`Verdict`/`Brouillon`/
+// `ResultatBrouillonProjet` le sont depuis la Phase 5 (incrément 2), leurs commandes de la Façade échangeant
+// désormais ces types comme paramètres explicites. Les annotations de portée groupe restent hors périmètre
+// (Phase 8).
+import type {
+  Instance,
+  ResultatGitlabBranches,
+  ResultatGitlabContributeurs,
+  ResultatGitlabDependances,
+  ResultatGitlabMarqueursIa,
+  ResultatGitlabMembres,
+  ResultatGitlabMergeRequests,
+  ResultatGitlabTailleDepot,
+  ResultatGitlabVitalite,
+  ResultatSonarCouverture,
+  ResultatSonarDette,
+  ResultatSonarNcloc,
+  ResultatSonarNotes,
+  ResultatSonarViolations,
+} from '../../sansetat/commandes/types-facade';
+import type {
+  ResultatCroiseActiviteSansQualite,
+  ResultatCroiseFraicheurSonar,
+  ResultatCroiseIaNouveauCode,
+} from '../campagne/connecteur-croise.utils';
+
+/**
+ * Résultat typé d'un audit, mirroir de `Resultat` côté cœur natif : union discriminée sur `type` (16 variantes du
+ * catalogue figé, `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`), chaque variante
+ * réutilisant l'interface de charge utile déjà définie (`types-facade.ts` pour les 13 résultats bruts obtenus par
+ * appel API, `connecteur-croise.utils.ts` pour les 3 résultats croisés calculés côté UI). À traiter par un switch
+ * exhaustif sur `type` plutôt que par un accès non sûr à un champ arbitraire (RG-011 : aucun verdict n'est jamais
+ * porté par ces charges utiles, seulement des constats bruts).
+ */
+export type Resultat =
+  | ({ readonly type: 'gitlab.dependances' } & ResultatGitlabDependances)
+  | ({ readonly type: 'gitlab.branches' } & ResultatGitlabBranches)
+  | ({ readonly type: 'gitlab.vitalite' } & ResultatGitlabVitalite)
+  | ({ readonly type: 'gitlab.contributeurs' } & ResultatGitlabContributeurs)
+  | ({ readonly type: 'gitlab.taille_depot' } & ResultatGitlabTailleDepot)
+  | ({ readonly type: 'gitlab.merge_requests' } & ResultatGitlabMergeRequests)
+  | ({ readonly type: 'gitlab.marqueurs_ia' } & ResultatGitlabMarqueursIa)
+  | ({ readonly type: 'gitlab.membres' } & ResultatGitlabMembres)
+  | ({ readonly type: 'sonar.violations' } & ResultatSonarViolations)
+  | ({ readonly type: 'sonar.dette' } & ResultatSonarDette)
+  | ({ readonly type: 'sonar.couverture' } & ResultatSonarCouverture)
+  | ({ readonly type: 'sonar.notes' } & ResultatSonarNotes)
+  | ({ readonly type: 'sonar.ncloc' } & ResultatSonarNcloc)
+  | ({ readonly type: 'croise.fraicheur_sonar' } & ResultatCroiseFraicheurSonar)
+  | ({ readonly type: 'croise.activite_sans_qualite' } & ResultatCroiseActiviteSansQualite)
+  | ({ readonly type: 'croise.ia_nouveau_code' } & ResultatCroiseIaNouveauCode);
+
+/**
+ * Grilles de lecture partageables (référentiels), mirroir strict de `Referentiels` côté cœur natif : `reglesDependances`/
+ * `reglesMarqueursIA` restent en `unknown[]` (contenu détaillé hors périmètre de cet incrément, cf. commentaire
+ * d'en-tête de ce fichier), seul `motifNommageBranches` (RG-030) est typé en toutes lettres, seul champ
+ * effectivement consommé avant la Phase 7 (Paramétrage), par le Moteur de jugement (incrément 2).
+ */
+export interface Referentiels {
+  /** Règles de dépendances (motif, versions, statuts d'obsolescence), non interprétées avant la Phase 7. */
+  readonly reglesDependances: readonly unknown[];
+  /** Règles de détection des marqueurs d'outils IA (F18), non interprétées avant la Phase 7. */
+  readonly reglesMarqueursIA: readonly unknown[];
+  /**
+   * Motif d'expression régulière de nommage de branche, paramétrable (RG-030), consommé exclusivement à
+   * l'affichage par le Moteur de jugement pour recalculer la conformité de nommage d'une branche
+   * (`Resultat.GitlabBranches`), jamais stocké comme un constat.
+   */
+  readonly motifNommageBranches: string;
+}
+
+/**
+ * Seuils de vitalité du dépôt (`parametres.seuils.vitalite`), mirroir de la clé homonyme de
+ * `docs/01_besoin/exemple-donnees.json`.
+ */
+export interface SeuilsVitalite {
+  /** Nombre de jours sans commit à partir duquel un dépôt est considéré mourant. */
+  readonly mourantJours: number;
+  /** Nombre de jours sans commit à partir duquel un dépôt est considéré mort. */
+  readonly mortJours: number;
+}
+
+/**
+ * Bornes de classe de taille du dépôt (`parametres.seuils.tailleDepot`), en octets.
+ */
+export interface SeuilsTailleDepot {
+  /** Borne supérieure de la classe « S ». */
+  readonly borneS: number;
+  /** Borne supérieure de la classe « L ». */
+  readonly borneL: number;
+  /** Borne supérieure de la classe « XL ». */
+  readonly borneXL: number;
+}
+
+/**
+ * Seuils de couverture de tests Sonar (`parametres.seuils.couverture`), en pourcentage.
+ */
+export interface SeuilsCouverture {
+  /** Seuil en-dessous duquel la couverture est jugée rouge. */
+  readonly seuilRouge: number;
+  /** Seuil en-dessous duquel la couverture est jugée orange (au-delà de {@link seuilRouge}). */
+  readonly seuilOrange: number;
+}
+
+/**
+ * Tolérance de fraîcheur Sonar (`parametres.seuils.fraicheurSonar`, RG-013).
+ */
+export interface SeuilsFraicheurSonar {
+  /** Nombre de jours d'écart toléré entre le dernier commit et la dernière analyse Sonar avant badge SONAR_KO. */
+  readonly toleranceJours: number;
+}
+
+/**
+ * Seuils d'activité sans qualité (`parametres.seuils.activiteSansQualite`).
+ */
+export interface SeuilsActiviteSansQualite {
+  /** Nombre minimal de commits sur la fenêtre glissante pour que le signal soit évaluable. */
+  readonly minCommits: number;
+  /** Nombre minimal de nouvelles violations Sonar pour déclencher le signal. */
+  readonly minNouvellesViolations: number;
+}
+
+/**
+ * Seuil de fraîcheur d'audit (`parametres.seuils.fraicheurAudit`).
+ */
+export interface SeuilsFraicheurAudit {
+  /** Nombre de jours au-delà duquel un projet est considéré non audité depuis trop longtemps. */
+  readonly ancienJours: number;
+}
+
+/**
+ * Seuils des demandes de fusion ouvertes (`parametres.seuils.mrOuvertes`).
+ */
+export interface SeuilsMrOuvertes {
+  /** Âge en jours à partir duquel une MR ouverte est jugée orange. */
+  readonly ageOrangeJours: number;
+  /** Âge en jours à partir duquel une MR ouverte est jugée rouge. */
+  readonly ageRougeJours: number;
+  /** Pourcentage de MR ouvertes en conflit à partir duquel le signal est jugé rouge. */
+  readonly pourcentageConflitRouge: number;
+}
+
+/**
+ * Seuils orange/rouge appliqués à un décompte de violations d'une sévérité donnée
+ * (`parametres.seuils.couleursViolations.{bloquant,critique}`).
+ */
+export interface SeuilsCouleurViolations {
+  /** Nombre de violations à partir duquel la sévérité concernée est jugée orange. */
+  readonly seuilOrange: number;
+  /** Nombre de violations à partir duquel la sévérité concernée est jugée rouge. */
+  readonly seuilRouge: number;
+}
+
+/**
+ * Seuils de couleur des violations bloquantes/critiques (`parametres.seuils.couleursViolations`).
+ */
+export interface SeuilsCouleursViolations {
+  /** Seuils appliqués au décompte de violations bloquantes. */
+  readonly bloquant: SeuilsCouleurViolations;
+  /** Seuils appliqués au décompte de violations critiques. */
+  readonly critique: SeuilsCouleurViolations;
+}
+
+/**
+ * Seuil de matérialité du brouillon (`parametres.seuils.materialiteBrouillon`, RG-020, F09).
+ */
+export interface SeuilsMaterialiteBrouillon {
+  /** Ratio de variation relative au-delà duquel un mouvement est signalé comme matériel. */
+  readonly variationRelative: number;
+}
+
+/**
+ * Grille de seuils du Moteur de jugement (`parametres.seuils`), mirroir des clés exactement confirmées dans
+ * `docs/01_besoin/exemple-donnees.json` (les autres sous-branches de `parametres` restent en `unknown`, cf.
+ * commentaire d'en-tête de ce fichier). Reste une valeur JSON générique côté cœur natif (`serde_json::Value`,
+ * décision de modélisation actée dès la Phase 1) : ce typage est propre à l'interface, consommé par le futur
+ * point unique de lecture défensive du Moteur de jugement (`ParametresJugementUtils`, incrément 2).
+ */
+export interface SeuilsJugement {
+  /** Seuils de vitalité du dépôt. */
+  readonly vitalite: SeuilsVitalite;
+  /** Bornes de classe de taille du dépôt. */
+  readonly tailleDepot: SeuilsTailleDepot;
+  /** Seuils de couverture de tests Sonar. */
+  readonly couverture: SeuilsCouverture;
+  /** Tolérance de fraîcheur Sonar (RG-013). */
+  readonly fraicheurSonar: SeuilsFraicheurSonar;
+  /** Seuils d'activité sans qualité. */
+  readonly activiteSansQualite: SeuilsActiviteSansQualite;
+  /** Seuil de fraîcheur d'audit. */
+  readonly fraicheurAudit: SeuilsFraicheurAudit;
+  /** Seuils des demandes de fusion ouvertes. */
+  readonly mrOuvertes: SeuilsMrOuvertes;
+  /** Seuils de couleur des violations bloquantes/critiques. */
+  readonly couleursViolations: SeuilsCouleursViolations;
+  /** Seuil de matérialité du brouillon. */
+  readonly materialiteBrouillon: SeuilsMaterialiteBrouillon;
+}
+
+/**
+ * Seuils et réglages applicatifs (`parametres`), mirroir partiel de `Parametres` côté cœur natif : seul `seuils`
+ * est typé en toutes lettres (périmètre exact de cet incrément), les autres sous-branches (`verrouillage`,
+ * `audit`, `proxy`, `sauvegarde`), pourtant typées côté cœur natif, restent en `unknown` côté interface faute
+ * d'être énumérées par la conception détaillée de cet incrément — décision arbitraire de portée limitée, cf.
+ * rapport de développement de cette phase.
+ */
+export interface Parametres {
+  /** Grille de seuils du Moteur de jugement. */
+  readonly seuils: SeuilsJugement;
+  /** Réglages de verrouillage de session, non interprétés côté interface. */
+  readonly verrouillage: unknown;
+  /** Réglages d'exécution des campagnes d'audit, non interprétés côté interface au-delà de `audit.concurrence`. */
+  readonly audit: unknown;
+  /** Réglages de proxy sortant, non interprétés côté interface. */
+  readonly proxy: unknown;
+  /** Réglages de sauvegarde de sécurité, non interprétés côté interface. */
+  readonly sauvegarde: unknown;
+}
+
+/**
+ * Attribut immuable recalculable identifiant la date du premier commit interne d'un projet, mirroir de
+ * `PremierCommitInterne` côté cœur natif.
+ */
+export interface PremierCommitInterne {
+  /** Date du premier commit interne détecté. */
+  readonly date: string;
+  /** SHA (éventuellement abrégé) du commit. */
+  readonly sha: string;
+  /** Adresse courriel de l'auteur du commit. */
+  readonly emailAuteur: string;
+  /** Date à laquelle ce calcul a été effectué. */
+  readonly calculeLe: string;
+  /** Empreinte du référentiel de membres connus utilisé au moment du calcul. */
+  readonly empreinteReferentiel: string;
+  /** Statut du calcul (ex. `determine`). */
+  readonly statut: string;
+}
+
+/**
+ * Statut de traitement d'une alerte (RG-026), mirroir de `StatutTraitementAlerte` côté cœur natif.
+ */
+export enum StatutTraitementAlerte {
+  /** Alerte vue mais non encore traitée. */
+  Vue = 'vue',
+  /** Alerte traitée. */
+  Traitee = 'traitee',
+}
+
+/**
+ * Statut vu/traité associé à une clé d'alerte stable (RG-026), mirroir de `TraitementAlerte` côté cœur natif.
+ */
+export interface TraitementAlerte {
+  /** Identifiant UUID v4 de l'entrée. */
+  readonly id: string;
+  /** Clé stable de l'alerte (`typeAlerte|projetId|discriminant`). */
+  readonly cleAlerte: string;
+  /** Statut courant du traitement. */
+  readonly statut: StatutTraitementAlerte;
+  /** Commentaire libre optionnel. */
+  readonly commentaire?: string;
+  /** Horodatage de la dernière mise à jour du statut. */
+  readonly horodatage: string;
+}
 
 /**
  * Type de critère d'identification d'un membre connu (mirroir de `TypeCritere` côté cœur natif).
@@ -125,8 +389,8 @@ export interface Projet {
   readonly iaAutorisee: boolean;
   /** Date d'autorisation de l'IA, renseignée uniquement si `iaAutorisee` est ou a été vraie (RG-015). */
   readonly iaAutoriseeDepuis?: string;
-  /** Date du premier commit interne, une fois calculée (hors périmètre de l'Administration). */
-  readonly premierCommitInterne?: unknown;
+  /** Date du premier commit interne, une fois calculée (consommé par la future Fiche projet, Phase 6). */
+  readonly premierCommitInterne?: PremierCommitInterne;
   /** Sources rattachées au projet. */
   readonly sources: readonly Source[];
   /**
@@ -185,8 +449,8 @@ export interface EntreeJournal {
 
 /**
  * Historique d'audit d'un projet : un ensemble de constats bruts obtenus à une date donnée, mirroir de `Audit`
- * côté cœur natif. `resultats` (catalogue figé des types d'indicateurs) reste en `unknown` : ni construit ni
- * interprété côté interface avant le Moteur de jugement (Phase 6).
+ * côté cœur natif. `resultats` (catalogue figé des types d'indicateurs, Phase 6, incrément 1) est désormais typé
+ * par l'union discriminée {@link Resultat}.
  */
 export interface Audit {
   /** Identifiant UUID v4 de l'audit. */
@@ -195,8 +459,8 @@ export interface Audit {
   readonly date: string;
   /** Identifiant de la campagne qui a produit cet audit. */
   readonly campagneId: string;
-  /** Résultats typés obtenus (catalogue figé, hors périmètre d'interprétation de l'interface avant la Phase 6). */
-  readonly resultats: readonly unknown[];
+  /** Résultats typés obtenus (catalogue figé, union discriminée sur `type`). */
+  readonly resultats: readonly Resultat[];
 }
 
 /**
@@ -301,16 +565,16 @@ export interface DonneesRacine {
   readonly meta: Meta;
   /** Grappe principale de groupes. */
   readonly groupes: readonly Groupe[];
-  /** Grilles de lecture partageables (hors périmètre de l'Administration, Phase 3). */
-  readonly referentiels: unknown;
-  /** Seuils et réglages applicatifs (hors périmètre de l'Administration, Phase 3). */
-  readonly parametres: unknown;
+  /** Grilles de lecture partageables (Phase 6, incrément 1 : `motifNommageBranches` typé, cf. {@link Referentiels}). */
+  readonly referentiels: Referentiels;
+  /** Seuils et réglages applicatifs (Phase 6, incrément 1 : `seuils` typé, cf. {@link Parametres}). */
+  readonly parametres: Parametres;
   /** Traces d'exécution des campagnes d'audit. */
   readonly campagnes: readonly Campagne[];
   /** Zone de validation courante, au plus une occurrence. */
   readonly brouillon: Brouillon | null;
-  /** Statuts vu/traité par clé d'alerte stable (hors périmètre de l'Administration, Phase 3). */
-  readonly traitementsAlertes: readonly unknown[];
+  /** Statuts vu/traité par clé d'alerte stable (RG-026, Phase 6, incrément 1). */
+  readonly traitementsAlertes: readonly TraitementAlerte[];
   /** Journal append-only des modifications de paramétrage (RG-023). */
   readonly journal: readonly EntreeJournal[];
   /** Modèles de filtres nommés (hors périmètre de l'Administration, Phase 3). */

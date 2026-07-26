@@ -23,9 +23,11 @@
 //     (`AberrationUtils`).
 //   - Un projet est « succès » dès qu'au moins un résultat exploitable a été obtenu (résultats partiels conservés,
 //     anomalies des appels échoués consignées) ; « échec » seulement si aucun résultat n'a pu être obtenu.
-//   - `interrogerDependances` et `gitlab.branches` restent différés (connecteurs non livrés) : simplement absents
-//     des appels effectués ici. `interrogerMarqueursIa` et `croise.ia_nouveau_code` sont livrés à l'incrément 7
-//     (référentiel `reglesMarqueursIA` extrait via `extraireReglesMarqueursIa`, jamais persisté par ce service).
+//   - `interrogerMarqueursIa` et `croise.ia_nouveau_code` sont livrés à l'incrément 7 (référentiel
+//     `reglesMarqueursIA` extrait via `extraireReglesMarqueursIa`, jamais persisté par ce service).
+//     `interrogerBranchesCompletes` (`gitlab.branches`) et `interrogerDependances` (`gitlab.dependances`) sont
+//     câblés depuis l'incrément de rattrapage de la Phase 5 (précédant la Phase 6), les deux dernières opérations
+//     du catalogue figé des résultats d'audit restées différées jusque-là.
 //   - Le rapport d'anomalies détaillé (F08, RG-021 : catégorie/message/action suggérée/regroupement) reste un
 //     incrément ultérieur ; les anomalies sont collectées ici sous une forme minimale (`{ indicateur, sourceId,
 //     anomalie }`), décision arbitraire documentée dans le rapport de développement de cette phase.
@@ -50,6 +52,7 @@ import type {
   Audit,
   Groupe,
   Projet,
+  Resultat,
   ResultatBrouillonProjet,
   ResultatMutationAdministration,
   Verdict,
@@ -226,7 +229,7 @@ export class OrchestrateurCampagneService {
       return { projetId, verdict: { projetId, statut: 'echec' } };
     }
 
-    const resultats: unknown[] = [];
+    const resultats: Resultat[] = [];
     const anomalies: unknown[] = [];
     let dernierMotifEchec: string | undefined;
     let vitalite: ResultatGitlabVitalite | undefined;
@@ -325,6 +328,36 @@ export class OrchestrateurCampagneService {
         );
         dernierMotifEchec =
           this.integrer(reponseMembres, resultats, anomalies) ?? dernierMotifEchec;
+
+        const reponseBranches = await this.executerIndicateur(
+          'gitlab.branches',
+          resolution.groupe.indicateursDesactives,
+          source.id,
+          () =>
+            this.facadeCommandes.interrogerBranchesCompletes(
+              instance,
+              source.id,
+              source.idExterne,
+              source.refAuditee,
+            ),
+        );
+        dernierMotifEchec =
+          this.integrer(reponseBranches, resultats, anomalies) ?? dernierMotifEchec;
+
+        const reponseDependances = await this.executerIndicateur(
+          'gitlab.dependances',
+          resolution.groupe.indicateursDesactives,
+          source.id,
+          () =>
+            this.facadeCommandes.interrogerDependances(
+              instance,
+              source.id,
+              source.idExterne,
+              source.refAuditee,
+            ),
+        );
+        dernierMotifEchec =
+          this.integrer(reponseDependances, resultats, anomalies) ?? dernierMotifEchec;
 
         const reponseMarqueursIa = await this.executerIndicateur(
           'gitlab.marqueurs_ia',
@@ -496,7 +529,10 @@ export class OrchestrateurCampagneService {
 
   /**
    * Invoque une opération d'interrogation d'indicateur, sauf si son tag figure parmi les indicateurs désactivés
-   * du groupe (US-009 : « indicateurs coûteux désactivables par groupe »).
+   * du groupe (US-009 : « indicateurs coûteux désactivables par groupe »). Le tag est contraint au discriminant
+   * `Resultat['type']` (Phase 6, incrément 1) : le type de retour attendu de `appel` (et donc de `resultatBrut`)
+   * s'en déduit automatiquement comme la charge utile de la variante `Resultat` correspondante, vérifiée par le
+   * compilateur à chaque site d'appel plutôt que par un simple `string` non contraint.
    * @param tag - Tag `Resultat` de l'indicateur (`#[serde(rename = "...")]` côté cœur natif, ex. `gitlab.vitalite`).
    * @param indicateursDesactives - Indicateurs désactivés du groupe du projet audité.
    * @param sourceId - Identifiant de la source concernée, reporté dans l'anomalie en cas d'échec.
@@ -504,16 +540,19 @@ export class OrchestrateurCampagneService {
    * @returns Le résultat brut typé (pour les calculs croisés/aberrations), le résultat tagué prêt pour le
    * brouillon, et l'anomalie éventuelle : chaque champ absent selon le cas (désactivé, succès ou échec).
    */
-  private async executerIndicateur<TResultat extends object>(
-    tag: string,
+  private async executerIndicateur<TTag extends Resultat['type']>(
+    tag: TTag,
     indicateursDesactives: readonly string[],
     sourceId: string,
     appel: () => Promise<
-      | { readonly type: 'succes'; readonly resultat: TResultat }
+      | {
+          readonly type: 'succes';
+          readonly resultat: Omit<Extract<Resultat, { readonly type: TTag }>, 'type'>;
+        }
       | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
     >,
   ): Promise<{
-    readonly resultatBrut?: TResultat;
+    readonly resultatBrut?: Omit<Extract<Resultat, { readonly type: TTag }>, 'type'>;
     readonly resultatTague?: Record<string, unknown>;
     readonly anomalieEntree?: Record<string, unknown>;
     readonly motif?: string;
@@ -532,13 +571,27 @@ export class OrchestrateurCampagneService {
   }
 
   /**
+   * Vérifie qu'une valeur porte un champ `type` de type `string`, condition nécessaire à son appartenance à
+   * l'union {@link Resultat}. Type-guard utilisateur plutôt qu'une assertion `as` (interdite sans exception par
+   * la configuration ESLint du projet, `@typescript-eslint/consistent-type-assertions: 'never'`) : la correction
+   * réelle repose sur l'invariant local de {@link executerIndicateur}, seul appelant de {@link integrer}, qui
+   * construit toujours `resultatTague` en associant le `tag` demandé (contraint à `Resultat['type']`) à la
+   * charge utile exacte renvoyée par un appel de la Façade de commandes typé en conséquence.
+   * @param valeur - Résultat tagué construit par {@link executerIndicateur}.
+   * @returns `true` si `valeur` porte un champ `type` de type `string`.
+   */
+  private estResultatTypeConnu(valeur: unknown): valeur is Resultat {
+    return this.estObjetIndexable(valeur) && typeof valeur['type'] === 'string';
+  }
+
+  /**
    * Reporte le résultat d'{@link executerIndicateur} dans les tableaux locaux de résultats/anomalies de l'appelant
    * (locaux à chaque appel d'`auditerProjet`, jamais un état partagé entre projets exécutés en parallèle).
    * @param reponse - Résultat retourné par {@link executerIndicateur}.
    * @param reponse.resultatTague - Résultat tagué à ajouter, absent si désactivé ou en échec.
    * @param reponse.anomalieEntree - Anomalie à ajouter, absente si désactivé ou en succès.
    * @param reponse.motif - Motif court de l'échec, absent si désactivé ou en succès.
-   * @param resultats - Tableau local des résultats tagués déjà obtenus pour ce projet.
+   * @param resultats - Tableau local des résultats typés déjà obtenus pour ce projet.
    * @param anomalies - Tableau local des anomalies déjà rencontrées pour ce projet.
    * @returns Le motif court de cet appel s'il a échoué, `undefined` sinon (désactivé ou succès).
    */
@@ -548,10 +601,10 @@ export class OrchestrateurCampagneService {
       readonly anomalieEntree?: Record<string, unknown>;
       readonly motif?: string;
     },
-    resultats: unknown[],
+    resultats: Resultat[],
     anomalies: unknown[],
   ): string | undefined {
-    if (reponse.resultatTague !== undefined) {
+    if (reponse.resultatTague !== undefined && this.estResultatTypeConnu(reponse.resultatTague)) {
       resultats.push(reponse.resultatTague);
     }
     if (reponse.anomalieEntree !== undefined) {
@@ -582,6 +635,9 @@ export class OrchestrateurCampagneService {
 
   /**
    * Extrait, du dernier audit intégré d'un projet, les 3 valeurs comparables par RG-020 (`AberrationUtils`).
+   * Simplifié à la Phase 6, incrément 1 (`resultats` désormais typé {@link Resultat}, cf. suppression de
+   * l'ancien couple `extraireChampNumerique`/`estResultatTague`, devenu inutile) : narrowing direct par
+   * discriminant `type` plutôt que par accès non sûr à une valeur `unknown`.
    * @param audits - Historique des audits intégrés du projet (`Projet.audits`, ordre d'intégration).
    * @returns Les valeurs extraites, `undefined` si le projet n'a encore aucun audit intégré (premier audit).
    */
@@ -593,59 +649,27 @@ export class OrchestrateurCampagneService {
       return undefined;
     }
     return {
-      tailleOctets: this.extraireChampNumerique(
-        dernierAudit.resultats,
-        'gitlab.taille_depot',
-        'tailleOctets',
-      ),
-      ncloc: this.extraireChampNumerique(dernierAudit.resultats, 'sonar.ncloc', 'ncloc'),
-      couverture: this.extraireChampNumerique(
-        dernierAudit.resultats,
-        'sonar.couverture',
-        'couverture',
-      ),
+      tailleOctets: dernierAudit.resultats.find(
+        (resultat): resultat is Extract<Resultat, { readonly type: 'gitlab.taille_depot' }> =>
+          resultat.type === 'gitlab.taille_depot',
+      )?.tailleOctets,
+      ncloc: dernierAudit.resultats.find(
+        (resultat): resultat is Extract<Resultat, { readonly type: 'sonar.ncloc' }> =>
+          resultat.type === 'sonar.ncloc',
+      )?.ncloc,
+      couverture: dernierAudit.resultats.find(
+        (resultat): resultat is Extract<Resultat, { readonly type: 'sonar.couverture' }> =>
+          resultat.type === 'sonar.couverture',
+      )?.couverture,
     };
-  }
-
-  /**
-   * Extrait un champ numérique d'un résultat d'audit historique typé `unknown` (catalogue figé non interprété
-   * côté interface avant le Moteur de jugement, Phase 6), sans accès non sûr à la valeur reçue.
-   * @param resultats - Résultats bruts de l'audit (`Audit.resultats`).
-   * @param tag - Tag `Resultat` recherché.
-   * @param champ - Nom du champ numérique à extraire au sein de ce résultat.
-   * @returns La valeur numérique si le résultat existe et porte ce champ sous forme de nombre, `undefined` sinon.
-   */
-  private extraireChampNumerique(
-    resultats: readonly unknown[],
-    tag: string,
-    champ: string,
-  ): number | undefined {
-    const entree = resultats.find((resultat) => this.estResultatTague(resultat, tag));
-    if (!this.estObjetIndexable(entree)) {
-      return undefined;
-    }
-    const valeur = entree[champ];
-    return typeof valeur === 'number' ? valeur : undefined;
-  }
-
-  /**
-   * Vérifie, sans accès non sûr à la valeur reçue, qu'un résultat d'audit historique correspond au tag `Resultat`
-   * recherché, sur le modèle de `FacadeCommandesService.estErreurConnecteur`.
-   * @param resultat - Entrée de `Audit.resultats`, de type `unknown`.
-   * @param tag - Tag `Resultat` recherché.
-   * @returns `true` si `resultat` porte ce tag.
-   */
-  private estResultatTague(resultat: unknown, tag: string): boolean {
-    if (typeof resultat !== 'object' || resultat === null || !('type' in resultat)) {
-      return false;
-    }
-    return resultat.type === tag;
   }
 
   /**
    * Type-guard sans assertion `as` : vérifie qu'une valeur `unknown` est un objet non nul, donc indexable en
    * sûreté par une clé dynamique (contrairement à l'opérateur `in` seul, qui ne suffit pas à narrower un type
-   * indexable pour une clé non littérale).
+   * indexable pour une clé non littérale). Reste utilisé par {@link extraireValeurParametres} (sous-branches de
+   * `parametres` non typées, cf. commentaire de `Parametres` dans `types-donnees.ts`) et par
+   * {@link validerRegleMarqueurIa} (contenu de `referentiels.reglesMarqueursIA` non typé item par item).
    * @param valeur - Valeur à vérifier.
    * @returns `true` si `valeur` est un objet non nul.
    */
@@ -665,16 +689,15 @@ export class OrchestrateurCampagneService {
 
   /**
    * Extrait le seuil de matérialité paramétré du brouillon (`parametres.seuils.materialiteBrouillon.
-   * variationRelative`, RG-020), sans accès non sûr à la racine `unknown`, avec repli documenté sur
-   * {@link VARIATION_RELATIVE_PAR_DEFAUT}.
+   * variationRelative`, RG-020), avec repli documenté sur {@link VARIATION_RELATIVE_PAR_DEFAUT}. Simplifié à la
+   * Phase 6, incrément 1 (`parametres.seuils` désormais typé `SeuilsJugement`, cf. `types-donnees.ts`) : accès
+   * direct sans traversée générique, la seule prudence restante portant sur l'absence de racine chargée
+   * (`racine()` nullable) et sur une valeur paramétrée invalide (zéro ou négative).
    * @returns Le seuil de matérialité à appliquer.
    */
   private extraireVariationRelative(): number {
-    const valeur = this.extraireValeurParametres([
-      'seuils',
-      'materialiteBrouillon',
-      'variationRelative',
-    ]);
+    const valeur =
+      this.donneesApplication.racine()?.parametres.seuils.materialiteBrouillon.variationRelative;
     return typeof valeur === 'number' && valeur > 0 ? valeur : VARIATION_RELATIVE_PAR_DEFAUT;
   }
 
@@ -696,21 +719,15 @@ export class OrchestrateurCampagneService {
   }
 
   /**
-   * Extrait le référentiel de règles de détection des marqueurs IA (`referentiels.reglesMarqueursIA`, F18), sans
-   * accès non sûr à la racine `unknown` (`referentiels` reste une donnée générique côté cœur natif, hors périmètre
-   * de l'Administration/Paramétrage, Phase 3/7). Toute entrée ne correspondant pas à la forme attendue est ignorée
-   * silencieusement plutôt que de faire échouer l'audit du projet.
+   * Extrait le référentiel de règles de détection des marqueurs IA (`referentiels.reglesMarqueursIA`, F18).
+   * Simplifié à la Phase 6, incrément 1 (`referentiels` désormais typé `Referentiels`, cf. `types-donnees.ts`) :
+   * `reglesMarqueursIA` est déjà garanti tableau, seul le contenu de chaque élément reste `unknown` (règles
+   * détaillées hors périmètre avant la Phase 7, Paramétrage). Toute entrée ne correspondant pas à la forme
+   * attendue est ignorée silencieusement plutôt que de faire échouer l'audit du projet.
    * @returns Les règles valides du référentiel, tableau vide si absent ou malformé.
    */
   private extraireReglesMarqueursIa(): readonly RegleMarqueurIA[] {
-    const referentiels = this.donneesApplication.racine()?.referentiels;
-    if (!this.estObjetIndexable(referentiels)) {
-      return [];
-    }
-    const regles = referentiels['reglesMarqueursIA'];
-    if (!Array.isArray(regles)) {
-      return [];
-    }
+    const regles = this.donneesApplication.racine()?.referentiels.reglesMarqueursIA ?? [];
     const reglesValides: RegleMarqueurIA[] = [];
     for (const regle of regles) {
       const regleValide = this.validerRegleMarqueurIa(regle);

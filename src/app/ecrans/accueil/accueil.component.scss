@@ -1,0 +1,106 @@
+// Tokens visuels repris de la maquette de référence (docs/01_besoin/Suivi Qualimetrie.dc.html, section « Écran
+// Accueil »), sur le modèle déjà retenu par shell.component.scss.
+.accueil {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.accueil__statistiques {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.accueil__carte {
+  background: white;
+  border: 1px solid oklch(89% 0.006 250);
+  border-radius: 10px;
+  padding: 14px 16px;
+
+  &--alerte {
+    background: oklch(93% 0.06 340);
+    border-color: oklch(78% 0.14 340);
+
+    .accueil__carte-libelle {
+      color: oklch(38% 0.18 340);
+      font-weight: 600;
+    }
+
+    .accueil__carte-valeur {
+      color: oklch(38% 0.2 340);
+    }
+  }
+}
+
+.accueil__carte-libelle {
+  font-size: 11.5px;
+  color: oklch(50% 0.012 250);
+  margin-bottom: 6px;
+}
+
+.accueil__carte-valeur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.accueil__section {
+  background: white;
+  border: 1px solid oklch(89% 0.006 250);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.accueil__section-titre {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: oklch(50% 0.012 250);
+  margin: 0 0 10px;
+}
+
+.accueil__vide {
+  font-size: 13px;
+  color: oklch(48% 0.012 250);
+  margin: 0;
+}
+
+.accueil__liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.accueil__ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid oklch(92% 0.005 250);
+  font-size: 13px;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.accueil__pastille {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(58% 0.2 25);
+  flex: none;
+}
+
+.accueil__ligne-libelle {
+  flex: 1;
+}
+
+.accueil__ligne-groupe,
+.accueil__mention-traitement {
+  font-size: 11.5px;
+  color: oklch(50% 0.012 250);
+}

@@ -7,8 +7,9 @@
 // `docs/01_besoin/screenshots/04-tableau-de-bord-audit.png`). Lit `EtatSessionService.progressionCampagne`
 // (Store d'état applicatif, cf. commentaire d'en-tête de `orchestrateur-campagne.service.ts`), jamais persisté.
 //
-// Routé seul, sans shell applicatif, même choix pragmatique que Constitution de campagne (cf. commentaire d'en-
-// tête de ce dernier).
+// Routé sous le shell applicatif depuis la Phase 6, incrément 3 (`ShellComponent`, `app.routes.ts`), sur le même
+// modèle que Constitution de campagne (cf. commentaire d'en-tête de ce dernier) : même chemin d'URL, même
+// composant, seule la navigation englobante a changé.
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';

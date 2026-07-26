@@ -1,0 +1,9 @@
+<!-- role="alert" : signal prioritaire annoncé immédiatement par les technologies d'assistance (RG-009). -->
+<div class="bandeau-alerte" role="alert">
+  <p class="bandeau-alerte__message">{{ message() }}</p>
+  @if (libelleAction(); as libelle) {
+    <button type="button" class="bandeau-alerte__action" (click)="declencherAction()">
+      {{ libelle }}
+    </button>
+  }
+</div>

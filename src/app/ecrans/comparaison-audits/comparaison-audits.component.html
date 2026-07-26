@@ -1,0 +1,380 @@
+<!-- Interpolation Angular systématique, jamais d'injection HTML dynamique ([innerHTML]) : tout contenu externe
+     (noms de dépendances/membres/marqueurs) toujours échappé (docs/02_documentation/15_normesSecurite.md). -->
+@if (etat(); as etatValue) {
+  @switch (etatValue.type) {
+    @case ('aucunFichier') {
+      <p class="comparaison-audits__etat-vide">Aucun fichier n'est actuellement chargé.</p>
+    }
+    @case ('projetIntrouvable') {
+      <p class="comparaison-audits__etat-vide">
+        Projet introuvable (identifiant inconnu ou projet supprimé depuis).
+        <a routerLink="/synthese-audits">Retour à la Synthèse des audits</a>
+      </p>
+    }
+    @case ('auditInsuffisant') {
+      <!-- État particulier impératif (US-018) : un seul audit, ou aucun, ne permet aucune comparaison — jamais un
+           écran vide silencieux. -->
+      <div class="comparaison-audits__etat-vide">
+        <p>
+          {{ etatValue.nomGroupe }} &gt; {{ etatValue.nomProjet }} : ce projet ne compte pas encore
+          deux audits intégrés, aucune comparaison n'est donc possible pour le moment.
+        </p>
+        <p>Revenez sur cet écran une fois un second audit intégré à l'historique de ce projet.</p>
+      </div>
+    }
+    @case ('pret') {
+      <div class="comparaison-audits">
+        @let donnees = etatValue.donnees;
+
+        <header class="comparaison-audits__entete">
+          <p class="comparaison-audits__fil-ariane">
+            {{ donnees.nomGroupe }} &gt; {{ donnees.nomProjet }} &gt; Comparaison entre deux audits
+          </p>
+        </header>
+
+        <!-- Sélection de deux dates, avec raccourcis (docs/02_documentation/09_maquettes.md#comparaison-entre-deux-
+             audits). -->
+        <section class="comparaison-audits__selection">
+          <div class="comparaison-audits__champ-selection">
+            <label for="comparaison-audits-avant">Audit le plus ancien</label>
+            <select
+              id="comparaison-audits-avant"
+              #selectAvant
+              [value]="donnees.idAvant"
+              (change)="definirIdAvant(selectAvant.value)"
+            >
+              @for (option of donnees.options; track option.id) {
+                <option [value]="option.id">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="comparaison-audits__champ-selection">
+            <label for="comparaison-audits-apres">Audit le plus récent</label>
+            <select
+              id="comparaison-audits-apres"
+              #selectApres
+              [value]="donnees.idApres"
+              (change)="definirIdApres(selectApres.value)"
+            >
+              @for (option of donnees.options; track option.id) {
+                <option [value]="option.id">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="comparaison-audits__raccourcis">
+            <button type="button" (click)="appliquerRaccourci('dernierPrecedent')">
+              Dernier audit vs précédent
+            </button>
+            <button type="button" (click)="appliquerRaccourci('unMois')">Il y a un mois</button>
+            <button type="button" (click)="appliquerRaccourci('troisMois')">
+              Il y a trois mois
+            </button>
+          </div>
+          <p class="comparaison-audits__intervalle">
+            Comparaison de {{ donnees.dateAvantLabel }} à {{ donnees.dateApresLabel }}.
+          </p>
+        </section>
+
+        <!-- Premier volet : indicateurs avant/après/delta. -->
+        <section class="comparaison-audits__volet">
+          <h2>Indicateurs</h2>
+          <table class="comparaison-audits__table">
+            <thead>
+              <tr>
+                <th scope="col">Indicateur</th>
+                <th scope="col">Avant</th>
+                <th scope="col">Après</th>
+                <th scope="col">Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ligne of donnees.indicateurs; track ligne.libelle) {
+                <tr>
+                  <td>{{ ligne.libelle }}</td>
+                  <td>
+                    @if (ligne.avant; as avant) {
+                      @if (avant.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="avant.label" />
+                      } @else {
+                        <span>{{ avant.label }}</span>
+                      }
+                    } @else {
+                      <span>—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (ligne.apres; as apres) {
+                      @if (apres.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="apres.label" />
+                      } @else {
+                        <span>{{ apres.label }}</span>
+                      }
+                    } @else {
+                      <span>—</span>
+                    }
+                  </td>
+                  <td>{{ ligne.deltaLabel }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Deuxième volet : dépendances (ajouts, retraits, changements de statut d'obsolescence). -->
+        <section class="comparaison-audits__volet">
+          <h2>Dépendances</h2>
+          @if (
+            donnees.dependances.ajouts.length === 0 &&
+            donnees.dependances.retraits.length === 0 &&
+            donnees.dependances.modifications.length === 0
+          ) {
+            <p>Aucune évolution des dépendances entre les deux audits comparés.</p>
+          } @else {
+            <table class="comparaison-audits__table">
+              <thead>
+                <tr>
+                  <th scope="col">Évolution</th>
+                  <th scope="col">Référence</th>
+                  <th scope="col">Manifeste</th>
+                  <th scope="col">Version avant</th>
+                  <th scope="col">Version après</th>
+                  <th scope="col">Statut avant</th>
+                  <th scope="col">Statut après</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (
+                  ligne of donnees.dependances.ajouts;
+                  track ligne.reference + ligne.manifeste
+                ) {
+                  <tr>
+                    <td>Ajout</td>
+                    <td>{{ ligne.reference }}</td>
+                    <td>{{ ligne.manifeste }}</td>
+                    <td>{{ ligne.versionAvantLabel }}</td>
+                    <td>{{ ligne.versionApresLabel }}</td>
+                    <td>
+                      @if (ligne.statutAvant.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
+                      } @else {
+                        <span>{{ ligne.statutAvant.label }}</span>
+                      }
+                    </td>
+                    <td>
+                      @if (ligne.statutApres.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
+                      } @else {
+                        <span>{{ ligne.statutApres.label }}</span>
+                      }
+                    </td>
+                  </tr>
+                }
+                @for (
+                  ligne of donnees.dependances.retraits;
+                  track ligne.reference + ligne.manifeste
+                ) {
+                  <tr>
+                    <td>Retrait</td>
+                    <td>{{ ligne.reference }}</td>
+                    <td>{{ ligne.manifeste }}</td>
+                    <td>{{ ligne.versionAvantLabel }}</td>
+                    <td>{{ ligne.versionApresLabel }}</td>
+                    <td>
+                      @if (ligne.statutAvant.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
+                      } @else {
+                        <span>{{ ligne.statutAvant.label }}</span>
+                      }
+                    </td>
+                    <td>
+                      @if (ligne.statutApres.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
+                      } @else {
+                        <span>{{ ligne.statutApres.label }}</span>
+                      }
+                    </td>
+                  </tr>
+                }
+                @for (
+                  ligne of donnees.dependances.modifications;
+                  track ligne.reference + ligne.manifeste
+                ) {
+                  <tr>
+                    <td>Changement de statut</td>
+                    <td>{{ ligne.reference }}</td>
+                    <td>{{ ligne.manifeste }}</td>
+                    <td>{{ ligne.versionAvantLabel }}</td>
+                    <td>{{ ligne.versionApresLabel }}</td>
+                    <td>
+                      @if (ligne.statutAvant.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
+                      } @else {
+                        <span>{{ ligne.statutAvant.label }}</span>
+                      }
+                    </td>
+                    <td>
+                      @if (ligne.statutApres.couleur; as couleur) {
+                        <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
+                      } @else {
+                        <span>{{ ligne.statutApres.label }}</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+
+        <!-- Troisième volet : membres et contributeurs (ajouts, retraits, changements de statut de rattachement). -->
+        <section class="comparaison-audits__volet">
+          <h2>Membres et contributeurs</h2>
+          @if (
+            donnees.membres.ajouts.length === 0 &&
+            donnees.membres.retraits.length === 0 &&
+            donnees.membres.modifications.length === 0
+          ) {
+            <p>Aucune évolution des membres et contributeurs entre les deux audits comparés.</p>
+          } @else {
+            <table class="comparaison-audits__table">
+              <thead>
+                <tr>
+                  <th scope="col">Évolution</th>
+                  <th scope="col">Identifiant</th>
+                  <th scope="col">Nom avant</th>
+                  <th scope="col">Nom après</th>
+                  <th scope="col">Statut avant</th>
+                  <th scope="col">Statut après</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (ligne of donnees.membres.ajouts; track ligne.username) {
+                  <tr>
+                    <td>Ajout</td>
+                    <td>{{ ligne.username }}</td>
+                    <td>{{ ligne.nomAvantLabel }}</td>
+                    <td>{{ ligne.nomApresLabel }}</td>
+                    <td>
+                      @if (ligne.statutAvant; as statut) {
+                        <app-badge [couleur]="statut.couleur ?? 'rouge'" [libelle]="statut.label" />
+                      } @else {
+                        <span>—</span>
+                      }
+                    </td>
+                    <td>
+                      @if (ligne.statutApres; as statut) {
+                        <app-badge [couleur]="statut.couleur ?? 'rouge'" [libelle]="statut.label" />
+                      } @else {
+                        <span>—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+                @for (ligne of donnees.membres.retraits; track ligne.username) {
+                  <tr>
+                    <td>Retrait</td>
+                    <td>{{ ligne.username }}</td>
+                    <td>{{ ligne.nomAvantLabel }}</td>
+                    <td>{{ ligne.nomApresLabel }}</td>
+                    <td>
+                      @if (ligne.statutAvant; as statut) {
+                        <app-badge [couleur]="statut.couleur ?? 'rouge'" [libelle]="statut.label" />
+                      } @else {
+                        <span>—</span>
+                      }
+                    </td>
+                    <td>
+                      @if (ligne.statutApres; as statut) {
+                        <app-badge [couleur]="statut.couleur ?? 'rouge'" [libelle]="statut.label" />
+                      } @else {
+                        <span>—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+                @for (ligne of donnees.membres.modifications; track ligne.username) {
+                  <tr>
+                    <td>Changement de statut</td>
+                    <td>{{ ligne.username }}</td>
+                    <td>{{ ligne.nomAvantLabel }}</td>
+                    <td>{{ ligne.nomApresLabel }}</td>
+                    <td>
+                      @if (ligne.statutAvant; as statut) {
+                        <app-badge [couleur]="statut.couleur ?? 'rouge'" [libelle]="statut.label" />
+                      } @else {
+                        <span>—</span>
+                      }
+                    </td>
+                    <td>
+                      @if (ligne.statutApres; as statut) {
+                        <app-badge [couleur]="statut.couleur ?? 'rouge'" [libelle]="statut.label" />
+                      } @else {
+                        <span>—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+
+        <!-- Quatrième volet : marqueurs IA détectés, avec le statut IA global recalculé aux deux bords (RG-016). -->
+        <section class="comparaison-audits__volet">
+          <h2>Marqueurs IA détectés</h2>
+          <div class="comparaison-audits__statut-ia">
+            <app-badge
+              [couleur]="donnees.marqueursIa.statutIaAvant.couleur ?? 'rouge'"
+              [libelle]="'Avant : ' + donnees.marqueursIa.statutIaAvant.label"
+            />
+            <app-badge
+              [couleur]="donnees.marqueursIa.statutIaApres.couleur ?? 'rouge'"
+              [libelle]="'Après : ' + donnees.marqueursIa.statutIaApres.label"
+            />
+          </div>
+          @if (
+            donnees.marqueursIa.ajouts.length === 0 && donnees.marqueursIa.retraits.length === 0
+          ) {
+            <p>
+              Aucune évolution des marqueurs d'outils IA détectés entre les deux audits comparés.
+            </p>
+          } @else {
+            <ul class="comparaison-audits__liste">
+              @for (
+                marqueur of donnees.marqueursIa.ajouts;
+                track marqueur.chemin + marqueur.outil
+              ) {
+                <li>Ajout — {{ marqueur.chemin }} ({{ marqueur.outil }})</li>
+              }
+              @for (
+                marqueur of donnees.marqueursIa.retraits;
+                track marqueur.chemin + marqueur.outil
+              ) {
+                <li>Retrait — {{ marqueur.chemin }} ({{ marqueur.outil }})</li>
+              }
+            </ul>
+          }
+        </section>
+
+        <!-- Rappel des annotations du projet dont la date tombe dans l'intervalle comparé, bornes incluses. -->
+        <section class="comparaison-audits__volet">
+          <h2>Annotations de l'intervalle</h2>
+          @if (donnees.annotationsIntervalle.length === 0) {
+            <p>Aucune annotation posée sur cet intervalle.</p>
+          } @else {
+            <ul class="comparaison-audits__liste">
+              @for (annotation of donnees.annotationsIntervalle; track annotation.id) {
+                <li>
+                  {{ annotation.date }} — {{ annotation.libelle }} ({{ annotation.categorie }})
+                  @if (annotation.description; as description) {
+                    <p>{{ description }}</p>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </div>
+    }
+  }
+}

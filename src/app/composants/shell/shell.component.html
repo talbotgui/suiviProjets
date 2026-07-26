@@ -1,0 +1,100 @@
+<div class="shell">
+  <nav class="shell__sidebar" aria-label="Navigation principale">
+    <div class="shell__marque">
+      <span class="shell__logo" aria-hidden="true">Q</span>
+      <span class="shell__titre">Qualimétrie</span>
+    </div>
+
+    <a
+      class="shell__lien"
+      routerLink="/accueil"
+      routerLinkActive="shell__lien--actif"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
+      <span aria-hidden="true">⌂</span>
+      <span>Accueil</span>
+    </a>
+
+    <a
+      class="shell__lien"
+      routerLink="/synthese-audits"
+      routerLinkActive="shell__lien--actif"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
+      <span aria-hidden="true">▤</span>
+      <span>Synthèse des audits</span>
+    </a>
+
+    <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
+      <span aria-hidden="true">📈</span>
+      <span>Synthèse graphique</span>
+    </span>
+
+    <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
+      <span aria-hidden="true">⚑</span>
+      <span>Liste de travail</span>
+    </span>
+
+    <button
+      type="button"
+      class="shell__lien shell__lien--bouton"
+      [class.shell__lien--actif]="auditsActif()"
+      (click)="ouvrirAudits()"
+    >
+      <span aria-hidden="true">◷</span>
+      <span>Audits</span>
+    </button>
+
+    <a
+      class="shell__lien"
+      routerLink="/administration"
+      routerLinkActive="shell__lien--actif"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
+      <span aria-hidden="true">⚙</span>
+      <span>Administration</span>
+    </a>
+
+    <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
+      <span aria-hidden="true">≡</span>
+      <span>Paramétrage</span>
+    </span>
+  </nav>
+
+  <div class="shell__zone">
+    <header class="shell__barre-superieure">
+      <div class="shell__fichier">{{ nomFichier() }}</div>
+      <div class="shell__actions-globales">
+        <span class="shell__statut-sauvegarde">{{ statutSauvegarde() }}</span>
+        <button
+          type="button"
+          disabled
+          title="Recherche transversale (à venir)"
+          aria-label="Recherche transversale"
+        >
+          ⌕
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Gestion des credentials (à venir)"
+          aria-label="Gestion des credentials"
+        >
+          🔑
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Verrouillage manuel (à venir)"
+          aria-label="Verrouillage manuel"
+        >
+          🔒
+        </button>
+      </div>
+    </header>
+
+    <main class="shell__ecran">
+      <router-outlet />
+    </main>
+  </div>
+</div>

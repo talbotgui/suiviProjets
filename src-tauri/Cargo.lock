@@ -3387,6 +3387,7 @@ dependencies = [
  "fs4",
  "log",
  "pbkdf2",
+ "quick-xml",
  "rand",
  "regex",
  "reqwest 0.12.28",

@@ -1,0 +1,130 @@
+// Tokens visuels repris de la maquette de référence (docs/01_besoin/Suivi Qualimetrie.dc.html) : sidebar 232px,
+// palette oklch neutre, police Inter. Se limite à une reprise fidèle des teintes déjà utilisées par la maquette
+// pour ce composant, sans introduire de nouveau système de tokens partagé (hors périmètre de cet incrément).
+.shell {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: oklch(22% 0.01 250);
+  background: oklch(97.5% 0.003 250);
+  overflow: hidden;
+}
+
+.shell__sidebar {
+  width: 232px;
+  flex: none;
+  background: oklch(96.3% 0.004 250);
+  border-right: 1px solid oklch(89% 0.006 250);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px;
+}
+
+.shell__marque {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px 18px;
+}
+
+.shell__logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: oklch(55% 0.16 258);
+  color: white;
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shell__titre {
+  font-weight: 700;
+  font-size: 14.5px;
+}
+
+.shell__lien {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  margin-bottom: 2px;
+  font-size: 13.5px;
+  color: oklch(30% 0.01 250);
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+
+  &--bouton {
+    font-family: inherit;
+  }
+
+  &--actif {
+    background: oklch(55% 0.16 258 / 12%);
+    color: oklch(45% 0.16 258);
+    font-weight: 600;
+  }
+
+  &--a-venir {
+    color: oklch(60% 0.012 250);
+    cursor: default;
+  }
+}
+
+.shell__zone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.shell__barre-superieure {
+  height: 52px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid oklch(89% 0.006 250);
+  background: white;
+}
+
+.shell__fichier {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: oklch(30% 0.01 250);
+}
+
+.shell__actions-globales {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  button {
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.shell__statut-sauvegarde {
+  font-size: 11.5px;
+  color: oklch(50% 0.012 250);
+}
+
+.shell__ecran {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 28px 60px;
+}

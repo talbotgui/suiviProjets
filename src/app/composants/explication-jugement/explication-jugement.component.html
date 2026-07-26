@@ -1,0 +1,18 @@
+<!-- Popover réutilisable : le contenu de l'explication est entièrement recalculé côté composant (aucune donnée
+     dupliquée depuis l'appelant), interpolé (jamais [innerHTML]). Le gestionnaire Échap est porté par le bouton
+     déclencheur lui-même (seul élément focusable de ce composant), pas par le conteneur englobant. -->
+<span class="explication-jugement">
+  <button
+    type="button"
+    class="explication-jugement__declencheur"
+    aria-label="Afficher l'explication du calcul"
+    [attr.aria-expanded]="ouvert()"
+    (click)="basculer()"
+    (keydown.escape)="fermer()"
+  >
+    ?
+  </button>
+  @if (ouvert()) {
+    <span class="explication-jugement__popover" role="tooltip">{{ explication() }}</span>
+  }
+</span>

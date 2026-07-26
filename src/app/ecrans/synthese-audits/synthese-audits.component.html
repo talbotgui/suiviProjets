@@ -1,0 +1,65 @@
+<!-- Conteneur exporté en PNG (barre de filtres, bandeau d'alerte inclus — « alerte membre inconnu conservée sur
+     l'export », cf. docs/02_documentation/09_maquettes.md#synthèse-des-audits) et tableau dense. Le bandeau
+     d'alerte (RG-009) est calculé depuis l'ensemble COMPLET des lignes, jamais depuis le sous-ensemble filtré
+     transmis au tableau dense : il reste donc visible quelle que soit la combinaison de filtres/tri appliquée. -->
+<div class="synthese-audits" #conteneurExport>
+  <div class="synthese-audits__filtres">
+    <select
+      #selectGroupe
+      class="synthese-audits__select"
+      aria-label="Filtrer par groupe"
+      (change)="onChangerGroupe(selectGroupe.value)"
+    >
+      <option value="">Tous les groupes</option>
+      @for (groupe of groupesDisponibles(); track groupe.id) {
+        <option [value]="groupe.id">{{ groupe.nom }}</option>
+      }
+    </select>
+
+    <select
+      #selectIndicateur
+      class="synthese-audits__select"
+      aria-label="Filtrer par indicateur en alerte"
+      (change)="onChangerIndicateur(selectIndicateur.value)"
+    >
+      <option value="tous">Tous les indicateurs</option>
+      <option value="vitalite">Vitalité en alerte</option>
+      <option value="couverture">Couverture en alerte</option>
+      <option value="violations">Violations en alerte</option>
+      <option value="mrOuvertes">MR ouvertes en alerte</option>
+      <option value="membresInconnus">Membres inconnus</option>
+      <option value="sonarKo">SONAR_KO</option>
+      <option value="ia">IA en violation</option>
+    </select>
+
+    <input
+      #champRecherche
+      type="text"
+      class="synthese-audits__recherche"
+      placeholder="Rechercher un projet…"
+      aria-label="Rechercher un projet"
+      [value]="texteRecherche()"
+      (input)="onChangerRecherche(champRecherche.value)"
+    />
+
+    <span class="synthese-audits__compteur">
+      {{ compteurProjets() }} projet{{ compteurProjets() > 1 ? 's' : '' }}
+    </span>
+
+    <button type="button" class="synthese-audits__export" (click)="exporterPng()">
+      Exporter en PNG
+    </button>
+  </div>
+
+  @if (membreInconnuDetecteGlobalement()) {
+    <app-bandeau-alerte [message]="messageMembreInconnu()" />
+  }
+
+  <app-tableau-dense
+    [colonnes]="colonnes()"
+    [lignes]="lignesFiltrees()"
+    [identifiant]="identifiantLigne"
+    [ligneGrisee]="ligneGrisee"
+    (activerLigne)="activerLigne($event)"
+  />
+</div>

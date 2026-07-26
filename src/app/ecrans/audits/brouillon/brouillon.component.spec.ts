@@ -69,15 +69,36 @@ class DonneesDeTest {
                   id: 'audit-0',
                   date: '2026-06-01T08:00:00Z',
                   campagneId: 'campagne-0',
-                  resultats: [{ type: 'sonar.ncloc', sourceId: 'source-1', ncloc: 10_000 }],
+                  resultats: [
+                    { type: 'sonar.ncloc', sourceId: 'source-1', ncloc: 10_000, parLangage: {} },
+                  ],
                 },
               ],
             },
           ],
         },
       ],
-      referentiels: {},
-      parametres: {},
+      referentiels: { reglesDependances: [], reglesMarqueursIA: [], motifNommageBranches: '' },
+      parametres: {
+        seuils: {
+          vitalite: { mourantJours: 180, mortJours: 365 },
+          tailleDepot: { borneS: 20_000_000, borneL: 100_000_000, borneXL: 500_000_000 },
+          couverture: { seuilRouge: 40, seuilOrange: 60 },
+          fraicheurSonar: { toleranceJours: 7 },
+          activiteSansQualite: { minCommits: 20, minNouvellesViolations: 10 },
+          fraicheurAudit: { ancienJours: 30 },
+          mrOuvertes: { ageOrangeJours: 30, ageRougeJours: 90, pourcentageConflitRouge: 50 },
+          couleursViolations: {
+            bloquant: { seuilOrange: 1, seuilRouge: 3 },
+            critique: { seuilOrange: 10, seuilRouge: 25 },
+          },
+          materialiteBrouillon: { variationRelative: 0.1 },
+        },
+        verrouillage: {},
+        audit: {},
+        proxy: {},
+        sauvegarde: {},
+      },
       campagnes: [
         {
           id: 'campagne-1',
@@ -109,7 +130,9 @@ class DonneesDeTest {
               id: 'audit-1',
               date: '2026-07-20T08:00:00Z',
               campagneId: 'campagne-1',
-              resultats: [{ type: 'sonar.ncloc', sourceId: 'source-1', ncloc: 15_000 }],
+              resultats: [
+                { type: 'sonar.ncloc', sourceId: 'source-1', ncloc: 15_000, parLangage: {} },
+              ],
             },
             aberrations: [
               { indicateur: 'sonar.ncloc', ancienneValeur: 10_000, nouvelleValeur: 15_000 },

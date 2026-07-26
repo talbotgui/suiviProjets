@@ -21,7 +21,10 @@
 //! sauvegardent elles-mêmes le fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`. Phase 5,
 //! incrément 7 : s'y ajoute `interrogerMarqueursIa` (US-009, F18, RG-021), différée depuis l'incrément 1, qui
 //! détecte les marqueurs d'outils IA de l'arborescence d'un dépôt GitLab par correspondance avec le référentiel
-//! `reglesMarqueursIA` transmis en paramètre.
+//! `reglesMarqueursIA` transmis en paramètre. Incrément de rattrapage de la Phase 5 (précédant la Phase 6) : s'y
+//! ajoutent `interrogerBranchesCompletes` et `interrogerDependances` (US-009), les deux dernières opérations du
+//! catalogue figé des résultats d'audit restées différées ; à cette occasion, `Branche` perd ses champs
+//! `rebasee`/`nommageConforme` (cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`).
 
 mod commandes;
 mod connecteurs;
@@ -58,6 +61,8 @@ pub fn run() {
             commandes::audit::interroger_contributeurs,
             commandes::audit::interroger_merge_requests,
             commandes::audit::interroger_membres,
+            commandes::audit::interroger_branches_completes,
+            commandes::audit::interroger_dependances,
             commandes::audit::interroger_marqueurs_ia,
             commandes::audit::interroger_violations,
             commandes::audit::interroger_dette,

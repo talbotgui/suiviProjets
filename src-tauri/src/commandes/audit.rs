@@ -6,9 +6,16 @@
 //! Périmètre de l'incrément 1 : dix opérations d'interrogation des indicateurs GitLab/Sonar déterministes, sans
 //! heuristique à inventer, cf.
 //! `docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces`.
-//! `interrogerDependances` et `interrogerBranches` (usage F05, distinct de l'autocomplétion `interrogerBranches` de
-//! `connectivite.rs`, US-008) restent différées à un incrément ultérieur ; `interrogerMarqueursIa`, elle aussi
-//! différée à l'incrément 1, est livrée depuis l'incrément 7 (US-009, F18, RG-021).
+//! `interrogerDependances` et `interrogerBranchesCompletes` (usage F05, cette dernière distincte de
+//! l'autocomplétion `interrogerBranches` de `connectivite.rs`, US-008) restaient différées à un incrément
+//! ultérieur ; `interrogerMarqueursIa`, elle aussi différée à l'incrément 1, est livrée depuis l'incrément 7
+//! (US-009, F18, RG-021).
+//!
+//! Périmètre de l'incrément de rattrapage de la Phase 5 (précédant la Phase 6) : `interrogerDependances` et
+//! `interrogerBranchesCompletes` sont livrées, complétant le catalogue figé des résultats d'audit. Nom de commande
+//! `interrogerBranchesCompletes` retenu par symétrie (cf. commentaire de
+//! `crate::connecteurs::gitlab::interroger_branches_completes`), faute de nom distinct de l'autocomplétion proposé
+//! par la conception détaillée.
 //!
 //! Chaque commande d'interrogation reçoit `sourceId` en paramètre explicite plutôt que de le déduire d'un contexte
 //! de fichier chargé (à la différence des commandes de `administration.rs`, qui reçoivent la racine complète du
@@ -38,10 +45,11 @@ use crate::connecteurs::commun::{ErreurConnecteur, client_http};
 use crate::connecteurs::gitlab::RegleMarqueurIA;
 use crate::connecteurs::{gitlab, sonar};
 use crate::modele::racine::{
-    DonneesRacine, Instance, ResultatBrouillonProjet, ResultatGitlabContributeurs,
-    ResultatGitlabMarqueursIa, ResultatGitlabMembres, ResultatGitlabMergeRequests,
-    ResultatGitlabTailleDepot, ResultatGitlabVitalite, ResultatSonarCouverture, ResultatSonarDette,
-    ResultatSonarNcloc, ResultatSonarNotes, ResultatSonarViolations, TypeInstance, Verdict,
+    DonneesRacine, Instance, ResultatBrouillonProjet, ResultatGitlabBranches,
+    ResultatGitlabContributeurs, ResultatGitlabDependances, ResultatGitlabMarqueursIa,
+    ResultatGitlabMembres, ResultatGitlabMergeRequests, ResultatGitlabTailleDepot,
+    ResultatGitlabVitalite, ResultatSonarCouverture, ResultatSonarDette, ResultatSonarNcloc,
+    ResultatSonarNotes, ResultatSonarViolations, TypeInstance, Verdict,
 };
 use crate::persistance::audit;
 use crate::persistance::moteur;
@@ -209,6 +217,75 @@ pub(crate) async fn interroger_membres(
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_membres(
+                &instance.url_base,
+                &credential,
+                &source_id,
+                &id_externe,
+                ref_auditee.as_deref(),
+                client_http(),
+            )
+            .await
+        }
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
+    }
+}
+
+/// Interroge la liste complète des branches d'un dépôt GitLab pour le catalogue figé des résultats d'audit
+/// (`gitlab.branches`, RG-030), distincte de la commande `interroger_branches` de `connectivite.rs`
+/// (autocomplétion US-008) : cf. `crate::connecteurs::gitlab::interroger_branches_completes` pour le détail de
+/// l'algorithme et la justification du nom de fonction retenu.
+///
+/// # Erreurs
+///
+/// Voir [`interroger_vitalite`].
+#[tauri::command]
+pub(crate) async fn interroger_branches_completes(
+    instance: Instance,
+    source_id: String,
+    id_externe: String,
+    ref_auditee: Option<String>,
+    etat: State<'_, EtatSession>,
+) -> Result<ResultatGitlabBranches, ErreurConnecteur> {
+    let credential = credential_instance(&instance, &etat)?;
+    match instance.type_instance {
+        TypeInstance::Gitlab => {
+            gitlab::interroger_branches_completes(
+                &instance.url_base,
+                &credential,
+                &source_id,
+                &id_externe,
+                ref_auditee.as_deref(),
+                client_http(),
+            )
+            .await
+        }
+        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Type de source incompatible avec cette opération".to_string(),
+        }),
+    }
+}
+
+/// Interroge les dépendances déclarées par les manifestes du dépôt GitLab (US-009, `gitlab.dependances`), tous
+/// écosystèmes reconnus confondus (périmètre V1, cf. `crate::connecteurs::gitlab::NOMS_MANIFESTES_RECONNUS` et
+/// l'en-tête de ce module Connecteur pour le détail des limites assumées).
+///
+/// # Erreurs
+///
+/// Voir [`interroger_vitalite`].
+#[tauri::command]
+pub(crate) async fn interroger_dependances(
+    instance: Instance,
+    source_id: String,
+    id_externe: String,
+    ref_auditee: Option<String>,
+    etat: State<'_, EtatSession>,
+) -> Result<ResultatGitlabDependances, ErreurConnecteur> {
+    let credential = credential_instance(&instance, &etat)?;
+    match instance.type_instance {
+        TypeInstance::Gitlab => {
+            gitlab::interroger_dependances(
                 &instance.url_base,
                 &credential,
                 &source_id,

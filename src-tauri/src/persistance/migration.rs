@@ -9,8 +9,9 @@
 //! plusieurs paliers, conformément à l'exigence de tests de la Phase 1 (cf.
 //! `docs/02_documentation/16_normesTests.md#tests-unitaires` : « migration de schéma palier par palier ... avec au
 //! moins un palier fictif pour prouver le mécanisme »). Le registre réel ([`ETAPES_MIGRATION_REELLES`]) est resté
-//! vide jusqu'à la Phase 5, incrément 7 (une seule version de schéma avait jamais existé) : il porte désormais sa
-//! toute première étape réelle, [`migration_1_vers_2`].
+//! vide jusqu'à la Phase 5, incrément 7 (une seule version de schéma avait jamais existé) : il porte sa toute
+//! première étape réelle, [`migration_1_vers_2`], complétée d'une seconde à la Phase 6, incrément 1,
+//! [`migration_2_vers_3`] (ajout de `referentiels.motifNommageBranches`, RG-030).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -33,9 +34,25 @@ fn migration_1_vers_2(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Seconde migration réelle du projet (Phase 6, incrément 1), faisant progresser `versionSchema` de `2` à `3`
+/// suite à l'ajout du champ `motifNommageBranches` sur `Referentiels` (RG-030, cf.
+/// [`crate::modele::racine::Referentiels`]).
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : le nouveau
+/// champ porte `#[serde(default = "...")]` (repli Gitflow), donc son absence sur un document existant se
+/// désérialise directement à cette valeur par défaut sans qu'aucune valeur n'ait à être recalculée ni déplacée ;
+/// seule la version de schéma progresse.
+fn migration_2_vers_3(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(3));
+    }
+    Ok(())
+}
+
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
-/// de schéma qu'elle sait faire progresser. Une seule étape à ce stade, cf. [`migration_1_vers_2`].
-pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[(1, migration_1_vers_2)];
+/// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`] et [`migration_2_vers_3`].
+pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] =
+    &[(1, migration_1_vers_2), (2, migration_2_vers_3)];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
 fn lire_version_schema(valeur: &Value) -> u32 {
@@ -254,6 +271,42 @@ mod tests {
             return Err("variante SonarCouverture attendue".into());
         };
         assert_eq!(couverture.duplication_nouveau_code, None);
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_2_vers_3_ne_perd_aucune_donnee_existante_et_ajoute_le_motif_par_defaut()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document historique typique d'avant la Phase 6, incrément 1 : `versionSchema: 2`, `referentiels` sans
+        // le champ `motifNommageBranches` (RG-030, absent car inexistant à l'époque). La migration ne doit ni
+        // échouer ni altérer les données existantes ; seul `versionSchema` progresse, `motifNommageBranches` se
+        // désérialisant nativement à sa valeur par défaut Gitflow (`#[serde(default = "...")]`).
+        let mut valeur = json!({
+            "versionSchema": 2,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "referentiels": {
+                "reglesDependances": [],
+                "reglesMarqueursIA": []
+            },
+            "groupes": []
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        assert_eq!(
+            racine.referentiels.motif_nommage_branches,
+            crate::modele::racine::MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT
+        );
         Ok(())
     }
 }

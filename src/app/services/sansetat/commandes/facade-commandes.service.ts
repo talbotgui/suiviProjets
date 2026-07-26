@@ -16,15 +16,19 @@ import type {
   ErreurConnecteur,
   Instance,
   RegleMarqueurIA,
+  ResultatGitlabBranches,
   ResultatGitlabContributeurs,
+  ResultatGitlabDependances,
   ResultatGitlabMarqueursIa,
   ResultatGitlabMembres,
   ResultatGitlabMergeRequests,
   ResultatGitlabTailleDepot,
   ResultatGitlabVitalite,
   ResultatInterrogationBranches,
+  ResultatInterrogationBranchesCompletes,
   ResultatInterrogationContributeurs,
   ResultatInterrogationCouverture,
+  ResultatInterrogationDependances,
   ResultatInterrogationDerniereAnalyse,
   ResultatInterrogationDette,
   ResultatInterrogationMarqueursIa,
@@ -238,6 +242,58 @@ export class FacadeCommandesService {
   ): Promise<ResultatInterrogationMembres> {
     return this.interrogerIndicateurGitlab<ResultatGitlabMembres>(
       'interroger_membres',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge la liste complète des branches d'un dépôt GitLab pour le catalogue figé des résultats d'audit
+   * (US-009, RG-030, incrément de rattrapage de la Phase 5 précédant la Phase 6) : à ne pas confondre avec
+   * {@link interrogerBranches} ci-dessus, dédiée à l'autocomplétion (US-008). Ne retourne ni `rebasee` ni
+   * `nommageConforme` (cf. commentaire du type `Branche` dans `types-facade.ts`).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerBranchesCompletes(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationBranchesCompletes> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabBranches>(
+      'interroger_branches_completes',
+      instance,
+      sourceId,
+      idExterne,
+      refAuditee,
+    );
+  }
+
+  /**
+   * Interroge les dépendances déclarées par les manifestes d'un dépôt GitLab (US-009, incrément de rattrapage de
+   * la Phase 5 précédant la Phase 6) : parseur best-effort limité en V1 aux trois écosystèmes illustrés par
+   * `docs/01_besoin/exemple-donnees.json` (cf. `src-tauri/src/connecteurs/gitlab.rs` pour le détail des limites
+   * assumées).
+   * @param instance - Instance GitLab hébergeant le dépôt.
+   * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
+   * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
+   * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerDependances(
+    instance: Instance,
+    sourceId: string,
+    idExterne: string,
+    refAuditee?: string,
+  ): Promise<ResultatInterrogationDependances> {
+    return this.interrogerIndicateurGitlab<ResultatGitlabDependances>(
+      'interroger_dependances',
       instance,
       sourceId,
       idExterne,

@@ -1,0 +1,64 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Confronte une dépendance constatée (référence + version) aux règles courantes de `referentiels.reglesDependances`
+// (`ParametresJugementUtils.lireReglesDependances`) pour déterminer son statut d'obsolescence.
+import { ParametresJugementUtils, type RegleDependance } from './parametres-jugement.utils';
+
+/**
+ *
+ */
+export class StatutObsolescenceUtils {
+  /**
+   * Calcule le statut d'obsolescence d'une dépendance constatée (RG-011 : ce statut n'est jamais stocké comme un
+   * constat, seulement calculé à l'affichage) : la première règle dont le motif (glob) correspond à la référence
+   * de la dépendance est retenue (précédence par ordre de déclaration du référentiel, décision arbitraire à
+   * valider par un humain — le texte normatif ne spécifie pas le comportement en cas de motifs de référence se
+   * recouvrant), puis, au sein de cette règle, la première borne de version dont le motif (glob) correspond à la
+   * version constatée détermine le statut restitué.
+   *
+   * Décision arbitraire (à valider par un humain, cf. rapport de développement de cet incrément) : ni l'absence de
+   * règle correspondant à la référence, ni la correspondance d'une règle sans qu'aucune de ses bornes de version ne
+   * corresponde à la version constatée, ne produisent de statut d'obsolescence par défaut (ni `obsolete` ni
+   * `maintenu` ne sont supposés sans base normative, cf. consigne explicite de cet incrément) : les deux cas sont
+   * restitués identiquement par le type `nonReference`.
+   * @param dependance - Dépendance constatée (référence + version, `Dependance.reference`/`Dependance.version`).
+   * @param regles - Règles de dépendances courantes (`referentiels.reglesDependances`).
+   * @returns Le statut d'obsolescence calculé.
+   */
+  public static calculerStatutObsolescence(
+    dependance: DependanceConstatee,
+    regles: readonly RegleDependance[],
+  ): ResultatObsolescence {
+    const regleCorrespondante = regles.find((regle) =>
+      ParametresJugementUtils.correspondMotifGlob(regle.motif, dependance.reference),
+    );
+    if (regleCorrespondante === undefined) {
+      return { type: 'nonReference' };
+    }
+    const versionCorrespondante = regleCorrespondante.versions.find((version) =>
+      ParametresJugementUtils.correspondMotifGlob(version.motifVersion, dependance.version),
+    );
+    if (versionCorrespondante === undefined) {
+      return { type: 'nonReference' };
+    }
+    return { type: 'statut', statut: versionCorrespondante.statut };
+  }
+}
+
+/**
+ * Dépendance constatée à confronter aux règles de dépendances (mirroir structurel minimal de `Dependance`, cf.
+ * `services/sansetat/commandes/types-facade.ts`).
+ */
+export interface DependanceConstatee {
+  /** Référence de la dépendance (ex. `org.springframework:spring-core`, `@angular/core`). */
+  readonly reference: string;
+  /** Version constatée de la dépendance. */
+  readonly version: string;
+}
+
+/**
+ * Statut d'obsolescence d'une dépendance constatée.
+ */
+export type ResultatObsolescence =
+  { readonly type: 'statut'; readonly statut: string } | { readonly type: 'nonReference' };

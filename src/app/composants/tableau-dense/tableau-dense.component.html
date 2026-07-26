@@ -1,0 +1,126 @@
+<!-- Conteneur avec défilement horizontal propre (jamais le corps de page, cf. règle générale de responsivité) :
+     la colonne d'indice 0 reste fixe (position:sticky) grâce à `estColonneFixe`. En-têtes triables rendus comme
+     `<button>` natifs (accessibles au clavier sans gestionnaire dédié) ; filtres rendus comme champs texte natifs
+     (accessibles au clavier). Ligne activable au clic ou à la touche Entrée (RG charte : « ligne activable pour
+     naviguer vers le détail »). Déclencheur d'explication du calcul (`colonne.explication`) affiché une seule fois
+     par colonne, dans l'en-tête, jamais dupliqué par ligne (cf. commentaire d'en-tête du composant). -->
+<div class="tableau-dense__conteneur">
+  <table class="tableau-dense">
+    <thead>
+      <tr>
+        @for (colonne of colonnes(); track colonne.cle; let i = $index) {
+          <th
+            scope="col"
+            class="tableau-dense__entete"
+            [class.tableau-dense__cellule--fixe]="estColonneFixe(i)"
+            [attr.aria-sort]="colonne.triable ? directionTri(colonne.cle) : null"
+          >
+            @if (colonne.triable) {
+              <button
+                type="button"
+                class="tableau-dense__bouton-tri"
+                (click)="trierPar(colonne.cle)"
+              >
+                {{ colonne.libelle }}
+                <span aria-hidden="true">{{ indicateurTri(colonne.cle) }}</span>
+              </button>
+            } @else {
+              {{ colonne.libelle }}
+            }
+            @if (colonne.explication; as explication) {
+              <app-explication-jugement
+                [cle]="explication.cle"
+                [seuilsBruts]="explication.seuilsBruts"
+                [referentielsBruts]="explication.referentielsBruts"
+              />
+            }
+          </th>
+        }
+      </tr>
+      @if (auMoinsUneColonneFiltrable()) {
+        <tr class="tableau-dense__ligne-filtres">
+          @for (colonne of colonnes(); track colonne.cle; let i = $index) {
+            <th
+              scope="col"
+              class="tableau-dense__cellule-filtre"
+              [class.tableau-dense__cellule--fixe]="estColonneFixe(i)"
+            >
+              @if (colonne.filtrable) {
+                <label
+                  class="tableau-dense__label-filtre"
+                  [attr.for]="'tableau-dense-filtre-' + colonne.cle"
+                >
+                  Filtrer la colonne {{ colonne.libelle }}
+                </label>
+                <input
+                  #champFiltre
+                  type="text"
+                  [id]="'tableau-dense-filtre-' + colonne.cle"
+                  class="tableau-dense__champ-filtre"
+                  [value]="valeurFiltre(colonne.cle)"
+                  (input)="definirFiltre(colonne.cle, champFiltre.value)"
+                />
+              }
+            </th>
+          }
+        </tr>
+      }
+    </thead>
+    <tbody>
+      @for (ligne of lignesAffichees(); track identifiant()(ligne)) {
+        <tr
+          class="tableau-dense__ligne"
+          [class.tableau-dense__ligne--grisee]="estLigneGrisee(ligne)"
+          [class.tableau-dense__ligne--desactivee]="estLigneDesactivee(ligne)"
+          [attr.tabindex]="estLigneDesactivee(ligne) ? null : 0"
+          [attr.aria-disabled]="estLigneDesactivee(ligne) ? true : null"
+          (click)="onActiverLigne(ligne)"
+          (keydown.enter)="onActiverLigne(ligne)"
+        >
+          @for (colonne of colonnes(); track colonne.cle; let i = $index) {
+            @let cellule = colonne.extraireCellule(ligne);
+            <td
+              class="tableau-dense__cellule"
+              [class.tableau-dense__cellule--fixe]="estColonneFixe(i)"
+              [class.tableau-dense__cellule--grisee]="cellule.grisee"
+            >
+              @for (segment of cellule.segments; track $index) {
+                @switch (segment.type) {
+                  @case ('texte') {
+                    <span class="tableau-dense__texte">{{ segment.valeur }}</span>
+                  }
+                  @case ('texteCouleur') {
+                    <span
+                      class="tableau-dense__texte-couleur"
+                      [class.tableau-dense__texte-couleur--vert]="segment.couleur === 'vert'"
+                      [class.tableau-dense__texte-couleur--orange]="segment.couleur === 'orange'"
+                      [class.tableau-dense__texte-couleur--rouge]="segment.couleur === 'rouge'"
+                      >{{ segment.valeur }}</span
+                    >
+                  }
+                  @case ('badge') {
+                    <app-badge [couleur]="segment.couleur" [libelle]="segment.libelle" />
+                  }
+                  @case ('icone') {
+                    <span
+                      class="tableau-dense__icone"
+                      [attr.title]="segment.titre"
+                      aria-hidden="true"
+                      >{{ segment.symbole }}</span
+                    >
+                  }
+                }
+              }
+            </td>
+          }
+        </tr>
+      } @empty {
+        <tr>
+          <td class="tableau-dense__vide" [attr.colspan]="colonnes().length">
+            Aucune ligne à afficher.
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

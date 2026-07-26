@@ -12,7 +12,9 @@ import { TypeSource } from '../etat/types-donnees';
 import type {
   Audit,
   Groupe,
+  Parametres,
   Projet,
+  Referentiels,
   ResultatBrouillonProjet,
   ResultatMutationAdministration,
   Source,
@@ -36,6 +38,40 @@ const INSTANCE_SONAR: Instance = {
   type: TypeInstance.Sonar,
   nom: 'Sonar interne',
   urlBase: 'https://sonar.exemple.test',
+};
+
+/**
+ * Grille de seuils de test (Phase 6, incrément 1 : `parametres.seuils` désormais typé `SeuilsJugement`, plus
+ * jamais un objet potentiellement incomplet). Valeurs sans rapport avec les assertions des tests concernés,
+ * reprises de `docs/01_besoin/exemple-donnees.json` par simplicité (sur le modèle des autres mocks de
+ * `DonneesRacine` du dépôt).
+ */
+const PARAMETRES_DE_TEST: Parametres = {
+  seuils: {
+    vitalite: { mourantJours: 180, mortJours: 365 },
+    tailleDepot: { borneS: 20_000_000, borneL: 100_000_000, borneXL: 500_000_000 },
+    couverture: { seuilRouge: 40, seuilOrange: 60 },
+    fraicheurSonar: { toleranceJours: 7 },
+    activiteSansQualite: { minCommits: 20, minNouvellesViolations: 10 },
+    fraicheurAudit: { ancienJours: 30 },
+    mrOuvertes: { ageOrangeJours: 30, ageRougeJours: 90, pourcentageConflitRouge: 50 },
+    couleursViolations: {
+      bloquant: { seuilOrange: 1, seuilRouge: 3 },
+      critique: { seuilOrange: 10, seuilRouge: 25 },
+    },
+    materialiteBrouillon: { variationRelative: 0.1 },
+  },
+  verrouillage: {},
+  audit: {},
+  proxy: {},
+  sauvegarde: {},
+};
+
+/** Référentiels de test, mêmes principes que {@link PARAMETRES_DE_TEST}. */
+const REFERENTIELS_DE_TEST: Referentiels = {
+  reglesDependances: [],
+  reglesMarqueursIA: [],
+  motifNommageBranches: '',
 };
 
 /**
@@ -178,6 +214,20 @@ const REPONSES_PAR_DEFAUT: Readonly<Record<string, unknown>> = {
     mrOuvertes: [],
   },
   interroger_membres: { sourceId: 'src', refEffective: 'main', shaTete: 'abc', membres: [] },
+  interroger_branches_completes: {
+    sourceId: 'src',
+    refEffective: 'main',
+    shaTete: 'abc',
+    branches: [{ nom: 'develop', avecMR: false, dernierCommitLe: '2026-07-20' }],
+  },
+  interroger_dependances: {
+    sourceId: 'src',
+    refEffective: 'main',
+    shaTete: 'abc',
+    dependances: [
+      { reference: 'org.springframework:spring-core', version: '5.3.12', manifeste: 'pom.xml' },
+    ],
+  },
   interroger_marqueurs_ia: { sourceId: 'src', refEffective: 'main', shaTete: 'abc', marqueurs: [] },
   interroger_violations: {
     sourceId: 'src',
@@ -236,7 +286,10 @@ describe('OrchestrateurCampagneService', () => {
     enregistrerBrouillon.mockResolvedValue({ type: 'succes' });
     donneesApplicationMock = {
       groupes: jest.fn(() => []),
-      racine: jest.fn(() => ({ parametres: {}, referentiels: {} })),
+      racine: jest.fn(() => ({
+        parametres: PARAMETRES_DE_TEST,
+        referentiels: REFERENTIELS_DE_TEST,
+      })),
       enregistrerBrouillon,
     };
     TestBed.configureTestingModule({
@@ -306,6 +359,46 @@ describe('OrchestrateurCampagneService', () => {
       );
     });
 
+    it(
+      'doit interroger la liste complète des branches et les dépendances du dépôt et les faire apparaître dans ' +
+        'resultats (US-009, incrément de rattrapage de la Phase 5 précédant la Phase 6)',
+      async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        expect(invokeSimule).toHaveBeenCalledWith(
+          'interroger_branches_completes',
+          expect.objectContaining({ sourceId: 'source-1' }),
+        );
+        expect(invokeSimule).toHaveBeenCalledWith(
+          'interroger_dependances',
+          expect.objectContaining({ sourceId: 'source-1' }),
+        );
+        const resultatsParProjet = donneesApplicationMock.enregistrerBrouillon.mock.calls[0][4];
+        const resultats: readonly unknown[] = resultatsParProjet[0].audit.resultats;
+        expect(resultats).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              type: 'gitlab.branches',
+              branches: [{ nom: 'develop', avecMR: false, dernierCommitLe: '2026-07-20' }],
+            }),
+            expect.objectContaining({
+              type: 'gitlab.dependances',
+              dependances: [
+                {
+                  reference: 'org.springframework:spring-core',
+                  version: '5.3.12',
+                  manifeste: 'pom.xml',
+                },
+              ],
+            }),
+          ]),
+        );
+      },
+    );
+
     it('doit transmettre le référentiel de marqueurs IA à interroger_marqueurs_ia et calculer le constat croisé', async () => {
       const projet = DonneesDeTest.projet('projet-1', [
         DonneesDeTest.sourceGitlab('source-1'),
@@ -313,8 +406,9 @@ describe('OrchestrateurCampagneService', () => {
       ]);
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
       donneesApplicationMock.racine.mockReturnValue({
-        parametres: {},
+        parametres: PARAMETRES_DE_TEST,
         referentiels: {
+          ...REFERENTIELS_DE_TEST,
           reglesMarqueursIA: [
             {
               motif: 'CLAUDE.md',
@@ -514,9 +608,20 @@ describe('OrchestrateurCampagneService', () => {
         date: '2026-06-01T00:00:00Z',
         campagneId: 'campagne-0',
         resultats: [
-          { type: 'gitlab.taille_depot', sourceId: 'source-1', tailleOctets: 1_000_000 },
-          { type: 'sonar.couverture', sourceId: 'source-2', couverture: 60 },
-          { type: 'sonar.ncloc', sourceId: 'source-2', ncloc: 10_000 },
+          {
+            type: 'gitlab.taille_depot',
+            sourceId: 'source-1',
+            refEffective: 'main',
+            shaTete: 'abcdef',
+            tailleOctets: 1_000_000,
+          },
+          {
+            type: 'sonar.couverture',
+            sourceId: 'source-2',
+            couverture: 60,
+            couvertureNouveauCode: 60,
+          },
+          { type: 'sonar.ncloc', sourceId: 'source-2', ncloc: 10_000, parLangage: {} },
         ],
       };
       const projet = DonneesDeTest.projet(
@@ -526,8 +631,8 @@ describe('OrchestrateurCampagneService', () => {
       );
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
       donneesApplicationMock.racine.mockReturnValue({
-        parametres: { seuils: { materialiteBrouillon: { variationRelative: 0.1 } } },
-        referentiels: {},
+        parametres: PARAMETRES_DE_TEST,
+        referentiels: REFERENTIELS_DE_TEST,
       });
       invokeSimule.mockImplementation((commande: string) => {
         if (commande === 'interroger_taille_depot') {
@@ -579,8 +684,8 @@ describe('OrchestrateurCampagneService', () => {
       );
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
       donneesApplicationMock.racine.mockReturnValue({
-        parametres: { audit: { concurrence: 2 } },
-        referentiels: {},
+        parametres: { ...PARAMETRES_DE_TEST, audit: { concurrence: 2 } },
+        referentiels: REFERENTIELS_DE_TEST,
       });
 
       await service.lancerCampagne(
@@ -602,8 +707,8 @@ describe('OrchestrateurCampagneService', () => {
       );
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
       donneesApplicationMock.racine.mockReturnValue({
-        parametres: { audit: { concurrence: 1 } },
-        referentiels: {},
+        parametres: { ...PARAMETRES_DE_TEST, audit: { concurrence: 1 } },
+        referentiels: REFERENTIELS_DE_TEST,
       });
       const etatSession = TestBed.inject(EtatSessionService);
 

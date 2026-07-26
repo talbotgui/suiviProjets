@@ -11,10 +11,11 @@
 // incrément 2, mais n'avait encore aucun appelant réel dans l'interface avant cet incrément (cf.
 // `docs/04_rapports/rapportDeDeveloppement.md`).
 //
-// Routé seul, sans shell applicatif, même choix pragmatique que les deux autres écrans d'Audits (cf. commentaire
-// d'en-tête de `ecrans/audits/constitution-campagne/constitution-campagne.component.ts`). RG-019 reste, comme
-// décidé pour cet incrément, un bandeau de blocage dans Constitution de campagne plutôt qu'un guard de route ;
-// ce bandeau porte désormais un lien direct vers cet écran.
+// Routé sous le shell applicatif depuis la Phase 6, incrément 3 (`ShellComponent`, `app.routes.ts`), sur le même
+// modèle que les deux autres écrans d'Audits (cf. commentaire d'en-tête de
+// `ecrans/audits/constitution-campagne/constitution-campagne.component.ts`) : même chemin d'URL, même composant.
+// RG-019 reste, comme décidé pour cet incrément, un bandeau de blocage dans Constitution de campagne plutôt qu'un
+// guard de route ; ce bandeau porte désormais un lien direct vers cet écran.
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';

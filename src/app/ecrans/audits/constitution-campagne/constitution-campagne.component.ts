@@ -6,8 +6,8 @@
 // (`OrchestrateurCampagneService.constituerCampagne`), blocage RG-019 et lancement (`OrchestrateurCampagneService.
 // lancerCampagne`) avec ressaisie du mot de passe (RG-002, `SqmConfirmationMotDePasseComponent`).
 //
-// Routé seul, sans shell applicatif (aucun shell ne existe encore, cf. `app.routes.ts` : même choix pragmatique
-// que l'écran Administration en Phase 3, à revoir une fois le shell construit).
+// Routé sous le shell applicatif depuis la Phase 6, incrément 3 (`ShellComponent`, `app.routes.ts`) : même chemin
+// d'URL et même composant qu'auparavant, seule la navigation englobante a changé.
 //
 // Décisions arbitraires (cf. rapport de développement de cette phase) : les credentials manquants sont affichés en
 // simple liste (nom d'instance), sans navigation vers un écran de saisie qui n'existe pas encore ; le blocage
@@ -24,13 +24,7 @@ import type { Groupe } from '../../../services/avecetat/etat/types-donnees';
 import { OrchestrateurCampagneService } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
 import type { ConstitutionCampagne } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
 import { PerimetreCampagneUtils } from '../../../services/avecetat/campagne/perimetre-campagne.utils';
-
-/**
- * Valeur par défaut du seuil « non audité depuis plus de N jours » (`parametres.seuils.fraicheurAudit.
- * ancienJours`), reprise de `docs/01_besoin/exemple-donnees.json` selon la même convention que
- * `CONCURRENCE_PAR_DEFAUT`/`VARIATION_RELATIVE_PAR_DEFAUT` d'`OrchestrateurCampagneService`.
- */
-const ANCIEN_JOURS_PAR_DEFAUT = 30;
+import { ParametresJugementUtils } from '../../../services/sansetat/jugement/parametres-jugement.utils';
 
 /**
  * Écran Constitution de campagne : sélection du périmètre, raccourcis F07, récapitulatif et lancement d'une
@@ -248,28 +242,14 @@ export class SqmConstitutionCampagneComponent {
 
   /**
    * Extrait le seuil « non audité depuis plus de N jours » paramétré (`parametres.seuils.fraicheurAudit.
-   * ancienJours`), sans accès non sûr à la racine `unknown`, avec repli documenté sur
-   * {@link ANCIEN_JOURS_PAR_DEFAUT}.
+   * ancienJours`), avec repli défensif désormais centralisé dans `ParametresJugementUtils.lireAncienJoursAvecRepli`
+   * (RG-022, Phase 6 incrément 4 : ce seuil était auparavant dupliqué à l'identique ici et dans
+   * `SqmAccueilComponent`, cf. rapport de développement).
    * @returns Le seuil à appliquer.
    */
   private extraireAncienJours(): number {
-    const parametres = this.donneesApplication.racine()?.parametres;
-    if (typeof parametres !== 'object' || parametres === null || !('seuils' in parametres)) {
-      return ANCIEN_JOURS_PAR_DEFAUT;
-    }
-    const seuils = parametres.seuils;
-    if (typeof seuils !== 'object' || seuils === null || !('fraicheurAudit' in seuils)) {
-      return ANCIEN_JOURS_PAR_DEFAUT;
-    }
-    const fraicheurAudit = seuils.fraicheurAudit;
-    if (
-      typeof fraicheurAudit !== 'object' ||
-      fraicheurAudit === null ||
-      !('ancienJours' in fraicheurAudit)
-    ) {
-      return ANCIEN_JOURS_PAR_DEFAUT;
-    }
-    const valeur = fraicheurAudit.ancienJours;
-    return typeof valeur === 'number' && valeur > 0 ? valeur : ANCIEN_JOURS_PAR_DEFAUT;
+    return ParametresJugementUtils.lireAncienJoursAvecRepli(
+      this.donneesApplication.racine()?.parametres.seuils,
+    );
   }
 }

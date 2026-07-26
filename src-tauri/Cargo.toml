@@ -47,10 +47,14 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "def
 # dépendance directe pour l'encodage sûr d'un segment de chemin d'URL (nom de branche pouvant contenir `/`), requis
 # par le Connecteur GitLab pour résoudre la ref effectivement auditée (Phase 5, Moteur d'audit).
 url = "2"
-# Déjà présent transitivement via tauri-utils (aucune empreinte nouvelle sur l'arbre de dépendances) : réutilisé en
-# dépendance directe pour convertir un motif glob simple (`*` seul caractère spécial) en expression régulière
-# ancrée, requis par `interroger_marqueurs_ia` du Connecteur GitLab (Phase 5, incrément 7, US-009, F18).
 regex = "1"
+# Déjà présent transitivement via tauri/tauri-utils (dépendance de `plist`, aucune empreinte nouvelle sur l'arbre de
+# dépendances, cf. `Cargo.lock`) : réutilisé en dépendance directe pour le parseur best-effort de `pom.xml`
+# (extraction des dépendances Maven directes, hors `<dependencyManagement>`), requis par `interroger_dependances` du
+# Connecteur GitLab (Phase 5, incrément de rattrapage). `package.json` (JSON, déjà couvert par `serde_json`) et
+# `build.gradle` (extraction par expression régulière, déjà couvert par `regex` ci-dessus) ne nécessitent aucune
+# dépendance supplémentaire.
+quick-xml = "0.38"
 
 [dev-dependencies]
 # Serveur HTTP simulé en boucle locale, seul moyen réaliste de tester la logique des connecteurs (en-têtes,

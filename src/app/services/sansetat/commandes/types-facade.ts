@@ -10,8 +10,11 @@
 // Périmètre de la Phase 5, incrément 1 : les dix charges utiles et résultats typés des opérations d'interrogation
 // GitLab/Sonar ne nécessitant qu'un appel API déterministe (`interrogerVitalite`, `interrogerTailleDepot`,
 // `interrogerContributeurs`, `interrogerMergeRequests`, `interrogerMembres`, `interrogerViolations`,
-// `interrogerDette`, `interrogerCouverture`, `interrogerNotes`, `interrogerNcloc`). `interrogerDependances` reste
-// différée à un incrément ultérieur. `interrogerMarqueursIa` est livrée à l'incrément 7 (cf. plus bas).
+// `interrogerDette`, `interrogerCouverture`, `interrogerNotes`, `interrogerNcloc`). `interrogerMarqueursIa` est
+// livrée à l'incrément 7 (cf. plus bas). `interrogerDependances` et `interrogerBranchesCompletes` (distincte de
+// l'autocomplétion `interrogerBranches` ci-dessus, US-008) sont livrées à l'incrément de rattrapage de la Phase 5
+// (précédant la Phase 6) : mirroir strict de `ResultatGitlabDependances`/`ResultatGitlabBranches` côté cœur natif,
+// sans `rebasee`/`nommageConforme` (cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`).
 
 /**
  * Type d'instance externe déclarée par un groupe (mirroir de `TypeInstance` côté cœur natif).
@@ -89,6 +92,72 @@ export type ResultatTestConnectivite =
  */
 export type ResultatInterrogationBranches =
   | { readonly type: 'succes'; readonly branches: readonly string[] }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * État d'une branche du dépôt (mirroir de `Branche` côté cœur natif). Ne porte ni `rebasee` ni `nommageConforme`
+ * depuis l'incrément de rattrapage de la Phase 5 (précédant la Phase 6) : la conformité de nommage se recalcule à
+ * l'affichage par le Moteur de jugement (RG-030, `referentiels.motifNommageBranches`) plutôt que d'être stockée
+ * comme un constat, et `rebasee` est abandonnée entièrement (aucune définition opérationnelle abordable sans coût
+ * réseau disproportionné, cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`).
+ */
+export interface Branche {
+  readonly nom: string;
+  readonly avecMR: boolean;
+  readonly dernierCommitLe: string;
+}
+
+/**
+ * Constat brut de `gitlab.branches` (mirroir de `ResultatGitlabBranches` côté cœur natif), produit par
+ * `FacadeCommandesService.interrogerBranchesCompletes` (incrément de rattrapage de la Phase 5, précédant la
+ * Phase 6) : à ne pas confondre avec {@link ResultatInterrogationBranches} ci-dessus, dédié à l'autocomplétion
+ * (US-008, simple liste de noms).
+ */
+export interface ResultatGitlabBranches {
+  readonly sourceId: string;
+  readonly refEffective: string;
+  readonly shaTete: string;
+  readonly branches: readonly Branche[];
+}
+
+/**
+ * Résultat typé de `FacadeCommandesService.interrogerBranchesCompletes` (US-009, RG-030), sur le modèle de
+ * {@link ResultatInterrogationBranches}, nom distinct retenu pour éviter toute confusion avec ce dernier.
+ */
+export type ResultatInterrogationBranchesCompletes =
+  | { readonly type: 'succes'; readonly resultat: ResultatGitlabBranches }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * Dépendance déclarée par un manifeste du dépôt (mirroir de `Dependance` côté cœur natif), sans jugement
+ * d'obsolescence (RG-011) : la confrontation à `referentiels.reglesDependances` relève du Moteur de jugement.
+ */
+export interface Dependance {
+  readonly reference: string;
+  readonly version: string;
+  readonly manifeste: string;
+}
+
+/**
+ * Constat brut de `gitlab.dependances` (mirroir de `ResultatGitlabDependances` côté cœur natif), produit par
+ * `FacadeCommandesService.interrogerDependances` (incrément de rattrapage de la Phase 5, précédant la Phase 6) :
+ * parseur best-effort de manifestes, limité en V1 aux trois écosystèmes illustrés par
+ * `docs/01_besoin/exemple-donnees.json` (`pom.xml` Maven, `package.json` npm, `build.gradle` Gradle, cf.
+ * `src-tauri/src/connecteurs/gitlab.rs` pour le détail des limites assumées).
+ */
+export interface ResultatGitlabDependances {
+  readonly sourceId: string;
+  readonly refEffective: string;
+  readonly shaTete: string;
+  readonly dependances: readonly Dependance[];
+}
+
+/**
+ * Résultat typé de `FacadeCommandesService.interrogerDependances` (US-009), sur le modèle de
+ * {@link ResultatInterrogationBranches}.
+ */
+export type ResultatInterrogationDependances =
+  | { readonly type: 'succes'; readonly resultat: ResultatGitlabDependances }
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**

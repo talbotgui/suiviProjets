@@ -6,12 +6,14 @@
 //! (`docs/02_documentation/13_conceptionDetaillee.md#détail-des-modulescomposants-et-de-leurs-interfaces`) —
 //! `interrogerVitalite`, `interrogerTailleDepot`, `interrogerContributeurs`, `interrogerMergeRequests`,
 //! `interrogerMembres` — chacune ne nécessitant qu'un appel à une API GitLab déterministe, sans heuristique à
-//! inventer. `interrogerDependances` (parseur de manifestes multi-écosystèmes) reste hors périmètre, différée à un
-//! incrément ultérieur, faute de spécification suffisante dans la documentation source à ce stade.
-//! `interrogerMarqueursIa` (US-009, F18, RG-021), différée à la Phase 5, incrément 1, est livrée depuis l'incrément
-//! 7 : détection des marqueurs d'outils IA dans l'arborescence complète de la ref auditée, par correspondance avec
-//! le référentiel `Referentiels.reglesMarqueursIA` transmis en paramètre (jamais lu depuis le fichier de données
-//! par le Connecteur lui-même).
+//! inventer. `interrogerMarqueursIa` (US-009, F18, RG-021), différée à la Phase 5, incrément 1, est livrée depuis
+//! l'incrément 7 : détection des marqueurs d'outils IA dans l'arborescence complète de la ref auditée, par
+//! correspondance avec le référentiel `Referentiels.reglesMarqueursIA` transmis en paramètre (jamais lu depuis le
+//! fichier de données par le Connecteur lui-même).
+//!
+//! `interrogerDependances` et le second `interrogerBranches` (production complète pour le catalogue d'audit,
+//! distincte de l'autocomplétion US-008 ci-dessous) sont livrés à l'incrément de rattrapage de la Phase 5, précédant
+//! la Phase 6 : cf. `interroger_dependances` et `interroger_branches_completes` plus bas.
 //!
 //! Décision arbitraire (cf. rapport de développement de cette phase) : le délai de requête reste le délai fixe
 //! partagé de `commun.rs` (`client_http()`) plutôt que le délai configurable envisagé par
@@ -20,7 +22,8 @@
 
 use super::commun::{ErreurConnecteur, VerdictConnectivite, erreur_depuis_reqwest};
 use crate::modele::racine::{
-    Contributeur, Marqueur, MembreGitlab, MergeRequestOuverte, ResultatGitlabContributeurs,
+    Branche, Contributeur, Dependance, Marqueur, MembreGitlab, MergeRequestOuverte,
+    ResultatGitlabBranches, ResultatGitlabContributeurs, ResultatGitlabDependances,
     ResultatGitlabMarqueursIa, ResultatGitlabMembres, ResultatGitlabMergeRequests,
     ResultatGitlabTailleDepot, ResultatGitlabVitalite,
 };
@@ -924,6 +927,513 @@ pub(crate) async fn interroger_membres(
         ref_effective: resolue.ref_effective,
         sha_tete: resolue.sha_tete,
         membres,
+    })
+}
+
+/// Nombre maximal de pages parcourues lors de la liste complète des branches ou des demandes de fusion ouvertes
+/// d'un dépôt (`interroger_branches_completes`) : borne de sécurité arbitraire (cf. rapport de développement de
+/// cette phase), sur le même principe que [`MAX_PAGES_CONTRIBUTEURS`].
+const MAX_PAGES_BRANCHES_COMPLETES: u32 = 20;
+
+/// Commit de tête d'une branche, tel que retourné par `GET .../repository/branches` (réduit au seul champ
+/// exploité par `interroger_branches_completes`).
+#[derive(Debug, Deserialize)]
+struct ReponseCommitBranche {
+    committed_date: String,
+}
+
+/// Réponse d'un élément de la liste complète des branches de l'API GitLab (à la différence de [`ReponseBranche`],
+/// exploitée par l'autocomplétion US-008), réduite aux champs exploités par `interroger_branches_completes`.
+#[derive(Debug, Deserialize)]
+struct ReponseBrancheComplete {
+    name: String,
+    commit: ReponseCommitBranche,
+}
+
+/// Réponse d'une demande de fusion ouverte, réduite à sa branche source (seul champ exploité par
+/// `interroger_branches_completes` pour déterminer `avecMR`).
+#[derive(Debug, Deserialize)]
+struct ReponseMergeRequestBrancheSource {
+    source_branch: String,
+}
+
+/// Interroge la liste complète des branches d'un dépôt GitLab pour le catalogue figé des résultats d'audit
+/// (`gitlab.branches`, RG-030), distincte de [`interroger_branches`] ci-dessus (autocomplétion US-008, limitée à
+/// [`TAILLE_PAGE_BRANCHES`] éléments) : nom de fonction retenu par symétrie avec les autres opérations
+/// d'interrogation de ce module (`interroger_membres`, `interroger_dependances`), faute de nom distinct proposé par
+/// `docs/02_documentation/13_conceptionDetaillee.md`, qui nomme `interrogerBranches` les deux opérations sans
+/// distinction — décision arbitraire signalée dans le rapport de développement de cette phase.
+///
+/// Chaque branche est enrichie de `avecMR` (présence d'au moins une demande de fusion ouverte dont elle est la
+/// branche source, RG-030) et de la date du commit de tête de la branche elle-même (`dernierCommitLe`, distincte du
+/// commit de tête de la ref auditée porté par `ResultatGitlabBranches.shaTete`). Ne porte ni `rebasee` ni
+/// `nommageConforme` (cf. commentaire de [`Branche`]).
+///
+/// # Erreurs
+///
+/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux appels de pagination des branches et des
+/// demandes de fusion ouvertes.
+pub(crate) async fn interroger_branches_completes(
+    url_base: &str,
+    credential: &str,
+    source_id: &str,
+    id_externe: &str,
+    ref_auditee: Option<&str>,
+    client: &reqwest::Client,
+) -> Result<ResultatGitlabBranches, ErreurConnecteur> {
+    let resolue =
+        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+
+    let mut branches_brutes = Vec::new();
+    for page in 1..=MAX_PAGES_BRANCHES_COMPLETES {
+        let url = format!(
+            "{}/api/v4/projects/{}/repository/branches",
+            url_base.trim_end_matches('/'),
+            id_externe
+        );
+        let reponse = client
+            .get(url)
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        let page_branches = reponse
+            .json::<Vec<ReponseBrancheComplete>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_branches.is_empty() {
+            break;
+        }
+        branches_brutes.extend(page_branches);
+    }
+
+    let mut noms_branches_avec_mr = HashSet::new();
+    for page in 1..=MAX_PAGES_BRANCHES_COMPLETES {
+        let url = format!(
+            "{}/api/v4/projects/{}/merge_requests",
+            url_base.trim_end_matches('/'),
+            id_externe
+        );
+        let reponse = client
+            .get(url)
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("state", "opened"),
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        let page_mrs = reponse
+            .json::<Vec<ReponseMergeRequestBrancheSource>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_mrs.is_empty() {
+            break;
+        }
+        for mr in page_mrs {
+            noms_branches_avec_mr.insert(mr.source_branch);
+        }
+    }
+
+    let branches: Vec<Branche> = branches_brutes
+        .into_iter()
+        .map(|branche| Branche {
+            avec_mr: noms_branches_avec_mr.contains(&branche.name),
+            nom: branche.name,
+            dernier_commit_le: branche.commit.committed_date,
+        })
+        .collect();
+
+    Ok(ResultatGitlabBranches {
+        source_id: source_id.to_string(),
+        ref_effective: resolue.ref_effective,
+        sha_tete: resolue.sha_tete,
+        branches,
+    })
+}
+
+/// Noms de fichiers manifestes reconnus par `interroger_dependances` (périmètre V1, cf. en-tête de module) :
+/// comparaison sur le seul basename de l'entrée d'arborescence, insensible au sous-répertoire (ex.
+/// `module-a/pom.xml` reconnu comme `pom.xml`). Point d'extension pour un futur écosystème : ajouter le nom de
+/// fichier ici, puis une branche dans le `match` de `interroger_dependances` déléguant au parseur dédié.
+const NOMS_MANIFESTES_RECONNUS: [&str; 3] = ["pom.xml", "package.json", "build.gradle"];
+
+/// Construit l'URL de lecture du contenu brut d'un fichier du dépôt (`GET .../repository/files/{chemin}/raw`), en
+/// encodant le chemin via le crate `url` plutôt qu'un simple `format!`, sur le même principe que
+/// [`url_commit_ref`] : un chemin de manifeste peut contenir `/` (ex. `module-a/pom.xml`), qui doit être
+/// percent-encodé pour rester un unique segment de chemin plutôt que d'introduire un sous-chemin.
+fn url_fichier_manifeste(
+    url_base: &str,
+    id_externe: &str,
+    chemin_manifeste: &str,
+) -> Result<url::Url, ErreurConnecteur> {
+    let mut url = url::Url::parse(&format!(
+        "{}/api/v4/projects/{}/repository/files",
+        url_base.trim_end_matches('/'),
+        id_externe
+    ))
+    .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+        message: erreur.to_string(),
+    })?;
+    url.path_segments_mut()
+        .map_err(|_| ErreurConnecteur::ReponseInattendue {
+            message: "URL de base non segmentable (schéma opaque)".to_string(),
+        })?
+        .push(chemin_manifeste)
+        .push("raw");
+    Ok(url)
+}
+
+/// Récupère le contenu brut d'un manifeste déjà localisé dans l'arborescence, `None` si celui-ci a disparu entre le
+/// listage de l'arborescence et cette lecture (course rare, jamais une anomalie : cf. `interroger_dependances`,
+/// « absence de manifeste ≠ anomalie »).
+///
+/// # Erreurs
+///
+/// Les mêmes catégories que [`resoudre_ref_effective`], hormis le statut 404 (traité comme une absence, cf.
+/// ci-dessus plutôt que comme [`ErreurConnecteur::ReponseInattendue`]).
+async fn recuperer_contenu_manifeste(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    chemin_manifeste: &str,
+    ref_effective: &str,
+    client: &reqwest::Client,
+) -> Result<Option<String>, ErreurConnecteur> {
+    let mut url = url_fichier_manifeste(url_base, id_externe, chemin_manifeste)?;
+    url.query_pairs_mut().append_pair("ref", ref_effective);
+
+    let reponse = client
+        .get(url)
+        .header("PRIVATE-TOKEN", credential)
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+    let statut = reponse.status();
+    if statut.as_u16() == 404 {
+        return Ok(None);
+    }
+    if statut.as_u16() == 401 {
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if statut.as_u16() == 403 {
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if !statut.is_success() {
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    let contenu = reponse
+        .text()
+        .await
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
+    Ok(Some(contenu))
+}
+
+/// Décode le nom qualifié (sans espace de noms) d'un élément XML `quick_xml` en `String`, sans assertion `as`/
+/// panique possible sur un contenu non UTF-8 (`String::from_utf8_lossy`, best-effort assumé pour ce parseur, cf.
+/// en-tête de module).
+fn nom_element_xml(nom_qualifie: &[u8]) -> String {
+    String::from_utf8_lossy(nom_qualifie).into_owned()
+}
+
+/// Parseur best-effort d'un manifeste `pom.xml` (Maven, périmètre V1 cf. en-tête de module) : extrait les
+/// dépendances directement déclarées sous `<project><dependencies><dependency>`, en ignorant délibérément tout
+/// contenu de `<dependencyManagement>` (versions gérées, pas des dépendances effectivement déclarées) ainsi que
+/// toute dépendance sans `<version>` explicite (héritée d'un parent ou d'une BOM, non résolvable sans télécharger
+/// le POM parent, hors périmètre V1). Un XML malformé ne fait jamais échouer l'audit : l'analyse s'arrête et
+/// retourne les dépendances déjà extraites avant le point de rupture (algorithme figé, cf. rapport de développement
+/// de cette phase).
+fn parser_pom_xml(contenu: &str) -> Vec<Dependance> {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+
+    let mut lecteur = Reader::from_str(contenu);
+    lecteur.config_mut().trim_text(true);
+
+    let mut pile: Vec<String> = Vec::new();
+    let mut profondeur_gestion_dependances = 0u32;
+    let mut dependance_courante: Option<(Option<String>, Option<String>, Option<String>)> = None;
+    let mut champ_actif: Option<&'static str> = None;
+    let mut texte_courant = String::new();
+    let mut dependances = Vec::new();
+
+    loop {
+        match lecteur.read_event() {
+            Ok(Event::Start(element)) => {
+                let nom = nom_element_xml(element.name().as_ref());
+                let parent = pile.last().map(String::as_str);
+                if nom == "dependencyManagement" {
+                    profondeur_gestion_dependances += 1;
+                }
+                if profondeur_gestion_dependances == 0
+                    && nom == "dependency"
+                    && parent == Some("dependencies")
+                {
+                    dependance_courante = Some((None, None, None));
+                }
+                champ_actif = if profondeur_gestion_dependances == 0 && parent == Some("dependency")
+                {
+                    match nom.as_str() {
+                        "groupId" => Some("groupId"),
+                        "artifactId" => Some("artifactId"),
+                        "version" => Some("version"),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                pile.push(nom);
+                texte_courant.clear();
+            }
+            Ok(Event::Text(texte)) => {
+                if let Ok(valeur) = texte.decode() {
+                    texte_courant.push_str(&valeur);
+                }
+            }
+            Ok(Event::End(element)) => {
+                let nom = nom_element_xml(element.name().as_ref());
+                if let (Some(champ), Some((groupe, artefact, version))) =
+                    (champ_actif, dependance_courante.as_mut())
+                {
+                    match champ {
+                        "groupId" => *groupe = Some(texte_courant.trim().to_string()),
+                        "artifactId" => *artefact = Some(texte_courant.trim().to_string()),
+                        "version" => *version = Some(texte_courant.trim().to_string()),
+                        _ => {}
+                    }
+                }
+                if nom == "dependency" && profondeur_gestion_dependances == 0 {
+                    if let Some((Some(groupe), Some(artefact), Some(version))) =
+                        dependance_courante.take()
+                    {
+                        dependances.push(Dependance {
+                            reference: format!("{groupe}:{artefact}"),
+                            version,
+                            manifeste: "pom.xml".to_string(),
+                        });
+                    }
+                }
+                if nom == "dependencyManagement" && profondeur_gestion_dependances > 0 {
+                    profondeur_gestion_dependances -= 1;
+                }
+                pile.pop();
+                champ_actif = None;
+                texte_courant.clear();
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+    dependances
+}
+
+/// Parseur d'un manifeste `package.json` (npm, périmètre V1 cf. en-tête de module) : extrait les dépendances de
+/// production déclarées sous la clé `dependencies` (`devDependencies` volontairement exclu, décision arbitraire
+/// signalée dans le rapport de développement de cette phase, sur le même principe que `<dependencyManagement>` du
+/// parseur `pom.xml` — une dépendance de développement n'est pas une dépendance effectivement embarquée). Un JSON
+/// malformé ou sans clé `dependencies` ne fait jamais échouer l'audit : retourne simplement une liste vide.
+fn parser_package_json(contenu: &str) -> Vec<Dependance> {
+    let Ok(valeur) = serde_json::from_str::<serde_json::Value>(contenu) else {
+        return Vec::new();
+    };
+    let Some(dependances_declarees) = valeur.get("dependencies").and_then(|v| v.as_object()) else {
+        return Vec::new();
+    };
+    dependances_declarees
+        .iter()
+        .filter_map(|(reference, version)| {
+            let version = version.as_str()?;
+            Some(Dependance {
+                reference: reference.clone(),
+                version: version.to_string(),
+                manifeste: "package.json".to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Expression régulière figée d'extraction des dépendances d'un manifeste `build.gradle` (Groovy DSL), cf.
+/// [`parser_build_gradle`] : jamais recompilée dynamiquement à partir d'une donnée externe (à la différence de
+/// [`regex_depuis_motif_glob`]), la validité de ce motif littéral à la compilation est donc garantie par les tests
+/// de ce module plutôt que gérée comme un cas d'erreur à l'exécution.
+const MOTIF_DEPENDANCE_GRADLE: &str = r#"(?m)^\s*(?:implementation|api|compile|testImplementation|androidTestImplementation|runtimeOnly|compileOnly)\s*\(?\s*['"]([^:'"]+):([^:'"]+):([^'"]+)['"]"#;
+
+/// Parseur best-effort d'un manifeste `build.gradle` (Gradle, périmètre V1 cf. en-tête de module) : extraction par
+/// expression régulière des déclarations de dépendance au format court `'groupe:artefact:version'` des
+/// configurations usuelles (`implementation`, `api`, `compile`, `testImplementation`,
+/// `androidTestImplementation`, `runtimeOnly`, `compileOnly`), avec ou sans parenthèses. Limite assumée (Groovy/
+/// Kotlin DSL n'étant pas parsé syntaxiquement) : le format nommé (`implementation group: '...', name: '...',
+/// version: '...'`) et toute déclaration résultant d'une variable ou d'une résolution de version dynamique
+/// (catalogue de versions, `libs.versions.toml`) ne sont pas reconnus, silencieusement ignorés plutôt que de faire
+/// échouer l'audit.
+fn parser_build_gradle(contenu: &str) -> Vec<Dependance> {
+    let Ok(motif) = Regex::new(MOTIF_DEPENDANCE_GRADLE) else {
+        return Vec::new();
+    };
+    motif
+        .captures_iter(contenu)
+        .map(|captures| Dependance {
+            reference: format!("{}:{}", &captures[1], &captures[2]),
+            version: captures[3].to_string(),
+            manifeste: "build.gradle".to_string(),
+        })
+        .collect()
+}
+
+/// Interroge les dépendances déclarées par les manifestes du dépôt (`gitlab.dependances`), tous écosystèmes
+/// reconnus confondus (périmètre V1, cf. [`NOMS_MANIFESTES_RECONNUS`]) : récupère l'arborescence complète de la ref
+/// auditée (même algorithme paginé que [`interroger_marqueurs_ia`]), retient les fichiers dont le basename
+/// correspond à un manifeste reconnu, lit leur contenu brut puis les parse avec le module dédié à leur écosystème.
+/// L'absence de tout manifeste dans le dépôt n'est jamais une anomalie : `dependances` est alors simplement vide.
+///
+/// # Erreurs
+///
+/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux appels de pagination de l'arborescence
+/// et à la lecture du contenu de chaque manifeste (hormis un statut 404 sur cette dernière, cf.
+/// [`recuperer_contenu_manifeste`]).
+pub(crate) async fn interroger_dependances(
+    url_base: &str,
+    credential: &str,
+    source_id: &str,
+    id_externe: &str,
+    ref_auditee: Option<&str>,
+    client: &reqwest::Client,
+) -> Result<ResultatGitlabDependances, ErreurConnecteur> {
+    let resolue =
+        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+
+    let mut chemins_manifestes = Vec::new();
+    for page in 1..=MAX_PAGES_ARBORESCENCE {
+        let url = format!(
+            "{}/api/v4/projects/{}/repository/tree",
+            url_base.trim_end_matches('/'),
+            id_externe
+        );
+        let reponse = client
+            .get(url)
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("ref", resolue.ref_effective.as_str()),
+                ("recursive", "true"),
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        let page_entrees = reponse
+            .json::<Vec<ReponseEntreeArborescence>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_entrees.is_empty() {
+            break;
+        }
+        for entree in &page_entrees {
+            if entree.type_entree == "blob"
+                && NOMS_MANIFESTES_RECONNUS.contains(&basename(&entree.path))
+            {
+                chemins_manifestes.push(entree.path.clone());
+            }
+        }
+    }
+
+    let mut dependances = Vec::new();
+    for chemin in chemins_manifestes {
+        let Some(contenu) = recuperer_contenu_manifeste(
+            url_base,
+            credential,
+            id_externe,
+            &chemin,
+            &resolue.ref_effective,
+            client,
+        )
+        .await?
+        else {
+            continue;
+        };
+        let dependances_manifeste = match basename(&chemin) {
+            "pom.xml" => parser_pom_xml(&contenu),
+            "package.json" => parser_package_json(&contenu),
+            "build.gradle" => parser_build_gradle(&contenu),
+            _ => Vec::new(),
+        };
+        dependances.extend(dependances_manifeste);
+    }
+
+    Ok(ResultatGitlabDependances {
+        source_id: source_id.to_string(),
+        ref_effective: resolue.ref_effective,
+        sha_tete: resolue.sha_tete,
+        dependances,
     })
 }
 
@@ -2024,5 +2534,421 @@ mod tests {
             resultat,
             Err(ErreurConnecteur::DelaiDepasse { .. })
         ));
+    }
+
+    // -- interroger_branches_completes ------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn interroger_branches_completes_marque_avec_mr_la_branche_source_dune_mr_ouverte()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/branches"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "name": "develop", "commit": { "committed_date": "2026-07-08T00:00:00Z" } },
+                { "name": "feature/paiement-sepa", "commit": { "committed_date": "2026-07-07T00:00:00Z" } }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/branches"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/merge_requests"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "source_branch": "feature/paiement-sepa" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/merge_requests"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_branches_completes(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.branches.len(), 2);
+        let Some(develop) = resultat
+            .branches
+            .iter()
+            .find(|branche| branche.nom == "develop")
+        else {
+            panic!("branche develop attendue dans le résultat");
+        };
+        assert!(!develop.avec_mr);
+        assert_eq!(develop.dernier_commit_le, "2026-07-08T00:00:00Z");
+        let Some(feature) = resultat
+            .branches
+            .iter()
+            .find(|branche| branche.nom == "feature/paiement-sepa")
+        else {
+            panic!("branche feature/paiement-sepa attendue dans le résultat");
+        };
+        assert!(feature.avec_mr);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_branches_completes_signale_authentification_refusee() {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/branches"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_branches_completes(
+            &serveur.uri(),
+            "jeton-invalide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
+    }
+
+    // -- interroger_dependances --------------------------------------------------------------------------------
+
+    /// Monte les mocks de résolution de ref et d'arborescence communs aux tests de `interroger_dependances`
+    /// (un seul appel de pagination de l'arborescence, page suivante vide).
+    async fn monter_mock_arborescence(serveur: &MockServer, entrees: serde_json::Value) {
+        use wiremock::matchers::query_param;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(entrees))
+            .mount(serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(serveur)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn interroger_dependances_agrege_les_trois_ecosystemes_reconnus()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        monter_mock_arborescence(
+            &serveur,
+            serde_json::json!([
+                { "path": "pom.xml", "type": "blob" },
+                { "path": "package.json", "type": "blob" },
+                { "path": "build.gradle", "type": "blob" },
+                { "path": "README.md", "type": "blob" }
+            ]),
+        )
+        .await;
+
+        let pom = r#"<project>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>ignoree-geree</artifactId>
+                        <version>9.9.9</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>5.3.12</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.example</groupId>
+                    <artifactId>sans-version</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/files/pom.xml/raw"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(pom))
+            .mount(&serveur)
+            .await;
+
+        let package_json = r#"{
+            "dependencies": { "@angular/core": "18.2.1", "rxjs": "7.8.1" },
+            "devDependencies": { "jest": "29.0.0" }
+        }"#;
+        Mock::given(method("GET"))
+            .and(path(
+                "/api/v4/projects/1234/repository/files/package.json/raw",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_string(package_json))
+            .mount(&serveur)
+            .await;
+
+        let build_gradle = "dependencies {\n    implementation 'com.squareup.retrofit2:retrofit:2.11.0'\n    testImplementation(\"junit:junit:4.13.2\")\n}\n";
+        Mock::given(method("GET"))
+            .and(path(
+                "/api/v4/projects/1234/repository/files/build.gradle/raw",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_string(build_gradle))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.dependances.len(), 5);
+        assert!(
+            resultat
+                .dependances
+                .iter()
+                .any(|d| d.reference == "org.springframework:spring-core"
+                    && d.version == "5.3.12"
+                    && d.manifeste == "pom.xml")
+        );
+        assert!(
+            !resultat
+                .dependances
+                .iter()
+                .any(|d| d.reference.contains("ignoree-geree")
+                    || d.reference.contains("sans-version"))
+        );
+        assert!(
+            resultat
+                .dependances
+                .iter()
+                .any(|d| d.reference == "@angular/core" && d.manifeste == "package.json")
+        );
+        assert!(!resultat.dependances.iter().any(|d| d.reference == "jest"));
+        assert!(
+            resultat
+                .dependances
+                .iter()
+                .any(|d| d.reference == "com.squareup.retrofit2:retrofit"
+                    && d.version == "2.11.0"
+                    && d.manifeste == "build.gradle")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_dependances_sans_manifeste_nest_pas_une_anomalie()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        monter_mock_arborescence(
+            &serveur,
+            serde_json::json!([{ "path": "README.md", "type": "blob" }]),
+        )
+        .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert!(resultat.dependances.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_dependances_ignore_un_manifeste_disparu_entre_larborescence_et_la_lecture()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        monter_mock_arborescence(
+            &serveur,
+            serde_json::json!([{ "path": "pom.xml", "type": "blob" }]),
+        )
+        .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/files/pom.xml/raw"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert!(resultat.dependances.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_dependances_signale_des_droits_insuffisants_sur_la_lecture_du_manifeste() {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        monter_mock_arborescence(
+            &serveur,
+            serde_json::json!([{ "path": "pom.xml", "type": "blob" }]),
+        )
+        .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/files/pom.xml/raw"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    // -- parser_pom_xml, parser_package_json, parser_build_gradle (parseurs purs) -----------------------------
+
+    #[test]
+    fn parser_pom_xml_ignore_la_gestion_de_dependances_et_les_versions_absentes() {
+        let pom = r#"<project>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>geree</artifactId>
+                        <version>1.0.0</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-core</artifactId>
+                    <version>2.17.1</version>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.example</groupId>
+                    <artifactId>sans-version</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let dependances = parser_pom_xml(pom);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(
+            dependances[0].reference,
+            "org.apache.logging.log4j:log4j-core"
+        );
+        assert_eq!(dependances[0].version, "2.17.1");
+        assert_eq!(dependances[0].manifeste, "pom.xml");
+    }
+
+    #[test]
+    fn parser_pom_xml_malforme_retourne_les_dependances_deja_extraites() {
+        // XML jamais fermé après la première dépendance complète : l'analyse s'arrête au point de rupture plutôt
+        // que de faire échouer l'audit (algorithme best-effort, cf. commentaire de `parser_pom_xml`).
+        let pom = r#"<project><dependencies><dependency><groupId>a</groupId><artifactId>b</artifactId><version>1</version></dependency><dependency><groupId>c</groupId>"#;
+
+        let dependances = parser_pom_xml(pom);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].reference, "a:b");
+    }
+
+    #[test]
+    fn parser_package_json_exclut_les_dependances_de_developpement() {
+        let contenu = r#"{
+            "dependencies": { "@angular/core": "18.2.1", "rxjs": "7.8.1" },
+            "devDependencies": { "jest": "29.0.0" }
+        }"#;
+
+        let dependances = parser_package_json(contenu);
+
+        assert_eq!(dependances.len(), 2);
+        assert!(
+            dependances
+                .iter()
+                .any(|d| d.reference == "@angular/core" && d.version == "18.2.1")
+        );
+        assert!(!dependances.iter().any(|d| d.reference == "jest"));
+    }
+
+    #[test]
+    fn parser_package_json_malforme_retourne_une_liste_vide() {
+        assert!(parser_package_json("pas du json").is_empty());
+    }
+
+    #[test]
+    fn parser_package_json_sans_cle_dependencies_retourne_une_liste_vide() {
+        assert!(parser_package_json(r#"{ "name": "app" }"#).is_empty());
+    }
+
+    #[test]
+    fn parser_build_gradle_reconnait_les_formes_courtes_avec_et_sans_parentheses() {
+        let contenu = "dependencies {\n    implementation 'com.squareup.retrofit2:retrofit:2.11.0'\n    testImplementation(\"junit:junit:4.13.2\")\n    implementation group: 'org.other', name: 'thing', version: '1.0'\n}\n";
+
+        let dependances = parser_build_gradle(contenu);
+
+        assert_eq!(dependances.len(), 2);
+        assert!(
+            dependances
+                .iter()
+                .any(|d| d.reference == "com.squareup.retrofit2:retrofit" && d.version == "2.11.0")
+        );
+        assert!(dependances.iter().any(|d| d.reference == "junit:junit"));
+        assert!(
+            !dependances
+                .iter()
+                .any(|d| d.reference.contains("org.other"))
+        );
+    }
+
+    #[test]
+    fn parser_build_gradle_sans_declaration_reconnue_retourne_une_liste_vide() {
+        assert!(parser_build_gradle("// rien à voir ici\n").is_empty());
     }
 }

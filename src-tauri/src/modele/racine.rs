@@ -23,7 +23,14 @@ use std::collections::HashMap;
 /// Passage de `1` à `2` (Phase 5, incrément 7) : ajout du champ optionnel `duplicationNouveauCode` sur
 /// [`ResultatSonarCouverture`] (`sonar.couverture`) ; voir la première étape réelle enregistrée dans
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 2;
+///
+/// Passage de `2` à `3` (Phase 6, incrément 1) : ajout du champ `motifNommageBranches` sur [`Referentiels`]
+/// (RG-030, `docs/02_documentation/05_reglesGestion.md`), reprenant sa valeur par défaut représentant la
+/// convention Gitflow (`#[serde(default = "...")]`, cf. [`MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT`]) ; voir la seconde
+/// étape réelle enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`
+/// (`migration_2_vers_3`), sur le modèle de la précédente (bump de version seul, aucune transformation de donnée
+/// nécessaire).
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 3;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -41,6 +48,23 @@ pub(crate) const ECHECS_AVANT_FERMETURE_PAR_DEFAUT: u32 = 5;
 /// Concurrence par défaut des appels d'audit (RNF-004), non utilisée par la Phase 1 mais portée ici pour la
 /// complétude du modèle de paramètres.
 pub(crate) const CONCURRENCE_AUDIT_PAR_DEFAUT: u32 = 4;
+
+/// Motif d'expression régulière de nommage de branche par défaut (RG-030,
+/// `docs/02_documentation/05_reglesGestion.md`), appliqué en l'absence de valeur explicite dans
+/// `referentiels.motifNommageBranches` : représente la convention Gitflow (`main`/`master`, `develop`,
+/// `feature/*`, `release/*`, `hotfix/*`, `bugfix/*`). Champ absent de tout document antérieur à la Phase 6,
+/// incrément 1, y compris `docs/01_besoin/exemple-donnees.json` (jamais modifié, cf.
+/// `.claude/rules/09-normes-developpement.md`) : sans ce repli, une valeur saisie par l'utilisateur serait
+/// silencieusement perdue à chaque sauvegarde d'un document créé avant ce champ.
+pub(crate) const MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT: &str =
+    r"^(main|master|develop|feature/.+|release/.+|hotfix/.+|bugfix/.+)$";
+
+/// Fonction de repli pour `#[serde(default = "...")]` sur [`Referentiels::motif_nommage_branches`] : seule forme
+/// acceptée par `serde` pour une valeur par défaut non triviale (une constante `&str` ne se convertit pas
+/// implicitement en `String` via cet attribut).
+fn motif_nommage_branches_par_defaut() -> String {
+    MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT.to_string()
+}
 
 /// Racine du document JSON en clair, avant compression puis chiffrement (cf. `Specification.md#61-vue-densemble`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -258,11 +282,11 @@ pub(crate) struct Source {
 /// d'obsolescence, badge, etc.) relève exclusivement du Moteur de jugement (UI), à partir des seuils et
 /// référentiels courants.
 ///
-/// `GitlabDependances` (Phase 5, incrément 1) : forme figée d'après l'exemple de référence
-/// `docs/01_besoin/exemple-donnees.json`, conservée dès maintenant pour la fidélité de round-trip, mais aucune
-/// fonction du Connecteur GitLab ne produit encore cette variante à ce stade (parseur de manifestes de
-/// dépendances multi-écosystèmes, non spécifié par la documentation source). `GitlabMarqueursIa`, en revanche, est
-/// produite depuis la Phase 5, incrément 7 par `interroger_marqueurs_ia` (cf. `crate::connecteurs::gitlab`).
+/// `GitlabDependances` est produite depuis l'incrément de rattrapage de la Phase 5 par
+/// `interroger_dependances` (cf. `crate::connecteurs::gitlab`) : parseur best-effort de manifestes de dépendances,
+/// limité en V1 aux trois écosystèmes illustrés par `docs/01_besoin/exemple-donnees.json` (`pom.xml` Maven,
+/// `package.json` npm, `build.gradle` Gradle). `GitlabMarqueursIa` est produite depuis la Phase 5, incrément 7 par
+/// `interroger_marqueurs_ia` (cf. `crate::connecteurs::gitlab`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub(crate) enum Resultat {
@@ -270,8 +294,12 @@ pub(crate) enum Resultat {
     /// ci-dessus).
     #[serde(rename = "gitlab.dependances")]
     GitlabDependances(ResultatGitlabDependances),
-    /// Constat brut de l'état des branches du dépôt (production différée : critère de nommage conforme et
-    /// détection de rebase non spécifiés par la documentation source).
+    /// Constat brut de l'état des branches du dépôt (produit depuis l'incrément de rattrapage de la Phase 5 par
+    /// `interroger_branches_completes`, cf. `crate::connecteurs::gitlab`). Ne porte plus, depuis ce même
+    /// incrément, ni `nommageConforme` (RG-030 : recalculé à l'affichage par le Moteur de jugement depuis
+    /// `referentiels.motifNommageBranches`, jamais stocké en constat) ni `rebasee` (abandonné entièrement : aucune
+    /// définition opérationnelle abordable sans un appel de comparaison GitLab par branche, coût réseau jugé
+    /// disproportionné, cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`).
     #[serde(rename = "gitlab.branches")]
     GitlabBranches(ResultatGitlabBranches),
     /// Constat brut de la vitalité du dépôt (date du dernier commit sur la ref auditée).
@@ -342,6 +370,12 @@ pub(crate) struct ResultatGitlabDependances {
 }
 
 /// État d'une branche du dépôt.
+///
+/// Ne porte ni `rebasee` ni `nommageConforme` : décision actée en amont de la Phase 6 (incrément de rattrapage de
+/// la Phase 5), cf. commentaire de [`Resultat::GitlabBranches`] et
+/// `docs/02_documentation/02_glossaire.md#journal-des-décisions`. Un document historique produit avant cette
+/// décision porte encore ces deux clés dans son JSON : `serde` les ignore silencieusement à la désérialisation
+/// (comportement par défaut, aucune clé inconnue déclarée), sans que ce soit une anomalie.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Branche {
@@ -352,8 +386,6 @@ pub(crate) struct Branche {
     /// de la Phase 5, incrément 1, avant toute production réelle de cette variante par le Connecteur GitLab.
     #[serde(rename = "avecMR")]
     pub(crate) avec_mr: bool,
-    pub(crate) rebasee: bool,
-    pub(crate) nommage_conforme: bool,
     pub(crate) dernier_commit_le: String,
 }
 
@@ -657,7 +689,7 @@ pub(crate) struct Groupe {
 /// Le contenu détaillé des règles (motifs, versions, statuts d'obsolescence) relève du Paramétrage
 /// (Phase 7, hors périmètre de la Phase 1) : représenté ici par des valeurs JSON génériques afin de préserver un
 /// round-trip fidèle sans anticiper cette logique métier.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Referentiels {
     /// Règles de dépendances (motif, versions, statuts d'obsolescence).
@@ -672,6 +704,24 @@ pub(crate) struct Referentiels {
     /// détecté ici en préparant `interroger_marqueurs_ia` (Phase 5, incrément 7).
     #[serde(default, rename = "reglesMarqueursIA")]
     pub(crate) regles_marqueurs_ia: Vec<Value>,
+    /// Motif d'expression régulière de nommage de branche, paramétrable (RG-030) : consommé exclusivement par le
+    /// Moteur de jugement (Phase 6) pour recalculer à l'affichage la conformité de nommage d'une branche
+    /// (`Resultat::GitlabBranches`), jamais stocké comme un constat. `#[serde(default = "...")]` plutôt que
+    /// `#[derive(Default)]` seul sur la structure (retiré ci-dessus) : la valeur par défaut de `String` serait la
+    /// chaîne vide, alors que RG-030 exige un repli représentant effectivement la convention Gitflow (cf.
+    /// [`Referentiels::default`] ci-dessous, qui applique le même repli qu'à la désérialisation).
+    #[serde(default = "motif_nommage_branches_par_defaut")]
+    pub(crate) motif_nommage_branches: String,
+}
+
+impl Default for Referentiels {
+    fn default() -> Self {
+        Self {
+            regles_dependances: Vec::new(),
+            regles_marqueurs_ia: Vec::new(),
+            motif_nommage_branches: motif_nommage_branches_par_defaut(),
+        }
+    }
 }
 
 /// Réglages de verrouillage de session (US-026, RG-004, RG-005, RNF-014).
@@ -943,6 +993,7 @@ pub(crate) struct VueEnregistree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use regex::Regex;
 
     #[test]
     fn nouvelle_racine_est_vide_et_porte_la_version_courante() {
@@ -1037,9 +1088,14 @@ mod tests {
     #[test]
     fn resultat_gitlab_branches_desserialise_le_champ_avec_mr_du_jeu_de_reference()
     -> Result<(), Box<dyn std::error::Error>> {
-        // Extrait exact de docs/01_besoin/exemple-donnees.json (résultat gitlab.branches) : vérifie que le champ
-        // `avecMR` (sigle « MR » entièrement capitalisé) est bien reconnu, à la différence de la conversion
-        // `camelCase` par défaut de `avec_mr`, qui produirait `avecMr` (une seule lettre capitalisée).
+        // Extrait de docs/01_besoin/exemple-donnees.json (résultat gitlab.branches, document historique antérieur
+        // à l'incrément de rattrapage de la Phase 5) : `rebasee` et `nommageConforme` sont volontairement conservés
+        // dans la charge JSON source pour vérifier que ces clés désormais inconnues de `Branche` sont ignorées
+        // silencieusement par `serde` (comportement par défaut) plutôt que de faire échouer la désérialisation ;
+        // aucune assertion ne porte plus sur ces deux champs, retirés du modèle (cf. commentaire de [`Branche`]).
+        // Vérifie par ailleurs que le champ `avecMR` (sigle « MR » entièrement capitalisé) est bien reconnu, à la
+        // différence de la conversion `camelCase` par défaut de `avec_mr`, qui produirait `avecMr` (une seule
+        // lettre capitalisée).
         let resultat: Resultat = serde_json::from_str(
             r#"{
                 "type": "gitlab.branches",
@@ -1062,9 +1118,12 @@ mod tests {
             return Err("variante GitlabBranches attendue".into());
         };
         assert!(resultat.branches[0].avec_mr);
+        assert_eq!(resultat.branches[0].dernier_commit_le, "2026-06-05");
 
         let json = serde_json::to_string(&resultat)?;
         assert!(json.contains("\"avecMR\":true"));
+        assert!(!json.contains("rebasee"));
+        assert!(!json.contains("nommageConforme"));
         Ok(())
     }
 
@@ -1088,6 +1147,75 @@ mod tests {
         let json = serde_json::to_string(&referentiels)?;
         assert!(json.contains("\"reglesMarqueursIA\":"));
         assert!(!json.contains("\"reglesMarqueursIa\":"));
+        Ok(())
+    }
+
+    #[test]
+    fn referentiels_motif_nommage_branches_survit_a_un_aller_retour_json()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let referentiels = Referentiels {
+            regles_dependances: vec![],
+            regles_marqueurs_ia: vec![],
+            motif_nommage_branches: r"^feature/.+$".to_string(),
+        };
+
+        let json = serde_json::to_string(&referentiels)?;
+        let relu: Referentiels = serde_json::from_str(&json)?;
+
+        assert_eq!(referentiels, relu);
+        assert_eq!(relu.motif_nommage_branches, r"^feature/.+$");
+        assert!(json.contains("\"motifNommageBranches\":\"^feature/.+$\""));
+        Ok(())
+    }
+
+    #[test]
+    fn referentiels_motif_nommage_branches_par_defaut_est_non_vide_et_conforme_gitflow()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // RG-030 : la valeur par défaut doit représenter effectivement la convention Gitflow, pas une chaîne vide
+        // (ce que produirait un simple `#[derive(Default)]` sur `String`, cf. commentaire de [`Referentiels`]).
+        let referentiels = Referentiels::default();
+        assert!(!referentiels.motif_nommage_branches.is_empty());
+
+        let motif = Regex::new(&referentiels.motif_nommage_branches)?;
+        for nom_conforme in [
+            "main",
+            "master",
+            "develop",
+            "feature/paiement-sepa",
+            "release/1.2.0",
+            "hotfix/urgent",
+            "bugfix/correction-typo",
+        ] {
+            assert!(
+                motif.is_match(nom_conforme),
+                "le nom de branche '{nom_conforme}' devrait être reconnu conforme par le motif Gitflow par défaut"
+            );
+        }
+        assert!(
+            !motif.is_match("n-importe-quoi"),
+            "un nom de branche hors convention Gitflow ne devrait pas être reconnu conforme"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn referentiels_document_historique_sans_motif_nommage_branches_se_desserialise_a_la_valeur_par_defaut()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Non-régression (Phase 6, incrément 1) : document historique antérieur à l'ajout de
+        // `motifNommageBranches`, sur le modèle des tests de non-régression déjà présents dans ce fichier
+        // (`avecMR`, `reglesMarqueursIA`, `duplicationNouveauCode`). Le champ absent du JSON doit se désérialiser
+        // au repli Gitflow (`#[serde(default = "...")]`) plutôt que de faire échouer la désérialisation.
+        let referentiels: Referentiels = serde_json::from_str(
+            r#"{
+                "reglesDependances": [],
+                "reglesMarqueursIA": []
+            }"#,
+        )?;
+
+        assert_eq!(
+            referentiels.motif_nommage_branches,
+            MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT
+        );
         Ok(())
     }
 

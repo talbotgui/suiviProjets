@@ -1,0 +1,64 @@
+<div class="accueil">
+  <div class="accueil__statistiques">
+    <div class="accueil__carte">
+      <div class="accueil__carte-libelle">Groupes / Projets</div>
+      <div class="accueil__carte-valeur">{{ nombreGroupes() }} / {{ nombreProjets() }}</div>
+    </div>
+    <div class="accueil__carte">
+      <div class="accueil__carte-libelle">Dernière campagne</div>
+      <div class="accueil__carte-valeur">{{ derniereCampagneLabel() }}</div>
+    </div>
+    <div class="accueil__carte" [class.accueil__carte--alerte]="membreInconnuDetecte()">
+      <div class="accueil__carte-libelle">Membres inconnus</div>
+      <div class="accueil__carte-valeur">{{ nombreProjetsAvecMembreInconnu() }}</div>
+    </div>
+    <div class="accueil__carte">
+      <div class="accueil__carte-libelle">Alertes actives</div>
+      <div class="accueil__carte-valeur">{{ alertesActives().length }}</div>
+    </div>
+  </div>
+
+  @if (membreInconnuDetecte()) {
+    <app-bandeau-alerte [message]="messageMembreInconnu()" />
+  }
+
+  <section class="accueil__section">
+    <h2 class="accueil__section-titre">Alertes principales</h2>
+    @if (alertesPrincipales().length === 0) {
+      <p class="accueil__vide">Aucune alerte active.</p>
+    } @else {
+      <ul class="accueil__liste">
+        @for (alerte of alertesPrincipales(); track alerte.cleAlerte) {
+          <li class="accueil__ligne">
+            <span class="accueil__pastille" aria-hidden="true"></span>
+            <span class="accueil__ligne-libelle">{{ alerte.libelle }}</span>
+            @if (alerte.traitementAnterieur; as traitement) {
+              <span class="accueil__mention-traitement">
+                traité précédemment le {{ traitement.horodatage | date: 'dd/MM/yyyy' }}
+                @if (traitement.commentaire) {
+                  — {{ traitement.commentaire }}
+                }
+              </span>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="accueil__section">
+    <h2 class="accueil__section-titre">Projets non audités depuis longtemps</h2>
+    @if (projetsNonAuditesDepuisLongtemps().length === 0) {
+      <p class="accueil__vide">Tous les projets ont été audités récemment.</p>
+    } @else {
+      <ul class="accueil__liste">
+        @for (projet of projetsNonAuditesDepuisLongtemps(); track projet.projetId) {
+          <li class="accueil__ligne">
+            <span class="accueil__ligne-libelle">{{ projet.nomProjet }}</span>
+            <span class="accueil__ligne-groupe">{{ projet.nomGroupe }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</div>
