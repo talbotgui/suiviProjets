@@ -16,17 +16,27 @@
 // strict de `Referentiels` côté cœur natif pour le premier, reprise exacte des clés confirmées dans
 // `docs/01_besoin/exemple-donnees.json` pour le second), de même que `resultats` (union discriminée `Resultat`,
 // 16 variantes) et `premierCommitInterne`/`traitementsAlertes`. Les autres sous-branches de `parametres`
-// (`verrouillage`, `audit`, `proxy`, `sauvegarde`) et le contenu des règles de `referentiels.reglesDependances`/
-// `referentiels.reglesMarqueursIA` restent en `unknown`, à l'identique de la décision de modélisation prise côté
-// Rust (`serde_json::Value`, cf. commentaire d'en-tête de `modele/racine.rs`) : hors périmètre exact de cet
-// incrément (non énuméré par la conception détaillée), non interprétées ici, seulement conservées telles quelles
-// lors des mutations du Store afin de préserver un round-trip fidèle vers `sauvegarderFichier`. `MembreConnu` et
-// `Annotation` sont typées intégralement depuis la Phase 4, `Campagne`/`Verdict`/`Brouillon`/
-// `ResultatBrouillonProjet` le sont depuis la Phase 5 (incrément 2), leurs commandes de la Façade échangeant
-// désormais ces types comme paramètres explicites. Les annotations de portée groupe restent hors périmètre
-// (Phase 8).
+// (`verrouillage`, `audit`, `proxy`, `sauvegarde`) restent en `unknown`, à l'identique de la décision de
+// modélisation prise côté Rust (`serde_json::Value`, cf. commentaire d'en-tête de `modele/racine.rs`) : hors
+// périmètre de cet incrément, non interprétées ici, seulement conservées telles quelles lors des mutations du
+// Store afin de préserver un round-trip fidèle vers `sauvegarderFichier`. `MembreConnu` et `Annotation` sont
+// typées intégralement depuis la Phase 4, `Campagne`/`Verdict`/`Brouillon`/`ResultatBrouillonProjet` le sont
+// depuis la Phase 5 (incrément 2), leurs commandes de la Façade échangeant désormais ces types comme paramètres
+// explicites. Les annotations de portée groupe restent hors périmètre (Phase 8).
+//
+// Périmètre de la Phase 7, incrément 1 : le contenu de `referentiels.reglesDependances`/`referentiels.
+// reglesMarqueursIA` est désormais typé (élément par élément), nécessaire à `definirReferentiel` (upsert par
+// identifiant, US-033). Réutilise `RegleDependance`/`RegleMarqueurIA`, structures déjà définies et exclusivement
+// consommées en lecture par le Moteur de jugement (`services/sansetat/jugement/parametres-jugement.utils.ts` et
+// `services/sansetat/commandes/types-facade.ts`), plutôt que de les redéfinir : ces deux types restent
+// volontairement dépourvus d'identifiant (aucune fonction pure du Moteur de jugement n'en a besoin, seule la
+// correspondance par motif compte). `EntreeReglesDependances`/`EntreeReglesMarqueursIA` ci-dessous les étendent
+// du seul identifiant stable nécessaire à l'édition depuis l'écran de Paramétrage, sans toucher aux deux types
+// du Moteur de jugement ni aux nombreux tests qui construisent déjà des valeurs de ces deux types sans
+// identifiant (Phase 6). `VersionDependance.statut` reste une chaîne ouverte, non énumérée en dur (RG-022).
 import type {
   Instance,
+  RegleMarqueurIA,
   ResultatGitlabBranches,
   ResultatGitlabContributeurs,
   ResultatGitlabDependances,
@@ -46,6 +56,7 @@ import type {
   ResultatCroiseFraicheurSonar,
   ResultatCroiseIaNouveauCode,
 } from '../campagne/connecteur-croise.utils';
+import type { RegleDependance } from '../../sansetat/jugement/parametres-jugement.utils';
 
 /**
  * Résultat typé d'un audit, mirroir de `Resultat` côté cœur natif : union discriminée sur `type` (16 variantes du
@@ -74,16 +85,34 @@ export type Resultat =
   | ({ readonly type: 'croise.ia_nouveau_code' } & ResultatCroiseIaNouveauCode);
 
 /**
- * Grilles de lecture partageables (référentiels), mirroir strict de `Referentiels` côté cœur natif : `reglesDependances`/
- * `reglesMarqueursIA` restent en `unknown[]` (contenu détaillé hors périmètre de cet incrément, cf. commentaire
- * d'en-tête de ce fichier), seul `motifNommageBranches` (RG-030) est typé en toutes lettres, seul champ
- * effectivement consommé avant la Phase 7 (Paramétrage), par le Moteur de jugement (incrément 2).
+ * Règle de dépendance persistée (`referentiels.reglesDependances[]`), `RegleDependance` du Moteur de jugement
+ * complétée de l'identifiant stable requis par `definirReferentiel` (US-033) pour distinguer un ajout d'une
+ * modification. Mirroir de l'entité `RegleDependance` de
+ * `docs/02_documentation/12_modeleDonnees.md#entités-attributs-et-relations`.
+ */
+export interface EntreeReglesDependances extends RegleDependance {
+  /** Identifiant UUID v4 de la règle, stable d'une édition à l'autre. */
+  readonly id: string;
+}
+
+/**
+ * Règle de détection de marqueur IA persistée (`referentiels.reglesMarqueursIA[]`), `RegleMarqueurIA` du Moteur
+ * de jugement complétée de l'identifiant stable requis par `definirReferentiel` (US-033). Mirroir de l'entité
+ * `RegleMarqueurIA` de `docs/02_documentation/12_modeleDonnees.md#entités-attributs-et-relations`.
+ */
+export interface EntreeReglesMarqueursIA extends RegleMarqueurIA {
+  /** Identifiant UUID v4 de la règle, stable d'une édition à l'autre. */
+  readonly id: string;
+}
+
+/**
+ * Grilles de lecture partageables (référentiels), mirroir strict de `Referentiels` côté cœur natif.
  */
 export interface Referentiels {
-  /** Règles de dépendances (motif, versions, statuts d'obsolescence), non interprétées avant la Phase 7. */
-  readonly reglesDependances: readonly unknown[];
-  /** Règles de détection des marqueurs d'outils IA (F18), non interprétées avant la Phase 7. */
-  readonly reglesMarqueursIA: readonly unknown[];
+  /** Règles de dépendances (motif, versions, statuts d'obsolescence). */
+  readonly reglesDependances: readonly EntreeReglesDependances[];
+  /** Règles de détection des marqueurs d'outils IA (F18). */
+  readonly reglesMarqueursIA: readonly EntreeReglesMarqueursIA[];
   /**
    * Motif d'expression régulière de nommage de branche, paramétrable (RG-030), consommé exclusivement à
    * l'affichage par le Moteur de jugement pour recalculer la conformité de nommage d'une branche
@@ -593,11 +622,11 @@ export interface ReponseQualificationMembre {
 }
 
 /**
- * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (Phase 4) et par
- * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2), mirroir de `ErreurFacade`
- * côté cœur natif, étendu des seules catégories métier propres à ces commandes ; les catégories techniques
- * héritées des commandes de fichier de la Phase 1 y figurent également, ces commandes pouvant en hériter via la
- * sauvegarde qu'elles déclenchent.
+ * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (Phase 4), par
+ * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2) et par
+ * `definirSeuil`/`definirReferentiel` (Phase 7, incrément 1), mirroir de `ErreurFacade` côté cœur natif, étendu des
+ * seules catégories métier propres à ces commandes ; les catégories techniques héritées des commandes de fichier
+ * de la Phase 1 y figurent également, ces commandes pouvant en hériter via la sauvegarde qu'elles déclenchent.
  */
 export type CategorieErreurAdministration =
   | 'groupeIntrouvable'
@@ -607,6 +636,11 @@ export type CategorieErreurAdministration =
   | 'brouillonDejaExistant'
   | 'aucunBrouillonCourant'
   | 'projetAbsentDuBrouillon'
+  | 'cleSeuilIntrouvable'
+  | 'typeReferentielInconnu'
+  | 'entreeReferentielInvalide'
+  | 'motifNommageBranchesInvalide'
+  | 'modePurgeAgeInconnu'
   | 'fichierIntrouvable'
   | 'motDePasseOuFichierInvalide'
   | 'formatNonReconnu'
@@ -639,3 +673,31 @@ export type ResultatQualificationMembre =
  */
 export type ResultatMutationAdministration =
   { readonly type: 'succes' } | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
+ * Résumé d'une prévisualisation ou d'une exécution de purge des audits anciens (US-025, Phase 7, incrément 4 ;
+ * RG-024, RG-025), mirroir de `PrevisualisationPurge` côté cœur natif.
+ */
+export interface PrevisualisationPurge {
+  /** Nombre d'audits concernés par la purge, tous projets confondus. */
+  readonly nbAuditsSupprimes: number;
+  /** Nombre de projets comportant au moins un audit concerné. */
+  readonly nbProjetsConcernes: number;
+  /** Taille compressée estimée du fichier de données avant la purge (octets). */
+  readonly octetsAvant: number;
+  /** Taille compressée estimée du fichier de données après la purge (octets). */
+  readonly octetsApres: number;
+}
+
+/**
+ * Résultat typé d'une prévisualisation de purge (`previsualiserPurgeDensite`/`previsualiserPurgeAge`), sur le
+ * modèle de {@link ResultatQualificationMembre}.
+ */
+export type ResultatPrevisualisationPurge =
+  | { readonly type: 'succes'; readonly previsualisation: PrevisualisationPurge }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
+ * Mode de purge par âge (RG-025), transmis tel quel à `previsualiserPurgeAge`/`executerPurgeAge`.
+ */
+export type ModePurgeAge = 'suppression' | 'agregationMensuelle';

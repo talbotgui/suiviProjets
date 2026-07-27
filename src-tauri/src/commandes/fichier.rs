@@ -62,6 +62,20 @@ pub(crate) enum ErreurFacade {
     /// Le projet désigné ne fait pas partie du brouillon courant (Phase 5, incrément 2, `integrerBrouillon`/
     /// `rejeterBrouillon`).
     ProjetAbsentDuBrouillon,
+    /// La clé de seuil désignée ne correspond à aucune feuille existante de `parametres.seuils` (Phase 7,
+    /// incrément 1, `definirSeuil`).
+    CleSeuilIntrouvable,
+    /// Le type de référentiel désigné n'est reconnu par aucune des branches gérées par `definirReferentiel`
+    /// (Phase 7, incrément 1).
+    TypeReferentielInconnu,
+    /// L'entrée soumise pour un référentiel-liste ne porte pas les champs requis sous la forme attendue (Phase 7,
+    /// incrément 1, `definirReferentiel`).
+    EntreeReferentielInvalide,
+    /// Le motif de nommage de branche soumis est vide ou syntaxiquement invalide (Phase 7, incrément 1, RG-030).
+    MotifNommageBranchesInvalide,
+    /// Le mode de purge par âge désigné n'est ni `"suppression"` ni `"agregationMensuelle"` (Phase 7, incrément 4,
+    /// `previsualiserPurgeAge`/`executerPurgeAge`, RG-025).
+    ModePurgeAgeInconnu,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
 }
@@ -74,6 +88,27 @@ impl From<crate::persistance::administration::ErreurAdministration> for ErreurFa
             ErreurAdministration::ProjetIntrouvable => Self::ProjetIntrouvable,
             ErreurAdministration::MembreIntrouvable => Self::MembreIntrouvable,
             ErreurAdministration::DoublonUsernameMembreConnu => Self::DoublonUsernameMembreConnu,
+        }
+    }
+}
+
+impl From<crate::persistance::parametrage::ErreurParametrage> for ErreurFacade {
+    fn from(erreur: crate::persistance::parametrage::ErreurParametrage) -> Self {
+        use crate::persistance::parametrage::ErreurParametrage;
+        match erreur {
+            ErreurParametrage::CleSeuilIntrouvable => Self::CleSeuilIntrouvable,
+            ErreurParametrage::TypeReferentielInconnu => Self::TypeReferentielInconnu,
+            ErreurParametrage::EntreeReferentielInvalide => Self::EntreeReferentielInvalide,
+            ErreurParametrage::MotifNommageBranchesInvalide => Self::MotifNommageBranchesInvalide,
+        }
+    }
+}
+
+impl From<crate::persistance::purge::ErreurPurge> for ErreurFacade {
+    fn from(erreur: crate::persistance::purge::ErreurPurge) -> Self {
+        use crate::persistance::purge::ErreurPurge;
+        match erreur {
+            ErreurPurge::ModePurgeAgeInconnu => Self::ModePurgeAgeInconnu,
         }
     }
 }

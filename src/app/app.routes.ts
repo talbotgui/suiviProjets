@@ -7,6 +7,7 @@ import { SqmConstitutionCampagneComponent } from './ecrans/audits/constitution-c
 import { SqmTableauDeBordComponent } from './ecrans/audits/tableau-de-bord/tableau-de-bord.component';
 import { SqmComparaisonAuditsComponent } from './ecrans/comparaison-audits/comparaison-audits.component';
 import { SqmFicheProjetComponent } from './ecrans/fiche-projet/fiche-projet.component';
+import { SqmParametrageComponent } from './ecrans/parametrage/parametrage.component';
 import { SqmSyntheseAuditsComponent } from './ecrans/synthese-audits/synthese-audits.component';
 import { SqmSyntheseGraphiqueComponent } from './ecrans/synthese-graphique/synthese-graphique.component';
 
@@ -31,6 +32,9 @@ import { SqmSyntheseGraphiqueComponent } from './ecrans/synthese-graphique/synth
 // Route `synthese-graphique` ajoutée à la Phase 6, incrément 7 (US-016, `SqmSyntheseGraphiqueComponent`), sur le
 // modèle exact de `synthese-audits` (route enfant sans paramètre, entrée de sidebar désormais active).
 //
+// Route `parametrage` ajoutée à la Phase 7, incrément 2 (US-033, `SqmParametrageComponent`), sur le même modèle
+// (route enfant sans paramètre, entrée de sidebar désormais active).
+//
 // Note de relecture (décision toujours provisoire, comme l'était déjà la précédente redirection vers
 // `administration`, cf. `docs/04_rapports/rapportDeDeveloppement.md#étape-3--administration-du-modèle`) :
 // `08_arborescenceNavigation.md` documente `Accueil` (résumé) comme un écran de la sidebar du shell, mais fait
@@ -53,6 +57,7 @@ export const routes: Routes = [
       { path: 'audits/constitution-campagne', component: SqmConstitutionCampagneComponent },
       { path: 'audits/tableau-de-bord', component: SqmTableauDeBordComponent },
       { path: 'audits/brouillon', component: SqmBrouillonComponent },
+      { path: 'parametrage', component: SqmParametrageComponent },
       { path: '', redirectTo: 'accueil', pathMatch: 'full' },
     ],
   },

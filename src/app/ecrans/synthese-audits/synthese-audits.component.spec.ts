@@ -678,6 +678,7 @@ describe('SqmSyntheseAuditsComponent', () => {
         ...racine.referentiels,
         reglesMarqueursIA: [
           {
+            id: 'regle-marqueur-ia-1',
             motif: '.cursorrules',
             typeCorrespondance: 'exact',
             portee: 'racine',

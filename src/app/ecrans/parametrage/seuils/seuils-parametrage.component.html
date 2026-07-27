@@ -1,0 +1,196 @@
+<section class="seuils-parametrage">
+  <h2>Seuils de couleur</h2>
+
+  @if (!fichierCharge()) {
+    <p class="seuils-parametrage__vide">Aucun fichier n'est chargé.</p>
+  } @else {
+    <form class="seuils-parametrage__formulaire" (ngSubmit)="demanderEnregistrement()">
+      <fieldset>
+        <legend>Vitalité du dépôt</legend>
+        <label>
+          Jours sans commit avant « mourant »
+          <input type="number" name="vitaliteMourantJours" [(ngModel)]="vitaliteMourantJours" />
+        </label>
+        <label>
+          Jours sans commit avant « mort »
+          <input type="number" name="vitaliteMortJours" [(ngModel)]="vitaliteMortJours" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Classe de taille du dépôt (octets)</legend>
+        <label>
+          Borne S
+          <input type="number" name="tailleDepotBorneS" [(ngModel)]="tailleDepotBorneS" />
+        </label>
+        <label>
+          Borne L
+          <input type="number" name="tailleDepotBorneL" [(ngModel)]="tailleDepotBorneL" />
+        </label>
+        <label>
+          Borne XL
+          <input type="number" name="tailleDepotBorneXL" [(ngModel)]="tailleDepotBorneXL" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Couverture de tests (%)</legend>
+        <label>
+          Seuil rouge
+          <input type="number" name="couvertureSeuilRouge" [(ngModel)]="couvertureSeuilRouge" />
+        </label>
+        <label>
+          Seuil orange
+          <input type="number" name="couvertureSeuilOrange" [(ngModel)]="couvertureSeuilOrange" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Fraîcheur Sonar (RG-013)</legend>
+        <label>
+          Tolérance en jours
+          <input
+            type="number"
+            name="fraicheurSonarToleranceJours"
+            [(ngModel)]="fraicheurSonarToleranceJours"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Activité sans qualité</legend>
+        <label>
+          Nombre minimal de commits
+          <input
+            type="number"
+            name="activiteSansQualiteMinCommits"
+            [(ngModel)]="activiteSansQualiteMinCommits"
+          />
+        </label>
+        <label>
+          Nombre minimal de nouvelles violations
+          <input
+            type="number"
+            name="activiteSansQualiteMinNouvellesViolations"
+            [(ngModel)]="activiteSansQualiteMinNouvellesViolations"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Fraîcheur d'audit</legend>
+        <label>
+          Jours avant projet « non audité récemment »
+          <input
+            type="number"
+            name="fraicheurAuditAncienJours"
+            [(ngModel)]="fraicheurAuditAncienJours"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Demandes de fusion ouvertes</legend>
+        <label>
+          Âge orange (jours)
+          <input
+            type="number"
+            name="mrOuvertesAgeOrangeJours"
+            [(ngModel)]="mrOuvertesAgeOrangeJours"
+          />
+        </label>
+        <label>
+          Âge rouge (jours)
+          <input
+            type="number"
+            name="mrOuvertesAgeRougeJours"
+            [(ngModel)]="mrOuvertesAgeRougeJours"
+          />
+        </label>
+        <label>
+          Pourcentage de conflit rouge
+          <input
+            type="number"
+            name="mrOuvertesPourcentageConflitRouge"
+            [(ngModel)]="mrOuvertesPourcentageConflitRouge"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Couleurs des violations bloquantes</legend>
+        <label>
+          Seuil orange
+          <input
+            type="number"
+            name="couleursViolationsBloquantSeuilOrange"
+            [(ngModel)]="couleursViolationsBloquantSeuilOrange"
+          />
+        </label>
+        <label>
+          Seuil rouge
+          <input
+            type="number"
+            name="couleursViolationsBloquantSeuilRouge"
+            [(ngModel)]="couleursViolationsBloquantSeuilRouge"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Couleurs des violations critiques</legend>
+        <label>
+          Seuil orange
+          <input
+            type="number"
+            name="couleursViolationsCritiqueSeuilOrange"
+            [(ngModel)]="couleursViolationsCritiqueSeuilOrange"
+          />
+        </label>
+        <label>
+          Seuil rouge
+          <input
+            type="number"
+            name="couleursViolationsCritiqueSeuilRouge"
+            [(ngModel)]="couleursViolationsCritiqueSeuilRouge"
+          />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Matérialité du brouillon (RG-020)</legend>
+        <label>
+          Variation relative
+          <input
+            type="number"
+            step="0.01"
+            name="materialiteBrouillonVariationRelative"
+            [(ngModel)]="materialiteBrouillonVariationRelative"
+          />
+        </label>
+      </fieldset>
+
+      @if (messageErreur) {
+        <p class="seuils-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+      }
+      @if (messageSucces) {
+        <p class="seuils-parametrage__succes" role="status">{{ messageSucces }}</p>
+      }
+
+      <div class="seuils-parametrage__actions">
+        <span>{{ nombreDeModifications() }} seuil(s) modifié(s)</span>
+        <button type="submit" [disabled]="enCours || nombreDeModifications() === 0">
+          Enregistrer les seuils modifiés
+        </button>
+      </div>
+    </form>
+
+    @if (actionEnAttenteMotDePasse) {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer les seuils modifiés."
+        (confirmee)="confirmerEnregistrement($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  }
+</section>

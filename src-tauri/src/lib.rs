@@ -73,6 +73,12 @@ pub fn run() {
             commandes::audit::enregistrer_brouillon,
             commandes::audit::integrer_brouillon,
             commandes::audit::rejeter_brouillon,
+            commandes::parametrage::definir_seuil,
+            commandes::parametrage::definir_referentiel,
+            commandes::purge::previsualiser_purge_densite,
+            commandes::purge::executer_purge_densite,
+            commandes::purge::previsualiser_purge_age,
+            commandes::purge::executer_purge_age,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -1,0 +1,104 @@
+<section class="purge-parametrage">
+  <h2>Purge des audits</h2>
+
+  @if (messageErreur) {
+    <p class="purge-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+  }
+  @if (messageSucces) {
+    <p class="purge-parametrage__succes">{{ messageSucces }}</p>
+  }
+
+  <section class="purge-parametrage__bloc">
+    <h3>Purge par densité</h3>
+    <p>
+      Conserve le premier et le dernier audit de chaque projet, puis un audit au minimum tous les
+      sept jours parmi les audits rapprochés.
+    </p>
+
+    <button type="button" [disabled]="enCours" (click)="previsualiserDensite()">
+      Prévisualiser
+    </button>
+
+    @if (previsualisationDensite) {
+      @if (previsualisationDensite.nbAuditsSupprimes === 0) {
+        <p>Aucun audit ne serait supprimé par une purge par densité.</p>
+      } @else {
+        <p>
+          {{ previsualisationDensite.nbAuditsSupprimes }} audit(s) supprimé(s) sur
+          {{ previsualisationDensite.nbProjetsConcernes }} projet(s),
+          {{ formaterOctets(previsualisationDensite.octetsAvant) }} →
+          {{ formaterOctets(previsualisationDensite.octetsApres) }}.
+        </p>
+        <button type="button" [disabled]="enCours" (click)="demanderExecutionDensite()">
+          Exécuter la purge
+        </button>
+      }
+    }
+
+    @if (actionEnAttenteMotDePasse === 'densite') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour exécuter cette purge par densité."
+        (confirmee)="confirmerExecutionDensite($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+
+  <section class="purge-parametrage__bloc">
+    <h3>Purge par âge</h3>
+    <p>
+      Au-delà de six mois, conserve le premier et le dernier audit de chaque projet, puis supprime
+      ou agrège mensuellement les audits restants selon le mode choisi.
+    </p>
+
+    <fieldset>
+      <legend>Mode</legend>
+      <label>
+        <input
+          type="radio"
+          name="modeAge"
+          [ngModel]="modeAge"
+          (ngModelChange)="changerModeAge($event)"
+          value="suppression"
+        />
+        Suppression
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="modeAge"
+          [ngModel]="modeAge"
+          (ngModelChange)="changerModeAge($event)"
+          value="agregationMensuelle"
+        />
+        Agrégation mensuelle (conserve le dernier audit de chaque mois)
+      </label>
+    </fieldset>
+
+    <button type="button" [disabled]="enCours" (click)="previsualiserAge()">Prévisualiser</button>
+
+    @if (previsualisationAge) {
+      @if (previsualisationAge.nbAuditsSupprimes === 0) {
+        <p>Aucun audit ne serait supprimé par une purge par âge, pour ce mode.</p>
+      } @else {
+        <p>
+          {{ previsualisationAge.nbAuditsSupprimes }} audit(s) supprimé(s) sur
+          {{ previsualisationAge.nbProjetsConcernes }} projet(s),
+          {{ formaterOctets(previsualisationAge.octetsAvant) }} →
+          {{ formaterOctets(previsualisationAge.octetsApres) }}.
+        </p>
+        <button type="button" [disabled]="enCours" (click)="demanderExecutionAge()">
+          Exécuter la purge
+        </button>
+      }
+    }
+
+    @if (actionEnAttenteMotDePasse === 'age') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour exécuter cette purge par âge."
+        (confirmee)="confirmerExecutionAge($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+</section>

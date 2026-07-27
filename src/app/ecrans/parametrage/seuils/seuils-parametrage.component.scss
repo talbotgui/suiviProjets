@@ -1,0 +1,21 @@
+.seuils-parametrage {
+  &__formulaire {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  &__erreur {
+    color: #b00020;
+  }
+
+  &__succes {
+    color: #1a7f37;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+}

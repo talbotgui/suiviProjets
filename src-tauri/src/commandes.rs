@@ -10,8 +10,12 @@
 //! membres connus d'un groupe et politique d'autorisation de l'IA d'un projet (US-022 à US-024). Périmètre de la
 //! Phase 5, incrément 1 : dix opérations d'interrogation des indicateurs GitLab/Sonar déterministes du Moteur
 //! d'audit (US-009). Périmètre de la Phase 5, incrément 2 : cycle de vie du brouillon d'une campagne
-//! (`enregistrerBrouillon`, `integrerBrouillon`, `rejeterBrouillon`, US-014, RG-019). La Façade n'est jamais
-//! testée isolément : chaque commande délègue au module qu'elle route
+//! (`enregistrerBrouillon`, `integrerBrouillon`, `rejeterBrouillon`, US-014, RG-019). Périmètre de la Phase 7,
+//! incrément 1 : modification d'un seuil de couleur et d'un référentiel (`definirSeuil`, `definirReferentiel`,
+//! US-033, RG-022, RG-023, RG-030). Périmètre de la Phase 7, incrément 4 : prévisualisation et exécution d'une
+//! purge d'audits anciens par densité ou par âge (`previsualiserPurgeDensite`, `executerPurgeDensite`,
+//! `previsualiserPurgeAge`, `executerPurgeAge`, US-025, RG-024, RG-025). La Façade n'est jamais testée isolément :
+//! chaque commande délègue au module qu'elle route
 //! (Moteur de persistance, Connecteur GitLab/Sonar), déjà couvert par ses propres tests unitaires (cf.
 //! `docs/02_documentation/16_normesTests.md#tests-unitaires`).
 
@@ -20,3 +24,5 @@ pub(crate) mod audit;
 pub(crate) mod connectivite;
 pub(crate) mod etat_session;
 pub(crate) mod fichier;
+pub(crate) mod parametrage;
+pub(crate) mod purge;

@@ -36,6 +36,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FacadeAdministrationService } from '../../sansetat/commandes/facade-administration.service';
+import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
 import type { Instance } from '../../sansetat/commandes/types-facade';
 import { EtatSessionService } from './etat-session.service';
 import type {
@@ -44,10 +45,13 @@ import type {
   ErreurAdministration,
   EntreeJournal,
   Groupe,
+  ModePurgeAge,
+  PrevisualisationPurge,
   Projet,
   ReponseQualificationMembre,
   ResultatBrouillonProjet,
   ResultatMutationAdministration,
+  ResultatPrevisualisationPurge,
   ResultatQualificationMembre,
   Source,
   StatutMembre,
@@ -136,6 +140,7 @@ export class DonneesApplicationService {
   private readonly facadeAdministration: FacadeAdministrationService = inject(
     FacadeAdministrationService,
   );
+  private readonly facadeParametrage: FacadeParametrageService = inject(FacadeParametrageService);
   private readonly racineInterne: WritableSignal<DonneesRacine | null> = signal(null);
 
   /**
@@ -516,6 +521,170 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Modifie un seuil de couleur (`parametres.seuils`) (US-033) : invoque la commande native `definirSeuil`, qui
+   * remplace la valeur désignée, consigne la modification au journal et sauvegarde effectivement le fichier
+   * (RG-002, RG-022, RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * Sans nouvel audit, le Moteur de jugement recalcule immédiatement, côté UI, tous les statuts affichés à partir
+   * des nouveaux seuils (RG-012, RG-022).
+   * @param cle - Chemin pointé de la clé à modifier au sein de `parametres.seuils` (ex. `vitalite.mortJours`).
+   * @param valeur - Nouvelle valeur du seuil désigné.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirSeuil(
+    cle: string,
+    valeur: unknown,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirSeuil<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        cle,
+        valeur,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Ajoute ou met à jour une entrée d'un référentiel, ou remplace le motif de nommage de branche (US-033) :
+   * invoque la commande native `definirReferentiel`, qui consigne la modification au journal et sauvegarde
+   * effectivement le fichier (RG-002, RG-023, RG-030) avant de renvoyer la racine mise à jour, substituée à
+   * l'état courant de ce Store. Sans nouvel audit, le Moteur de jugement recalcule immédiatement, côté UI, tous
+   * les statuts affichés à partir du nouveau référentiel (RG-012, RG-022, RG-030).
+   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances`, `reglesMarqueursIA` ou
+   * `motifNommageBranches`).
+   * @param entree - Entrée à ajouter ou mettre à jour (objet portant `id`), ou nouvelle valeur scalaire.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirReferentiel(
+    typeReferentiel: string,
+    entree: unknown,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirReferentiel<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        typeReferentiel,
+        entree,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Prévisualise une purge par densité des audits anciens (US-025, RG-024) : invoque la commande native
+   * `previsualiserPurgeDensite` sur la racine actuellement chargée, sans aucune modification ni sauvegarde.
+   * @returns Le Résultat typé de l'opération, portant le résumé de la purge qui serait effectuée.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  public async previsualiserPurgeDensite(): Promise<ResultatPrevisualisationPurge> {
+    const racine = this.racineActuelle();
+    try {
+      const previsualisation = await this.facadeParametrage.previsualiserPurgeDensite<
+        DonneesRacine,
+        PrevisualisationPurge
+      >({ donnees: racine });
+      return { type: 'succes', previsualisation };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Exécute une purge par densité des audits anciens (US-025, RG-024) : invoque la commande native
+   * `executerPurgeDensite`, qui sauvegarde effectivement le fichier (RG-002) avant de renvoyer la racine mise à
+   * jour, substituée à l'état courant de ce Store.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async executerPurgeDensite(motDePasse: string): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.executerPurgeDensite<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Prévisualise une purge par âge des audits anciens, pour le mode désigné (US-025, RG-025) : invoque la commande
+   * native `previsualiserPurgeAge` sur la racine actuellement chargée, sans aucune modification ni sauvegarde.
+   * @param mode - Mode de purge par âge (`suppression` ou `agregationMensuelle`).
+   * @returns Le Résultat typé de l'opération, portant le résumé de la purge qui serait effectuée.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  public async previsualiserPurgeAge(mode: ModePurgeAge): Promise<ResultatPrevisualisationPurge> {
+    const racine = this.racineActuelle();
+    try {
+      const previsualisation = await this.facadeParametrage.previsualiserPurgeAge<
+        DonneesRacine,
+        PrevisualisationPurge
+      >({ donnees: racine, mode });
+      return { type: 'succes', previsualisation };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Exécute une purge par âge des audits anciens, pour le mode désigné (US-025, RG-025) : invoque la commande
+   * native `executerPurgeAge`, qui sauvegarde effectivement le fichier (RG-002) avant de renvoyer la racine mise à
+   * jour, substituée à l'état courant de ce Store.
+   * @param mode - Mode de purge par âge (`suppression` ou `agregationMensuelle`).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async executerPurgeAge(
+    mode: ModePurgeAge,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.executerPurgeAge<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, mode, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Supprime une règle de membre connu d'un groupe (US-023) : invoque la commande native `supprimerMembreConnu`,
    * qui retire la règle, consigne la suppression au journal et sauvegarde effectivement le fichier (RG-002,
    * RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
@@ -686,6 +855,10 @@ export class DonneesApplicationService {
       'brouillonDejaExistant',
       'aucunBrouillonCourant',
       'projetAbsentDuBrouillon',
+      'cleSeuilIntrouvable',
+      'typeReferentielInconnu',
+      'entreeReferentielInvalide',
+      'motifNommageBranchesInvalide',
       'fichierIntrouvable',
       'motDePasseOuFichierInvalide',
       'formatNonReconnu',

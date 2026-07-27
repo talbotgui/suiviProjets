@@ -1,0 +1,53 @@
+<section class="parametrage">
+  <h1>Paramétrage</h1>
+
+  <nav class="parametrage__onglets">
+    <button
+      type="button"
+      [class.parametrage__onglet--actif]="ongletActif === 'seuilsReferentiels'"
+      (click)="selectionnerOnglet('seuilsReferentiels')"
+    >
+      Seuils et référentiels
+    </button>
+    <button
+      type="button"
+      [class.parametrage__onglet--actif]="ongletActif === 'journal'"
+      (click)="selectionnerOnglet('journal')"
+    >
+      Journal des modifications
+    </button>
+    <button
+      type="button"
+      [class.parametrage__onglet--actif]="ongletActif === 'purge'"
+      (click)="selectionnerOnglet('purge')"
+    >
+      Purge des audits
+    </button>
+    <button
+      type="button"
+      [class.parametrage__onglet--actif]="ongletActif === 'exportImport'"
+      (click)="selectionnerOnglet('exportImport')"
+    >
+      Export / Import
+    </button>
+  </nav>
+
+  @switch (ongletActif) {
+    @case ('seuilsReferentiels') {
+      <app-seuils-parametrage />
+      <app-referentiels-parametrage />
+    }
+    @case ('journal') {
+      <app-journal-parametrage />
+    }
+    @case ('purge') {
+      <app-purge-parametrage />
+    }
+    @case ('exportImport') {
+      <p class="parametrage__a-venir">
+        Onglet à venir (US-028 à US-030, Phase 9) : export et import de la configuration
+        partageable.
+      </p>
+    }
+  }
+</section>

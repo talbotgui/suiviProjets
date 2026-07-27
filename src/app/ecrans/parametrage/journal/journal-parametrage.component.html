@@ -1,0 +1,39 @@
+<section class="journal-parametrage">
+  <h2>Journal des modifications</h2>
+
+  @if (entrees().length === 0) {
+    <p class="journal-parametrage__vide">
+      Aucune entrée de journal des modifications pour le moment.
+    </p>
+  } @else {
+    <table class="journal-parametrage__tableau">
+      <thead>
+        <tr>
+          <th scope="col">Horodatage</th>
+          <th scope="col">Objet</th>
+          <th scope="col">Avant</th>
+          <th scope="col">Après</th>
+          <th scope="col">Origine</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entree of entrees(); track entree.id) {
+          <tr>
+            <td>{{ entree.horodatage }}</td>
+            <td>{{ entree.objet }}</td>
+            <td>{{ formaterValeur(entree.avant) }}</td>
+            <td>{{ formaterValeur(entree.apres) }}</td>
+            <td>
+              {{ entree.origine }}
+              @if (entree.detailOrigine) {
+                <span class="journal-parametrage__detail-origine"
+                  >({{ entree.detailOrigine }})</span
+                >
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

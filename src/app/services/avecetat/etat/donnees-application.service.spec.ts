@@ -535,6 +535,67 @@ describe('DonneesApplicationService', () => {
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'projetIntrouvable' } });
     });
 
+    it('invoque definir_seuil avec les paramètres attendus et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirSeuil('vitalite.mortJours', 400, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_seuil', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        cle: 'vitalite.mortJours',
+        valeur: 400,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « cleSeuilIntrouvable » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'cleSeuilIntrouvable' });
+
+      const resultat = await service.definirSeuil('vitalite.cleInexistante', 1, 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'cleSeuilIntrouvable' } });
+    });
+
+    it('invoque definir_referentiel avec les paramètres attendus et met à jour la racine', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+      const entree = { id: 'd1', motif: 'moment', versions: [] };
+
+      const resultat = await service.definirReferentiel(
+        'reglesDependances',
+        entree,
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_referentiel', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        typeReferentiel: 'reglesDependances',
+        entree,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « entreeReferentielInvalide » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'entreeReferentielInvalide' });
+
+      const resultat = await service.definirReferentiel(
+        'reglesDependances',
+        { id: 'd1' },
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'entreeReferentielInvalide' } });
+    });
+
     it('invoque supprimer_membre_connu avec les paramètres attendus et met à jour la racine', async () => {
       const racineAvantAppel = DonneesDeTest.racineActuelle(service);
       const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 4 };

@@ -1,0 +1,180 @@
+<div
+  class="recherche-transversale"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Recherche transversale"
+  (keydown)="gererTouche($event)"
+>
+  <button
+    type="button"
+    class="recherche-transversale__arriere-plan"
+    aria-label="Fermer la recherche transversale"
+    (click)="fermer()"
+  ></button>
+
+  <div class="recherche-transversale__panneau">
+    @if (!pret()) {
+      <p class="recherche-transversale__indisponible">
+        Recherche indisponible : aucun fichier n'est actuellement chargé.
+      </p>
+    } @else {
+      <div class="recherche-transversale__entete">
+        <span class="recherche-transversale__icone" aria-hidden="true">⌕</span>
+        <input
+          #champRecherche
+          type="text"
+          class="recherche-transversale__champ"
+          placeholder="Rechercher une dépendance, un membre, un outil IA, un groupe, un projet…"
+          [value]="terme()"
+          (input)="gererSaisieTerme($event)"
+        />
+        <button type="button" class="recherche-transversale__fermer" (click)="fermer()">
+          Échap
+        </button>
+      </div>
+
+      <label class="recherche-transversale__option">
+        <input
+          type="checkbox"
+          [checked]="inclureHistorique()"
+          (change)="basculerInclureHistorique()"
+        />
+        Inclure l'historique complet (pas seulement le dernier audit intégré)
+      </label>
+
+      @if (resultats().aucunResultat) {
+        <p class="recherche-transversale__aucun-resultat">
+          Aucun résultat.
+          @if (!inclureHistorique()) {
+            Essayez d'étendre la recherche à l'historique complet.
+          }
+        </p>
+      } @else {
+        <div class="recherche-transversale__resultats">
+          @if (resultats().dependances.nombreTotal > 0) {
+            <section class="recherche-transversale__groupe">
+              <h3>Dépendances</h3>
+              <ul>
+                @for (
+                  occurrence of resultats().dependances.occurrences;
+                  track occurrence.projetId + occurrence.reference + occurrence.dateAudit
+                ) {
+                  <li>
+                    <button type="button" (click)="naviguerVersOccurrence(occurrence)">
+                      <strong>{{ occurrence.reference }}</strong>
+                      {{ occurrence.version }} — {{ occurrence.projetNom }} ({{
+                        occurrence.groupeNom
+                      }})
+                      @if (!occurrence.dansDernierAudit) {
+                        <span class="recherche-transversale__date-historique">
+                          audit du {{ formaterDate(occurrence.dateAudit) }}
+                        </span>
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+              @if (
+                resultats().dependances.nombreTotal > resultats().dependances.occurrences.length
+              ) {
+                <p class="recherche-transversale__troncature">
+                  et
+                  {{
+                    resultats().dependances.nombreTotal - resultats().dependances.occurrences.length
+                  }}
+                  de plus, affinez votre recherche.
+                </p>
+              }
+            </section>
+          }
+
+          @if (resultats().membres.nombreTotal > 0) {
+            <section class="recherche-transversale__groupe">
+              <h3>Membres et contributeurs</h3>
+              <ul>
+                @for (
+                  occurrence of resultats().membres.occurrences;
+                  track occurrence.projetId + occurrence.identifiant + occurrence.dateAudit
+                ) {
+                  <li>
+                    <button type="button" (click)="naviguerVersOccurrence(occurrence)">
+                      <strong>{{ occurrence.nom }}</strong>
+                      ({{ occurrence.identifiant }}, {{ occurrence.nature }}) —
+                      {{ occurrence.projetNom }} ({{ occurrence.groupeNom }})
+                      @if (!occurrence.dansDernierAudit) {
+                        <span class="recherche-transversale__date-historique">
+                          audit du {{ formaterDate(occurrence.dateAudit) }}
+                        </span>
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+              @if (resultats().membres.nombreTotal > resultats().membres.occurrences.length) {
+                <p class="recherche-transversale__troncature">
+                  et {{ resultats().membres.nombreTotal - resultats().membres.occurrences.length }}
+                  de plus, affinez votre recherche.
+                </p>
+              }
+            </section>
+          }
+
+          @if (resultats().outilsIa.nombreTotal > 0) {
+            <section class="recherche-transversale__groupe">
+              <h3>Outils IA détectés</h3>
+              <ul>
+                @for (
+                  occurrence of resultats().outilsIa.occurrences;
+                  track occurrence.projetId + occurrence.chemin + occurrence.dateAudit
+                ) {
+                  <li>
+                    <button type="button" (click)="naviguerVersOccurrence(occurrence)">
+                      <strong>{{ occurrence.outil }}</strong>
+                      — {{ occurrence.chemin }} — {{ occurrence.projetNom }} ({{
+                        occurrence.groupeNom
+                      }})
+                      @if (!occurrence.dansDernierAudit) {
+                        <span class="recherche-transversale__date-historique">
+                          audit du {{ formaterDate(occurrence.dateAudit) }}
+                        </span>
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+              @if (resultats().outilsIa.nombreTotal > resultats().outilsIa.occurrences.length) {
+                <p class="recherche-transversale__troncature">
+                  et
+                  {{ resultats().outilsIa.nombreTotal - resultats().outilsIa.occurrences.length }}
+                  de plus, affinez votre recherche.
+                </p>
+              }
+            </section>
+          }
+
+          @if (resultats().entites.nombreTotal > 0) {
+            <section class="recherche-transversale__groupe">
+              <h3>Entités</h3>
+              <ul>
+                @for (entite of resultats().entites.occurrences; track entite.id) {
+                  <li>
+                    <button type="button" (click)="naviguerVersEntite(entite)">
+                      <strong>{{ entite.libelle }}</strong>
+                      ({{ entite.type }}) — {{ entite.groupeNom }}
+                    </button>
+                  </li>
+                }
+              </ul>
+              @if (resultats().entites.nombreTotal > resultats().entites.occurrences.length) {
+                <p class="recherche-transversale__troncature">
+                  et {{ resultats().entites.nombreTotal - resultats().entites.occurrences.length }}
+                  de plus, affinez votre recherche.
+                </p>
+              }
+            </section>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>

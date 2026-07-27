@@ -106,10 +106,10 @@ describe('SqmShellComponent', () => {
     fixture.detectChanges();
     const element = DomTestUtils.obtenirElementNatif(fixture);
 
-    // Liste de travail, Paramétrage (Synthèse des audits depuis la Phase 6 incrément 4 et Synthèse graphique
-    // depuis la Phase 6 incrément 7 sont désormais interactives).
+    // Liste de travail (Synthèse des audits depuis la Phase 6 incrément 4, Synthèse graphique depuis la Phase 6
+    // incrément 7 et Paramétrage depuis la Phase 7 incrément 2 sont désormais interactives).
     const entreesAVenir = element.querySelectorAll('[aria-disabled="true"]');
-    expect(entreesAVenir.length).toBe(2);
+    expect(entreesAVenir.length).toBe(1);
   });
 
   it('navigue vers Synthèse des audits au clic sur l’entrée de sidebar correspondante', async () => {
@@ -140,6 +140,21 @@ describe('SqmShellComponent', () => {
     await fixture.whenStable();
 
     expect(router.url).toBe('/synthese-graphique');
+  });
+
+  it('navigue vers Paramétrage au clic sur l’entrée de sidebar correspondante', async () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    const lien = Array.from(element.querySelectorAll('a.shell__lien')).find((candidat) =>
+      candidat.textContent?.includes('Paramétrage'),
+    );
+    expect(lien).not.toBeUndefined();
+    lien?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/parametrage');
   });
 
   it('affiche un libellé de repli quand aucun fichier n’est chargé', () => {
@@ -196,5 +211,61 @@ describe('SqmShellComponent', () => {
     await fixture.whenStable();
 
     expect(router.url).toBe('/audits/brouillon');
+  });
+
+  it('ouvre la recherche transversale au clic sur le bouton de la barre supérieure', () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.querySelector('[role="dialog"]')).toBeNull();
+
+    const bouton = element.querySelector<HTMLButtonElement>(
+      'button[aria-label="Recherche transversale"]',
+    );
+    bouton?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+
+    expect(element.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
+  it('ouvre la recherche transversale sur Ctrl+K depuis n’importe quel écran routé', () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const zoneEcran = element.querySelector('.shell__ecran');
+    expect(zoneEcran).not.toBeNull();
+
+    zoneEcran?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
+    );
+    fixture.detectChanges();
+
+    expect(element.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
+  it('referme la recherche transversale sur émission de son événement de fermeture', () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.ouvrirRecherche();
+    fixture.detectChanges();
+
+    fixture.componentInstance.fermerRecherche();
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('ignore les autres combinaisons de touches', () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const zoneEcran = element.querySelector('.shell__ecran');
+
+    zoneEcran?.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(element.querySelector('[role="dialog"]')).toBeNull();
   });
 });

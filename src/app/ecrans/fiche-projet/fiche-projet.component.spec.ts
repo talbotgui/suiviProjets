@@ -226,13 +226,18 @@ class DonneesDeTest {
       referentiels: {
         reglesDependances: [
           {
+            id: 'regle-dependance-1',
             motif: 'org.springframework:*',
             versions: [
               { motifVersion: '4.*', statut: 'obsolete' },
               { motifVersion: '5.3.*', statut: 'maintenu' },
             ],
           },
-          { motif: 'moment', versions: [{ motifVersion: '*', statut: 'obsolete' }] },
+          {
+            id: 'regle-dependance-2',
+            motif: 'moment',
+            versions: [{ motifVersion: '*', statut: 'obsolete' }],
+          },
         ],
         reglesMarqueursIA: [],
         motifNommageBranches: '',

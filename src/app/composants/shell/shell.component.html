@@ -1,4 +1,4 @@
-<div class="shell">
+<div class="shell" tabindex="-1" (document:keydown)="gererRaccourciClavier($event)">
   <nav class="shell__sidebar" aria-label="Navigation principale">
     <div class="shell__marque">
       <span class="shell__logo" aria-hidden="true">Q</span>
@@ -60,10 +60,15 @@
       <span>Administration</span>
     </a>
 
-    <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
+    <a
+      class="shell__lien"
+      routerLink="/parametrage"
+      routerLinkActive="shell__lien--actif"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
       <span aria-hidden="true">≡</span>
       <span>Paramétrage</span>
-    </span>
+    </a>
   </nav>
 
   <div class="shell__zone">
@@ -73,9 +78,9 @@
         <span class="shell__statut-sauvegarde">{{ statutSauvegarde() }}</span>
         <button
           type="button"
-          disabled
-          title="Recherche transversale (à venir)"
+          title="Recherche transversale (Ctrl+K)"
           aria-label="Recherche transversale"
+          (click)="ouvrirRecherche()"
         >
           ⌕
         </button>
@@ -102,4 +107,8 @@
       <router-outlet />
     </main>
   </div>
+
+  @if (rechercheOuverte()) {
+    <app-recherche-transversale (fermee)="fermerRecherche()" />
+  }
 </div>
