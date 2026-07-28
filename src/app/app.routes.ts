@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { AppRoutesGuards } from './app.routes.guards';
 import { SqmShellComponent } from './composants/shell/shell.component';
 import { SqmAccueilComponent } from './ecrans/accueil/accueil.component';
 import { SqmAdministrationComponent } from './ecrans/administration/administration.component';
@@ -6,6 +7,7 @@ import { SqmBrouillonComponent } from './ecrans/audits/brouillon/brouillon.compo
 import { SqmConstitutionCampagneComponent } from './ecrans/audits/constitution-campagne/constitution-campagne.component';
 import { SqmTableauDeBordComponent } from './ecrans/audits/tableau-de-bord/tableau-de-bord.component';
 import { SqmComparaisonAuditsComponent } from './ecrans/comparaison-audits/comparaison-audits.component';
+import { SqmDemarrageComponent } from './ecrans/demarrage/demarrage.component';
 import { SqmFicheProjetComponent } from './ecrans/fiche-projet/fiche-projet.component';
 import { SqmListeTravailComponent } from './ecrans/liste-travail/liste-travail.component';
 import { SqmParametrageComponent } from './ecrans/parametrage/parametrage.component';
@@ -38,20 +40,25 @@ import { SqmSyntheseGraphiqueComponent } from './ecrans/synthese-graphique/synth
 //
 // Route `liste-travail` ajoutée à la Phase 8 (US-020, `SqmListeTravailComponent`), sur le même modèle.
 //
-// Note de relecture (décision toujours provisoire, comme l'était déjà la précédente redirection vers
-// `administration`, cf. `docs/04_rapports/rapportDeDeveloppement.md#étape-3--administration-du-modèle`) :
-// `08_arborescenceNavigation.md` documente `Accueil` (résumé) comme un écran de la sidebar du shell, mais fait
-// atterrir explicitement l'utilisateur, à l'ouverture d'un fichier existant, sur Liste de travail (si alertes non
-// traitées) ou Synthèse des audits (sinon). Les deux écrans cibles existent désormais (Liste de travail depuis
-// cette phase), mais aucun écran de sélection/ouverture de fichier n'est encore construit dans ce dépôt (US-001,
-// US-002, cf. commentaire d'en-tête de `accueil.component.ts`) : `accueil` reste donc ici le meilleur repli
-// disponible, pas le point d'entrée définitif prescrit par la documentation. À corriger lorsque cet écran de
-// sélection de fichier sera construit, en y câblant la redirection conditionnelle (présence d'alertes non
-// traitées) plutôt qu'une route statique.
+// Point résolu (cf. tâche de câblage de l'écran de Démarrage, US-001, US-002) : la tension notée jusqu'ici entre
+// `05_reglesGestion.md` et `08_arborescenceNavigation.md` sur la nature de l'écran d'accueil est levée par
+// l'introduction d'une route racine distincte `demarrage` (`SqmDemarrageComponent`, hors Shell), qui porte
+// désormais elle-même la redirection conditionnelle documentée (Liste de travail si alertes non traitées, Synthèse
+// des audits sinon, cf. commentaire d'en-tête de `demarrage.component.ts`) après un chargement réussi. La route
+// racine du Shell (`''`) est désormais gardée par `AppRoutesGuards.fichierOuvertGuard`
+// (`app.routes.guards.ts`) : tout accès sans fichier ouvert redirige vers `/demarrage` ; la redirection interne
+// `'' → accueil` reste le point d'entrée par défaut du Shell une fois cette garde franchie (ex. après création,
+// qui atterrit explicitement sur Administration plutôt que sur cette redirection par défaut).
 export const routes: Routes = [
+  {
+    path: 'demarrage',
+    component: SqmDemarrageComponent,
+    canActivate: [AppRoutesGuards.demarrageIndisponibleSiOuvertGuard],
+  },
   {
     path: '',
     component: SqmShellComponent,
+    canActivate: [AppRoutesGuards.fichierOuvertGuard],
     children: [
       { path: 'accueil', component: SqmAccueilComponent },
       { path: 'synthese-audits', component: SqmSyntheseAuditsComponent },

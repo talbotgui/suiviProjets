@@ -184,6 +184,24 @@ export class SqmTableauDeBordComponent {
   }
 
   /**
+   * Indique si la campagne affichée est encore en cours (au moins un projet du périmètre pas encore traité),
+   * pour conditionner l'affichage du bouton « Annuler la campagne » (bug corrigé le 2026-07-28 : ce bouton
+   * restait affiché indéfiniment après la fin d'une campagne, `EtatSessionService.progressionCampagne` n'étant
+   * jamais réinitialisé à `null`, cf. commentaire d'en-tête de `etat-session.service.ts`). Un clic sur « Annuler »
+   * une fois tous les projets déjà traités serait de toute façon sans effet (le pipeline RxJS de
+   * `OrchestrateurCampagneService.lancerCampagne` est déjà terminé), d'où le choix de masquer le bouton plutôt
+   * que de le laisser actif sans effet.
+   * @returns `true` si au moins un projet du périmètre n'a pas encore de statut terminal.
+   */
+  public campagneEnCours(): boolean {
+    const progression = this.progression();
+    if (progression === null) {
+      return false;
+    }
+    return this.nombreProjetsTraites() < progression.perimetre.length;
+  }
+
+  /**
    * Indique si un statut d'exécution correspond à un projet déjà traité (par opposition à en attente ou en
    * cours).
    * @param statut - Statut d'exécution à évaluer.

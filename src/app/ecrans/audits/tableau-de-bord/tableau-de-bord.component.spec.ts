@@ -45,7 +45,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},
@@ -189,5 +189,26 @@ describe('SqmTableauDeBordComponent', () => {
     // effectivement en vol dans ce test unitaire, cf. `orchestrateur-campagne.service.spec.ts` pour le
     // comportement d'annulation complet).
     expect(etatSession.progressionCampagne()?.projets[projetId]?.statut).toBe('enCours');
+  });
+
+  describe('campagneEnCours (bouton « Annuler la campagne »)', () => {
+    it("doit retourner faux tant qu'aucune campagne n'a été lancée", () => {
+      expect(composant.campagneEnCours()).toBe(false);
+    });
+
+    it("doit retourner vrai tant qu'au moins un projet du périmètre n'est pas traité", () => {
+      etatSession.demarrerProgressionCampagne([projetId, 'projet-2']);
+      etatSession.mettreAJourProgressionProjet(projetId, { statut: 'termine', dureeMs: 1_000 });
+
+      expect(composant.campagneEnCours()).toBe(true);
+    });
+
+    it('doit retourner faux une fois tous les projets du périmètre traités (bug corrigé le 2026-07-28)', () => {
+      etatSession.demarrerProgressionCampagne([projetId, 'projet-2']);
+      etatSession.mettreAJourProgressionProjet(projetId, { statut: 'termine', dureeMs: 1_000 });
+      etatSession.mettreAJourProgressionProjet('projet-2', { statut: 'echoue', dureeMs: 500 });
+
+      expect(composant.campagneEnCours()).toBe(false);
+    });
   });
 });

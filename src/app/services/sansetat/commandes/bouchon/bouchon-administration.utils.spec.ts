@@ -1,0 +1,252 @@
+// Test du bouchon TS des commandes d'administration (cf. bouchon-administration.utils.ts), généré avec
+// l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
+import { BouchonAdministrationUtils } from './bouchon-administration.utils';
+
+const GROUPE_VIDE = {
+  id: 'groupe-1',
+  membresConnus: [],
+  projets: [{ id: 'projet-1', iaAutorisee: false, annotations: [], audits: [] }],
+};
+
+const RACINE_VIDE = { groupes: [GROUPE_VIDE], brouillon: null, campagnes: [], meta: {} };
+
+interface DonneesTest {
+  readonly groupes: readonly {
+    readonly id: string;
+    readonly membresConnus: readonly Record<string, unknown>[];
+    readonly projets: readonly Record<string, unknown>[];
+  }[];
+  readonly brouillon: Record<string, unknown> | null;
+  readonly campagnes: readonly Record<string, unknown>[];
+  readonly meta: { readonly modifieLe?: string };
+}
+
+describe('BouchonAdministrationUtils', () => {
+  it('doit exposer les six commandes de FacadeAdministrationService dans COMMANDES', () => {
+    expect([...BouchonAdministrationUtils.COMMANDES]).toEqual([
+      'qualifier_membre',
+      'definir_politique_ia',
+      'supprimer_membre_connu',
+      'enregistrer_brouillon',
+      'integrer_brouillon',
+      'rejeter_brouillon',
+    ]);
+  });
+
+  it('doit rejeter une commande non bouchonnée', async () => {
+    await expect(BouchonAdministrationUtils.invoquer('commande_inexistante', {})).rejects.toThrow(
+      'commande_inexistante',
+    );
+  });
+
+  describe('qualifier_membre', () => {
+    it('doit ajouter une nouvelle règle et horodater la racine', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        readonly donnees: DonneesTest;
+        readonly membresEnConflit: readonly string[];
+      }>('qualifier_membre', {
+        donnees: RACINE_VIDE,
+        groupeId: 'groupe-1',
+        membreId: undefined,
+        critere: 'jdupont',
+        typeCritere: 'username',
+        statut: 'interne',
+        libelle: 'Jean Dupont',
+        aliasEmail: undefined,
+      });
+
+      expect(resultat.membresEnConflit).toEqual([]);
+      expect(resultat.donnees.groupes[0]?.membresConnus).toHaveLength(1);
+      expect(resultat.donnees.groupes[0]?.membresConnus[0]).toMatchObject({
+        critere: 'jdupont',
+        typeCritere: 'username',
+        statut: 'interne',
+        libelle: 'Jean Dupont',
+      });
+      expect(resultat.donnees.meta.modifieLe).toBeDefined();
+    });
+
+    it('doit rejeter un doublon de username (RG-006/RG-007)', async () => {
+      const racineAvecMembre = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            membresConnus: [{ id: 'm1', critere: 'jdupont', typeCritere: 'username' }],
+          },
+        ],
+      };
+
+      await expect(
+        BouchonAdministrationUtils.invoquer('qualifier_membre', {
+          donnees: racineAvecMembre,
+          groupeId: 'groupe-1',
+          membreId: undefined,
+          critere: 'jdupont',
+          typeCritere: 'username',
+          statut: 'interne',
+        }),
+      ).rejects.toMatchObject({ type: 'doublonUsernameMembreConnu' });
+    });
+
+    it('doit rejeter un groupe introuvable', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('qualifier_membre', {
+          donnees: RACINE_VIDE,
+          groupeId: 'groupe-inconnu',
+          critere: 'x',
+          typeCritere: 'username',
+          statut: 'interne',
+        }),
+      ).rejects.toMatchObject({ type: 'groupeIntrouvable' });
+    });
+  });
+
+  describe('definir_politique_ia', () => {
+    it("doit autoriser l'IA et ajouter l'annotation système (RG-014 à RG-016)", async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'definir_politique_ia',
+        {
+          donnees: RACINE_VIDE,
+          groupeId: 'groupe-1',
+          projetId: 'projet-1',
+          iaAutorisee: true,
+        },
+      );
+
+      const projet = donnees.groupes[0]?.projets[0];
+      expect(projet?.['iaAutorisee']).toBe(true);
+      expect(projet?.['iaAutoriseeDepuis']).toBeDefined();
+      expect(projet?.['annotations']).toHaveLength(1);
+    });
+
+    it('doit rejeter un projet introuvable', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('definir_politique_ia', {
+          donnees: RACINE_VIDE,
+          groupeId: 'groupe-1',
+          projetId: 'projet-inconnu',
+          iaAutorisee: true,
+        }),
+      ).rejects.toMatchObject({ type: 'projetIntrouvable' });
+    });
+  });
+
+  describe('supprimer_membre_connu', () => {
+    it('doit supprimer la règle désignée', async () => {
+      const racineAvecMembre = {
+        ...RACINE_VIDE,
+        groupes: [{ ...GROUPE_VIDE, membresConnus: [{ id: 'm1', critere: 'jdupont' }] }],
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'supprimer_membre_connu',
+        {
+          donnees: racineAvecMembre,
+          groupeId: 'groupe-1',
+          membreId: 'm1',
+        },
+      );
+
+      expect(donnees.groupes[0]?.membresConnus).toEqual([]);
+    });
+
+    it('doit rejeter un membre introuvable', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('supprimer_membre_connu', {
+          donnees: RACINE_VIDE,
+          groupeId: 'groupe-1',
+          membreId: 'inconnu',
+        }),
+      ).rejects.toMatchObject({ type: 'membreIntrouvable' });
+    });
+  });
+
+  describe('enregistrer_brouillon', () => {
+    it('doit créer le brouillon et la campagne (RG-019)', async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'enregistrer_brouillon',
+        {
+          donnees: RACINE_VIDE,
+          campagneId: 'campagne-1',
+          date: '2026-07-28',
+          perimetre: ['projet-1'],
+          verdicts: [{ projetId: 'projet-1', statut: 'succes' }],
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'brouillon' },
+          ],
+        },
+      );
+
+      expect(donnees.campagnes).toHaveLength(1);
+      expect(donnees.brouillon).not.toBeNull();
+      expect(donnees.brouillon?.['resultatsParProjet']).toEqual([
+        { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+      ]);
+    });
+
+    it('doit refuser un brouillon déjà existant (RG-019)', async () => {
+      const racineAvecBrouillon = {
+        ...RACINE_VIDE,
+        brouillon: { campagneId: 'x', resultatsParProjet: [] },
+      };
+
+      await expect(
+        BouchonAdministrationUtils.invoquer('enregistrer_brouillon', {
+          donnees: racineAvecBrouillon,
+          campagneId: 'campagne-2',
+          date: '2026-07-28',
+          perimetre: [],
+          verdicts: [],
+          resultatsParProjet: [],
+        }),
+      ).rejects.toMatchObject({ type: 'brouillonDejaExistant' });
+    });
+  });
+
+  describe('integrer_brouillon / rejeter_brouillon', () => {
+    const racineAvecBrouillon = {
+      ...RACINE_VIDE,
+      brouillon: {
+        campagneId: 'campagne-1',
+        resultatsParProjet: [
+          { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+        ],
+      },
+    };
+
+    it('doit intégrer une entrée dans l’historique du projet et effacer le brouillon résolu', async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>('integrer_brouillon', {
+        donnees: racineAvecBrouillon,
+      });
+
+      expect(donnees.brouillon).toBeNull();
+      expect(donnees.groupes[0]?.projets[0]?.['audits']).toEqual([{ id: 'audit-1' }]);
+    });
+
+    it('doit rejeter une entrée sans jamais l’ajouter à l’historique du projet', async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>('rejeter_brouillon', {
+        donnees: racineAvecBrouillon,
+        motif: 'Anomalie détectée',
+      });
+
+      expect(donnees.brouillon).toBeNull();
+      expect(donnees.groupes[0]?.projets[0]?.['audits']).toEqual([]);
+    });
+
+    it('doit rejeter si aucun brouillon courant', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('integrer_brouillon', { donnees: RACINE_VIDE }),
+      ).rejects.toMatchObject({ type: 'aucunBrouillonCourant' });
+    });
+
+    it('doit rejeter une sélection portant un projet absent du brouillon', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('integrer_brouillon', {
+          donnees: racineAvecBrouillon,
+          selection: ['projet-inconnu'],
+        }),
+      ).rejects.toMatchObject({ type: 'projetAbsentDuBrouillon' });
+    });
+  });
+});

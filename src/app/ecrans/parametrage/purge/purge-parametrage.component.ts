@@ -226,6 +226,7 @@ export class SqmPurgeParametrageComponent {
       case 'versionSchemaSuperieure':
       case 'aucunFichierOuvert':
       case 'credentialInvalide':
+      case 'vueIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'opération.";
     }

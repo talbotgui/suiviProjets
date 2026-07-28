@@ -46,6 +46,7 @@ use commandes::etat_session::EtatSession;
 pub fn run() {
     let resultat = tauri::Builder::default()
         .manage(EtatSession::nouveau())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commandes::fichier::creer_fichier,
             commandes::fichier::charger_fichier,
@@ -83,6 +84,8 @@ pub fn run() {
             commandes::purge::executer_purge_age,
             commandes::alertes::creer_annotation,
             commandes::alertes::qualifier_alerte,
+            commandes::vues::definir_vue,
+            commandes::vues::supprimer_vue,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

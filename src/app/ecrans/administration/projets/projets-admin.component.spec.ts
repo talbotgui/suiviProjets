@@ -1,15 +1,18 @@
 // Test de l'onglet Projets de l'écran Administration (cf. projets-admin.component.ts), généré avec l'assistance
 // de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmProjetsAdminComponent } from './projets-admin.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-commandes.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction
@@ -45,7 +48,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},
@@ -81,6 +84,7 @@ describe('SqmProjetsAdminComponent', () => {
 
   beforeEach(async () => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     await TestBed.configureTestingModule({
       imports: [SqmProjetsAdminComponent],
     }).compileComponents();

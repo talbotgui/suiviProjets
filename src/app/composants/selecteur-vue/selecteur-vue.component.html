@@ -1,0 +1,69 @@
+<div class="selecteur-vue">
+  <label class="selecteur-vue__champ">
+    Vue enregistrée
+    <select
+      [ngModel]="idSelectionne()"
+      (ngModelChange)="selectionner($event)"
+      aria-label="Vue enregistrée"
+    >
+      <option value="">-- Aucune vue --</option>
+      @for (vue of vues(); track vue.id) {
+        <option [value]="vue.id">{{ vue.nom }}{{ vue.parDefaut ? ' (par défaut)' : '' }}</option>
+      }
+    </select>
+  </label>
+
+  <div class="selecteur-vue__actions">
+    <button type="button" (click)="ouvrirFormulaireEnregistrement()">Enregistrer sous...</button>
+    @if (vueSelectionnee(); as vue) {
+      <button type="button" (click)="mettreAJourVueSelectionnee()">
+        Mettre à jour « {{ vue.nom }} »
+      </button>
+      <button type="button" (click)="demanderSuppression()">Supprimer « {{ vue.nom }} »</button>
+    }
+  </div>
+
+  @if (formulaireEnregistrementOuvert()) {
+    <form class="selecteur-vue__formulaire" (ngSubmit)="validerFormulaireEnregistrement()">
+      <label>
+        Nom de la vue
+        <input
+          type="text"
+          name="nomVue"
+          required
+          [ngModel]="nomSaisi()"
+          (ngModelChange)="nomSaisi.set($event)"
+        />
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          name="parDefautVue"
+          [ngModel]="parDefautSaisi()"
+          (ngModelChange)="parDefautSaisi.set($event)"
+        />
+        Définir comme vue par défaut de cet écran
+      </label>
+      <div class="selecteur-vue__actions">
+        <button type="button" (click)="annulerFormulaireEnregistrement()">Annuler</button>
+        <button type="submit">Enregistrer</button>
+      </div>
+    </form>
+  }
+
+  @if (confirmationSuppressionVisible() && vueSelectionnee(); as vue) {
+    <app-confirmation-suppression
+      [message]="'Supprimer la vue « ' + vue.nom + ' » ? Cette action est irréversible.'"
+      (confirmee)="confirmerSuppression()"
+      (annulee)="annulerSuppression()"
+    />
+  }
+
+  @if (confirmationMotDePasseVisible()) {
+    <app-confirmation-mot-de-passe
+      [message]="messageConfirmationMotDePasse()"
+      (confirmee)="confirmerMotDePasse($event)"
+      (annulee)="annulerMotDePasse()"
+    />
+  }
+</div>

@@ -138,7 +138,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},
@@ -318,5 +318,202 @@ describe('SqmListeTravailComponent', () => {
 
     expect(composant.messageErreur).not.toBeNull();
     expect(composant.alerteSelectionnee()).toBeDefined();
+  });
+
+  describe('vues enregistrées (US-028, RG-027, Phase 9 incrément 1)', () => {
+    it('applique le filtre de groupe porté par une vue choisie', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine([]));
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.appliquerVue({
+        id: 'v1',
+        nom: 'Mon groupe',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1' },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+    });
+
+    it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine([]));
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+      composant.filtreGroupeId.set('groupe-1');
+
+      composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+    });
+
+    it('enregistre une vue avec les filtres courants et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      donneesApplication.chargerRacine(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+      composant.filtreGroupeId.set('groupe-1');
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: true,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_vue',
+        expect.objectContaining({
+          id: undefined,
+          nom: 'Ma vue',
+          ecran: 'listeTravail',
+          versionFiltres: 1,
+          parDefaut: true,
+          filtres: { groupeId: 'groupe-1' },
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      expect(composant.messageErreur).toBeNull();
+      expect(donneesApplication.racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque l'enregistrement d'une vue échoue", async () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockRejectedValue({ type: 'erreurInterne' });
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: false,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(composant.messageErreur).not.toBeNull();
+    });
+
+    it('supprime une vue et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      donneesApplication.chargerRacine(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      await composant.supprimerVue({ id: 'v1', motDePasse: 'mot-de-passe' });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'supprimer_vue',
+        expect.objectContaining({ id: 'v1', motDePasse: 'mot-de-passe' }),
+      );
+      expect(composant.messageErreur).toBeNull();
+      expect(donneesApplication.racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque la suppression d'une vue échoue", async () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockRejectedValue({ type: 'vueIntrouvable' });
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      await composant.supprimerVue({ id: 'id-inconnu', motDePasse: 'mot-de-passe' });
+
+      expect(composant.messageErreur).not.toBeNull();
+    });
+
+    it('applique automatiquement la vue par défaut de cet écran à l’ouverture', () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'listeTravail',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1' },
+          },
+        ],
+      };
+      donneesApplication.chargerRacine(racineAvecVueParDefaut);
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+    });
+
+    it("n'applique la vue par défaut qu'une seule fois, sans écraser un choix ultérieur de l'utilisateur", () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'listeTravail',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1' },
+          },
+        ],
+      };
+      donneesApplication.chargerRacine(racineAvecVueParDefaut);
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+
+      composant.filtreGroupeId.set(null);
+      donneesApplication.chargerRacine({ ...racineAvecVueParDefaut, versionSchema: 2 });
+      fixture.detectChanges();
+
+      expect(composant.filtreGroupeId()).toBeNull();
+    });
+
+    it('ignore une vue enregistrée dont la version de filtres est obsolète et avertit l’utilisateur', () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueObsolete: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Ancienne vue',
+            ecran: 'listeTravail',
+            versionFiltres: 0,
+            parDefaut: false,
+            filtres: { groupeId: 'groupe-1' },
+          },
+        ],
+      };
+      donneesApplication.chargerRacine(racineAvecVueObsolete);
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      expect(composant.vuesApplicables()).toHaveLength(0);
+      expect(composant.nombreVuesIgnorees()).toBe(1);
+    });
   });
 });

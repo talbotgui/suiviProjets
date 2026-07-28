@@ -10,8 +10,11 @@
 // du Moteur d'audit. Périmètre de l'incrément 3 : `interrogerDerniereAnalyse`, donnée intermédiaire consommée par
 // le Connecteur croisé (`services/avecetat/campagne/connecteur-croise.utils.ts`). Classé sous `services/sansetat/`
 // : aucun état interne n'est conservé entre deux appels de ce service.
+// Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis le 2026-07-28 : point de
+// passage unique permettant le bouchon TS des commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
+// `invocation-commande.utils.ts`.
 import { Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
+import { InvocationCommandeUtils } from './invocation-commande.utils';
 import type {
   ErreurConnecteur,
   Instance,
@@ -69,10 +72,13 @@ export class FacadeCommandesService {
     credential: string,
   ): Promise<ResultatTestConnectivite> {
     try {
-      const verdict = await invoke<VerdictConnectivite>('tester_connectivite', {
-        instance,
-        credential,
-      });
+      const verdict = await InvocationCommandeUtils.invoquer<VerdictConnectivite>(
+        'tester_connectivite',
+        {
+          instance,
+          credential,
+        },
+      );
       return { type: 'succes', verdict };
     } catch (erreur: unknown) {
       if (this.estErreurConnecteur(erreur)) {
@@ -95,7 +101,7 @@ export class FacadeCommandesService {
    * @param credentials - Credentials à mirroirer, par identifiant d'instance, jamais persistés (RG-004).
    */
   public async definirCredentials(credentials: Readonly<Record<string, string>>): Promise<void> {
-    await invoke<void>('definir_credentials', { credentials });
+    await InvocationCommandeUtils.invoquer<void>('definir_credentials', { credentials });
   }
 
   /**
@@ -113,11 +119,14 @@ export class FacadeCommandesService {
     recherche?: string,
   ): Promise<ResultatInterrogationBranches> {
     try {
-      const branches = await invoke<readonly string[]>('interroger_branches', {
-        instance,
-        idExterne,
-        recherche,
-      });
+      const branches = await InvocationCommandeUtils.invoquer<readonly string[]>(
+        'interroger_branches',
+        {
+          instance,
+          idExterne,
+          recherche,
+        },
+      );
       return { type: 'succes', branches };
     } catch (erreur: unknown) {
       if (this.estErreurConnecteur(erreur)) {
@@ -324,13 +333,16 @@ export class FacadeCommandesService {
       // appliquée par Tauri au paramètre Rust `regles_marqueurs_ia` ne capitalise que la première lettre de
       // chaque segment (« Ia », pas « IA »), comme déjà constaté pour `avec_mr` -> `avecMr` (Phase 5, incrément 1,
       // cf. commentaire de `Branche.avec_mr` dans `src-tauri/src/modele/racine.rs`).
-      const resultat = await invoke<ResultatGitlabMarqueursIa>('interroger_marqueurs_ia', {
-        instance,
-        sourceId,
-        idExterne,
-        reglesMarqueursIa: reglesMarqueursIA,
-        refAuditee,
-      });
+      const resultat = await InvocationCommandeUtils.invoquer<ResultatGitlabMarqueursIa>(
+        'interroger_marqueurs_ia',
+        {
+          instance,
+          sourceId,
+          idExterne,
+          reglesMarqueursIa: reglesMarqueursIA,
+          refAuditee,
+        },
+      );
       return { type: 'succes', resultat };
     } catch (erreur: unknown) {
       if (this.estErreurConnecteur(erreur)) {
@@ -461,10 +473,13 @@ export class FacadeCommandesService {
     idExterne: string,
   ): Promise<ResultatInterrogationDerniereAnalyse> {
     try {
-      const resultat = await invoke<string | null>('interroger_derniere_analyse', {
-        instance,
-        idExterne,
-      });
+      const resultat = await InvocationCommandeUtils.invoquer<string | null>(
+        'interroger_derniere_analyse',
+        {
+          instance,
+          idExterne,
+        },
+      );
       return { type: 'succes', resultat };
     } catch (erreur: unknown) {
       if (this.estErreurConnecteur(erreur)) {
@@ -501,7 +516,7 @@ export class FacadeCommandesService {
     | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
   > {
     try {
-      const resultat = await invoke<TResultat>(commande, {
+      const resultat = await InvocationCommandeUtils.invoquer<TResultat>(commande, {
         instance,
         sourceId,
         idExterne,
@@ -541,7 +556,7 @@ export class FacadeCommandesService {
     | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
   > {
     try {
-      const resultat = await invoke<TResultat>(commande, {
+      const resultat = await InvocationCommandeUtils.invoquer<TResultat>(commande, {
         instance,
         sourceId,
         idExterne,

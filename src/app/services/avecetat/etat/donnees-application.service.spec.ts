@@ -1,7 +1,7 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../sansetat/commandes/types-facade';
 import { DonneesApplicationService } from './donnees-application.service';
 import type {
@@ -10,7 +10,7 @@ import type {
   DonneesProjet,
   DonneesSource,
 } from './donnees-application.service';
-import { EtatSessionService } from './etat-session.service';
+import { EtatFichier, EtatSessionService } from './etat-session.service';
 import { StatutMembre, TypeCritereMembre, TypeSource } from './types-donnees';
 import type {
   DonneesRacine,
@@ -19,9 +19,12 @@ import type {
   Verdict,
 } from './types-donnees';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-commandes.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction
@@ -57,7 +60,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},
@@ -116,6 +119,7 @@ describe('DonneesApplicationService', () => {
 
   beforeEach(() => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     TestBed.configureTestingModule({});
     service = TestBed.inject(DonneesApplicationService);
   });
@@ -596,6 +600,77 @@ describe('DonneesApplicationService', () => {
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'entreeReferentielInvalide' } });
     });
 
+    it('invoque definir_vue avec les paramètres attendus et met à jour la racine (US-028)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirVue(
+        undefined,
+        'Ma vue',
+        'listeTravail',
+        1,
+        true,
+        { groupeId: 'g1' },
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_vue', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        id: undefined,
+        nom: 'Ma vue',
+        ecran: 'listeTravail',
+        versionFiltres: 1,
+        parDefaut: true,
+        filtres: { groupeId: 'g1' },
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « vueIntrouvable » en Résultat « echec » (definirVue)', async () => {
+      invokeSimule.mockRejectedValue({ type: 'vueIntrouvable' });
+
+      const resultat = await service.definirVue(
+        'id-inconnu',
+        'Ma vue',
+        'listeTravail',
+        1,
+        false,
+        { groupeId: null },
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'vueIntrouvable' } });
+    });
+
+    it('invoque supprimer_vue avec les paramètres attendus et met à jour la racine (US-028)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.supprimerVue('vue-1', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('supprimer_vue', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        id: 'vue-1',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « vueIntrouvable » en Résultat « echec » (supprimerVue)', async () => {
+      invokeSimule.mockRejectedValue({ type: 'vueIntrouvable' });
+
+      const resultat = await service.supprimerVue('id-inconnu', 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'vueIntrouvable' } });
+    });
+
     it('invoque supprimer_membre_connu avec les paramètres attendus et met à jour la racine', async () => {
       const racineAvantAppel = DonneesDeTest.racineActuelle(service);
       const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 4 };
@@ -766,6 +841,174 @@ describe('DonneesApplicationService', () => {
       );
 
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'projetAbsentDuBrouillon' } });
+    });
+  });
+
+  describe('cycle de vie du fichier et de la session (Phase 1, US-001, US-002, US-026)', () => {
+    let etatSession: EtatSessionService;
+
+    beforeEach(() => {
+      etatSession = TestBed.inject(EtatSessionService);
+    });
+
+    it('crée un fichier, charge la racine renvoyée et ouvre la session (US-001)', async () => {
+      const racine = DonneesDeTest.racineVide();
+      invokeSimule.mockResolvedValue(racine);
+
+      const resultat = await service.creerFichier('/tmp/nouveau.sqm', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('creer_fichier', {
+        chemin: '/tmp/nouveau.sqm',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racine);
+      expect(etatSession.etatFichier()).toBe(EtatFichier.Ouvert);
+      expect(etatSession.cheminFichier()).toBe('/tmp/nouveau.sqm');
+    });
+
+    it('convertit un rejet lors de la création en Résultat « echec » sans ouvrir la session', async () => {
+      invokeSimule.mockRejectedValue({ type: 'erreurInterne' });
+
+      const resultat = await service.creerFichier('/tmp/nouveau.sqm', 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'erreurInterne' } });
+      expect(service.racine()).toBeNull();
+      expect(etatSession.etatFichier()).toBe(EtatFichier.Ferme);
+    });
+
+    it('charge un fichier existant, charge la racine renvoyée et ouvre la session (US-002)', async () => {
+      const racine = DonneesDeTest.racineVide();
+      invokeSimule.mockResolvedValue(racine);
+
+      const resultat = await service.chargerFichier('/tmp/existant.sqm', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('charger_fichier', {
+        chemin: '/tmp/existant.sqm',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racine);
+      expect(etatSession.etatFichier()).toBe(EtatFichier.Ouvert);
+    });
+
+    it('convertit un mot de passe incorrect au chargement en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
+
+      const resultat = await service.chargerFichier('/tmp/existant.sqm', 'mauvais-mot-de-passe');
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'motDePasseOuFichierInvalide' },
+      });
+      expect(service.racine()).toBeNull();
+    });
+
+    describe('une fois un fichier ouvert', () => {
+      beforeEach(() => {
+        service.chargerRacine(DonneesDeTest.racineVide());
+        etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      });
+
+      it('sauvegarde le fichier avec la racine courante horodatée (RG-001 à RG-003)', async () => {
+        invokeSimule.mockResolvedValue(undefined);
+        const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+
+        const resultat = await service.sauvegarderFichier('mot-de-passe');
+
+        expect(invokeSimule).toHaveBeenCalledWith(
+          'sauvegarder_fichier',
+          expect.objectContaining({
+            chemin: '/tmp/donnees-test.sqm',
+            motDePasse: 'mot-de-passe',
+          }),
+        );
+        expect(resultat).toEqual({ type: 'succes' });
+        expect(service.racine()?.meta.modifieLe).not.toBe(racineAvantAppel.meta.modifieLe);
+      });
+
+      it('convertit un rejet de sauvegarde typé « fichierVerrouille » en Résultat « echec »', async () => {
+        invokeSimule.mockRejectedValue({ type: 'fichierVerrouille' });
+
+        const resultat = await service.sauvegarderFichier('mot-de-passe');
+
+        expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'fichierVerrouille' } });
+      });
+
+      it('verrouille la session (US-026) sans oublier la racine en mémoire', async () => {
+        invokeSimule.mockResolvedValue(undefined);
+
+        const resultat = await service.verrouillerSession();
+
+        expect(invokeSimule).toHaveBeenCalledWith('verrouiller_session', {});
+        expect(resultat).toEqual({ type: 'succes' });
+        expect(etatSession.etatFichier()).toBe(EtatFichier.Verrouille);
+        expect(service.racine()).not.toBeNull();
+      });
+
+      it('déverrouille la session avec le bon mot de passe et remet le compteur d’échecs à zéro (US-026)', async () => {
+        etatSession.verrouiller();
+        invokeSimule.mockResolvedValue(undefined);
+
+        const resultat = await service.deverrouillerSession('mot-de-passe');
+
+        expect(invokeSimule).toHaveBeenCalledWith('deverrouiller_session', {
+          motDePasse: 'mot-de-passe',
+        });
+        expect(resultat).toEqual({ type: 'succes' });
+        expect(etatSession.etatFichier()).toBe(EtatFichier.Ouvert);
+        expect(etatSession.echecsDeverrouillage()).toBe(0);
+      });
+
+      it('enregistre un échec de mot de passe sans fermer le fichier avant le seuil (US-026)', async () => {
+        etatSession.verrouiller();
+        invokeSimule.mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
+
+        const resultat = await service.deverrouillerSession('mauvais-mot-de-passe');
+
+        expect(resultat).toEqual({
+          type: 'echec',
+          anomalie: { type: 'motDePasseOuFichierInvalide' },
+          fichierFerme: false,
+        });
+        expect(etatSession.echecsDeverrouillage()).toBe(1);
+        expect(etatSession.etatFichier()).toBe(EtatFichier.Verrouille);
+        expect(service.racine()).not.toBeNull();
+      });
+
+      it('ferme complètement le fichier après le nombre paramétré d’échecs consécutifs (US-026)', async () => {
+        etatSession.verrouiller();
+        invokeSimule.mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
+        const seuil =
+          DonneesDeTest.racineActuelle(service).parametres.verrouillage.echecsAvantFermeture;
+
+        let resultat;
+        for (let essai = 0; essai < seuil; essai += 1) {
+          resultat = await service.deverrouillerSession('mauvais-mot-de-passe');
+        }
+
+        expect(resultat).toEqual({
+          type: 'echec',
+          anomalie: { type: 'motDePasseOuFichierInvalide' },
+          fichierFerme: true,
+        });
+        expect(etatSession.etatFichier()).toBe(EtatFichier.Ferme);
+        expect(service.racine()).toBeNull();
+      });
+
+      it('n’incrémente pas le compteur d’échecs pour une anomalie autre qu’un mot de passe incorrect', async () => {
+        etatSession.verrouiller();
+        invokeSimule.mockRejectedValue({ type: 'erreurInterne' });
+
+        const resultat = await service.deverrouillerSession('mot-de-passe');
+
+        expect(resultat).toEqual({
+          type: 'echec',
+          anomalie: { type: 'erreurInterne' },
+          fichierFerme: false,
+        });
+        expect(etatSession.echecsDeverrouillage()).toBe(0);
+      });
     });
   });
 });

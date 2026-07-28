@@ -3,7 +3,7 @@
 // via le mock de `invoke` (comme `facade-commandes.service.spec.ts`), le Store d'état applicatif via un mock
 // direct de `DonneesApplicationService` (cf. `docs/02_documentation/16_normesTests.md#tests-unitaires`).
 import { TestBed } from '@angular/core/testing';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../sansetat/commandes/types-facade';
 import type { Instance } from '../../sansetat/commandes/types-facade';
 import { DonneesApplicationService } from '../etat/donnees-application.service';
@@ -22,9 +22,12 @@ import type {
 } from '../etat/types-donnees';
 import { OrchestrateurCampagneService } from './orchestrateur-campagne.service';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-commandes.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 const INSTANCE_GITLAB: Instance = {
   id: 'instance-gitlab',
@@ -61,7 +64,7 @@ const PARAMETRES_DE_TEST: Parametres = {
     },
     materialiteBrouillon: { variationRelative: 0.1 },
   },
-  verrouillage: {},
+  verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
   audit: {},
   proxy: {},
   sauvegarde: {},
@@ -269,6 +272,7 @@ describe('OrchestrateurCampagneService', () => {
 
   beforeEach(() => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     invokeSimule.mockImplementation((commande: string) =>
       Promise.resolve(REPONSES_PAR_DEFAUT[commande]),
     );

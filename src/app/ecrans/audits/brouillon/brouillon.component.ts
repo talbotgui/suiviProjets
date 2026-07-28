@@ -437,6 +437,7 @@ export class SqmBrouillonComponent {
       case 'aucunFichierOuvert':
       case 'credentialInvalide':
       case 'modePurgeAgeInconnu':
+      case 'vueIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

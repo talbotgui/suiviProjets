@@ -1,0 +1,94 @@
+<div class="demarrage">
+  <div class="demarrage__cartes">
+    <div class="demarrage__carte">
+      <div class="demarrage__carte-icone" aria-hidden="true">＋</div>
+      <div class="demarrage__carte-titre">Créer un nouveau fichier</div>
+      <p class="demarrage__carte-description">
+        Démarre un fichier de données vierge, protégé par un mot de passe que vous définissez.
+      </p>
+
+      <button
+        type="button"
+        class="demarrage__bouton-secondaire"
+        (click)="choisirEmplacementCreation()"
+      >
+        Choisir l'emplacement…
+      </button>
+      @if (cheminCreation) {
+        <p class="demarrage__chemin">{{ cheminCreation }}</p>
+      }
+
+      <label class="demarrage__champ">
+        <span>Mot de passe</span>
+        <input
+          type="password"
+          name="motDePasseCreation"
+          autocomplete="new-password"
+          [(ngModel)]="motDePasseCreation"
+        />
+      </label>
+      <label class="demarrage__champ">
+        <span>Confirmation du mot de passe</span>
+        <input
+          type="password"
+          name="confirmationMotDePasseCreation"
+          autocomplete="new-password"
+          [(ngModel)]="confirmationMotDePasseCreation"
+        />
+      </label>
+
+      @if (messageErreurCreation) {
+        <p class="demarrage__erreur" role="alert">{{ messageErreurCreation }}</p>
+      }
+
+      <button
+        type="button"
+        class="demarrage__bouton-principal"
+        [disabled]="creationEnCours"
+        (click)="creerFichier()"
+      >
+        Créer le fichier
+      </button>
+    </div>
+
+    <div class="demarrage__carte demarrage__carte--mise-en-avant">
+      <div class="demarrage__carte-icone" aria-hidden="true">⤒</div>
+      <div class="demarrage__carte-titre">Charger un fichier existant</div>
+      <p class="demarrage__carte-description">Reprend le suivi là où vous l'avez laissé.</p>
+
+      <button
+        type="button"
+        class="demarrage__bouton-secondaire"
+        (click)="choisirFichierChargement()"
+      >
+        Choisir un fichier…
+      </button>
+      @if (cheminChargement) {
+        <p class="demarrage__chemin">{{ cheminChargement }}</p>
+      }
+
+      <label class="demarrage__champ">
+        <span>Mot de passe</span>
+        <input
+          type="password"
+          name="motDePasseChargement"
+          autocomplete="current-password"
+          [(ngModel)]="motDePasseChargement"
+        />
+      </label>
+
+      @if (messageErreurChargement) {
+        <p class="demarrage__erreur" role="alert">{{ messageErreurChargement }}</p>
+      }
+
+      <button
+        type="button"
+        class="demarrage__bouton-principal"
+        [disabled]="chargementEnCours"
+        (click)="chargerFichier()"
+      >
+        Charger le fichier
+      </button>
+    </div>
+  </div>
+</div>

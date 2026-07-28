@@ -42,7 +42,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},

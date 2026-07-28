@@ -1,0 +1,25 @@
+.selecteur-vue {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__champ {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  &__formulaire {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid;
+    padding: 0.75rem;
+  }
+}

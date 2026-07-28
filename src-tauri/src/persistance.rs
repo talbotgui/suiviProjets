@@ -16,7 +16,8 @@
 //! référentiel (`parametrage`). Périmètre de la Phase 7, incrément 4 (US-025 ; RG-024, RG-025) : purge des audits
 //! anciens par densité ou par âge, avec prévisualisation systématique (`purge`). Périmètre de la Phase 8
 //! (US-019, US-020 ; RG-026) : création d'une annotation de portée groupe ou projet et qualification d'une alerte
-//! (statut vu/traité, `alertes`). Ces modules opèrent tous en mémoire sur une
+//! (statut vu/traité, `alertes`). Périmètre de la Phase 9, incrément 1 (US-028 ; RG-027) : création, mise à jour et
+//! suppression d'une vue enregistrée (`vues`). Ces modules opèrent tous en mémoire sur une
 //! [`crate::modele::racine::DonneesRacine`] déjà chargée, sans toucher elles-mêmes le disque.
 
 pub(crate) mod administration;
@@ -29,3 +30,4 @@ pub(crate) mod migration;
 pub(crate) mod moteur;
 pub(crate) mod parametrage;
 pub(crate) mod purge;
+pub(crate) mod vues;

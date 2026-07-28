@@ -1,14 +1,17 @@
 // Test du client typé de la Façade de commandes (cf. facade-commandes.service.ts), généré avec l'assistance de
 // l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { FacadeCommandesService } from './facade-commandes.service';
 import { TypeInstance } from './types-facade';
 import type { Instance } from './types-facade';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), le
+// bouchon TS activé hors contexte Tauri étant couvert par `bouchon-commandes.utils.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 const INSTANCE_GITLAB: Instance = {
   id: 'instance-1',
@@ -29,6 +32,7 @@ describe('FacadeCommandesService', () => {
 
   beforeEach(() => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     TestBed.configureTestingModule({});
     service = TestBed.inject(FacadeCommandesService);
   });

@@ -1,18 +1,22 @@
 // Test du client typé de la Façade de commandes dédié à la Phase 4 (cf. facade-administration.service.ts), généré
 // avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { FacadeAdministrationService } from './facade-administration.service';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-commandes.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 describe('FacadeAdministrationService', () => {
   let service: FacadeAdministrationService;
 
   beforeEach(() => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     TestBed.configureTestingModule({});
     service = TestBed.inject(FacadeAdministrationService);
   });

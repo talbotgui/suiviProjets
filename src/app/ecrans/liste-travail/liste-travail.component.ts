@@ -30,11 +30,17 @@
 // (arborescence : « Liste de travail a un enfant contextuel Fiche projet, accès par clic sur une alerte ») est
 // proposé comme une action explicite de ce même panneau plutôt que déclenché directement par l'activation de ligne,
 // pour ne pas faire disparaître silencieusement le panneau de traitement à chaque simple consultation.
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
+import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
+import type {
+  DemandeEnregistrementVue,
+  DemandeSuppressionVue,
+  VueSelectionnable,
+} from '../../composants/selecteur-vue/selecteur-vue.component';
 import { SqmTableauDenseComponent } from '../../composants/tableau-dense/tableau-dense.component';
 import type {
   CelluleTableauDense,
@@ -45,6 +51,33 @@ import type { Groupe, TraitementAlerte } from '../../services/avecetat/etat/type
 import { StatutTraitementAlerte } from '../../services/avecetat/etat/types-donnees';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 import type { GraviteAlerteMembreInconnu } from '../../services/sansetat/jugement/statut-membre.utils';
+import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
+import type {
+  ResultatFiltrageVues,
+  VueEnregistreeConnue,
+} from '../../services/sansetat/jugement/vues-enregistrees.utils';
+
+/**
+ * Identifiant stable de cet écran pour les vues enregistrées (US-028, RG-027).
+ */
+const ECRAN_LISTE_TRAVAIL = 'listeTravail';
+
+/**
+ * Version courante du schéma de filtres de cet écran (US-028, RG-027) : à incrémenter si la forme de
+ * {@link FiltresListeTravail} change, pour que `VuesEnregistreesUtils.filtrerPourEcran` ignore avec avertissement
+ * les vues enregistrées par un schéma antérieur incompatible (cf.
+ * `docs/02_documentation/12_modeleDonnees.md#stratégie-de-migration-des-données`).
+ */
+const VERSION_FILTRES_LISTE_TRAVAIL = 1;
+
+/**
+ * Forme des filtres de cet écran persistée par une vue enregistrée (US-028). Seul `filtreGroupeId` est aujourd'hui
+ * un filtre à proprement parler ; `texteRecherche` est volontairement exclu (recherche ponctuelle, non un critère
+ * de vue durable, cf. RG-027 : « groupes, projets, indicateurs, période, tri »).
+ */
+interface FiltresListeTravail {
+  readonly groupeId: string | null;
+}
 
 /**
  * Préfixe de clé d'alerte des causes de membre inconnu (RG-006 à RG-009), seul type d'alerte actuellement
@@ -97,7 +130,12 @@ type ActionEnAttente = 'vu' | 'traitement' | null;
  */
 @Component({
   selector: 'app-liste-travail',
-  imports: [FormsModule, SqmTableauDenseComponent, SqmConfirmationMotDePasseComponent],
+  imports: [
+    FormsModule,
+    SqmTableauDenseComponent,
+    SqmConfirmationMotDePasseComponent,
+    SqmSelecteurVueComponent,
+  ],
   templateUrl: './liste-travail.component.html',
   styleUrl: './liste-travail.component.scss',
 })
@@ -106,6 +144,29 @@ export class SqmListeTravailComponent {
     inject(DonneesApplicationService);
 
   private readonly router: Router = inject(Router);
+
+  /**
+   * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne
+   * l'appliquer qu'une seule fois par instance de ce composant même si `vuesApplicables` est recalculé ensuite
+   * (ex. après la création d'une nouvelle vue).
+   */
+  private vueParDefautDejaAppliquee = false;
+
+  public constructor() {
+    effect(() => {
+      if (this.vueParDefautDejaAppliquee) {
+        return;
+      }
+      const vueParDefaut = VuesEnregistreesUtils.trouverVueParDefaut(
+        this.resultatFiltrageVues().applicables,
+      );
+      if (vueParDefaut === undefined) {
+        return;
+      }
+      this.vueParDefautDejaAppliquee = true;
+      this.appliquerVue(vueParDefaut);
+    });
+  }
 
   /**
    * Identifiant du groupe sélectionné dans le filtre, `null` = tous les groupes.
@@ -171,6 +232,35 @@ export class SqmListeTravailComponent {
   });
 
   /**
+   * Résultat du filtrage des vues enregistrées de cet écran par version de filtres courante (US-028, RG-027) :
+   * vues applicables et nombre de vues ignorées pour cause de version de filtres obsolète (cf.
+   * `docs/02_documentation/12_modeleDonnees.md#stratégie-de-migration-des-données`).
+   */
+  private readonly resultatFiltrageVues: Signal<ResultatFiltrageVues> = computed(() => {
+    const connues: readonly VueEnregistreeConnue[] =
+      this.donneesApplication.racine()?.vuesEnregistrees ?? [];
+    return VuesEnregistreesUtils.filtrerPourEcran(
+      connues,
+      ECRAN_LISTE_TRAVAIL,
+      VERSION_FILTRES_LISTE_TRAVAIL,
+    );
+  });
+
+  /**
+   * Vues enregistrées applicables à cet écran (US-028, RG-027).
+   */
+  public readonly vuesApplicables: Signal<readonly VueSelectionnable[]> = computed(
+    () => this.resultatFiltrageVues().applicables,
+  );
+
+  /**
+   * Nombre de vues enregistrées de cet écran ignorées pour cause de version de filtres obsolète (US-028).
+   */
+  public readonly nombreVuesIgnorees: Signal<number> = computed(
+    () => this.resultatFiltrageVues().nombreIgnorees,
+  );
+
+  /**
    * Groupes disponibles pour le filtre.
    * @returns Les groupes actuellement chargés.
    */
@@ -201,6 +291,69 @@ export class SqmListeTravailComponent {
    */
   public onChangerRecherche(valeur: string): void {
     this.texteRecherche.set(valeur);
+  }
+
+  /**
+   * Applique les filtres portés par une vue enregistrée choisie dans `SqmSelecteurVueComponent` (US-028).
+   * Ignore silencieusement une vue dont les filtres ne correspondent pas structurellement à
+   * {@link FiltresListeTravail} (aucun accès non sûr à une valeur JSON externe) : ce cas ne devrait jamais se
+   * produire en pratique, `vuesApplicables` étant déjà restreint à la version de filtres courante de cet écran.
+   * @param vue - Vue choisie, dont `filtres` reste typé `unknown` côté composant transverse.
+   */
+  public appliquerVue(vue: VueSelectionnable): void {
+    if (!SqmListeTravailComponent.estFiltresListeTravail(vue.filtres)) {
+      return;
+    }
+    this.filtreGroupeId.set(vue.filtres.groupeId);
+  }
+
+  /**
+   * Vérifie structurellement qu'une valeur JSON externe (`VueEnregistree.filtres`) correspond bien à
+   * {@link FiltresListeTravail}, avant tout accès à ses champs (aucun accès non sûr à une valeur JSON externe, cf.
+   * `docs/02_documentation/14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--typescript`).
+   * @param valeur - Valeur à vérifier.
+   * @returns `true` si `valeur` correspond à la forme attendue.
+   */
+  private static estFiltresListeTravail(valeur: unknown): valeur is FiltresListeTravail {
+    if (typeof valeur !== 'object' || valeur === null || !('groupeId' in valeur)) {
+      return false;
+    }
+    const groupeId: unknown = valeur.groupeId;
+    return groupeId === null || typeof groupeId === 'string';
+  }
+
+  /**
+   * Crée ou met à jour une vue enregistrée avec les filtres courants (US-028, RG-027, RG-002) : invoque
+   * `DonneesApplicationService.definirVue`, sauvegarde effective incluse.
+   * @param demande - Nom, statut par défaut, identifiant de mise à jour éventuel et mot de passe déjà confirmés par
+   * `SqmSelecteurVueComponent`.
+   */
+  public async enregistrerVue(demande: DemandeEnregistrementVue): Promise<void> {
+    const filtres: FiltresListeTravail = { groupeId: this.filtreGroupeId() };
+    const resultat = await this.donneesApplication.definirVue(
+      demande.id,
+      demande.nom,
+      ECRAN_LISTE_TRAVAIL,
+      VERSION_FILTRES_LISTE_TRAVAIL,
+      demande.parDefaut,
+      filtres,
+      demande.motDePasse,
+    );
+    if (resultat.type === 'echec') {
+      this.messageErreur = "Une erreur inattendue est survenue lors de l'enregistrement de la vue.";
+    }
+  }
+
+  /**
+   * Supprime une vue enregistrée (US-028, RG-002) : invoque `DonneesApplicationService.supprimerVue`, sauvegarde
+   * effective incluse.
+   * @param demande - Identifiant de la vue et mot de passe déjà confirmés par `SqmSelecteurVueComponent`.
+   */
+  public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
+    const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
+    if (resultat.type === 'echec') {
+      this.messageErreur = 'Une erreur inattendue est survenue lors de la suppression de la vue.';
+    }
   }
 
   /**

@@ -1,0 +1,27 @@
+<div class="verrouillage">
+  <div class="verrouillage__panneau">
+    <div class="verrouillage__icone" aria-hidden="true">🔒</div>
+    <h2 class="verrouillage__titre">Session verrouillée</h2>
+    <p class="verrouillage__message">
+      Le fichier reste protégé. Les credentials de session ont été effacés et devront être
+      ressaisis.
+    </p>
+
+    <app-confirmation-mot-de-passe
+      message="Ressaisissez le mot de passe du fichier pour déverrouiller."
+      (confirmee)="deverrouiller($event)"
+    />
+
+    @if (messageErreur) {
+      <p class="verrouillage__erreur" role="alert">{{ messageErreur }}</p>
+    }
+
+    @if (essaisRestants(); as essais) {
+      @if (echecsDeverrouillage() > 0) {
+        <p class="verrouillage__echecs">
+          {{ essais }} essai(s) restant(s) avant fermeture automatique du fichier.
+        </p>
+      }
+    }
+  </div>
+</div>

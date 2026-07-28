@@ -250,17 +250,30 @@ export interface SeuilsJugement {
 }
 
 /**
- * Seuils et réglages applicatifs (`parametres`), mirroir partiel de `Parametres` côté cœur natif : seul `seuils`
- * est typé en toutes lettres (périmètre exact de cet incrément), les autres sous-branches (`verrouillage`,
- * `audit`, `proxy`, `sauvegarde`), pourtant typées côté cœur natif, restent en `unknown` côté interface faute
- * d'être énumérées par la conception détaillée de cet incrément — décision arbitraire de portée limitée, cf.
- * rapport de développement de cette phase.
+ * Réglages de verrouillage de session (US-026, RG-004, RG-005, RNF-014), mirroir de `Verrouillage` côté cœur
+ * natif (`src-tauri/src/modele/racine.rs`). Typé à l'occasion du câblage de l'écran de Verrouillage (périmètre de
+ * cette tâche) : jusqu'ici laissé en `unknown` bien que déjà typé côté cœur natif, faute d'un appelant côté
+ * interface ayant besoin de lire ces valeurs.
+ */
+export interface Verrouillage {
+  /** Délai d'inactivité, en minutes, avant verrouillage automatique de la session. */
+  readonly delaiInactiviteMinutes: number;
+  /** Nombre d'échecs consécutifs de déverrouillage avant fermeture complète du fichier. */
+  readonly echecsAvantFermeture: number;
+}
+
+/**
+ * Seuils et réglages applicatifs (`parametres`), mirroir partiel de `Parametres` côté cœur natif : `seuils` et
+ * `verrouillage` sont typés en toutes lettres, les autres sous-branches (`audit`, `proxy`, `sauvegarde`), pourtant
+ * typées côté cœur natif, restent en `unknown` côté interface faute d'être énumérées par la conception détaillée
+ * d'un incrément ayant besoin de les lire — décision arbitraire de portée limitée, cf. rapport de développement de
+ * cette phase.
  */
 export interface Parametres {
   /** Grille de seuils du Moteur de jugement. */
   readonly seuils: SeuilsJugement;
-  /** Réglages de verrouillage de session, non interprétés côté interface. */
-  readonly verrouillage: unknown;
+  /** Réglages de verrouillage de session (US-026). */
+  readonly verrouillage: Verrouillage;
   /** Réglages d'exécution des campagnes d'audit, non interprétés côté interface au-delà de `audit.concurrence`. */
   readonly audit: unknown;
   /** Réglages de proxy sortant, non interprétés côté interface. */
@@ -582,10 +595,30 @@ export interface Meta {
 }
 
 /**
+ * Modèle de filtres nommé, propre à un écran, mirroir de `VueEnregistree` côté cœur natif (US-028, RG-027, Phase 9
+ * incrément 1). `filtres` reste typé en `unknown` : sa structure concrète est propre à l'écran désigné par `ecran`
+ * et interprétée par lui seul (cf. `VuesEnregistreesUtils`).
+ */
+export interface VueEnregistree {
+  /** Identifiant UUID v4 de la vue enregistrée. */
+  readonly id: string;
+  /** Nom donné par l'utilisateur. */
+  readonly nom: string;
+  /** Identifiant stable de l'écran auquel s'applique la vue. */
+  readonly ecran: string;
+  /** Version du schéma de filtres, propre à l'écran concerné. */
+  readonly versionFiltres: number;
+  /** Indique si cette vue est la vue par défaut de son écran. */
+  readonly parDefaut: boolean;
+  /** Filtres, structure propre à l'écran concerné. */
+  readonly filtres: unknown;
+}
+
+/**
  * Racine du document JSON en clair, mirroir de `DonneesRacine` côté cœur natif, telle que retournée par
  * `creerFichier`/`chargerFichier` et attendue par `sauvegarderFichier`. Les branches non interprétées par
- * l'interface (référentiels, paramètres, journal hors ajout, vues enregistrées) sont typées en `unknown`/tableau
- * générique afin de n'être jamais perdues lors d'une mutation du Store.
+ * l'interface (référentiels, paramètres, journal hors ajout) sont typées en `unknown`/tableau générique afin de
+ * n'être jamais perdues lors d'une mutation du Store.
  */
 export interface DonneesRacine {
   /** Version du schéma de données. */
@@ -606,8 +639,8 @@ export interface DonneesRacine {
   readonly traitementsAlertes: readonly TraitementAlerte[];
   /** Journal append-only des modifications de paramétrage (RG-023). */
   readonly journal: readonly EntreeJournal[];
-  /** Modèles de filtres nommés (hors périmètre de l'Administration, Phase 3). */
-  readonly vuesEnregistrees: readonly unknown[];
+  /** Modèles de filtres nommés (US-028, RG-027, Phase 9 incrément 1). */
+  readonly vuesEnregistrees: readonly VueEnregistree[];
 }
 
 /**
@@ -623,10 +656,11 @@ export interface ReponseQualificationMembre {
 
 /**
  * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (Phase 4), par
- * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2) et par
- * `definirSeuil`/`definirReferentiel` (Phase 7, incrément 1), mirroir de `ErreurFacade` côté cœur natif, étendu des
- * seules catégories métier propres à ces commandes ; les catégories techniques héritées des commandes de fichier
- * de la Phase 1 y figurent également, ces commandes pouvant en hériter via la sauvegarde qu'elles déclenchent.
+ * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2), par
+ * `definirSeuil`/`definirReferentiel` (Phase 7, incrément 1) et par `definirVue`/`supprimerVue` (Phase 9,
+ * incrément 1), mirroir de `ErreurFacade` côté cœur natif, étendu des seules catégories métier propres à ces
+ * commandes ; les catégories techniques héritées des commandes de fichier de la Phase 1 y figurent également, ces
+ * commandes pouvant en hériter via la sauvegarde qu'elles déclenchent.
  */
 export type CategorieErreurAdministration =
   | 'groupeIntrouvable'
@@ -641,6 +675,7 @@ export type CategorieErreurAdministration =
   | 'entreeReferentielInvalide'
   | 'motifNommageBranchesInvalide'
   | 'modePurgeAgeInconnu'
+  | 'vueIntrouvable'
   | 'fichierIntrouvable'
   | 'motDePasseOuFichierInvalide'
   | 'formatNonReconnu'
@@ -673,6 +708,21 @@ export type ResultatQualificationMembre =
  */
 export type ResultatMutationAdministration =
   { readonly type: 'succes' } | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
+ * Résultat typé d'un déverrouillage de session (`DonneesApplicationService.deverrouillerSession`, US-026) : à la
+ * différence de {@link ResultatMutationAdministration}, la branche d'échec porte `fichierFerme`, `true` lorsque cet
+ * échec a atteint `parametres.verrouillage.echecsAvantFermeture` et provoqué la fermeture complète du fichier
+ * (`EtatSessionService.enregistrerEchecDeverrouillage`), pour permettre à l'écran de Verrouillage de distinguer un
+ * nouvel essai possible d'un retour obligatoire à l'écran de Démarrage.
+ */
+export type ResultatDeverrouillage =
+  | { readonly type: 'succes' }
+  | {
+      readonly type: 'echec';
+      readonly anomalie: ErreurAdministration;
+      readonly fichierFerme: boolean;
+    };
 
 /**
  * Résumé d'une prévisualisation ou d'une exécution de purge des audits anciens (US-025, Phase 7, incrément 4 ;

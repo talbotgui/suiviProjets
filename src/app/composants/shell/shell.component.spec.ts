@@ -3,13 +3,19 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import type { Brouillon, DonneesRacine } from '../../services/avecetat/etat/types-donnees';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmShellComponent } from './shell.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-commandes.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
+
+const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 /**
  * Composant factice utilisé comme cible des routes de test : seul son enregistrement importe, jamais son rendu.
@@ -51,7 +57,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},
@@ -79,6 +85,8 @@ describe('SqmShellComponent', () => {
   let etatSession: EtatSessionService;
 
   beforeEach(async () => {
+    invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     await TestBed.configureTestingModule({
       imports: [SqmShellComponent],
       providers: [provideRouter([{ path: '**', component: ComposantFactice }])],
@@ -270,5 +278,114 @@ describe('SqmShellComponent', () => {
     fixture.detectChanges();
 
     expect(element.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  describe('verrouillage manuel et automatique (US-026, RNF-014)', () => {
+    it('verrouille manuellement au clic sur le bouton 🔒 et affiche la superposition', async () => {
+      invokeSimule.mockResolvedValue(undefined);
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      element
+        .querySelector<HTMLButtonElement>('button[aria-label="Verrouillage manuel"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(invokeSimule).toHaveBeenCalledWith('verrouiller_session', {});
+      expect(element.querySelector('app-verrouillage')).not.toBeNull();
+    });
+
+    it('n’affiche pas la superposition de verrouillage tant qu’aucun fichier n’est ouvert', () => {
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(element.querySelector('app-verrouillage')).toBeNull();
+    });
+
+    it('verrouille automatiquement après le délai d’inactivité paramétré (RNF-014)', () => {
+      jest.useFakeTimers();
+      try {
+        invokeSimule.mockResolvedValue(undefined);
+        donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+        etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+        const fixture = TestBed.createComponent(SqmShellComponent);
+        fixture.detectChanges();
+
+        jest.advanceTimersByTime(15 * 60_000);
+
+        expect(invokeSimule).toHaveBeenCalledWith('verrouiller_session', {});
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('repousse le verrouillage automatique sur activité (clic)', () => {
+      jest.useFakeTimers();
+      try {
+        invokeSimule.mockResolvedValue(undefined);
+        donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+        etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+        const fixture = TestBed.createComponent(SqmShellComponent);
+        fixture.detectChanges();
+
+        jest.advanceTimersByTime(10 * 60_000);
+        fixture.componentInstance.gererActivitePointeur();
+        jest.advanceTimersByTime(10 * 60_000);
+
+        expect(invokeSimule).not.toHaveBeenCalledWith('verrouiller_session', {});
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('sauvegarde manuelle (RG-001 à RG-003)', () => {
+    it('sauvegarde le fichier après confirmation du mot de passe et referme le panneau', async () => {
+      invokeSimule.mockResolvedValue(undefined);
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      element
+        .querySelector<HTMLButtonElement>('button[aria-label="Sauvegarder"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+      expect(element.querySelector('app-confirmation-mot-de-passe')).not.toBeNull();
+
+      await fixture.componentInstance.confirmerSauvegarde('mot-de-passe');
+      fixture.detectChanges();
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'sauvegarder_fichier',
+        expect.objectContaining({ chemin: '/tmp/donnees-test.sqm', motDePasse: 'mot-de-passe' }),
+      );
+      expect(element.querySelector('app-confirmation-mot-de-passe')).toBeNull();
+    });
+
+    it('affiche un message d’erreur bref si la sauvegarde échoue', async () => {
+      invokeSimule.mockRejectedValue({ type: 'fichierVerrouille' });
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      element
+        .querySelector<HTMLButtonElement>('button[aria-label="Sauvegarder"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+
+      await fixture.componentInstance.confirmerSauvegarde('mot-de-passe');
+      fixture.detectChanges();
+
+      expect(element.textContent).toContain('La sauvegarde a échoué. Réessayez.');
+    });
   });
 });

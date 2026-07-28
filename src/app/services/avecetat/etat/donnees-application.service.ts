@@ -37,7 +37,9 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FacadeAdministrationService } from '../../sansetat/commandes/facade-administration.service';
 import { FacadeAlertesService } from '../../sansetat/commandes/facade-alertes.service';
+import { FacadeFichierService } from '../../sansetat/commandes/facade-fichier.service';
 import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
+import { FacadeVuesService } from '../../sansetat/commandes/facade-vues.service';
 import type { Instance } from '../../sansetat/commandes/types-facade';
 import { EtatSessionService } from './etat-session.service';
 import type {
@@ -51,6 +53,7 @@ import type {
   Projet,
   ReponseQualificationMembre,
   ResultatBrouillonProjet,
+  ResultatDeverrouillage,
   ResultatMutationAdministration,
   ResultatPrevisualisationPurge,
   ResultatQualificationMembre,
@@ -158,7 +161,10 @@ export class DonneesApplicationService {
     FacadeAdministrationService,
   );
   private readonly facadeAlertes: FacadeAlertesService = inject(FacadeAlertesService);
+  private readonly facadeFichier: FacadeFichierService = inject(FacadeFichierService);
   private readonly facadeParametrage: FacadeParametrageService = inject(FacadeParametrageService);
+
+  private readonly facadeVues: FacadeVuesService = inject(FacadeVuesService);
   private readonly racineInterne: WritableSignal<DonneesRacine | null> = signal(null);
 
   /**
@@ -187,6 +193,121 @@ export class DonneesApplicationService {
    */
   public reinitialiser(): void {
     this.racineInterne.set(null);
+  }
+
+  /**
+   * Crée un nouveau fichier de données chiffré, vide (US-001, RG-001, RG-002) : invoque la commande native
+   * `creerFichier`, charge la racine initiale renvoyée et marque le fichier ouvert auprès de `EtatSessionService`.
+   * @param chemin - Chemin choisi par l'utilisateur via la boîte de dialogue native de l'OS.
+   * @param motDePasse - Mot de passe saisi et confirmé du futur fichier.
+   * @returns Le Résultat typé de l'opération.
+   */
+  public async creerFichier(
+    chemin: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    try {
+      const racine = await this.facadeFichier.creerFichier<DonneesRacine>(chemin, motDePasse);
+      this.chargerRacine(racine);
+      this.etatSession.ouvrirFichier(chemin);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Charge un fichier de données existant (US-002, RG-002) : invoque la commande native `chargerFichier`, charge
+   * la racine renvoyée (migrée si nécessaire côté cœur natif) et marque le fichier ouvert auprès de
+   * `EtatSessionService`.
+   * @param chemin - Chemin du fichier choisi via la boîte de dialogue native de l'OS.
+   * @param motDePasse - Mot de passe saisi par l'utilisateur.
+   * @returns Le Résultat typé de l'opération.
+   */
+  public async chargerFichier(
+    chemin: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    try {
+      const racine = await this.facadeFichier.chargerFichier<DonneesRacine>(chemin, motDePasse);
+      this.chargerRacine(racine);
+      this.etatSession.ouvrirFichier(chemin);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Sauvegarde le fichier actuellement ouvert (RG-001 à RG-003) : invoque la commande native `sauvegarderFichier`
+   * avec la racine courante, horodatée localement (`meta.modifieLe`) puisque le cœur natif écrit `donnees` telle
+   * quelle sans l'horodater lui-même (cf. `src-tauri/src/persistance/moteur.rs`, `ecrire_fichier_chiffre`).
+   * @param motDePasse - Mot de passe ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async sauvegarderFichier(motDePasse: string): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    const racineHorodatee: DonneesRacine = {
+      ...racine,
+      meta: { ...racine.meta, modifieLe: new Date().toISOString() },
+    };
+    try {
+      await this.facadeFichier.sauvegarderFichier(chemin, racineHorodatee, motDePasse);
+      this.racineInterne.set(racineHorodatee);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Verrouille la session courante (US-026, RG-004, RG-005) : invoque la commande native `verrouillerSession`, qui
+   * efface la clé dérivée détenue côté cœur natif, puis purge en miroir les données sensibles détenues côté
+   * interface (`EtatSessionService.verrouiller`). La racine des données reste en mémoire (seule sa consultation est
+   * masquée par l'écran de Verrouillage), pour permettre un déverrouillage immédiat sans recharger le fichier.
+   * @returns Le Résultat typé de l'opération.
+   */
+  public async verrouillerSession(): Promise<ResultatMutationAdministration> {
+    try {
+      await this.facadeFichier.verrouillerSession();
+      this.etatSession.verrouiller();
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Déverrouille la session courante (US-026) : invoque la commande native `deverrouillerSession`, qui revérifie
+   * le mot de passe par nouvelle dérivation de clé. En cas de mot de passe incorrect, enregistre l'échec auprès de
+   * `EtatSessionService.enregistrerEchecDeverrouillage`, qui ferme complètement le fichier dès que le nombre
+   * paramétré d'échecs consécutifs (`parametres.verrouillage.echecsAvantFermeture`) est atteint ; ce Store oublie
+   * alors également la racine en mémoire (`reinitialiser`), le cœur natif ne le faisant pas lui-même.
+   * @param motDePasse - Mot de passe ressaisi par l'utilisateur.
+   * @returns Le Résultat typé de l'opération, dont la branche d'échec précise si le fichier a été fermé.
+   * @throws {Error} Si aucun fichier n'est chargé (aucune session à déverrouiller).
+   */
+  public async deverrouillerSession(motDePasse: string): Promise<ResultatDeverrouillage> {
+    const racine = this.racineActuelle();
+    try {
+      await this.facadeFichier.deverrouillerSession(motDePasse);
+      this.etatSession.marquerDeverrouille();
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      const anomalie = this.anomalieAdministration(erreur);
+      if (anomalie.type !== 'motDePasseOuFichierInvalide') {
+        return { type: 'echec', anomalie, fichierFerme: false };
+      }
+      const fichierFerme = this.etatSession.enregistrerEchecDeverrouillage(
+        racine.parametres.verrouillage.echecsAvantFermeture,
+      );
+      if (fichierFerme) {
+        this.reinitialiser();
+      }
+      return { type: 'echec', anomalie, fichierFerme };
+    }
   }
 
   /**
@@ -782,6 +903,81 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Ajoute ou met à jour une vue enregistrée (US-028, RG-027) : invoque la commande native `definirVue`, qui
+   * mute la vue désignée (ou en crée une nouvelle si `id` est `undefined`) et sauvegarde effectivement le fichier
+   * (RG-002) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store. Si `parDefaut` vaut
+   * `true`, toute autre vue déjà par défaut du même écran est désélectionnée par le cœur natif (au plus une vue
+   * par défaut par écran).
+   * @param id - Identifiant de la vue à mettre à jour, `undefined` pour une création.
+   * @param nom - Nom donné par l'utilisateur à la vue.
+   * @param ecran - Identifiant stable de l'écran auquel s'applique la vue.
+   * @param versionFiltres - Version du schéma de filtres, propre à l'écran concerné.
+   * @param parDefaut - Indique si cette vue doit devenir la vue par défaut de son écran.
+   * @param filtres - Filtres, structure propre à l'écran concerné.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirVue(
+    id: string | undefined,
+    nom: string,
+    ecran: string,
+    versionFiltres: number,
+    parDefaut: boolean,
+    filtres: unknown,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeVues.definirVue<DonneesRacine, DonneesRacine>({
+        chemin,
+        donnees: racine,
+        id,
+        nom,
+        ecran,
+        versionFiltres,
+        parDefaut,
+        filtres,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Supprime une vue enregistrée par identifiant (US-028) : invoque la commande native `supprimerVue`, qui retire
+   * la vue et sauvegarde effectivement le fichier (RG-002) avant de renvoyer la racine mise à jour, substituée à
+   * l'état courant de ce Store.
+   * @param id - Identifiant de la vue à supprimer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerVue(
+    id: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeVues.supprimerVue<DonneesRacine, DonneesRacine>({
+        chemin,
+        donnees: racine,
+        id,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Supprime une règle de membre connu d'un groupe (US-023) : invoque la commande native `supprimerMembreConnu`,
    * qui retire la règle, consigne la suppression au journal et sauvegarde effectivement le fichier (RG-002,
    * RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
@@ -956,6 +1152,8 @@ export class DonneesApplicationService {
       'typeReferentielInconnu',
       'entreeReferentielInvalide',
       'motifNommageBranchesInvalide',
+      'modePurgeAgeInconnu',
+      'vueIntrouvable',
       'fichierIntrouvable',
       'motDePasseOuFichierInvalide',
       'formatNonReconnu',

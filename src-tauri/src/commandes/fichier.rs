@@ -78,6 +78,9 @@ pub(crate) enum ErreurFacade {
     /// Le mode de purge par âge désigné n'est ni `"suppression"` ni `"agregationMensuelle"` (Phase 7, incrément 4,
     /// `previsualiserPurgeAge`/`executerPurgeAge`, RG-025).
     ModePurgeAgeInconnu,
+    /// La vue enregistrée désignée par son identifiant n'existe pas (Phase 9, incrément 1, `definirVue`/
+    /// `supprimerVue`).
+    VueIntrouvable,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
 }
@@ -121,6 +124,15 @@ impl From<crate::persistance::purge::ErreurPurge> for ErreurFacade {
         use crate::persistance::purge::ErreurPurge;
         match erreur {
             ErreurPurge::ModePurgeAgeInconnu => Self::ModePurgeAgeInconnu,
+        }
+    }
+}
+
+impl From<crate::persistance::vues::ErreurVues> for ErreurFacade {
+    fn from(erreur: crate::persistance::vues::ErreurVues) -> Self {
+        use crate::persistance::vues::ErreurVues;
+        match erreur {
+            ErreurVues::VueIntrouvable => Self::VueIntrouvable,
         }
     }
 }

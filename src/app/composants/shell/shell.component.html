@@ -1,4 +1,9 @@
-<div class="shell" tabindex="-1" (document:keydown)="gererRaccourciClavier($event)">
+<div
+  class="shell"
+  tabindex="-1"
+  (document:keydown)="gererRaccourciClavier($event)"
+  (document:mousedown)="gererActivitePointeur()"
+>
   <nav class="shell__sidebar" aria-label="Navigation principale">
     <div class="shell__marque">
       <span class="shell__logo" aria-hidden="true">Q</span>
@@ -99,9 +104,17 @@
         </button>
         <button
           type="button"
-          disabled
-          title="Verrouillage manuel (à venir)"
+          title="Sauvegarder"
+          aria-label="Sauvegarder"
+          (click)="ouvrirSauvegarde()"
+        >
+          💾
+        </button>
+        <button
+          type="button"
+          title="Verrouillage manuel"
           aria-label="Verrouillage manuel"
+          (click)="verrouillerManuellement()"
         >
           🔒
         </button>
@@ -115,5 +128,20 @@
 
   @if (rechercheOuverte()) {
     <app-recherche-transversale (fermee)="fermerRecherche()" />
+  }
+
+  @if (sauvegardeOuverte()) {
+    <app-confirmation-mot-de-passe
+      message="Ressaisissez le mot de passe du fichier pour confirmer la sauvegarde."
+      (confirmee)="confirmerSauvegarde($event)"
+      (annulee)="annulerSauvegarde()"
+    />
+  }
+  @if (messageErreurSauvegarde) {
+    <p class="shell__erreur-sauvegarde" role="alert">{{ messageErreurSauvegarde }}</p>
+  }
+
+  @if (verrouillageActif()) {
+    <app-verrouillage />
   }
 </div>

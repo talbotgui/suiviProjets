@@ -15,8 +15,9 @@
 //! US-033, RG-022, RG-023, RG-030). Périmètre de la Phase 7, incrément 4 : prévisualisation et exécution d'une
 //! purge d'audits anciens par densité ou par âge (`previsualiserPurgeDensite`, `executerPurgeDensite`,
 //! `previsualiserPurgeAge`, `executerPurgeAge`, US-025, RG-024, RG-025). Périmètre de la Phase 8 : création d'une
-//! annotation et qualification d'une alerte (`creerAnnotation`, `qualifierAlerte`, US-019, US-020, RG-026). La
-//! Façade n'est jamais testée isolément : chaque commande délègue au module qu'elle route
+//! annotation et qualification d'une alerte (`creerAnnotation`, `qualifierAlerte`, US-019, US-020, RG-026).
+//! Périmètre de la Phase 9, incrément 1 : ajout/mise à jour et suppression d'une vue enregistrée (`definirVue`,
+//! `supprimerVue`, US-028, RG-027). La Façade n'est jamais testée isolément : chaque commande délègue au module qu'elle route
 //! (Moteur de persistance, Connecteur GitLab/Sonar), déjà couvert par ses propres tests unitaires (cf.
 //! `docs/02_documentation/16_normesTests.md#tests-unitaires`).
 
@@ -28,3 +29,4 @@ pub(crate) mod etat_session;
 pub(crate) mod fichier;
 pub(crate) mod parametrage;
 pub(crate) mod purge;
+pub(crate) mod vues;

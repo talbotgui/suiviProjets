@@ -21,8 +21,12 @@
 // `invoke` lui-même : ce service en est désormais la seule frontière pour ces trois commandes (correction de
 // revue, cf. rapport de développement de cette phase — la première version de ce Store invoquait `invoke`
 // directement, rompant la frontière unique documentée en en-tête de `FacadeCommandesService`).
+//
+// Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis le 2026-07-28 : point de
+// passage unique permettant le bouchon TS des six commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
+// `invocation-commande.utils.ts` et `bouchon/bouchon-administration.utils.ts`.
 import { Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
+import { InvocationCommandeUtils } from './invocation-commande.utils';
 
 /**
  * Paramètres transmis à la commande native `qualifierMembre` (US-022, US-023), génériques sur le type concret de
@@ -152,7 +156,7 @@ export class FacadeAdministrationService {
   public async qualifierMembre<TDonnees, TReponse>(
     parametres: ParametresQualificationMembre<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('qualifier_membre', { ...parametres });
+    return InvocationCommandeUtils.invoquer<TReponse>('qualifier_membre', { ...parametres });
   }
 
   /**
@@ -164,7 +168,7 @@ export class FacadeAdministrationService {
   public async definirPolitiqueIA<TDonnees, TReponse>(
     parametres: ParametresDefinitionPolitiqueIA<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('definir_politique_ia', { ...parametres });
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_politique_ia', { ...parametres });
   }
 
   /**
@@ -176,7 +180,7 @@ export class FacadeAdministrationService {
   public async supprimerMembreConnu<TDonnees, TReponse>(
     parametres: ParametresSuppressionMembreConnu<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('supprimer_membre_connu', { ...parametres });
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_membre_connu', { ...parametres });
   }
 
   /**
@@ -188,7 +192,7 @@ export class FacadeAdministrationService {
   public async enregistrerBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet, TReponse>(
     parametres: ParametresEnregistrementBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('enregistrer_brouillon', { ...parametres });
+    return InvocationCommandeUtils.invoquer<TReponse>('enregistrer_brouillon', { ...parametres });
   }
 
   /**
@@ -200,7 +204,7 @@ export class FacadeAdministrationService {
   public async integrerBrouillon<TDonnees, TReponse>(
     parametres: Omit<ParametresResolutionBrouillon<TDonnees>, 'motif'>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('integrer_brouillon', { ...parametres });
+    return InvocationCommandeUtils.invoquer<TReponse>('integrer_brouillon', { ...parametres });
   }
 
   /**
@@ -212,6 +216,6 @@ export class FacadeAdministrationService {
   public async rejeterBrouillon<TDonnees, TReponse>(
     parametres: ParametresResolutionBrouillon<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('rejeter_brouillon', { ...parametres });
+    return InvocationCommandeUtils.invoquer<TReponse>('rejeter_brouillon', { ...parametres });
   }
 }

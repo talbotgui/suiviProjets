@@ -3,7 +3,7 @@
 // via le mock de `invoke`, sur le modèle de `tableau-de-bord.component.spec.ts`.
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
@@ -11,9 +11,12 @@ import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmBrouillonComponent } from './brouillon.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-commandes.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction
@@ -94,7 +97,7 @@ class DonneesDeTest {
           },
           materialiteBrouillon: { variationRelative: 0.1 },
         },
-        verrouillage: {},
+        verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
         audit: {},
         proxy: {},
         sauvegarde: {},
@@ -154,6 +157,7 @@ describe('SqmBrouillonComponent', () => {
 
   beforeEach(async () => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     routerMock = { navigateByUrl: jest.fn().mockResolvedValue(true) };
     await TestBed.configureTestingModule({
       imports: [SqmBrouillonComponent],

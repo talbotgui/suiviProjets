@@ -20,7 +20,11 @@
           [style.width.%]="pourcentage()"
         ></div>
       </div>
-      <button type="button" (click)="annuler()">Annuler la campagne</button>
+      @if (campagneEnCours()) {
+        <button type="button" (click)="annuler()">Annuler la campagne</button>
+      } @else {
+        <p class="tableau-de-bord__termine">Campagne terminée.</p>
+      }
     </header>
 
     <table class="tableau-de-bord__tableau">
