@@ -10,13 +10,9 @@
 // Décisions arbitraires (à valider par un humain, cf. rapport de développement de cet incrément) :
 // - La sidebar reprend l'ordre exact des sept entrées énuméré par `08_arborescenceNavigation.md#règles-de-
 //   navigation` (Accueil, Synthèse des audits, Synthèse graphique, Liste de travail, Audits, Administration,
-//   Paramétrage). Seules les entrées dont l'écran existe déjà (Accueil, Synthèse des audits depuis la Phase 6
-//   incrément 4, Synthèse graphique depuis la Phase 6 incrément 7, Audits, Administration, Paramétrage depuis la
-//   Phase 7 incrément 2) portent une navigation active ; l'entrée restante, dont l'écran n'est pas encore
-//   construit (Liste de travail, Phase 8), est rendue non interactive (`aria-disabled`, sur le modèle de la
-//   section « À VENIR » de la maquette de référence) plutôt que de pointer vers une route inexistante : ce choix
-//   respecte le critère de sortie de chaque incrément (« navigation shell fonctionnelle entre tous les écrans
-//   EXISTANTS »).
+//   Paramétrage). Toutes les entrées portent désormais une navigation active depuis la Phase 8 (`SqmListeTravailComponent`,
+//   US-020) : jusqu'à cette phase, l'entrée « Liste de travail » était rendue non interactive (`aria-disabled`, sur
+//   le modèle de la section « À VENIR » de la maquette de référence), son écran n'existant pas encore.
 // - L'entrée « Audits » applique la règle de routage intelligent documentée par `08_arborescenceNavigation.md`
 //   (« ouvre par défaut Constitution de campagne ; ouvre le Tableau de bord d'exécution si une campagne est en
 //   cours ; ouvre l'écran de Brouillon si un brouillon reste à traiter ») : sa cible n'étant pas statique, elle est

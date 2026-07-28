@@ -24,7 +24,9 @@
 //! `reglesMarqueursIA` transmis en paramètre. Incrément de rattrapage de la Phase 5 (précédant la Phase 6) : s'y
 //! ajoutent `interrogerBranchesCompletes` et `interrogerDependances` (US-009), les deux dernières opérations du
 //! catalogue figé des résultats d'audit restées différées ; à cette occasion, `Branche` perd ses champs
-//! `rebasee`/`nommageConforme` (cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`).
+//! `rebasee`/`nommageConforme` (cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`). Phase 8 (US-019,
+//! US-020 ; RG-026) : s'y ajoutent `creerAnnotation` et `qualifierAlerte`, qui mutent et sauvegardent elles-mêmes le
+//! fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`.
 
 mod commandes;
 mod connecteurs;
@@ -79,6 +81,8 @@ pub fn run() {
             commandes::purge::executer_purge_densite,
             commandes::purge::previsualiser_purge_age,
             commandes::purge::executer_purge_age,
+            commandes::alertes::creer_annotation,
+            commandes::alertes::qualifier_alerte,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -7,6 +7,7 @@ import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import {
   StatutMembre,
   TypeCritereMembre,
@@ -489,5 +490,63 @@ describe('SqmFicheProjetComponent', () => {
     expect(toPng).toHaveBeenCalled();
     expect(clicSpy).toHaveBeenCalled();
     clicSpy.mockRestore();
+  });
+
+  it("refuse la demande de création d'annotation quand le libellé est vide (US-019)", () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const composant = fixture.componentInstance;
+
+    composant.ouvrirCreationAnnotation();
+    composant.libelleAnnotation = '';
+    composant.demanderCreationAnnotation();
+
+    expect(composant.messageErreurAnnotation).not.toBeNull();
+    expect(composant.attenteMotDePasseAnnotation()).toBe(false);
+  });
+
+  it('crée une annotation de portée projet après confirmation du mot de passe (US-019)', async () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const racine = DonneesDeTest.racine(projet);
+    const fixture = creerFixture('projet-1', racine);
+    TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    jest.mocked(invoke).mockResolvedValue(racine);
+    const composant = fixture.componentInstance;
+
+    composant.ouvrirCreationAnnotation();
+    composant.libelleAnnotation = 'Migration majeure';
+    composant.categorieAnnotation = 'technique';
+    composant.demanderCreationAnnotation();
+    expect(composant.attenteMotDePasseAnnotation()).toBe(true);
+
+    await composant.confirmerCreationAnnotation('mot-de-passe');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'creer_annotation',
+      expect.objectContaining({
+        groupeId: 'groupe-1',
+        projetId: 'projet-1',
+        libelle: 'Migration majeure',
+        categorie: 'technique',
+        motDePasse: 'mot-de-passe',
+      }),
+    );
+    expect(composant.formulaireAnnotationVisible()).toBe(false);
+  });
+
+  it("affiche un message d'erreur lorsque la création d'annotation échoue", async () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    jest.mocked(invoke).mockRejectedValue({ type: 'fichierVerrouille' });
+    const composant = fixture.componentInstance;
+
+    composant.ouvrirCreationAnnotation();
+    composant.libelleAnnotation = 'Migration majeure';
+    composant.demanderCreationAnnotation();
+    await composant.confirmerCreationAnnotation('mot-de-passe');
+
+    expect(composant.messageErreurAnnotation).not.toBeNull();
+    expect(composant.formulaireAnnotationVisible()).toBe(true);
   });
 });

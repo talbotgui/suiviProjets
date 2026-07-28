@@ -14,10 +14,13 @@
 //! (US-014 ; RG-019) : cycle de vie du brouillon d'une campagne (`audit`). Périmètre de la Phase 7, incrément 1
 //! (US-033 ; RG-022, RG-023, RG-030) : modification d'un seuil de couleur et ajout/modification/remplacement d'un
 //! référentiel (`parametrage`). Périmètre de la Phase 7, incrément 4 (US-025 ; RG-024, RG-025) : purge des audits
-//! anciens par densité ou par âge, avec prévisualisation systématique (`purge`). Ces modules opèrent tous en
-//! mémoire sur une [`crate::modele::racine::DonneesRacine`] déjà chargée, sans toucher elles-mêmes le disque.
+//! anciens par densité ou par âge, avec prévisualisation systématique (`purge`). Périmètre de la Phase 8
+//! (US-019, US-020 ; RG-026) : création d'une annotation de portée groupe ou projet et qualification d'une alerte
+//! (statut vu/traité, `alertes`). Ces modules opèrent tous en mémoire sur une
+//! [`crate::modele::racine::DonneesRacine`] déjà chargée, sans toucher elles-mêmes le disque.
 
 pub(crate) mod administration;
+pub(crate) mod alertes;
 pub(crate) mod audit;
 pub(crate) mod enveloppe;
 pub(crate) mod erreurs;

@@ -12,11 +12,13 @@
 //
 // Route `fiche-projet/:projetId` (`app.routes.ts`), paramètre lié directement à l'`input()` {@link projetId} via
 // `withComponentInputBinding()` (`app.config.ts`).
-import { Component, ElementRef, computed, inject, input, viewChild } from '@angular/core';
-import type { InputSignal, Signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, input, signal, viewChild } from '@angular/core';
+import type { InputSignal, Signal, WritableSignal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBadgeComponent } from '../../composants/badge/badge.component';
+import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
 import { RapportAnomaliesUtils } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { AnomalieResolue } from '../../services/avecetat/campagne/rapport-anomalies.utils';
@@ -227,7 +229,7 @@ interface DonneesFicheProjet {
   readonly membres: readonly LigneMembre[];
   /** Marqueurs d'outils IA détectés dans l'arborescence par le dernier audit intégré. */
   readonly marqueursIa: readonly Marqueur[];
-  /** Annotations du projet (US-024), triées de la plus récente à la plus ancienne. */
+  /** Annotations du projet (US-019, Phase 8), triées de la plus récente à la plus ancienne. */
   readonly annotations: readonly Annotation[];
   /**
    * Entrées du journal des modifications (RG-023) concernant spécifiquement ce projet (`objet` préfixé par
@@ -268,7 +270,13 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
  */
 @Component({
   selector: 'app-fiche-projet',
-  imports: [RouterLink, SqmBadgeComponent, SqmExplicationJugementComponent],
+  imports: [
+    RouterLink,
+    FormsModule,
+    SqmBadgeComponent,
+    SqmExplicationJugementComponent,
+    SqmConfirmationMotDePasseComponent,
+  ],
   templateUrl: './fiche-projet.component.html',
   styleUrl: './fiche-projet.component.scss',
 })
@@ -291,6 +299,119 @@ export class SqmFicheProjetComponent {
    * État complet de l'écran, recalculé à chaque changement de {@link projetId} ou de la racine courante.
    */
   public readonly etat: Signal<EtatFicheProjet> = computed(() => this.calculerEtat());
+
+  /**
+   * Indique si le formulaire de création d'une annotation (US-019, portée projet) est actuellement affiché.
+   */
+  public readonly formulaireAnnotationVisible: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Date saisie dans le formulaire de création d'annotation, initialisée à la date du jour à l'ouverture.
+   */
+  public dateAnnotation = '';
+
+  /**
+   * Libellé saisi dans le formulaire de création d'annotation.
+   */
+  public libelleAnnotation = '';
+
+  /**
+   * Catégorie saisie dans le formulaire de création d'annotation.
+   */
+  public categorieAnnotation = '';
+
+  /**
+   * Description optionnelle saisie dans le formulaire de création d'annotation.
+   */
+  public descriptionAnnotation = '';
+
+  /**
+   * Indique si la ressaisie du mot de passe (RG-002) est en cours d'affichage pour la création d'annotation.
+   */
+  public readonly attenteMotDePasseAnnotation: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Message d'erreur de la dernière création d'annotation tentée, `null` si aucune erreur en cours.
+   */
+  public messageErreurAnnotation: string | null = null;
+
+  /**
+   * Indique qu'une création d'annotation est en cours, pour désactiver les actions concurrentes.
+   */
+  public enCoursAnnotation = false;
+
+  /**
+   * Ouvre le formulaire de création d'une annotation de portée projet (US-019), date du jour pré-remplie.
+   */
+  public ouvrirCreationAnnotation(): void {
+    this.dateAnnotation = new Date().toISOString().slice(0, 10);
+    this.libelleAnnotation = '';
+    this.categorieAnnotation = '';
+    this.descriptionAnnotation = '';
+    this.messageErreurAnnotation = null;
+    this.formulaireAnnotationVisible.set(true);
+  }
+
+  /**
+   * Referme le formulaire de création d'annotation sans enregistrer.
+   */
+  public fermerCreationAnnotation(): void {
+    this.formulaireAnnotationVisible.set(false);
+  }
+
+  /**
+   * Valide le formulaire puis, si valide, ouvre la ressaisie du mot de passe avant la création effective (RG-002).
+   */
+  public demanderCreationAnnotation(): void {
+    if (this.libelleAnnotation.trim().length === 0 || this.dateAnnotation.trim().length === 0) {
+      this.messageErreurAnnotation = 'La date et le libellé sont obligatoires.';
+      return;
+    }
+    this.messageErreurAnnotation = null;
+    this.attenteMotDePasseAnnotation.set(true);
+  }
+
+  /**
+   * Crée l'annotation après confirmation du mot de passe (US-019, RG-002).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerCreationAnnotation(motDePasse: string): Promise<void> {
+    const etatCourant = this.etat();
+    this.attenteMotDePasseAnnotation.set(false);
+    if (etatCourant.type !== 'trouve') {
+      return;
+    }
+
+    this.enCoursAnnotation = true;
+    const resultat = await this.donneesApplication.creerAnnotation(
+      etatCourant.donnees.groupeId,
+      etatCourant.donnees.projetId,
+      {
+        date: this.dateAnnotation.trim(),
+        libelle: this.libelleAnnotation.trim(),
+        categorie: this.categorieAnnotation.trim(),
+        description:
+          this.descriptionAnnotation.trim().length > 0
+            ? this.descriptionAnnotation.trim()
+            : undefined,
+      },
+      motDePasse,
+    );
+    this.enCoursAnnotation = false;
+
+    if (resultat.type === 'echec') {
+      this.messageErreurAnnotation = 'Une erreur inattendue est survenue lors de la création.';
+      return;
+    }
+    this.formulaireAnnotationVisible.set(false);
+  }
+
+  /**
+   * Annule la ressaisie du mot de passe en cours pour la création d'annotation.
+   */
+  public annulerMotDePasseAnnotation(): void {
+    this.attenteMotDePasseAnnotation.set(false);
+  }
 
   /**
    * Exporte la fiche courante (bandeau/encart d'anomalie technique inclus, même conteneur que le reste de l'écran)

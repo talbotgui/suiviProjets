@@ -1,0 +1,88 @@
+<section class="liste-travail">
+  <div class="liste-travail__filtres">
+    <select
+      #selectGroupe
+      class="liste-travail__select"
+      aria-label="Filtrer par groupe"
+      (change)="onChangerGroupe(selectGroupe.value)"
+    >
+      <option value="">Tous les groupes</option>
+      @for (groupe of groupesDisponibles(); track groupe.id) {
+        <option [value]="groupe.id">{{ groupe.nom }}</option>
+      }
+    </select>
+
+    <input
+      #champRecherche
+      type="text"
+      class="liste-travail__recherche"
+      placeholder="Rechercher un projet ou une alerte…"
+      aria-label="Rechercher une alerte"
+      [value]="texteRecherche()"
+      (input)="onChangerRecherche(champRecherche.value)"
+    />
+
+    <span class="liste-travail__compteur">
+      {{ alertesFiltrees().length }} alerte{{ alertesFiltrees().length > 1 ? 's' : '' }}
+    </span>
+  </div>
+
+  @if (aucuneAlerte()) {
+    <p class="liste-travail__vide">Aucune alerte active : tout est traité.</p>
+  } @else {
+    <app-tableau-dense
+      [colonnes]="colonnes()"
+      [lignes]="alertesFiltrees()"
+      [identifiant]="identifiantLigne"
+      (activerLigne)="activerLigne($event)"
+    />
+  }
+
+  @if (alerteSelectionnee(); as alerte) {
+    <section class="liste-travail__panneau" aria-label="Traitement de l'alerte sélectionnée">
+      <header class="liste-travail__panneau-entete">
+        <h2>{{ alerte.libelle }}</h2>
+        <button type="button" (click)="fermerPanneau()">Fermer</button>
+      </header>
+
+      <p>{{ alerte.nomProjet }} ({{ alerte.nomGroupe }}) — {{ libelleStatut(alerte) }}</p>
+
+      <label class="liste-travail__commentaire">
+        Commentaire
+        <textarea [(ngModel)]="commentaire" rows="2"></textarea>
+      </label>
+
+      @if (messageErreur) {
+        <p class="liste-travail__erreur" role="alert">{{ messageErreur }}</p>
+      }
+
+      <div class="liste-travail__panneau-actions">
+        <button type="button" [disabled]="enCours" (click)="ouvrirFicheProjet()">
+          Ouvrir la fiche projet
+        </button>
+        <button type="button" [disabled]="enCours" (click)="demanderMarquerVu()">
+          Marquer vue
+        </button>
+        <button type="button" [disabled]="enCours" (click)="demanderTraiter()">
+          Marquer traitée
+        </button>
+      </div>
+
+      @if (actionEnAttenteMotDePasse === 'vu') {
+        <app-confirmation-mot-de-passe
+          message="Ressaisissez le mot de passe du fichier pour marquer cette alerte comme vue."
+          (confirmee)="confirmerQualification($event)"
+          (annulee)="annulerMotDePasse()"
+        />
+      }
+
+      @if (actionEnAttenteMotDePasse === 'traitement') {
+        <app-confirmation-mot-de-passe
+          message="Ressaisissez le mot de passe du fichier pour marquer cette alerte comme traitée."
+          (confirmee)="confirmerQualification($event)"
+          (annulee)="annulerMotDePasse()"
+        />
+      }
+    </section>
+  }
+</section>

@@ -36,6 +36,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FacadeAdministrationService } from '../../sansetat/commandes/facade-administration.service';
+import { FacadeAlertesService } from '../../sansetat/commandes/facade-alertes.service';
 import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
 import type { Instance } from '../../sansetat/commandes/types-facade';
 import { EtatSessionService } from './etat-session.service';
@@ -55,6 +56,7 @@ import type {
   ResultatQualificationMembre,
   Source,
   StatutMembre,
+  StatutTraitementAlerte,
   TypeCritereMembre,
   Verdict,
 } from './types-donnees';
@@ -127,12 +129,27 @@ export interface DonneesMembreConnu {
 }
 
 /**
+ * Données saisies pour créer une annotation de portée groupe ou projet (US-019).
+ */
+export interface DonneesAnnotation {
+  /** Date de l'événement annoté. */
+  readonly date: string;
+  /** Libellé court de l'événement. */
+  readonly libelle: string;
+  /** Catégorie de l'événement. */
+  readonly categorie: string;
+  /** Description longue optionnelle. */
+  readonly description?: string;
+}
+
+/**
  * Store d'état applicatif des données du fichier actuellement chargé (Phase 3, Phase 4) : expose la racine
  * courante en lecture seule et l'ensemble des mutations CRUD sur les groupes, projets et sources (US-006, US-007,
  * US-008). Ces mutations n'écrivent pas sur disque : la sauvegarde explicite (`sauvegarderFichier`, RG-002) reste
  * une action distincte, déclenchée par l'écran appelant. `qualifierMembre` et `definirPolitiqueIA` (US-022 à
- * US-024) dérogent à cette règle : elles délèguent à `FacadeAdministrationService` les commandes natives de même
- * nom, qui mutent puis sauvegardent elles-mêmes le fichier (cf. commentaire d'en-tête de ce fichier).
+ * US-024), ainsi que `creerAnnotation` et `qualifierAlerte` (US-019, US-020, Phase 8), dérogent à cette règle :
+ * elles délèguent à `FacadeAdministrationService`/`FacadeAlertesService` les commandes natives de même nom, qui
+ * mutent puis sauvegardent elles-mêmes le fichier (cf. commentaire d'en-tête de ce fichier).
  */
 @Injectable({ providedIn: 'root' })
 export class DonneesApplicationService {
@@ -140,6 +157,7 @@ export class DonneesApplicationService {
   private readonly facadeAdministration: FacadeAdministrationService = inject(
     FacadeAdministrationService,
   );
+  private readonly facadeAlertes: FacadeAlertesService = inject(FacadeAlertesService);
   private readonly facadeParametrage: FacadeParametrageService = inject(FacadeParametrageService);
   private readonly racineInterne: WritableSignal<DonneesRacine | null> = signal(null);
 
@@ -677,6 +695,85 @@ export class DonneesApplicationService {
         DonneesRacine,
         DonneesRacine
       >({ chemin, donnees: racine, mode, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Crée une annotation de portée groupe ou projet (US-019) : invoque la commande native `creerAnnotation`, qui
+   * ajoute l'annotation, consigne la création au journal et sauvegarde effectivement le fichier (RG-002, RG-023)
+   * avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param projetId - Identifiant du projet de rattachement, `undefined` pour une annotation de portée groupe.
+   * @param donnees - Date, libellé, catégorie et description de l'annotation à créer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async creerAnnotation(
+    groupeId: string,
+    projetId: string | undefined,
+    donnees: DonneesAnnotation,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAlertes.creerAnnotation<DonneesRacine, DonneesRacine>(
+        {
+          chemin,
+          donnees: racine,
+          groupeId,
+          projetId,
+          date: donnees.date,
+          libelle: donnees.libelle,
+          categorie: donnees.categorie,
+          description: donnees.description,
+          motDePasse,
+        },
+      );
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Qualifie une alerte (statut vu/traité, commentaire optionnel, RG-026) : invoque la commande native
+   * `qualifierAlerte`, qui ajoute une nouvelle entrée à l'historique `traitementsAlertes` et sauvegarde
+   * effectivement le fichier (RG-002) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce
+   * Store. Ajoute toujours une nouvelle entrée plutôt que de muter une entrée existante (cf. commentaire d'en-tête
+   * de `persistance::alertes::qualifier_alerte` côté cœur natif).
+   * @param cleAlerte - Clé stable de l'alerte qualifiée (RG-026).
+   * @param statut - Nouveau statut de traitement.
+   * @param commentaire - Commentaire libre optionnel.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async qualifierAlerte(
+    cleAlerte: string,
+    statut: StatutTraitementAlerte,
+    commentaire: string | undefined,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAlertes.qualifierAlerte<DonneesRacine, DonneesRacine>(
+        {
+          chemin,
+          donnees: racine,
+          cleAlerte,
+          statut,
+          commentaire,
+          motDePasse,
+        },
+      );
       this.racineInterne.set(nouvelleRacine);
       return { type: 'succes' };
     } catch (erreur: unknown) {

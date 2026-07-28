@@ -101,15 +101,18 @@ describe('SqmShellComponent', () => {
     expect(element.querySelector('router-outlet')).not.toBeNull();
   });
 
-  it('signale comme non interactives les entrées de sidebar dont l’écran n’existe pas encore', () => {
+  it('rend interactives les sept entrées de sidebar, toutes désormais construites (Phase 8)', () => {
     const fixture = TestBed.createComponent(SqmShellComponent);
     fixture.detectChanges();
     const element = DomTestUtils.obtenirElementNatif(fixture);
 
-    // Liste de travail (Synthèse des audits depuis la Phase 6 incrément 4, Synthèse graphique depuis la Phase 6
-    // incrément 7 et Paramétrage depuis la Phase 7 incrément 2 sont désormais interactives).
-    const entreesAVenir = element.querySelectorAll('[aria-disabled="true"]');
-    expect(entreesAVenir.length).toBe(1);
+    // Plus aucune entrée « à venir » depuis la Phase 8 (Liste de travail, dernière entrée restée non interactive).
+    expect(element.querySelectorAll('[aria-disabled="true"]').length).toBe(0);
+    const lienListeTravail = Array.from(element.querySelectorAll('a.shell__lien')).find(
+      (candidat) => candidat.textContent?.includes('Liste de travail'),
+    );
+    expect(lienListeTravail).not.toBeUndefined();
+    expect(lienListeTravail?.getAttribute('href')).toBe('/liste-travail');
   });
 
   it('navigue vers Synthèse des audits au clic sur l’entrée de sidebar correspondante', async () => {

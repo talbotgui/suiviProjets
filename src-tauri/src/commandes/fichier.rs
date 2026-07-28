@@ -44,9 +44,11 @@ pub(crate) enum ErreurFacade {
     /// interface, cf. `docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties` (« aucune
     /// confiance aveugle dans une donnée reçue via une commande »).
     CredentialInvalide,
-    /// Le groupe désigné n'existe pas dans les données courantes (Phase 4, `qualifierMembre`/`definirPolitiqueIA`).
+    /// Le groupe désigné n'existe pas dans les données courantes (Phase 4, `qualifierMembre`/`definirPolitiqueIA` ;
+    /// Phase 8, `creerAnnotation`).
     GroupeIntrouvable,
-    /// Le projet désigné n'existe pas dans les données courantes (Phase 4, `definirPolitiqueIA`).
+    /// Le projet désigné n'existe pas dans les données courantes (Phase 4, `definirPolitiqueIA` ; Phase 8,
+    /// `creerAnnotation`).
     ProjetIntrouvable,
     /// La règle de membre connu désignée par son identifiant n'existe pas dans le groupe (Phase 4,
     /// `qualifierMembre`).
@@ -88,6 +90,16 @@ impl From<crate::persistance::administration::ErreurAdministration> for ErreurFa
             ErreurAdministration::ProjetIntrouvable => Self::ProjetIntrouvable,
             ErreurAdministration::MembreIntrouvable => Self::MembreIntrouvable,
             ErreurAdministration::DoublonUsernameMembreConnu => Self::DoublonUsernameMembreConnu,
+        }
+    }
+}
+
+impl From<crate::persistance::alertes::ErreurAlertes> for ErreurFacade {
+    fn from(erreur: crate::persistance::alertes::ErreurAlertes) -> Self {
+        use crate::persistance::alertes::ErreurAlertes;
+        match erreur {
+            ErreurAlertes::GroupeIntrouvable => Self::GroupeIntrouvable,
+            ErreurAlertes::ProjetIntrouvable => Self::ProjetIntrouvable,
         }
     }
 }

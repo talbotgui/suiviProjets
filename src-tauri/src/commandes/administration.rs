@@ -48,10 +48,12 @@ pub(crate) struct ReponseQualificationMembre {
 /// arbitraire documentée dans le compte-rendu de développement de cette phase. `membreId` permet à l'écran
 /// d'Administration (US-023) de désigner sans ambiguïté la règle à modifier même si son critère change ;
 /// `libelle`/`aliasEmail` complètent le modèle `MembreConnu` ; `origine` distingue une saisie directe en
-/// administration (US-023, valeur `Administration` envoyée par l'écran) d'une future qualification déclenchée
-/// depuis une alerte (US-022, Phase 8, hors périmètre, qui enverrait `qualificationDepuisAlerte`) ; `chemin`/
-/// `donnees`/`motDePasse` sont nécessaires à la sauvegarde effective décrite par cette même séquence, sur le
-/// modèle déjà établi par `sauvegarderFichier` (Phase 1).
+/// administration (US-023, valeur `Administration` envoyée par l'écran) d'une éventuelle qualification déclenchée
+/// depuis une alerte (US-020, Phase 8, toujours hors périmètre à cette phase — la Liste de travail construite à
+/// cette phase ne fait que marquer une alerte vue/traitée via `qualifierAlerte`, sans jamais qualifier elle-même le
+/// membre connu concerné — qui enverrait alors `qualificationDepuisAlerte`) ; `chemin`/`donnees`/`motDePasse` sont
+/// nécessaires à la sauvegarde effective décrite par cette même séquence, sur le modèle déjà établi par
+/// `sauvegarderFichier` (Phase 1).
 ///
 /// # Erreurs
 ///

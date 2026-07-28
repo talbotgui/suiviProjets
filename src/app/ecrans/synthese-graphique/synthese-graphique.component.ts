@@ -190,8 +190,8 @@ export class SqmSyntheseGraphiqueComponent {
   /**
    * Lignes verticales étiquetées du graphique : changements de seuil pertinents pour l'indicateur sélectionné
    * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global) et annotations des
-   * projets actuellement retenus (US-024, lues et affichées ici en lecture seule uniquement, jamais créées ni
-   * modifiées par cet écran).
+   * projets actuellement retenus (US-019, Phase 8, créées ailleurs — `SqmFicheProjetComponent` — et seulement lues
+   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran).
    */
   public readonly lignesVerticales: Signal<readonly LigneVerticaleGraphique[]> = computed(() => {
     const racine = this.donneesApplication.racine();

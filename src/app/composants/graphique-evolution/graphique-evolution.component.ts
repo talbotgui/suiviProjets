@@ -86,8 +86,9 @@ export interface SerieGraphiqueEvolution {
 }
 
 /**
- * Catégorie d'une ligne verticale étiquetée du graphique d'évolution : une annotation (US-024, Phase 8, lue et
- * affichée ici en lecture seule uniquement) ou un changement de seuil (RG-023, `ChangementSeuilUtils`).
+ * Catégorie d'une ligne verticale étiquetée du graphique d'évolution : une annotation (US-019, Phase 8, créée
+ * ailleurs — `SqmFicheProjetComponent` — et seulement lue et affichée ici, en lecture seule) ou un changement de
+ * seuil (RG-023, `ChangementSeuilUtils`).
  */
 export type CategorieLigneVerticale = 'annotation' | 'changementSeuil';
 

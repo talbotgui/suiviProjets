@@ -289,6 +289,60 @@
               </ul>
             }
 
+            @if (!formulaireAnnotationVisible()) {
+              <button type="button" (click)="ouvrirCreationAnnotation()">
+                Créer une annotation
+              </button>
+            } @else {
+              <form
+                class="fiche-projet__formulaire-annotation"
+                (ngSubmit)="demanderCreationAnnotation()"
+              >
+                <label>
+                  Date
+                  <input type="date" name="dateAnnotation" [(ngModel)]="dateAnnotation" required />
+                </label>
+                <label>
+                  Libellé
+                  <input
+                    type="text"
+                    name="libelleAnnotation"
+                    [(ngModel)]="libelleAnnotation"
+                    required
+                  />
+                </label>
+                <label>
+                  Catégorie
+                  <input type="text" name="categorieAnnotation" [(ngModel)]="categorieAnnotation" />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    name="descriptionAnnotation"
+                    [(ngModel)]="descriptionAnnotation"
+                    rows="2"
+                  ></textarea>
+                </label>
+
+                @if (messageErreurAnnotation) {
+                  <p role="alert">{{ messageErreurAnnotation }}</p>
+                }
+
+                <div class="fiche-projet__actions-formulaire-annotation">
+                  <button type="button" (click)="fermerCreationAnnotation()">Annuler</button>
+                  <button type="submit" [disabled]="enCoursAnnotation">Enregistrer</button>
+                </div>
+              </form>
+
+              @if (attenteMotDePasseAnnotation()) {
+                <app-confirmation-mot-de-passe
+                  message="Ressaisissez le mot de passe du fichier pour créer cette annotation."
+                  (confirmee)="confirmerCreationAnnotation($event)"
+                  (annulee)="annulerMotDePasseAnnotation()"
+                />
+              }
+            }
+
             <h2>Journal</h2>
             @if (donnees.journal.length === 0) {
               <p>Aucune entrée de journal pour ce projet.</p>

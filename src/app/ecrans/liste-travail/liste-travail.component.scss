@@ -1,0 +1,73 @@
+.liste-travail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.liste-travail__filtres {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.liste-travail__select,
+.liste-travail__recherche {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+}
+
+.liste-travail__recherche {
+  width: 260px;
+}
+
+.liste-travail__compteur {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.liste-travail__vide {
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #f3f6fb;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.liste-travail__panneau {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background-color: #fafafa;
+}
+
+.liste-travail__panneau-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.liste-travail__commentaire {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.liste-travail__panneau-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.liste-travail__erreur {
+  color: #b3261e;
+  font-size: 0.85rem;
+}

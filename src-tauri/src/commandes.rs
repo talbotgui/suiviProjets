@@ -14,12 +14,14 @@
 //! incrément 1 : modification d'un seuil de couleur et d'un référentiel (`definirSeuil`, `definirReferentiel`,
 //! US-033, RG-022, RG-023, RG-030). Périmètre de la Phase 7, incrément 4 : prévisualisation et exécution d'une
 //! purge d'audits anciens par densité ou par âge (`previsualiserPurgeDensite`, `executerPurgeDensite`,
-//! `previsualiserPurgeAge`, `executerPurgeAge`, US-025, RG-024, RG-025). La Façade n'est jamais testée isolément :
-//! chaque commande délègue au module qu'elle route
+//! `previsualiserPurgeAge`, `executerPurgeAge`, US-025, RG-024, RG-025). Périmètre de la Phase 8 : création d'une
+//! annotation et qualification d'une alerte (`creerAnnotation`, `qualifierAlerte`, US-019, US-020, RG-026). La
+//! Façade n'est jamais testée isolément : chaque commande délègue au module qu'elle route
 //! (Moteur de persistance, Connecteur GitLab/Sonar), déjà couvert par ses propres tests unitaires (cf.
 //! `docs/02_documentation/16_normesTests.md#tests-unitaires`).
 
 pub(crate) mod administration;
+pub(crate) mod alertes;
 pub(crate) mod audit;
 pub(crate) mod connectivite;
 pub(crate) mod etat_session;

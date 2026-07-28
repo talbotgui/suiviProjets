@@ -35,10 +35,15 @@
       <span>Synthèse graphique</span>
     </a>
 
-    <span class="shell__lien shell__lien--a-venir" aria-disabled="true" title="Écran à venir">
+    <a
+      class="shell__lien"
+      routerLink="/liste-travail"
+      routerLinkActive="shell__lien--actif"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
       <span aria-hidden="true">⚑</span>
       <span>Liste de travail</span>
-    </span>
+    </a>
 
     <button
       type="button"

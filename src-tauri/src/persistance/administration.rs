@@ -45,8 +45,9 @@ pub(crate) enum ErreurAdministration {
 /// le groupe désigné) : c'est le cas d'usage de l'écran d'Administration (US-023), qui connaît l'identifiant précis
 /// de la règle éditée. Si `membre_id` est absent, la règle est retrouvée par correspondance exacte de
 /// `type_critere`/`critere` au sein du groupe (mise à jour si trouvée, création sinon) : cela reproduit exactement
-/// la sémantique « ajoute ou met à jour » attendue de la qualification depuis une alerte (US-022, Phase 8), qui ne
-/// connaît que le critère observé, jamais un identifiant préexistant.
+/// la sémantique « ajoute ou met à jour » attendue d'une éventuelle qualification depuis une alerte (US-020,
+/// Phase 8, toujours hors périmètre à cette phase, cf. commentaire d'en-tête de `commandes::administration::
+/// qualifier_membre`), qui ne connaîtrait que le critère observé, jamais un identifiant préexistant.
 ///
 /// # Erreurs
 ///

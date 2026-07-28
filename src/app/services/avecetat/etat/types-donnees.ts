@@ -359,7 +359,7 @@ export interface MembreConnu {
 }
 
 /**
- * Événement daté de portée groupe ou projet (US-024), mirroir de `Annotation` côté cœur natif, affiché en repère
+ * Événement daté de portée groupe ou projet (US-019), mirroir de `Annotation` côté cœur natif, affiché en repère
  * sur les graphiques d'évolution (hors périmètre de restitution de l'Administration, Phase 6).
  */
 export interface Annotation {
@@ -433,7 +433,7 @@ export interface Projet {
 
 /**
  * Groupe, racine de la grappe principale (US-006, US-022, US-023), mirroir de `Groupe` côté cœur natif. Les
- * annotations de groupe (US-020) restent hors périmètre de l'Administration (Phase 8) et sont conservées telles
+ * annotations de groupe (US-019) restent hors périmètre de l'Administration (Phase 8) et sont conservées telles
  * quelles.
  */
 export interface Groupe {
