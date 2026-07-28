@@ -25,10 +25,30 @@
       }
     </select>
 
+    <app-selecteur-vue
+      [vues]="vuesApplicables()"
+      (vueAppliquee)="appliquerVue($event)"
+      (enregistrementDemande)="enregistrerVue($event)"
+      (suppressionDemandee)="supprimerVue($event)"
+    />
+
     <button type="button" class="synthese-graphique__export" (click)="exporterPng()">
       Exporter en PNG
     </button>
   </div>
+
+  @if (nombreVuesIgnorees() > 0) {
+    <p class="synthese-graphique__avertissement" role="status">
+      {{ nombreVuesIgnorees() }} vue{{ nombreVuesIgnorees() > 1 ? 's' : '' }} enregistrée{{
+        nombreVuesIgnorees() > 1 ? 's' : ''
+      }}
+      ignorée{{ nombreVuesIgnorees() > 1 ? 's' : '' }} (schéma de filtres obsolète).
+    </p>
+  }
+
+  @if (messageErreur; as erreur) {
+    <p class="synthese-graphique__erreur" role="alert">{{ erreur }}</p>
+  }
 
   <fieldset class="synthese-graphique__projets">
     <legend>Projets</legend>

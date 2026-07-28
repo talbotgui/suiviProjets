@@ -2,8 +2,10 @@
 // avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
+import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import type {
   Annotation,
   Audit,
@@ -16,6 +18,7 @@ import type {
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmSyntheseGraphiqueComponent } from './synthese-graphique.component';
 
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
 jest.mock('html-to-image', () => ({ toPng: jest.fn() }));
 
 /**
@@ -169,6 +172,7 @@ class DonneesDeTest {
 
 describe('SqmSyntheseGraphiqueComponent', () => {
   beforeEach(async () => {
+    jest.mocked(invoke).mockReset();
     jest.mocked(toPng).mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmSyntheseGraphiqueComponent],
@@ -512,5 +516,243 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     fixture.detectChanges();
 
     expect(composant.messageAucuneDonnee()).toContain('Couverture de tests (%)');
+  });
+
+  describe('vues enregistrées (US-028, RG-027, Phase 9 incrément 2)', () => {
+    /**
+     * Construit une racine de test avec un unique groupe et deux projets, pour exercer le filtre de projets.
+     * @returns La racine de test.
+     */
+    function racineAvecDeuxProjets(): DonneesRacine {
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe 1',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [
+          DonneesDeTest.projet('projet-a', 'Projet A', []),
+          DonneesDeTest.projet('projet-b', 'Projet B', []),
+        ],
+      };
+      return DonneesDeTest.racine([groupe]);
+    }
+
+    it('applique le filtre de groupe, d’indicateur et de projets portés par une vue choisie', () => {
+      const fixture = creerFixture(racineAvecDeuxProjets());
+      const composant = fixture.componentInstance;
+
+      composant.appliquerVue({
+        id: 'v1',
+        nom: 'Ma vue',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1', indicateur: 'tailleDepot', projetIds: ['projet-a'] },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreIndicateur()).toBe('tailleDepot');
+      expect(composant.projetRetenu('projet-a')).toBe(true);
+      expect(composant.projetRetenu('projet-b')).toBe(false);
+    });
+
+    it('applique une vue dont le filtre de projets vaut `null` (tous les projets)', () => {
+      const fixture = creerFixture(racineAvecDeuxProjets());
+      const composant = fixture.componentInstance;
+      composant.basculerProjet('projet-a');
+      expect(composant.projetRetenu('projet-a')).toBe(false);
+
+      composant.appliquerVue({
+        id: 'v1',
+        nom: 'Ma vue',
+        parDefaut: false,
+        filtres: { groupeId: null, indicateur: 'couverture', projetIds: null },
+      });
+
+      expect(composant.projetRetenu('projet-a')).toBe(true);
+      expect(composant.projetRetenu('projet-b')).toBe(true);
+    });
+
+    it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
+      const fixture = creerFixture(racineAvecDeuxProjets());
+      const composant = fixture.componentInstance;
+      composant.onChangerGroupe('groupe-1');
+
+      composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
+      composant.appliquerVue({
+        id: 'v2',
+        nom: 'Indicateur invalide',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1', indicateur: 'inexistant', projetIds: null },
+      });
+      composant.appliquerVue({
+        id: 'v3',
+        nom: 'Projets invalides',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1', indicateur: 'couverture', projetIds: [42] },
+      });
+      composant.appliquerVue({
+        id: 'v4',
+        nom: 'Groupe de type invalide',
+        parDefaut: false,
+        filtres: { groupeId: 42, indicateur: 'couverture', projetIds: null },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreIndicateur()).toBe('couverture');
+    });
+
+    it('enregistre une vue avec les filtres courants (dont le filtre de projets sérialisé) et met à jour la racine (US-028)', async () => {
+      const racineInitiale = racineAvecDeuxProjets();
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+      const fixture = creerFixture(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+      composant.onChangerGroupe('groupe-1');
+      composant.onChangerIndicateur('mrOuvertes');
+      composant.basculerProjet('projet-b');
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: true,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_vue',
+        expect.objectContaining({
+          id: undefined,
+          nom: 'Ma vue',
+          ecran: 'syntheseGraphique',
+          versionFiltres: 1,
+          parDefaut: true,
+          filtres: { groupeId: 'groupe-1', indicateur: 'mrOuvertes', projetIds: ['projet-a'] },
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      expect(composant.messageErreur).toBeNull();
+      expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque l'enregistrement d'une vue échoue", async () => {
+      jest.mocked(invoke).mockRejectedValue({ type: 'erreurInterne' });
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: false,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(composant.messageErreur).not.toBeNull();
+    });
+
+    it('supprime une vue et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+      const fixture = creerFixture(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      await composant.supprimerVue({ id: 'v1', motDePasse: 'mot-de-passe' });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'supprimer_vue',
+        expect.objectContaining({ id: 'v1', motDePasse: 'mot-de-passe' }),
+      );
+      expect(composant.messageErreur).toBeNull();
+      expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque la suppression d'une vue échoue", async () => {
+      jest.mocked(invoke).mockRejectedValue({ type: 'vueIntrouvable' });
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      await composant.supprimerVue({ id: 'id-inconnu', motDePasse: 'mot-de-passe' });
+
+      expect(composant.messageErreur).not.toBeNull();
+    });
+
+    it('applique automatiquement la vue par défaut de cet écran à l’ouverture', () => {
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racineAvecDeuxProjets(),
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'syntheseGraphique',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1', indicateur: 'tailleDepot', projetIds: ['projet-a'] },
+          },
+        ],
+      };
+
+      const fixture = creerFixture(racineAvecVueParDefaut);
+      const composant = fixture.componentInstance;
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreIndicateur()).toBe('tailleDepot');
+      expect(composant.projetRetenu('projet-a')).toBe(true);
+      expect(composant.projetRetenu('projet-b')).toBe(false);
+    });
+
+    it("n'applique la vue par défaut qu'une seule fois, sans écraser un choix ultérieur de l'utilisateur", () => {
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racineAvecDeuxProjets(),
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'syntheseGraphique',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1', indicateur: 'tailleDepot', projetIds: null },
+          },
+        ],
+      };
+      const fixture = creerFixture(racineAvecVueParDefaut);
+      const composant = fixture.componentInstance;
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+
+      composant.onChangerGroupe('');
+      TestBed.inject(DonneesApplicationService).chargerRacine({
+        ...racineAvecVueParDefaut,
+        versionSchema: 2,
+      });
+      fixture.detectChanges();
+
+      expect(composant.filtreGroupeId()).toBeNull();
+    });
+
+    it('ignore une vue enregistrée dont la version de filtres est obsolète et avertit l’utilisateur', () => {
+      const racineAvecVueObsolete: DonneesRacine = {
+        ...racineAvecDeuxProjets(),
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Ancienne vue',
+            ecran: 'syntheseGraphique',
+            versionFiltres: 0,
+            parDefaut: false,
+            filtres: { groupeId: 'groupe-1', indicateur: 'couverture', projetIds: null },
+          },
+        ],
+      };
+
+      const fixture = creerFixture(racineAvecVueObsolete);
+
+      expect(fixture.componentInstance.vuesApplicables()).toHaveLength(0);
+      expect(fixture.componentInstance.nombreVuesIgnorees()).toBe(1);
+    });
   });
 });

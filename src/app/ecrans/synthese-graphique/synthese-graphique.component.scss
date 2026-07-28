@@ -39,6 +39,16 @@
   outline-offset: 2px;
 }
 
+.synthese-graphique__avertissement {
+  color: #8a5a00;
+  font-size: 0.8rem;
+}
+
+.synthese-graphique__erreur {
+  color: #b3261e;
+  font-size: 0.85rem;
+}
+
 .synthese-graphique__projets {
   border: 1px solid #ddd;
   border-radius: 8px;

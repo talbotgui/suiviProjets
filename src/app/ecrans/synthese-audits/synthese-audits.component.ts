@@ -20,11 +20,17 @@
 // combinaison de filtres de cet écran (groupe, indicateur, recherche texte) ni aucun tri interne du tableau dense
 // ne peut donc faire disparaître le signal, qui reste au moins signalé globalement (RG-009) même si la ligne
 // concernée est filtrée hors du tableau visible.
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { Router } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBandeauAlerteComponent } from '../../composants/bandeau-alerte/bandeau-alerte.component';
+import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
+import type {
+  DemandeEnregistrementVue,
+  DemandeSuppressionVue,
+  VueSelectionnable,
+} from '../../composants/selecteur-vue/selecteur-vue.component';
 import { SqmTableauDenseComponent } from '../../composants/tableau-dense/tableau-dense.component';
 import type {
   CelluleTableauDense,
@@ -39,6 +45,11 @@ import type {
   Projet,
   Resultat,
 } from '../../services/avecetat/etat/types-donnees';
+import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
+import type {
+  ResultatFiltrageVues,
+  VueEnregistreeConnue,
+} from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import type { ResultatCroiseFraicheurSonar } from '../../services/avecetat/campagne/connecteur-croise.utils';
 import type {
   Marqueur,
@@ -88,6 +99,29 @@ export type CleFiltreIndicateur =
   | 'membresInconnus'
   | 'sonarKo'
   | 'ia';
+
+/**
+ * Identifiant stable de cet écran pour les vues enregistrées (US-028, RG-027, Phase 9 incrément 2), distinct de
+ * `listeTravail` (Phase 9 incrément 1) et de `syntheseGraphique`.
+ */
+const ECRAN_SYNTHESE_AUDITS = 'syntheseAudits';
+
+/**
+ * Version courante du schéma de filtres de cet écran (US-028, RG-027) : à incrémenter si la forme de
+ * {@link FiltresSyntheseAudits} change, sur le modèle déjà établi par `SqmListeTravailComponent` (Phase 9
+ * incrément 1).
+ */
+const VERSION_FILTRES_SYNTHESE_AUDITS = 1;
+
+/**
+ * Forme des filtres de cet écran persistée par une vue enregistrée (US-028, RG-027 : « groupes, projets,
+ * indicateurs, période, tri »). Le texte de recherche libre en est volontairement exclu (recherche ponctuelle, non
+ * un critère de vue durable), sur le modèle déjà retenu par `SqmListeTravailComponent`.
+ */
+interface FiltresSyntheseAudits {
+  readonly groupeId: string | null;
+  readonly indicateur: CleFiltreIndicateur;
+}
 
 /**
  * Libellé et couleur sémantique d'une valeur calculée, couleur absente si aucun seuil courant n'est disponible pour
@@ -173,7 +207,7 @@ interface SeuilsResolus {
  */
 @Component({
   selector: 'app-synthese-audits',
-  imports: [SqmBandeauAlerteComponent, SqmTableauDenseComponent],
+  imports: [SqmBandeauAlerteComponent, SqmTableauDenseComponent, SqmSelecteurVueComponent],
   templateUrl: './synthese-audits.component.html',
   styleUrl: './synthese-audits.component.scss',
 })
@@ -209,10 +243,38 @@ export class SqmSyntheseAuditsComponent {
   private readonly router: Router = inject(Router);
 
   /**
+   * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne l'appliquer
+   * qu'une seule fois par instance de ce composant (sur le modèle de `SqmListeTravailComponent`, Phase 9
+   * incrément 1).
+   */
+  private vueParDefautDejaAppliquee = false;
+
+  public constructor() {
+    effect(() => {
+      if (this.vueParDefautDejaAppliquee) {
+        return;
+      }
+      const vueParDefaut = VuesEnregistreesUtils.trouverVueParDefaut(
+        this.resultatFiltrageVues().applicables,
+      );
+      if (vueParDefaut === undefined) {
+        return;
+      }
+      this.vueParDefautDejaAppliquee = true;
+      this.appliquerVue(vueParDefaut);
+    });
+  }
+
+  /**
    * Élément conteneur exporté en PNG (bandeau d'alerte inclus, cf. commentaire d'en-tête : « alerte membre inconnu
    * conservée sur l'export »).
    */
   private readonly conteneurExport = viewChild<ElementRef<HTMLElement>>('conteneurExport');
+
+  /**
+   * Message d'erreur de la dernière mutation de vue enregistrée tentée (US-028), `null` si aucune erreur en cours.
+   */
+  public messageErreur: string | null = null;
 
   /**
    * Identifiant du groupe sélectionné dans le filtre, `null` = tous les groupes.
@@ -269,6 +331,33 @@ export class SqmSyntheseAuditsComponent {
       return this.correspondIndicateur(ligne, indicateur);
     });
   });
+
+  /**
+   * Résultat du filtrage des vues enregistrées de cet écran par version de filtres courante (US-028, RG-027).
+   */
+  private readonly resultatFiltrageVues: Signal<ResultatFiltrageVues> = computed(() => {
+    const connues: readonly VueEnregistreeConnue[] =
+      this.donneesApplication.racine()?.vuesEnregistrees ?? [];
+    return VuesEnregistreesUtils.filtrerPourEcran(
+      connues,
+      ECRAN_SYNTHESE_AUDITS,
+      VERSION_FILTRES_SYNTHESE_AUDITS,
+    );
+  });
+
+  /**
+   * Vues enregistrées applicables à cet écran (US-028, RG-027).
+   */
+  public readonly vuesApplicables: Signal<readonly VueSelectionnable[]> = computed(
+    () => this.resultatFiltrageVues().applicables,
+  );
+
+  /**
+   * Nombre de vues enregistrées de cet écran ignorées pour cause de version de filtres obsolète (US-028).
+   */
+  public readonly nombreVuesIgnorees: Signal<number> = computed(
+    () => this.resultatFiltrageVues().nombreIgnorees,
+  );
 
   /**
    * Groupes disponibles pour le filtre.
@@ -357,6 +446,78 @@ export class SqmSyntheseAuditsComponent {
    */
   public onChangerRecherche(valeur: string): void {
     this.texteRecherche.set(valeur);
+  }
+
+  /**
+   * Applique les filtres portés par une vue enregistrée choisie dans `SqmSelecteurVueComponent` (US-028). Ignore
+   * silencieusement une vue dont les filtres ne correspondent pas structurellement à {@link FiltresSyntheseAudits}
+   * (aucun accès non sûr à une valeur JSON externe), sur le modèle de `SqmListeTravailComponent`.
+   * @param vue - Vue choisie, dont `filtres` reste typé `unknown` côté composant transverse.
+   */
+  public appliquerVue(vue: VueSelectionnable): void {
+    if (!SqmSyntheseAuditsComponent.estFiltresSyntheseAudits(vue.filtres)) {
+      return;
+    }
+    this.filtreGroupeId.set(vue.filtres.groupeId);
+    this.filtreIndicateur.set(vue.filtres.indicateur);
+  }
+
+  /**
+   * Vérifie structurellement qu'une valeur JSON externe (`VueEnregistree.filtres`) correspond bien à
+   * {@link FiltresSyntheseAudits}, avant tout accès à ses champs.
+   * @param valeur - Valeur à vérifier.
+   * @returns `true` si `valeur` correspond à la forme attendue.
+   */
+  private static estFiltresSyntheseAudits(valeur: unknown): valeur is FiltresSyntheseAudits {
+    if (
+      typeof valeur !== 'object' ||
+      valeur === null ||
+      !('groupeId' in valeur) ||
+      !('indicateur' in valeur)
+    ) {
+      return false;
+    }
+    const groupeId: unknown = valeur.groupeId;
+    if (groupeId !== null && typeof groupeId !== 'string') {
+      return false;
+    }
+    const indicateur: unknown = valeur.indicateur;
+    return SqmSyntheseAuditsComponent.CLES_FILTRE_INDICATEUR.some((cle) => cle === indicateur);
+  }
+
+  /**
+   * Crée ou met à jour une vue enregistrée avec les filtres courants (US-028, RG-027, RG-002).
+   * @param demande - Nom, statut par défaut, identifiant de mise à jour éventuel et mot de passe déjà confirmés par
+   * `SqmSelecteurVueComponent`.
+   */
+  public async enregistrerVue(demande: DemandeEnregistrementVue): Promise<void> {
+    const filtres: FiltresSyntheseAudits = {
+      groupeId: this.filtreGroupeId(),
+      indicateur: this.filtreIndicateur(),
+    };
+    const resultat = await this.donneesApplication.definirVue(
+      demande.id,
+      demande.nom,
+      ECRAN_SYNTHESE_AUDITS,
+      VERSION_FILTRES_SYNTHESE_AUDITS,
+      demande.parDefaut,
+      filtres,
+      demande.motDePasse,
+    );
+    if (resultat.type === 'echec') {
+      this.messageErreur = "Une erreur inattendue est survenue lors de l'enregistrement de la vue.";
+    }
+  }
+
+  /**
+   * Supprime une vue enregistrée (US-028, RG-002).
+   * @param demande - Identifiant de la vue et mot de passe déjà confirmés par `SqmSelecteurVueComponent`.
+   */
+  public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
+    const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
+    if (resultat.type === 'echec') {
+      this.messageErreur = 'Une erreur inattendue est survenue lors de la suppression de la vue.';
+    }
   }
 
   /**

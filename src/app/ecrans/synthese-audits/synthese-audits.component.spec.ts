@@ -7,6 +7,7 @@ import { Router, provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/types-donnees';
 import type {
   Audit,
@@ -722,5 +723,196 @@ describe('SqmSyntheseAuditsComponent', () => {
     expect(router.url).toBe(
       `/fiche-projet/${fixture.componentInstance.toutesLesLignes()[0].projetId}`,
     );
+  });
+
+  describe('vues enregistrées (US-028, RG-027, Phase 9 incrément 2)', () => {
+    it('applique le filtre de groupe et d’indicateur portés par une vue choisie', () => {
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      const composant = fixture.componentInstance;
+
+      composant.appliquerVue({
+        id: 'v1',
+        nom: 'Mon groupe en alerte',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1', indicateur: 'sonarKo' },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreIndicateur()).toBe('sonarKo');
+    });
+
+    it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      const composant = fixture.componentInstance;
+      composant.onChangerGroupe('groupe-1');
+
+      composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
+      composant.appliquerVue({
+        id: 'v2',
+        nom: 'Indicateur invalide',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1', indicateur: 'inexistant' },
+      });
+      composant.appliquerVue({
+        id: 'v3',
+        nom: 'Groupe de type invalide',
+        parDefaut: false,
+        filtres: { groupeId: 42, indicateur: 'tous' },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreIndicateur()).toBe('tous');
+    });
+
+    it('enregistre une vue avec les filtres courants et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+      const fixture = creerFixture(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+      composant.onChangerGroupe('groupe-1');
+      composant.onChangerIndicateur('couverture');
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: true,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_vue',
+        expect.objectContaining({
+          id: undefined,
+          nom: 'Ma vue',
+          ecran: 'syntheseAudits',
+          versionFiltres: 1,
+          parDefaut: true,
+          filtres: { groupeId: 'groupe-1', indicateur: 'couverture' },
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      expect(composant.messageErreur).toBeNull();
+      expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque l'enregistrement d'une vue échoue", async () => {
+      jest.mocked(invoke).mockRejectedValue({ type: 'erreurInterne' });
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: false,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(composant.messageErreur).not.toBeNull();
+    });
+
+    it('supprime une vue et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+      const fixture = creerFixture(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      await composant.supprimerVue({ id: 'v1', motDePasse: 'mot-de-passe' });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'supprimer_vue',
+        expect.objectContaining({ id: 'v1', motDePasse: 'mot-de-passe' }),
+      );
+      expect(composant.messageErreur).toBeNull();
+      expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque la suppression d'une vue échoue", async () => {
+      jest.mocked(invoke).mockRejectedValue({ type: 'vueIntrouvable' });
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      await composant.supprimerVue({ id: 'id-inconnu', motDePasse: 'mot-de-passe' });
+
+      expect(composant.messageErreur).not.toBeNull();
+    });
+
+    it('applique automatiquement la vue par défaut de cet écran à l’ouverture', () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'syntheseAudits',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1', indicateur: 'sonarKo' },
+          },
+        ],
+      };
+
+      const fixture = creerFixture(racineAvecVueParDefaut);
+
+      expect(fixture.componentInstance.filtreGroupeId()).toBe('groupe-1');
+      expect(fixture.componentInstance.filtreIndicateur()).toBe('sonarKo');
+    });
+
+    it("n'applique la vue par défaut qu'une seule fois, sans écraser un choix ultérieur de l'utilisateur", () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'syntheseAudits',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1', indicateur: 'sonarKo' },
+          },
+        ],
+      };
+      const fixture = creerFixture(racineAvecVueParDefaut);
+      const composant = fixture.componentInstance;
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+
+      composant.onChangerGroupe('');
+      TestBed.inject(DonneesApplicationService).chargerRacine({
+        ...racineAvecVueParDefaut,
+        versionSchema: 2,
+      });
+      fixture.detectChanges();
+
+      expect(composant.filtreGroupeId()).toBeNull();
+    });
+
+    it('ignore une vue enregistrée dont la version de filtres est obsolète et avertit l’utilisateur', () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueObsolete: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Ancienne vue',
+            ecran: 'syntheseAudits',
+            versionFiltres: 0,
+            parDefaut: false,
+            filtres: { groupeId: 'groupe-1', indicateur: 'tous' },
+          },
+        ],
+      };
+
+      const fixture = creerFixture(racineAvecVueObsolete);
+
+      expect(fixture.componentInstance.vuesApplicables()).toHaveLength(0);
+      expect(fixture.componentInstance.nombreVuesIgnorees()).toBe(1);
+    });
   });
 });
