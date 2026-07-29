@@ -21,6 +21,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import type {
   ErreurAdministration,
   Groupe,
@@ -61,6 +62,7 @@ type ActionEnAttente =
 export class SqmBrouillonComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly etatSession: EtatSessionService = inject(EtatSessionService);
   private readonly router: Router = inject(Router);
 
   /**
@@ -87,6 +89,20 @@ export class SqmBrouillonComponent {
    * Message d'erreur à afficher après l'échec d'une mutation, `null` sinon.
    */
   public messageErreur: string | null = null;
+
+  /**
+   * À la construction, reprend un éventuel échec d'enregistrement du brouillon survenu après la navigation
+   * immédiate de Constitution de campagne vers le Tableau de bord d'exécution (R10-06) : ce Store ne connaît la
+   * fin réelle de la campagne, y compris de sa sauvegarde finale, qu'après cette navigation, cet écran étant le
+   * point de consultation prévu pour un tel échec. Acquitté aussitôt lu, pour ne pas le réafficher indéfiniment.
+   */
+  public constructor() {
+    const echec = this.etatSession.echecEnregistrementBrouillon();
+    if (echec !== null) {
+      this.messageErreur = this.libelleAnomalie(echec);
+      this.etatSession.acquitterEchecEnregistrementBrouillon();
+    }
+  }
 
   /**
    * Entrées en attente de traitement du brouillon courant (F09), `undefined` si aucun brouillon n'est en cours.
@@ -422,6 +438,10 @@ export class SqmBrouillonComponent {
         return 'Le fichier de données est verrouillé par un autre processus.';
       case 'motDePasseOuFichierInvalide':
         return 'Mot de passe incorrect.';
+      case 'sessionVerrouillee':
+        return 'La session est verrouillée : déverrouillez-la avant de sauvegarder.';
+      case 'motDePasseSessionDivergent':
+        return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'groupeIntrouvable':
       case 'projetIntrouvable':
       case 'membreIntrouvable':
@@ -437,6 +457,10 @@ export class SqmBrouillonComponent {
       case 'aucunFichierOuvert':
       case 'credentialInvalide':
       case 'modePurgeAgeInconnu':
+      case 'fichierConfigurationIllisible':
+      case 'formatConfigurationNonReconnu':
+      case 'versionSchemaConfigurationSuperieure':
+      case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";

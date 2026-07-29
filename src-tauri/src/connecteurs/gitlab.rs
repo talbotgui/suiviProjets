@@ -848,9 +848,13 @@ struct ReponseMembre {
 /// second ensemble sans figurer dans le premier est marqué hérité. L'API GitLab n'exposant pas l'email public d'un
 /// membre arbitraire à ce point d'entrée, `emailPublic` reste toujours absent.
 ///
+/// Chacun des deux appels pagine sur les pages de résultats successives, jusqu'à épuisement ou
+/// [`MAX_PAGES_CONTRIBUTEURS`] (R10-02 : un dépôt de plus de cent membres voyait jusqu'ici sa liste silencieusement
+/// tronquée par un unique appel non paginé), sur le même principe que [`interroger_contributeurs`].
+///
 /// # Erreurs
 ///
-/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux deux appels de liste de membres.
+/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux deux appels paginés de liste de membres.
 pub(crate) async fn interroger_membres(
     url_base: &str,
     credential: &str,
@@ -872,35 +876,47 @@ pub(crate) async fn interroger_membres(
         let client = client.clone();
         let credential = credential.to_string();
         async move {
-            let reponse = client
-                .get(url)
-                .header("PRIVATE-TOKEN", &credential)
-                .query(&[("per_page", TAILLE_PAGE_AUDIT)])
-                .send()
-                .await
-                .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-            let statut = reponse.status();
-            if statut.as_u16() == 401 {
-                return Err(ErreurConnecteur::AuthentificationRefusee {
-                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
-                });
+            let mut membres = Vec::new();
+            for page in 1..=MAX_PAGES_CONTRIBUTEURS {
+                let reponse = client
+                    .get(url.as_str())
+                    .header("PRIVATE-TOKEN", &credential)
+                    .query(&[
+                        ("per_page", TAILLE_PAGE_AUDIT),
+                        ("page", page.to_string().as_str()),
+                    ])
+                    .send()
+                    .await
+                    .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+                let statut = reponse.status();
+                if statut.as_u16() == 401 {
+                    return Err(ErreurConnecteur::AuthentificationRefusee {
+                        message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                    });
+                }
+                if statut.as_u16() == 403 {
+                    return Err(ErreurConnecteur::DroitsInsuffisants {
+                        message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                    });
+                }
+                if !statut.is_success() {
+                    return Err(ErreurConnecteur::ReponseInattendue {
+                        message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                    });
+                }
+                let page_membres =
+                    reponse
+                        .json::<Vec<ReponseMembre>>()
+                        .await
+                        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                            message: erreur.to_string(),
+                        })?;
+                if page_membres.is_empty() {
+                    break;
+                }
+                membres.extend(page_membres);
             }
-            if statut.as_u16() == 403 {
-                return Err(ErreurConnecteur::DroitsInsuffisants {
-                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
-                });
-            }
-            if !statut.is_success() {
-                return Err(ErreurConnecteur::ReponseInattendue {
-                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
-                });
-            }
-            reponse
-                .json::<Vec<ReponseMembre>>()
-                .await
-                .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-                    message: erreur.to_string(),
-                })
+            Ok(membres)
         }
     };
 
@@ -2083,6 +2099,8 @@ mod tests {
     #[tokio::test]
     async fn interroger_membres_marque_herite_les_membres_absents_des_membres_directs()
     -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/v4/projects/1234/repository/commits/develop"))
@@ -2094,17 +2112,31 @@ mod tests {
             .await;
         Mock::given(method("GET"))
             .and(path("/api/v4/projects/1234/members"))
+            .and(query_param("page", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
                 { "username": "mdurand", "name": "Marie Durand", "access_level": 40 }
             ])))
             .mount(&serveur)
             .await;
         Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
             .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
                 { "username": "mdurand", "name": "Marie Durand", "access_level": 40 },
                 { "username": "alopez-ext", "name": "Ana Lopez", "access_level": 30 }
             ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
             .mount(&serveur)
             .await;
 
@@ -2132,6 +2164,67 @@ mod tests {
                     && membre.herite
                     && membre.email_public.is_none())
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_membres_pagine_au_dela_de_cent_membres() -> Result<(), ErreurConnecteur> {
+        // R10-02 : au-delà de cent membres, la liste (`/members/all`, qui porte le résultat final) ne doit plus
+        // être silencieusement tronquée par un unique appel non paginé (round-trip sur deux pages, la troisième
+        // vide, sur le modèle de `interroger_contributeurs_agrege_par_email_sur_plusieurs_pages`).
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits/develop"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "8c1d0e44",
+                "committed_date": "2026-06-05T10:00:00Z"
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "page1", "name": "Page Un", "access_level": 40 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "page2", "name": "Page Deux", "access_level": 40 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "3"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_membres(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        // Les membres des deux pages ("page1", "page2") apparaissent tous deux dans le résultat final : preuve que
+        // la seconde page n'a pas été tronquée par le premier appel.
+        assert!(resultat.membres.iter().any(|m| m.username == "page1"));
+        assert!(resultat.membres.iter().any(|m| m.username == "page2"));
         Ok(())
     }
 

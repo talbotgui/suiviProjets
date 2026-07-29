@@ -556,6 +556,7 @@ pub(crate) fn enregistrer_brouillon(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     audit::enregistrer_brouillon(
@@ -594,6 +595,7 @@ pub(crate) fn integrer_brouillon(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     audit::integrer_brouillon(&mut donnees, selection.as_deref())?;
 
@@ -622,6 +624,7 @@ pub(crate) fn rejeter_brouillon(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     audit::rejeter_brouillon(&mut donnees, selection.as_deref(), motif)?;
 

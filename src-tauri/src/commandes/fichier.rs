@@ -81,8 +81,59 @@ pub(crate) enum ErreurFacade {
     /// La vue enregistrée désignée par son identifiant n'existe pas (Phase 9, incrément 1, `definirVue`/
     /// `supprimerVue`).
     VueIntrouvable,
+    /// Le fichier de configuration désigné est illisible ou introuvable (Phase 9, incrément 3,
+    /// `previsualiserImportConfiguration`/`importerConfiguration`, US-030).
+    FichierConfigurationIllisible,
+    /// Le contenu du fichier de configuration n'est pas reconnu comme une configuration partageable valide
+    /// (Phase 9, incrément 3, US-030).
+    FormatConfigurationNonReconnu,
+    /// Le fichier de configuration a été produit par une version de schéma plus récente que celle de
+    /// l'application (Phase 9, incrément 3, US-030, F23).
+    VersionSchemaConfigurationSuperieure,
+    /// Une ligne acceptée de l'import de configuration ne correspond à aucune ligne du différentiel recalculé,
+    /// état obsolète (Phase 9, incrément 3, `importerConfiguration`, US-030, RG-029).
+    LigneDifferentielInconnue,
+    /// La session est verrouillée (aucune clé dérivée détenue) : une commande de mutation a été invoquée sans
+    /// déverrouillage préalable (Phase 10, R10-01, RG-002).
+    SessionVerrouillee,
+    /// Le mot de passe fourni à une commande de mutation ne correspond pas à la clé dérivée déjà authentifiée par
+    /// la session courante (Phase 10, R10-01, RG-002) : empêche un changement silencieux du mot de passe du
+    /// fichier.
+    MotDePasseSessionDivergent,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
+}
+
+/// Revérifie, avant toute réécriture du fichier de données par une commande de mutation, que le mot de passe fourni
+/// correspond bien à la clé dérivée déjà authentifiée par la session courante (Phase 10, R10-01, RG-002) : empêche
+/// qu'une commande qui ne redemande le mot de passe qu'en apparence ne change silencieusement le mot de passe du
+/// fichier. Rejette la sauvegarde si la session est verrouillée (aucune clé en mémoire, décision actée avec
+/// l'utilisateur) plutôt que de l'accepter sans vérification possible. Si le fichier n'existe pas encore sur disque
+/// (cas rare : supprimé de l'extérieur entre deux opérations), aucune comparaison n'est possible : la vérification
+/// est alors sans effet, laissée à la charge de l'écriture elle-même.
+///
+/// Fonction ordinaire (pas une commande Tauri) : testable directement, conformément à la convention du projet
+/// selon laquelle la Façade de commandes n'est testée qu'à travers les modules qu'elle route.
+///
+/// # Erreurs
+///
+/// [`ErreurFacade::SessionVerrouillee`] si aucune clé n'est détenue par la session ; [`ErreurFacade::MotDePasseSessionDivergent`]
+/// si le mot de passe fourni ne correspond pas à la clé de session.
+pub(crate) fn verifier_avant_ecriture(
+    chemin: &Path,
+    mot_de_passe: &str,
+    etat: &EtatSession,
+) -> Result<(), ErreurFacade> {
+    if !etat.est_deverrouillee() {
+        return Err(ErreurFacade::SessionVerrouillee);
+    }
+    if chemin.exists() {
+        let cle_candidate = moteur::deriver_cle_disque(chemin, mot_de_passe)?;
+        if !etat.correspond_a(&cle_candidate) {
+            return Err(ErreurFacade::MotDePasseSessionDivergent);
+        }
+    }
+    Ok(())
 }
 
 impl From<crate::persistance::administration::ErreurAdministration> for ErreurFacade {
@@ -133,6 +184,26 @@ impl From<crate::persistance::vues::ErreurVues> for ErreurFacade {
         use crate::persistance::vues::ErreurVues;
         match erreur {
             ErreurVues::VueIntrouvable => Self::VueIntrouvable,
+        }
+    }
+}
+
+impl From<crate::persistance::configuration_partageable::ErreurConfigurationPartageable>
+    for ErreurFacade
+{
+    fn from(
+        erreur: crate::persistance::configuration_partageable::ErreurConfigurationPartageable,
+    ) -> Self {
+        use crate::persistance::configuration_partageable::ErreurConfigurationPartageable;
+        match erreur {
+            ErreurConfigurationPartageable::FichierIllisible => Self::FichierConfigurationIllisible,
+            ErreurConfigurationPartageable::FormatNonReconnu => Self::FormatConfigurationNonReconnu,
+            ErreurConfigurationPartageable::VersionSchemaSuperieure => {
+                Self::VersionSchemaConfigurationSuperieure
+            }
+            ErreurConfigurationPartageable::LigneDifferentielInconnue => {
+                Self::LigneDifferentielInconnue
+            }
         }
     }
 }
@@ -204,6 +275,7 @@ pub(crate) fn sauvegarder_fichier(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<(), ErreurFacade> {
+    verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
     etat.definir(PathBuf::from(chemin), cle);
     Ok(())
@@ -254,5 +326,119 @@ mod tests {
             }),
             ErreurFacade::VersionSchemaSuperieure
         );
+    }
+
+    /// Répertoire temporaire de test, supprimé à la destruction de la valeur (même gabarit que
+    /// `persistance::moteur::tests::DossierTemporaire`, non réutilisable telle quelle car privée à son module).
+    struct DossierTemporaire {
+        chemin: PathBuf,
+    }
+
+    impl DossierTemporaire {
+        fn nouveau(prefixe: &str) -> Self {
+            let mut chemin = std::env::temp_dir();
+            let unique = uuid::Uuid::new_v4();
+            chemin.push(format!("suiviqualimetrie-test-{prefixe}-{unique}"));
+            std::fs::create_dir_all(&chemin).unwrap_or(());
+            Self { chemin }
+        }
+
+        fn chemin_fichier(&self, nom: &str) -> PathBuf {
+            self.chemin.join(nom)
+        }
+    }
+
+    impl Drop for DossierTemporaire {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.chemin);
+        }
+    }
+
+    #[test]
+    fn verifier_avant_ecriture_rejette_si_session_verrouillee() {
+        let dossier = DossierTemporaire::nouveau("verif-verrouille");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        let etat = EtatSession::nouveau();
+
+        let resultat = verifier_avant_ecriture(&chemin, "peu-importe", &etat);
+
+        assert_eq!(resultat, Err(ErreurFacade::SessionVerrouillee));
+    }
+
+    #[test]
+    fn verifier_avant_ecriture_rejette_un_mot_de_passe_divergent_de_la_session()
+    -> Result<(), ErreurPersistance> {
+        let dossier = DossierTemporaire::nouveau("verif-divergent");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        let (_racine, cle) = moteur::creer_fichier(
+            &chemin,
+            "mot-de-passe-correct",
+            "2026-07-29T08:00:00Z",
+            "Test",
+        )?;
+        let etat = EtatSession::nouveau();
+        etat.definir(chemin.clone(), cle);
+
+        let resultat = verifier_avant_ecriture(&chemin, "mot-de-passe-different", &etat);
+
+        assert_eq!(resultat, Err(ErreurFacade::MotDePasseSessionDivergent));
+        Ok(())
+    }
+
+    #[test]
+    fn verifier_avant_ecriture_accepte_le_mot_de_passe_correct() -> Result<(), ErreurPersistance> {
+        let dossier = DossierTemporaire::nouveau("verif-correct");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        let (_racine, cle) = moteur::creer_fichier(
+            &chemin,
+            "mot-de-passe-correct",
+            "2026-07-29T08:00:00Z",
+            "Test",
+        )?;
+        let etat = EtatSession::nouveau();
+        etat.definir(chemin.clone(), cle);
+
+        let resultat = verifier_avant_ecriture(&chemin, "mot-de-passe-correct", &etat);
+
+        assert_eq!(resultat, Ok(()));
+        Ok(())
+    }
+
+    #[test]
+    fn verifier_avant_ecriture_accepte_la_toute_premiere_sauvegarde_apres_creation()
+    -> Result<(), ErreurPersistance> {
+        // La commande `creerFichier` définit déjà la clé de session avec le mot de passe de création (cf.
+        // `creer_fichier` ci-dessus) : la toute première sauvegarde qui suit trouve donc naturellement une clé de
+        // session à comparer, sans cas particulier à prévoir pour ce moment précis.
+        let dossier = DossierTemporaire::nouveau("verif-premiere-sauvegarde");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        let etat = EtatSession::nouveau();
+        let (_racine, cle) = moteur::creer_fichier(
+            &chemin,
+            "mot-de-passe-creation",
+            "2026-07-29T08:00:00Z",
+            "Test",
+        )?;
+        etat.definir(chemin.clone(), cle);
+
+        let resultat = verifier_avant_ecriture(&chemin, "mot-de-passe-creation", &etat);
+
+        assert_eq!(resultat, Ok(()));
+        Ok(())
+    }
+
+    #[test]
+    fn verifier_avant_ecriture_accepte_si_le_fichier_est_absent_du_disque() {
+        // Cas rare (fichier supprimé de l'extérieur entre deux opérations) : aucune comparaison n'est possible,
+        // laissé sans effet à la charge de l'écriture elle-même (décision arbitraire, cf. rapport de
+        // développement).
+        let dossier = DossierTemporaire::nouveau("verif-fichier-absent");
+        let chemin = dossier.chemin_fichier("inexistant.sqm");
+        let etat = EtatSession::nouveau();
+        etat.definir(chemin.clone(), [1u8; crate::persistance::kdf::TAILLE_CLE]);
+
+        let resultat = verifier_avant_ecriture(&chemin, "peu-importe", &etat);
+
+        assert_eq!(resultat, Ok(()));
     }
 }

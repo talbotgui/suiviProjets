@@ -44,7 +44,10 @@ export interface Instance {
 /**
  * Catégorie d'anomalie pouvant survenir lors d'un appel à une instance GitLab ou Sonar (mirroir de
  * `ErreurConnecteur` côté cœur natif), alignée sur le catalogue figé RG-021 complété de `credentialAbsent`
- * (extension propre à `interrogerBranches`, Phase 3, hors catalogue RG-021 d'origine).
+ * (extension propre à `interrogerBranches`, Phase 3, hors catalogue RG-021 d'origine) et de `instanceIntrouvable`
+ * (extension propre à `OrchestrateurCampagneService.auditerProjet`, Phase 10, R10-09 : une source dont
+ * `instanceId` ne désigne plus aucune instance du groupe, jamais un échec d'appel réseau à proprement parler,
+ * mais sur le même modèle que `credentialAbsent`, une anomalie de configuration détectée avant tout appel).
  */
 export type CategorieErreurConnecteur =
   | 'authentificationRefusee'
@@ -53,7 +56,8 @@ export type CategorieErreurConnecteur =
   | 'delaiDepasse'
   | 'reponseInattendue'
   | 'droitsInsuffisants'
-  | 'credentialAbsent';
+  | 'credentialAbsent'
+  | 'instanceIntrouvable';
 
 /**
  * Anomalie typée d'un test de connectivité (US-004) ou d'un audit (Phase 5), mirroir de `ErreurConnecteur` côté

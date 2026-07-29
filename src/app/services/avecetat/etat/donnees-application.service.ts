@@ -37,6 +37,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FacadeAdministrationService } from '../../sansetat/commandes/facade-administration.service';
 import { FacadeAlertesService } from '../../sansetat/commandes/facade-alertes.service';
+import { FacadeConfigurationPartageableService } from '../../sansetat/commandes/facade-configuration-partageable.service';
 import { FacadeFichierService } from '../../sansetat/commandes/facade-fichier.service';
 import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
 import { FacadeVuesService } from '../../sansetat/commandes/facade-vues.service';
@@ -49,12 +50,14 @@ import type {
   EntreeJournal,
   Groupe,
   ModePurgeAge,
+  DifferentielImportConfiguration,
   PrevisualisationPurge,
   Projet,
   ReponseQualificationMembre,
   ResultatBrouillonProjet,
   ResultatDeverrouillage,
   ResultatMutationAdministration,
+  ResultatPrevisualisationImportConfiguration,
   ResultatPrevisualisationPurge,
   ResultatQualificationMembre,
   Source,
@@ -161,6 +164,9 @@ export class DonneesApplicationService {
     FacadeAdministrationService,
   );
   private readonly facadeAlertes: FacadeAlertesService = inject(FacadeAlertesService);
+  private readonly facadeConfigurationPartageable: FacadeConfigurationPartageableService = inject(
+    FacadeConfigurationPartageableService,
+  );
   private readonly facadeFichier: FacadeFichierService = inject(FacadeFichierService);
   private readonly facadeParametrage: FacadeParametrageService = inject(FacadeParametrageService);
 
@@ -978,6 +984,88 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Exporte la configuration partageable courante (seuils et référentiels, RG-028) en un fichier JSON en clair au
+   * chemin désigné (US-029) : invoque la commande native `exporterConfiguration`, qui ne mute ni ne sauvegarde le
+   * fichier de données.
+   * @param chemin - Chemin du fichier de configuration à écrire, choisi par l'utilisateur via la boîte de dialogue
+   * native (`SelecteurFichierUtils`).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  public async exporterConfiguration(chemin: string): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    try {
+      await this.facadeConfigurationPartageable.exporterConfiguration<DonneesRacine>({
+        chemin,
+        donnees: racine,
+      });
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Prévisualise l'import d'un fichier de configuration partageable (US-030) : invoque la commande native
+   * `previsualiserImportConfiguration` sur la racine actuellement chargée, sans aucune modification ni sauvegarde.
+   * @param chemin - Chemin du fichier de configuration à prévisualiser, choisi par l'utilisateur via la boîte de
+   * dialogue native.
+   * @returns Le Résultat typé de l'opération, portant le différentiel calculé.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  public async previsualiserImportConfiguration(
+    chemin: string,
+  ): Promise<ResultatPrevisualisationImportConfiguration> {
+    const racine = this.racineActuelle();
+    try {
+      const differentiel =
+        await this.facadeConfigurationPartageable.previsualiserImportConfiguration<
+          DonneesRacine,
+          DifferentielImportConfiguration
+        >({ chemin, donnees: racine });
+      return { type: 'succes', differentiel };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Importe un fichier de configuration partageable (US-030, RG-029) : invoque la commande native
+   * `importerConfiguration`, qui n'applique que les lignes de différentiel désignées par `cheminsAcceptes`,
+   * sauvegarde effectivement le fichier (RG-002) et consigne une entrée de journal par ligne réellement appliquée,
+   * avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param cheminConfiguration - Chemin du fichier de configuration importé, relu par le cœur natif.
+   * @param cheminsAcceptes - Chemins des lignes de différentiel acceptées par l'utilisateur.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async importerConfiguration(
+    cheminConfiguration: string,
+    cheminsAcceptes: readonly string[],
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeConfigurationPartageable.importerConfiguration<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        cheminConfiguration,
+        cheminsAcceptes,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Supprime une règle de membre connu d'un groupe (US-023) : invoque la commande native `supprimerMembreConnu`,
    * qui retire la règle, consigne la suppression au journal et sauvegarde effectivement le fichier (RG-002,
    * RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
@@ -1154,6 +1242,10 @@ export class DonneesApplicationService {
       'motifNommageBranchesInvalide',
       'modePurgeAgeInconnu',
       'vueIntrouvable',
+      'fichierConfigurationIllisible',
+      'formatConfigurationNonReconnu',
+      'versionSchemaConfigurationSuperieure',
+      'ligneDifferentielInconnue',
       'fichierIntrouvable',
       'motDePasseOuFichierInvalide',
       'formatNonReconnu',
@@ -1161,6 +1253,8 @@ export class DonneesApplicationService {
       'fichierVerrouille',
       'aucunFichierOuvert',
       'credentialInvalide',
+      'sessionVerrouillee',
+      'motDePasseSessionDivergent',
       'erreurInterne',
     ];
     if (typeof valeur === 'object' && valeur !== null && 'type' in valeur) {

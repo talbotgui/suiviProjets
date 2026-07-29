@@ -110,6 +110,31 @@ describe('RapportAnomaliesUtils', () => {
       ]);
     });
 
+    it('doit résoudre une entrée « instanceIntrouvable » (R10-09), sans la rejeter comme catégorie inconnue', () => {
+      const groupes = [
+        DonneesDeTest.groupe([DonneesDeTest.projet('p1', [DonneesDeTest.source('s1')])]),
+      ];
+
+      const resolues = RapportAnomaliesUtils.resoudreAnomaliesProjet(
+        'p1',
+        'Projet p1',
+        [
+          {
+            indicateur: 'source.instanceIntrouvable',
+            sourceId: 's1',
+            anomalie: {
+              type: 'instanceIntrouvable',
+              message: 'Instance instance-absente introuvable dans le groupe groupe-1',
+            },
+          },
+        ],
+        groupes,
+      );
+
+      expect(resolues).toHaveLength(1);
+      expect(resolues[0].categorie).toBe('instanceIntrouvable');
+    });
+
     it('doit ignorer silencieusement une entrée malformée (forme inattendue)', () => {
       const resolues = RapportAnomaliesUtils.resoudreAnomaliesProjet(
         'p1',

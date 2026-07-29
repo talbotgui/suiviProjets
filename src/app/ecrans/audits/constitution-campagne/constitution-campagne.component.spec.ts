@@ -8,7 +8,10 @@ import { EtatSessionService } from '../../../services/avecetat/etat/etat-session
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmConstitutionCampagneComponent } from './constitution-campagne.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai (R10-06) : nécessaire au passage réel par `invoke` (`InvocationCommandeUtils`) désormais
+// exercé par les tests qui attendent l'issue de `confirmerLancement`, sur le modèle de
+// `orchestrateur-campagne.service.spec.ts`.
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
 
@@ -203,6 +206,37 @@ describe('SqmConstitutionCampagneComponent', () => {
 
     expect(composant.confirmationMotDePasseVisible).toBe(false);
     expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/tableau-de-bord');
+  });
+
+  it("doit retenir l'échec de la sauvegarde finale du brouillon dans le Store, connu seulement après la navigation vers le Tableau de bord (R10-06)", async () => {
+    invokeSimule.mockImplementation((commande: string) =>
+      commande === 'enregistrer_brouillon'
+        ? Promise.reject(
+            Object.assign(new Error('motDePasseOuFichierInvalide'), {
+              type: 'motDePasseOuFichierInvalide',
+            }),
+          )
+        : Promise.resolve(DonneesDeTest.racineVide()),
+    );
+    const etatSession = TestBed.inject(EtatSessionService);
+    composant.basculerProjet(projetId);
+
+    composant.confirmerLancement('mauvais-mot-de-passe');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(etatSession.echecEnregistrementBrouillon()).toEqual({
+      type: 'motDePasseOuFichierInvalide',
+    });
+  });
+
+  it('ne doit rien retenir dans le Store quand la sauvegarde finale du brouillon réussit', async () => {
+    const etatSession = TestBed.inject(EtatSessionService);
+    composant.basculerProjet(projetId);
+
+    composant.confirmerLancement('mot-de-passe');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(etatSession.echecEnregistrementBrouillon()).toBeNull();
   });
 
   it('doit ouvrir puis annuler la ressaisie du mot de passe sans lancer la campagne', () => {

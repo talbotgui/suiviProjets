@@ -100,6 +100,28 @@ pub(crate) fn sauvegarder_fichier(
     ecrire_fichier_chiffre(chemin, donnees, mot_de_passe)
 }
 
+/// Dérive la clé correspondant au mot de passe fourni à partir du sel actuellement inscrit dans l'enveloppe sur
+/// disque, sans déchiffrer le contenu du fichier (R10-01) : utilisé pour revérifier, avant toute réécriture, qu'un
+/// mot de passe fourni à une commande de mutation correspond bien à la clé de session déjà authentifiée, à moindre
+/// coût qu'un chargement complet.
+///
+/// # Erreurs
+///
+/// [`ErreurPersistance::FichierIntrouvable`] si le fichier n'existe pas ; [`ErreurPersistance::EnveloppeNonReconnue`]
+/// si le format binaire n'est pas reconnu.
+pub(crate) fn deriver_cle_disque(
+    chemin: &Path,
+    mot_de_passe: &str,
+) -> Result<[u8; TAILLE_CLE], ErreurPersistance> {
+    if !chemin.is_file() {
+        return Err(ErreurPersistance::FichierIntrouvable(chemin.to_path_buf()));
+    }
+    let octets = fs::read(chemin)?;
+    let enveloppe = Enveloppe::desserialiser(&octets)?;
+    let (cle, _cle_de_repli) = deriver_cle_avec_repli(&enveloppe, mot_de_passe.as_bytes());
+    Ok(cle)
+}
+
 /// Supprime, s'il existe, le fichier temporaire d'écriture atomique laissé orphelin par une écriture interrompue
 /// précédente (coupure, processus tué) visant ce même chemin cible.
 pub(crate) fn nettoyer_fichier_temporaire_orphelin(chemin: &Path) -> Result<(), ErreurPersistance> {
@@ -586,6 +608,57 @@ mod tests {
 
         assert_eq!(nombre_sauvegardes, 2);
         Ok(())
+    }
+
+    #[test]
+    fn deriver_cle_disque_retourne_la_meme_cle_que_le_chargement_complet()
+    -> Result<(), ErreurPersistance> {
+        let dossier = DossierTemporaire::nouveau("deriver-cle-disque");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        creer_fichier(
+            &chemin,
+            "mot-de-passe-correct",
+            "2026-07-20T08:00:00Z",
+            "Test",
+        )?;
+
+        let cle_disque = deriver_cle_disque(&chemin, "mot-de-passe-correct")?;
+        let (_racine, cle_chargement) = charger_fichier(&chemin, "mot-de-passe-correct")?;
+
+        assert_eq!(cle_disque, cle_chargement);
+        Ok(())
+    }
+
+    #[test]
+    fn deriver_cle_disque_differe_pour_un_mot_de_passe_different() -> Result<(), ErreurPersistance>
+    {
+        let dossier = DossierTemporaire::nouveau("deriver-cle-disque-divergent");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        creer_fichier(
+            &chemin,
+            "mot-de-passe-correct",
+            "2026-07-20T08:00:00Z",
+            "Test",
+        )?;
+
+        let cle_correcte = deriver_cle_disque(&chemin, "mot-de-passe-correct")?;
+        let cle_incorrecte = deriver_cle_disque(&chemin, "mot-de-passe-incorrect")?;
+
+        assert_ne!(cle_correcte, cle_incorrecte);
+        Ok(())
+    }
+
+    #[test]
+    fn deriver_cle_disque_signale_un_fichier_absent() {
+        let dossier = DossierTemporaire::nouveau("deriver-cle-disque-absent");
+        let chemin = dossier.chemin_fichier("inexistant.sqm");
+
+        let resultat = deriver_cle_disque(&chemin, "peu-importe");
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurPersistance::FichierIntrouvable(_))
+        ));
     }
 
     #[test]

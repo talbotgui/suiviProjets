@@ -11,8 +11,30 @@
 
 .comparaison-audits__entete {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.35rem;
+}
+
+.comparaison-audits__export {
+  margin-left: auto;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #1a56db;
+  background-color: #fff;
+  color: #1a56db;
+  cursor: pointer;
+}
+
+.comparaison-audits__export:hover {
+  background-color: #eef3ff;
+}
+
+.comparaison-audits__export:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
 }
 
 .comparaison-audits__fil-ariane {

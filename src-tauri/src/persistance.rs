@@ -23,6 +23,7 @@
 pub(crate) mod administration;
 pub(crate) mod alertes;
 pub(crate) mod audit;
+pub(crate) mod configuration_partageable;
 pub(crate) mod enveloppe;
 pub(crate) mod erreurs;
 pub(crate) mod kdf;

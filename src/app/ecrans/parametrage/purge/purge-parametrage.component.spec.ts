@@ -212,6 +212,25 @@ describe('SqmPurgeParametrageComponent', () => {
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
   });
 
+  it("affiche un message explicite quand la session est verrouillée à l'exécution de la purge (R10-01)", async () => {
+    invokeSimule.mockResolvedValueOnce({
+      nbAuditsSupprimes: 1,
+      nbProjetsConcernes: 1,
+      octetsAvant: 100,
+      octetsApres: 50,
+    });
+    const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+    await composant.previsualiserDensite();
+    composant.demanderExecutionDensite();
+
+    invokeSimule.mockRejectedValueOnce({ type: 'sessionVerrouillee' });
+    await composant.confirmerExecutionDensite('mot-de-passe');
+
+    expect(composant.messageErreur).toBe(
+      'La session est verrouillée : déverrouillez-la avant de sauvegarder.',
+    );
+  });
+
   it('exécute une purge par âge après confirmation du mot de passe, réinitialise la prévisualisation', async () => {
     invokeSimule.mockResolvedValueOnce({
       nbAuditsSupprimes: 4,

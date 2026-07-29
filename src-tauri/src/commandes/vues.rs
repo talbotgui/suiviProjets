@@ -45,6 +45,7 @@ pub(crate) fn definir_vue(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     vues::definir_vue(
         &mut donnees,
@@ -76,6 +77,7 @@ pub(crate) fn supprimer_vue(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     vues::supprimer_vue(&mut donnees, &id)?;
 

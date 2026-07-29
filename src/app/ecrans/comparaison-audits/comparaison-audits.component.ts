@@ -19,9 +19,10 @@
 // (raccourcis compris) et mettre en forme le différentiel déjà calculé (libellés, couleurs), sur le modèle déjà
 // établi par `SqmFicheProjetComponent` pour la coloration des indicateurs Sonar et du statut de rattachement des
 // membres.
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, input, signal, viewChild } from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { toPng } from 'html-to-image';
 import { SqmBadgeComponent } from '../../composants/badge/badge.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { StatutMembre } from '../../services/avecetat/etat/types-donnees';
@@ -201,6 +202,14 @@ export class SqmComparaisonAuditsComponent {
   public readonly projetId: InputSignal<string> = input.required<string>();
 
   /**
+   * Référence du conteneur exporté en image (US-032, F25), sur le même gabarit que
+   * `SqmSyntheseAuditsComponent`/`SqmSyntheseGraphiqueComponent`/`SqmFicheProjetComponent` (Phase 6) : dernier écran
+   * des quatre visés par F25 à porter cette fonctionnalité (Phase 9, incrément 3), au moyen de `html-to-image`
+   * (rendu DOM, cf. `docs/01_besoin/Specification.md#525-f25--exports-png`).
+   */
+  private readonly conteneurExport = viewChild<ElementRef<HTMLElement>>('conteneurExport');
+
+  /**
    * Identifiant de l'audit le plus ancien explicitement sélectionné par l'utilisateur (sélecteur ou raccourci),
    * `null` tant qu'aucune sélection explicite n'a été faite (repli automatique sur l'avant-dernier audit, cf.
    * {@link calculerEtat}).
@@ -248,6 +257,31 @@ export class SqmComparaisonAuditsComponent {
     const resolution = this.resoudreRaccourci(raccourci, options);
     this.idAvantSelectionne.set(resolution.idAvant);
     this.idApresSelectionne.set(resolution.idApres);
+  }
+
+  /**
+   * Exporte l'intégralité de l'écran (fil d'ariane, sélection, quatre volets du différentiel) en image PNG
+   * (US-032, F25), sur le même gabarit que `SqmSyntheseGraphiqueComponent.exporterPng` : rendu DOM via
+   * `html-to-image`, aucune capture ECharts native n'étant nécessaire ici (aucun graphique sur cet écran).
+   */
+  public async exporterPng(): Promise<void> {
+    const conteneur = this.conteneurExport()?.nativeElement;
+    if (conteneur === undefined) {
+      return;
+    }
+    const dataUrl = await toPng(conteneur);
+    this.declencherTelechargementPng(dataUrl);
+  }
+
+  /**
+   * Déclenche le téléchargement d'une image PNG encodée en URL de données.
+   * @param dataUrl - URL de données PNG produite par `toPng`.
+   */
+  private declencherTelechargementPng(dataUrl: string): void {
+    const lien = document.createElement('a');
+    lien.href = dataUrl;
+    lien.download = `comparaison-audits-${new Date().toISOString().slice(0, 10)}.png`;
+    lien.click();
   }
 
   /**

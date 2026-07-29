@@ -1,7 +1,7 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Vocabulaire français partagé pour les 7 catégories de `CategorieErreurConnecteur` (Phase 5, incrément 6, écran
+// Vocabulaire français partagé pour les 8 catégories de `CategorieErreurConnecteur` (Phase 5, incrément 6, écran
 // Brouillon et rapport d'anomalies, F08/RG-021). `docs/01_besoin/Specification.md#58-f08--rapport-danomalies-
 // techniques-daudit` exige explicitement que ce vocabulaire soit le même que celui du futur test de connectivité
 // global (F24, hors périmètre à ce jour, cf. `docs/02_documentation/04_casUsage.md` : aucun écran ne consomme
@@ -36,6 +36,8 @@ export class ErreurConnecteurUtils {
         return 'Droits insuffisants';
       case 'credentialAbsent':
         return 'Credential absent';
+      case 'instanceIntrouvable':
+        return 'Instance introuvable';
     }
   }
 
@@ -61,6 +63,8 @@ export class ErreurConnecteurUtils {
         return 'Vérifier que le credential dispose des droits nécessaires sur ce projet ou ce dépôt.';
       case 'credentialAbsent':
         return 'Saisir un credential pour cette instance avant de relancer une campagne.';
+      case 'instanceIntrouvable':
+        return "Vérifier la configuration de la source (instance associée) dans l'écran Administration.";
     }
   }
 }

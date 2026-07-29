@@ -136,15 +136,32 @@ impl EtatSession {
     }
 
     /// Indique si une clé dérivée est actuellement détenue (session déverrouillée avec un fichier ouvert).
-    #[allow(
-        dead_code,
-        reason = "aucune commande de la Façade n'a encore besoin d'interroger cet état ; exercé par les tests ci-dessous, prêt pour les commandes ultérieures"
-    )]
     pub(crate) fn est_deverrouillee(&self) -> bool {
         deverrouiller_mutex(self.interieur.lock())
             .cle_derivee
             .is_some()
     }
+
+    /// Compare, en temps constant, la clé fournie à la clé dérivée actuellement détenue par la session (R10-01,
+    /// RG-002) : utilisé pour revérifier qu'un mot de passe fourni à une commande de mutation correspond bien à
+    /// celui déjà authentifié pour la session courante, avant toute réécriture du fichier. Retourne toujours
+    /// `false` si aucune clé n'est détenue (session verrouillée ou aucun fichier ouvert), sans qu'aucune
+    /// comparaison ne soit alors tentée.
+    pub(crate) fn correspond_a(&self, cle: &[u8; TAILLE_CLE]) -> bool {
+        deverrouiller_mutex(self.interieur.lock())
+            .cle_derivee
+            .as_ref()
+            .is_some_and(|cle_session| comparaison_temps_constant(&cle_session.0, cle))
+    }
+}
+
+/// Compare deux clés octet à octet sans interrompre la boucle à la première différence trouvée (temps constant),
+/// pour ne pas exposer par canal auxiliaire la position du premier octet divergent d'un mot de passe erroné.
+fn comparaison_temps_constant(a: &[u8; TAILLE_CLE], b: &[u8; TAILLE_CLE]) -> bool {
+    a.iter()
+        .zip(b.iter())
+        .fold(0u8, |divergence, (x, y)| divergence | (x ^ y))
+        == 0
 }
 
 #[cfg(test)]
@@ -259,5 +276,37 @@ mod tests {
             1,
             "la map de credentials valide précédente ne doit pas être écrasée par un appel rejeté"
         );
+    }
+
+    #[test]
+    fn correspond_a_est_faux_sans_cle_en_session() {
+        let etat = EtatSession::nouveau();
+
+        assert!(!etat.correspond_a(&[1u8; TAILLE_CLE]));
+    }
+
+    #[test]
+    fn correspond_a_est_vrai_pour_la_cle_identique() {
+        let etat = EtatSession::nouveau();
+        etat.definir(PathBuf::from("/tmp/donnees-test.sqm"), [7u8; TAILLE_CLE]);
+
+        assert!(etat.correspond_a(&[7u8; TAILLE_CLE]));
+    }
+
+    #[test]
+    fn correspond_a_est_faux_pour_une_cle_divergente() {
+        let etat = EtatSession::nouveau();
+        etat.definir(PathBuf::from("/tmp/donnees-test.sqm"), [7u8; TAILLE_CLE]);
+
+        assert!(!etat.correspond_a(&[8u8; TAILLE_CLE]));
+    }
+
+    #[test]
+    fn correspond_a_redevient_faux_apres_purge() {
+        let etat = EtatSession::nouveau();
+        etat.definir(PathBuf::from("/tmp/donnees-test.sqm"), [7u8; TAILLE_CLE]);
+        etat.purger();
+
+        assert!(!etat.correspond_a(&[7u8; TAILLE_CLE]));
     }
 }

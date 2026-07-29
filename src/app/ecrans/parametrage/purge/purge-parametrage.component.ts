@@ -210,6 +210,10 @@ export class SqmPurgeParametrageComponent {
         return 'Le fichier de données est verrouillé par un autre processus.';
       case 'motDePasseOuFichierInvalide':
         return 'Mot de passe incorrect.';
+      case 'sessionVerrouillee':
+        return 'La session est verrouillée : déverrouillez-la avant de sauvegarder.';
+      case 'motDePasseSessionDivergent':
+        return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
       case 'entreeReferentielInvalide':
@@ -226,6 +230,10 @@ export class SqmPurgeParametrageComponent {
       case 'versionSchemaSuperieure':
       case 'aucunFichierOuvert':
       case 'credentialInvalide':
+      case 'fichierConfigurationIllisible':
+      case 'formatConfigurationNonReconnu':
+      case 'versionSchemaConfigurationSuperieure':
+      case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'opération.";

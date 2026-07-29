@@ -174,6 +174,11 @@ describe('SqmReferentielsParametrageComponent', () => {
     ['typeReferentielInconnu', 'Ce type de référentiel est inconnu.'],
     ['motDePasseOuFichierInvalide', 'Mot de passe incorrect.'],
     ['fichierVerrouille', 'Le fichier de données est verrouillé par un autre processus.'],
+    ['sessionVerrouillee', 'La session est verrouillée : déverrouillez-la avant de sauvegarder.'],
+    [
+      'motDePasseSessionDivergent',
+      'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
+    ],
     ['erreurInterne', "Une erreur inattendue est survenue lors de l'enregistrement."],
   ] as const)('traduit l’anomalie « %s » en message explicite', async (type, messageAttendu) => {
     const composant = TestBed.createComponent(

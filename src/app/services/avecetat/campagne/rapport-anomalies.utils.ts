@@ -224,6 +224,7 @@ export class RapportAnomaliesUtils {
       'reponseInattendue',
       'droitsInsuffisants',
       'credentialAbsent',
+      'instanceIntrouvable',
     ];
     return categories.find((candidate) => candidate === valeur);
   }

@@ -589,6 +589,32 @@ describe('OrchestrateurCampagneService', () => {
       expect(progressionProjet?.motifEchec).toBe('gitlab.marqueurs_ia : instanceInjoignable');
     });
 
+    it('doit consigner une anomalie « instanceIntrouvable » plutôt que d’ignorer silencieusement une source dont l’instance n’existe plus dans le groupe (R10-09)', async () => {
+      const sourceOrpheline: Source = {
+        ...DonneesDeTest.sourceGitlab('source-1'),
+        instanceId: 'instance-absente',
+      };
+      const projet = DonneesDeTest.projet('projet-1', [sourceOrpheline]);
+      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+      await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+      expect(invokeSimule).not.toHaveBeenCalled();
+      const [, , , verdicts] = donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+      const verdict: Verdict = verdicts[0];
+      expect(verdict.statut).toBe('echec');
+      expect(verdict.anomalies).toEqual([
+        {
+          indicateur: 'source.instanceIntrouvable',
+          sourceId: 'source-1',
+          anomalie: {
+            type: 'instanceIntrouvable',
+            message: 'Instance instance-absente introuvable dans le groupe groupe-1',
+          },
+        },
+      ]);
+    });
+
     it('ne doit pas interroger un indicateur désactivé pour le groupe et ne pas le proposer au brouillon', async () => {
       const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
       donneesApplicationMock.groupes.mockReturnValue([

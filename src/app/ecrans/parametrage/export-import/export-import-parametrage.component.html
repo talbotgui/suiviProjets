@@ -1,0 +1,113 @@
+<!-- Interpolation Angular systématique, jamais d'injection HTML dynamique ([innerHTML]) : tout contenu externe
+     (valeurs `avant`/`apres` d'une entrée de référentiel importée) toujours échappé
+     (docs/02_documentation/15_normesSecurite.md). -->
+<section class="export-import-parametrage">
+  <h2>Export / Import de configuration</h2>
+
+  @if (messageErreur) {
+    <p class="export-import-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+  }
+  @if (messageSucces) {
+    <p class="export-import-parametrage__succes">{{ messageSucces }}</p>
+  }
+
+  <section class="export-import-parametrage__bloc">
+    <h3>Exporter</h3>
+    <p>
+      Exporte en clair les seuils de couleur et les référentiels (dépendances, marqueurs IA, motif
+      de nommage de branche) dans un fichier JSON partageable. Les membres connus et toute autre
+      donnée de groupe en sont structurellement exclus (RG-028).
+    </p>
+    <button type="button" [disabled]="enCours" (click)="exporter()">
+      Choisir un emplacement et exporter
+    </button>
+  </section>
+
+  <section class="export-import-parametrage__bloc">
+    <h3>Importer</h3>
+    <p>
+      Importe une configuration partageable déjà exportée : chaque ligne est présentée avec son
+      ancienne et sa nouvelle valeur, à accepter globalement ou une à une ; rien n'est appliqué sans
+      confirmation explicite (RG-029).
+    </p>
+    <button type="button" [disabled]="enCours" (click)="choisirEtPrevisualiser()">
+      Choisir un fichier de configuration
+    </button>
+
+    @if (differentiel) {
+      @if (differentiel.lignesInvalides.length > 0) {
+        <div class="export-import-parametrage__avertissement" role="status">
+          <p>
+            {{ differentiel.lignesInvalides.length }} ligne(s) du fichier importé sont
+            structurellement invalides et ne peuvent pas être proposées à l'acceptation :
+          </p>
+          <ul>
+            @for (ligneInvalide of differentiel.lignesInvalides; track ligneInvalide.chemin) {
+              <li>{{ ligneInvalide.chemin }} — {{ ligneInvalide.motif }}</li>
+            }
+          </ul>
+        </div>
+      }
+
+      @if (differentiel.lignes.length === 0) {
+        <p>Ce fichier de configuration ne porte aucune donnée exploitable.</p>
+      } @else {
+        <div class="export-import-parametrage__actions-groupees">
+          <button type="button" [disabled]="enCours" (click)="toutAccepter()">Tout accepter</button>
+          <button type="button" [disabled]="enCours" (click)="toutRefuser()">Tout refuser</button>
+        </div>
+
+        <table class="export-import-parametrage__table">
+          <thead>
+            <tr>
+              <th scope="col">Accepter</th>
+              <th scope="col">Élément</th>
+              <th scope="col">Catégorie</th>
+              <th scope="col">Valeur actuelle</th>
+              <th scope="col">Valeur importée</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ligne of differentiel.lignes; track ligne.chemin) {
+              <tr>
+                <td>
+                  @if (estLigneSelectionnable(ligne.chemin)) {
+                    <input
+                      type="checkbox"
+                      [checked]="lignesAcceptees.has(ligne.chemin)"
+                      (change)="basculerLigne(ligne.chemin)"
+                      [attr.aria-label]="'Accepter la ligne ' + ligne.chemin"
+                    />
+                  }
+                </td>
+                <td>{{ ligne.chemin }}</td>
+                <td>{{ libelleCategorie(ligne.categorie) }}</td>
+                <td>{{ formaterValeur(ligne.avant) }}</td>
+                <td>{{ formaterValeur(ligne.apres) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div class="export-import-parametrage__actions-groupees">
+          <button
+            type="button"
+            [disabled]="enCours || lignesAcceptees.size === 0"
+            (click)="demanderImport()"
+          >
+            Importer les lignes acceptées
+          </button>
+          <button type="button" [disabled]="enCours" (click)="annulerImport()">Annuler</button>
+        </div>
+      }
+    }
+
+    @if (importEnAttenteMotDePasse) {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour appliquer les lignes acceptées."
+        (confirmee)="confirmerImport($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+</section>

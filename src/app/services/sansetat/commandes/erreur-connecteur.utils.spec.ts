@@ -11,6 +11,7 @@ const CATEGORIES: readonly CategorieErreurConnecteur[] = [
   'reponseInattendue',
   'droitsInsuffisants',
   'credentialAbsent',
+  'instanceIntrouvable',
 ];
 
 describe('ErreurConnecteurUtils', () => {

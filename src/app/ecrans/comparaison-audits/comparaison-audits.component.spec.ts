@@ -5,6 +5,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
+import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import {
   StatutMembre,
@@ -22,6 +23,7 @@ import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmComparaisonAuditsComponent } from './comparaison-audits.component';
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('html-to-image', () => ({ toPng: jest.fn() }));
 
 const JOUR_MS = 24 * 60 * 60 * 1000;
 
@@ -287,6 +289,7 @@ class DonneesDeTest {
 describe('SqmComparaisonAuditsComponent', () => {
   beforeEach(async () => {
     jest.mocked(invoke).mockReset();
+    jest.mocked(toPng).mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmComparaisonAuditsComponent],
       providers: [provideRouter([{ path: '**', component: ComposantFactice }])],
@@ -578,6 +581,27 @@ describe('SqmComparaisonAuditsComponent', () => {
       const element = DomTestUtils.obtenirElementNatif(fixture);
       expect(element.textContent).toContain('Jalon dans');
       expect(element.textContent).not.toContain('Jalon hors intervalle');
+    });
+
+    it('déclenche l’export PNG au clic sur le bouton dédié (conteneur complet)', async () => {
+      const toPngSimule = jest.mocked(toPng);
+      toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
+      const clicAncre = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
+        // Neutralisé : jsdom ne doit pas tenter de naviguer vers l'URL de données générée.
+      });
+
+      const fixture = creerFixture('projet-1', racineDeuxAudits());
+      const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
+        '.comparaison-audits__export',
+      );
+      expect(bouton).not.toBeNull();
+      bouton?.click();
+      await fixture.whenStable();
+
+      expect(toPngSimule).toHaveBeenCalledTimes(1);
+      const [elementExporte] = toPngSimule.mock.calls[0];
+      expect(elementExporte.classList.contains('comparaison-audits')).toBe(true);
+      clicAncre.mockRestore();
     });
 
     it(

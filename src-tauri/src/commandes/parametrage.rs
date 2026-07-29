@@ -37,6 +37,7 @@ pub(crate) fn definir_seuil(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_seuil(&mut donnees, &cle, valeur, horodatage)?;
@@ -64,6 +65,7 @@ pub(crate) fn definir_referentiel(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_referentiel(&mut donnees, &type_referentiel, entree, horodatage)?;

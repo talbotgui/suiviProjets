@@ -79,6 +79,7 @@ pub(crate) fn qualifier_membre(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ReponseQualificationMembre, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     let membres_en_conflit = administration::qualifier_membre(
@@ -127,6 +128,7 @@ pub(crate) fn definir_politique_ia(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     let a_change = administration::definir_politique_ia(
@@ -167,6 +169,7 @@ pub(crate) fn supprimer_membre_connu(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     administration::supprimer_membre_connu(

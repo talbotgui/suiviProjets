@@ -327,4 +327,24 @@ describe('SqmMembresConnusAdminComponent', () => {
       'Cette règle est introuvable : elle a peut-être déjà été supprimée.',
     );
   });
+
+  it('affiche un message explicite quand le mot de passe saisi diverge de la session (R10-01)', async () => {
+    const racineAvecMembre: DonneesRacine = {
+      ...DonneesDeTest.racineActuelle(donneesApplication),
+      groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+        g.id === groupeId ? { ...g, membresConnus: [DonneesDeTest.membre('m1')] } : g,
+      ),
+    };
+    donneesApplication.chargerRacine(racineAvecMembre);
+    invokeSimule.mockRejectedValue({ type: 'motDePasseSessionDivergent' });
+    composant.selectionnerGroupe(groupeId);
+
+    composant.demanderSuppression('m1');
+    composant.confirmerSuppression();
+    await composant.confirmerSuppressionMotDePasse('mauvais-mot-de-passe');
+
+    expect(composant.messageErreur).toBe(
+      'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
+    );
+  });
 });

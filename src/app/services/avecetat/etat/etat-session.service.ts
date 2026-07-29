@@ -9,6 +9,7 @@
 // phases ultérieures du plan. Aucun écran ni aucune façade de commandes TypeScript n'existe encore à ce stade.
 import { Injectable, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
+import type { ErreurAdministration } from './types-donnees';
 
 /**
  * État courant du fichier de données au sein de la session applicative (US-026).
@@ -86,6 +87,8 @@ export class EtatSessionService {
   private readonly echecsDeverrouillageInterne: WritableSignal<number> = signal(0);
   private readonly progressionCampagneInterne: WritableSignal<ProgressionCampagne | null> =
     signal(null);
+  private readonly echecEnregistrementBrouillonInterne: WritableSignal<ErreurAdministration | null> =
+    signal(null);
 
   /**
    * État courant du fichier de données (fermé, ouvert, verrouillé), exposé en lecture seule.
@@ -123,6 +126,16 @@ export class EtatSessionService {
    */
   public readonly progressionCampagne: Signal<ProgressionCampagne | null> =
     this.progressionCampagneInterne.asReadonly();
+
+  /**
+   * Anomalie de l'échec le plus récent d'enregistrement du brouillon à l'issue d'une campagne (RG-002, R10-06),
+   * `null` si aucun échec n'est en attente d'affichage. La campagne navigue immédiatement vers le Tableau de bord
+   * d'exécution sans attendre cette sauvegarde finale (progression réactive) : un échec survenant après cette
+   * navigation était jusqu'ici silencieusement perdu ; il est désormais retenu ici jusqu'à sa prise en compte par
+   * l'écran Brouillon.
+   */
+  public readonly echecEnregistrementBrouillon: Signal<ErreurAdministration | null> =
+    this.echecEnregistrementBrouillonInterne.asReadonly();
 
   /**
    * Marque l'ouverture d'un fichier (création ou chargement réussi) : passe en état ouvert, mémorise le chemin et
@@ -183,6 +196,23 @@ export class EtatSessionService {
         [projetId]: { ...entreeCourante, ...misesAJour },
       },
     });
+  }
+
+  /**
+   * Signale l'échec de l'enregistrement du brouillon à l'issue d'une campagne (RG-002, R10-06), pour affichage
+   * ultérieur par l'écran Brouillon, seul consommateur prévu de cet état.
+   * @param anomalie - Anomalie typée renvoyée par `DonneesApplicationService.enregistrerBrouillon`.
+   */
+  public signalerEchecEnregistrementBrouillon(anomalie: ErreurAdministration): void {
+    this.echecEnregistrementBrouillonInterne.set(anomalie);
+  }
+
+  /**
+   * Acquitte l'échec d'enregistrement du brouillon actuellement retenu, une fois pris en compte par l'écran
+   * Brouillon (affiché ou dépassé par un nouvel enregistrement réussi).
+   */
+  public acquitterEchecEnregistrementBrouillon(): void {
+    this.echecEnregistrementBrouillonInterne.set(null);
   }
 
   /**

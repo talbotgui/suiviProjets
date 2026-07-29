@@ -47,6 +47,7 @@ pub(crate) fn creer_annotation(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     alertes::creer_annotation(
@@ -86,6 +87,7 @@ pub(crate) fn qualifier_alerte(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     alertes::qualifier_alerte(&mut donnees, cle_alerte, statut, commentaire, horodatage);

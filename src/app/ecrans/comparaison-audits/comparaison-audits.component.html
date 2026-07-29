@@ -23,13 +23,16 @@
       </div>
     }
     @case ('pret') {
-      <div class="comparaison-audits">
+      <div class="comparaison-audits" #conteneurExport>
         @let donnees = etatValue.donnees;
 
         <header class="comparaison-audits__entete">
           <p class="comparaison-audits__fil-ariane">
             {{ donnees.nomGroupe }} &gt; {{ donnees.nomProjet }} &gt; Comparaison entre deux audits
           </p>
+          <button type="button" class="comparaison-audits__export" (click)="exporterPng()">
+            Exporter en PNG
+          </button>
         </header>
 
         <!-- Sélection de deux dates, avec raccourcis (docs/02_documentation/09_maquettes.md#comparaison-entre-deux-

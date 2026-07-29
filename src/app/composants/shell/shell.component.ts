@@ -20,9 +20,11 @@
 //   chaque activation à partir de `EtatSessionService.progressionCampagne`/`DonneesApplicationService.racine()?.
 //   brouillon`, déjà exposés par les Stores existants (Phase 5).
 // - La gestion des credentials, documentée comme action de la barre supérieure par `08_arborescenceNavigation.md#
-//   règles-de-navigation`, reste un bouton désactivé (« à venir », écran distinct US-003/US-004, hors périmètre de
-//   la tâche ayant câblé le verrouillage/la sauvegarde ci-dessous) : l'emplacement prévu par la charte de
-//   navigation reste ainsi visible plutôt qu'omis silencieusement.
+//   règles-de-navigation`, ouvre désormais l'écran dédié `SqmCredentialsComponent` (Phase 9, incrément 3, US-003,
+//   US-004, US-031) par navigation programmatique (`ouvrirCredentials`), sur le même modèle que le bouton
+//   « Audits » ci-dessous (bouton plutôt que `routerLink`, seule différence : cette cible est statique, la
+//   navigation programmatique n'est retenue ici que pour conserver l'apparence de bouton déjà en place dans la
+//   barre supérieure plutôt que de la reconstruire avec un lien).
 // - La recherche transversale (US-021, Phase 7 incrément 5) est désormais active : `SqmRechercheTransversaleComponent`
 //   n'est monté par ce Shell que lorsqu'il doit être visible (aucun état de visibilité interne, cf. commentaire
 //   d'en-tête de ce composant), ouvert par le bouton de la barre supérieure ou par le raccourci clavier Ctrl+K/Cmd+K
@@ -159,6 +161,13 @@ export class SqmShellComponent {
    */
   public async verrouillerManuellement(): Promise<void> {
     await this.donneesApplication.verrouillerSession();
+  }
+
+  /**
+   * Ouvre l'écran de Gestion des credentials (bouton 🔑 de la barre supérieure, US-003, US-004, US-031).
+   */
+  public ouvrirCredentials(): void {
+    void this.router.navigateByUrl('/credentials');
   }
 
   /**

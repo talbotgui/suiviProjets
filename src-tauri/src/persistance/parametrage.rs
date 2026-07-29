@@ -115,7 +115,12 @@ fn lire_champ_chaine_non_vide<'a>(
 
 /// Valide la forme minimale attendue d'une entrée de `referentiels.reglesDependances` (`id`, `motif` non vides,
 /// `versions` tableau), sans interpréter le détail de chaque borne de version (rôle du Moteur de jugement, UI).
-fn valider_entree_regles_dependances(entree: &Value) -> Result<&str, ErreurParametrage> {
+///
+/// `pub(crate)` depuis la Phase 9, incrément 3 (correction post-relecture) : réutilisé tel quel par
+/// `persistance::configuration_partageable::calculer_differentiel` pour signaler comme lignes invalides, plutôt
+/// que d'appliquer sans contrôle, les entrées importées ne respectant pas cette même forme minimale — la voie
+/// d'import ne doit jamais être moins stricte que la saisie manuelle sur les mêmes données.
+pub(crate) fn valider_entree_regles_dependances(entree: &Value) -> Result<&str, ErreurParametrage> {
     let objet = entree
         .as_object()
         .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
@@ -130,7 +135,12 @@ fn valider_entree_regles_dependances(entree: &Value) -> Result<&str, ErreurParam
 /// Valide la forme minimale attendue d'une entrée de `referentiels.reglesMarqueursIA` (F18) : `id`, `motif`,
 /// `outil` non vides, `typeCorrespondance`/`portee`/`nature` parmi leurs valeurs closes respectives (mêmes
 /// ensembles que `ParametresJugementUtils` côté UI, `services/sansetat/jugement/parametres-jugement.utils.ts`).
-fn valider_entree_regles_marqueurs_ia(entree: &Value) -> Result<&str, ErreurParametrage> {
+///
+/// `pub(crate)` depuis la Phase 9, incrément 3 (correction post-relecture) : cf. commentaire de
+/// [`valider_entree_regles_dependances`] ci-dessus, même justification.
+pub(crate) fn valider_entree_regles_marqueurs_ia(
+    entree: &Value,
+) -> Result<&str, ErreurParametrage> {
     let objet = entree
         .as_object()
         .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
@@ -152,9 +162,28 @@ fn valider_entree_regles_marqueurs_ia(entree: &Value) -> Result<&str, ErreurPara
     Ok(id)
 }
 
+/// Valide qu'une valeur JSON est une chaîne non vide et syntaxiquement valide comme expression régulière (RG-030),
+/// et la renvoie. Extraite de [`definir_referentiel`] à la Phase 9, incrément 3 (correction post-relecture) :
+/// `pub(crate)`, réutilisée telle quelle par `persistance::configuration_partageable::calculer_differentiel` pour
+/// signaler comme ligne invalide, plutôt que d'appliquer sans contrôle, un motif de nommage de branche importé
+/// syntaxiquement incorrect — la voie d'import ne doit jamais être moins stricte que la saisie manuelle sur la
+/// même donnée.
+pub(crate) fn valider_motif_nommage_branches(entree: &Value) -> Result<&str, ErreurParametrage> {
+    let motif = entree
+        .as_str()
+        .filter(|motif| !motif.is_empty())
+        .ok_or(ErreurParametrage::MotifNommageBranchesInvalide)?;
+    Regex::new(motif).map_err(|_| ErreurParametrage::MotifNommageBranchesInvalide)?;
+    Ok(motif)
+}
+
 /// Ajoute ou met à jour, par identifiant, une entrée d'un référentiel-liste (`regles`), et renvoie l'entrée
 /// précédente (`Value::Null` si l'identifiant était absent, c'est-à-dire création).
-fn upsert_par_id(regles: &mut Vec<Value>, id: &str, entree: Value) -> Value {
+///
+/// `pub(crate)` (plutôt que privé au module) depuis la Phase 9, incrément 3 : réutilisé tel quel par
+/// `persistance::configuration_partageable::appliquer_ligne` pour l'application d'une ligne acceptée du
+/// différentiel d'import de configuration (US-030), afin de ne pas dupliquer cette logique d'upsert.
+pub(crate) fn upsert_par_id(regles: &mut Vec<Value>, id: &str, entree: Value) -> Value {
     let existante = regles.iter_mut().find(|regle| {
         regle.as_object().and_then(|objet| objet.get("id")) == Some(&Value::String(id.to_string()))
     });
@@ -205,13 +234,9 @@ pub(crate) fn definir_referentiel(
             (format!("referentiels.reglesMarqueursIA/{id}"), avant)
         }
         "motifNommageBranches" => {
-            let motif = entree
-                .as_str()
-                .filter(|motif| !motif.is_empty())
-                .ok_or(ErreurParametrage::MotifNommageBranchesInvalide)?;
-            Regex::new(motif).map_err(|_| ErreurParametrage::MotifNommageBranchesInvalide)?;
+            let motif = valider_motif_nommage_branches(&entree)?.to_string();
             let avant = Value::String(donnees.referentiels.motif_nommage_branches.clone());
-            donnees.referentiels.motif_nommage_branches = motif.to_string();
+            donnees.referentiels.motif_nommage_branches = motif;
             ("referentiels.motifNommageBranches".to_string(), avant)
         }
         _ => return Err(ErreurParametrage::TypeReferentielInconnu),

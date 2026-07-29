@@ -13,13 +13,15 @@
 // simple liste (nom d'instance), sans navigation vers un écran de saisie qui n'existe pas encore ; le blocage
 // RG-019 est un bandeau intégré à cet écran plutôt qu'un guard de route, faute d'écran Brouillon existant vers
 // lequel rediriger ; le lancement n'attend pas la fin de la campagne avant de naviguer vers le Tableau de bord
-// d'exécution (la progression y est réactive), ce qui signifie qu'un échec de la sauvegarde finale du brouillon
-// (RG-002, mot de passe incorrect) n'est aujourd'hui pas re-signalé après cette navigation — limitation connue, à
-// traiter par un incrément ultérieur (écran Brouillon).
+// d'exécution (la progression y est réactive). Un échec de la sauvegarde finale du brouillon (RG-002, mot de passe
+// incorrect) survient nécessairement après cette navigation : il n'est donc pas affiché ici, mais retenu par
+// `EtatSessionService.signalerEchecEnregistrementBrouillon` pour affichage par l'écran Brouillon dès sa prochaine
+// consultation (Phase 10, R10-06).
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import type { Groupe } from '../../../services/avecetat/etat/types-donnees';
 import { OrchestrateurCampagneService } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
 import type { ConstitutionCampagne } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
@@ -42,6 +44,7 @@ export class SqmConstitutionCampagneComponent {
   private readonly orchestrateurCampagne: OrchestrateurCampagneService = inject(
     OrchestrateurCampagneService,
   );
+  private readonly etatSession: EtatSessionService = inject(EtatSessionService);
   private readonly router: Router = inject(Router);
 
   /**
@@ -230,13 +233,21 @@ export class SqmConstitutionCampagneComponent {
 
   /**
    * Lance la campagne sur la sélection courante après confirmation du mot de passe (US-009, RG-002), puis navigue
-   * immédiatement vers le Tableau de bord d'exécution sans attendre la fin de la campagne (cf. commentaire d'en-
-   * tête de ce fichier : la progression y est réactive, un échec de sauvegarde finale n'est pas re-signalé ici).
+   * immédiatement vers le Tableau de bord d'exécution sans attendre la fin de la campagne (progression réactive,
+   * cf. commentaire d'en-tête de ce fichier). Un échec de la sauvegarde finale du brouillon, connu seulement une
+   * fois la campagne achevée, est retenu par `EtatSessionService.signalerEchecEnregistrementBrouillon` plutôt que
+   * perdu silencieusement (R10-06) : c'est l'écran Brouillon qui l'affichera à sa prochaine consultation.
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public confirmerLancement(motDePasse: string): void {
     this.confirmationMotDePasseVisible = false;
-    void this.orchestrateurCampagne.lancerCampagne(Array.from(this.selectionProjetIds), motDePasse);
+    void this.orchestrateurCampagne
+      .lancerCampagne(Array.from(this.selectionProjetIds), motDePasse)
+      .then((resultat) => {
+        if (resultat.type === 'echec') {
+          this.etatSession.signalerEchecEnregistrementBrouillon(resultat.anomalie);
+        }
+      });
     void this.router.navigateByUrl('/audits/tableau-de-bord');
   }
 

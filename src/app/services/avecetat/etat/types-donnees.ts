@@ -676,6 +676,10 @@ export type CategorieErreurAdministration =
   | 'motifNommageBranchesInvalide'
   | 'modePurgeAgeInconnu'
   | 'vueIntrouvable'
+  | 'fichierConfigurationIllisible'
+  | 'formatConfigurationNonReconnu'
+  | 'versionSchemaConfigurationSuperieure'
+  | 'ligneDifferentielInconnue'
   | 'fichierIntrouvable'
   | 'motDePasseOuFichierInvalide'
   | 'formatNonReconnu'
@@ -683,6 +687,8 @@ export type CategorieErreurAdministration =
   | 'fichierVerrouille'
   | 'aucunFichierOuvert'
   | 'credentialInvalide'
+  | 'sessionVerrouillee'
+  | 'motDePasseSessionDivergent'
   | 'erreurInterne';
 
 /**
@@ -751,3 +757,59 @@ export type ResultatPrevisualisationPurge =
  * Mode de purge par âge (RG-025), transmis tel quel à `previsualiserPurgeAge`/`executerPurgeAge`.
  */
 export type ModePurgeAge = 'suppression' | 'agregationMensuelle';
+
+/**
+ * Catégorie d'une ligne du différentiel d'import de configuration partageable (US-030, RG-029), mirroir de
+ * `CategorieLigneDifferentiel` côté cœur natif.
+ */
+export type CategorieLigneDifferentiel = 'ajout' | 'modification' | 'identique';
+
+/**
+ * Ligne du différentiel entre la configuration partageable actuelle et celle importée (US-030), mirroir de
+ * `LigneDifferentielImport` côté cœur natif.
+ */
+export interface LigneDifferentielImport {
+  /**
+   * Chemin stable identifiant la valeur concernée (ex. `parametres.seuils.vitalite.mortJours`,
+   * `referentiels.reglesDependances/d1`, `referentiels.motifNommageBranches`).
+   */
+  readonly chemin: string;
+  /** Catégorie de la ligne. */
+  readonly categorie: CategorieLigneDifferentiel;
+  /** Valeur actuelle, absente si la ligne est un ajout. */
+  readonly avant?: unknown;
+  /** Valeur importée. */
+  readonly apres: unknown;
+}
+
+/**
+ * Ligne d'une entrée importée structurellement invalide (motif de nommage de branche syntaxiquement incorrect,
+ * entrée de référentiel-liste dépourvue de ses champs obligatoires), mirroir de `LigneInvalideImport` côté cœur
+ * natif : jamais proposée à l'acceptation, mais signalée explicitement à l'utilisateur (correction post-relecture,
+ * Phase 9 incrément 3, arbitrage humain explicite).
+ */
+export interface LigneInvalideImport {
+  /** Chemin stable de la ligne concernée, sur le même format que `LigneDifferentielImport.chemin`. */
+  readonly chemin: string;
+  /** Motif de l'invalidité, message technique (jamais un credential ni une donnée sensible). */
+  readonly motif: string;
+}
+
+/**
+ * Différentiel complet entre la configuration partageable actuelle et celle importée (US-029, US-030, RG-028,
+ * RG-029), mirroir de `DifferentielImportConfiguration` côté cœur natif.
+ */
+export interface DifferentielImportConfiguration {
+  /** Lignes du différentiel. */
+  readonly lignes: readonly LigneDifferentielImport[];
+  /** Lignes importées structurellement invalides, jamais proposées à l'acceptation. */
+  readonly lignesInvalides: readonly LigneInvalideImport[];
+}
+
+/**
+ * Résultat typé d'une prévisualisation d'import de configuration partageable
+ * (`previsualiserImportConfiguration`), sur le modèle de {@link ResultatPrevisualisationPurge}.
+ */
+export type ResultatPrevisualisationImportConfiguration =
+  | { readonly type: 'succes'; readonly differentiel: DifferentielImportConfiguration }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };

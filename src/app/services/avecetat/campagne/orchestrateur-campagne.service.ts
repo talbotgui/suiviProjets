@@ -246,6 +246,18 @@ export class OrchestrateurCampagneService {
         (candidate) => candidate.id === source.instanceId,
       );
       if (instance === undefined) {
+        // R10-09 : une source dont l'instance associée n'existe plus dans le groupe était jusqu'ici ignorée
+        // silencieusement (source de configuration invalide, jamais consignée) ; consignée désormais comme une
+        // anomalie explicite, sur le même modèle minimal `{ indicateur, sourceId, anomalie }` que les échecs d'appel
+        // (cf. commentaire d'en-tête de ce fichier), afin de rester visible dans le rapport d'anomalies (F08).
+        anomalies.push({
+          indicateur: 'source.instanceIntrouvable',
+          sourceId: source.id,
+          anomalie: {
+            type: 'instanceIntrouvable',
+            message: `Instance ${source.instanceId} introuvable dans le groupe ${resolution.groupe.id}`,
+          },
+        });
         continue;
       }
       this.etatSession.mettreAJourProgressionProjet(projetId, {

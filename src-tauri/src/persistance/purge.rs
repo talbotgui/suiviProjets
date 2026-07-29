@@ -13,14 +13,20 @@
 //! confiance à une liste d'identifiants choisie côté interface pour une opération destructrice et irréversible (cf.
 //! `docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`), et dupliquer cet algorithme de
 //! sélection côté TypeScript risquerait une divergence entre l'aperçu montré à l'utilisateur et ce qui est
-//! réellement supprimé. Contrairement à `persistance::parametrage`, aucune entrée n'est consignée au journal des
-//! modifications (RG-023) : une purge d'audits n'est pas une donnée « de jugement » au sens du périmètre de RG-023
-//! (seuil, référentiel, qualification de membre, politique IA, ref auditée d'une source), qui reste inchangé par
-//! cette opération.
+//! réellement supprimé.
+//!
+//! Une exécution effective (jamais une prévisualisation, consultation pure) qui supprime au moins un audit consigne
+//! une entrée récapitulative au journal des modifications (RG-023 étendue, Phase 10, R10-17) : un arbitrage humain
+//! antérieur avait initialement exclu la purge de ce périmètre au motif qu'elle ne touche aucune donnée « de
+//! jugement » au sens strict de RG-023 (seuil, référentiel, qualification de membre, politique IA, ref auditée),
+//! mais la disparition irréversible d'audits est en pratique la modification la plus significative que le journal
+//! puisse tracer ; ce point a été révisé lors de la session d'arbitrage précédant la Phase 10 (cf.
+//! `docs/03_plan/plan_13_developpement.md#phase-10--rattrapage--bugs`, R10-17).
 
-use crate::modele::racine::{Audit, DonneesRacine};
+use crate::modele::racine::{Audit, DonneesRacine, EntreeJournal};
 use chrono::{Datelike, Months, NaiveDate};
 use serde::Serialize;
+use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -230,11 +236,43 @@ pub(crate) fn previsualiser_purge_densite(racine: &DonneesRacine) -> Previsualis
     purger(&mut copie, identifiants_a_supprimer_densite)
 }
 
+/// Consigne une entrée récapitulative au journal des modifications (RG-023, R10-17) pour une exécution effective de
+/// purge ayant réellement supprimé au moins un audit ; sans effet si `resume.nb_audits_supprimes` est nul (cohérent
+/// avec RG-023 : une entrée de journal représente une modification réelle, jamais un no-op).
+fn consigner_purge(
+    donnees: &mut DonneesRacine,
+    resume: &PrevisualisationPurge,
+    mode: &str,
+    horodatage: String,
+) {
+    if resume.nb_audits_supprimes == 0 {
+        return;
+    }
+    donnees.journal.push(EntreeJournal {
+        id: uuid::Uuid::new_v4().to_string(),
+        horodatage,
+        objet: "audits".to_string(),
+        avant: Value::Null,
+        apres: json!({
+            "nbAuditsSupprimes": resume.nb_audits_supprimes,
+            "nbProjetsConcernes": resume.nb_projets_concernes,
+        }),
+        origine: "Purge".to_string(),
+        detail_origine: Some(mode.to_string()),
+    });
+}
+
 /// Exécute une purge par densité (RG-024) : retire de `racine`, en place, les audits désignés par
-/// [`identifiants_a_supprimer_densite`] ; la sauvegarde effective reste de la responsabilité de la commande de la
-/// Façade appelante (`commandes::purge`).
-pub(crate) fn executer_purge_densite(racine: &mut DonneesRacine) -> PrevisualisationPurge {
-    purger(racine, identifiants_a_supprimer_densite)
+/// [`identifiants_a_supprimer_densite`], puis consigne une entrée de journal si au moins un audit a été supprimé
+/// (RG-023, R10-17) ; la sauvegarde effective reste de la responsabilité de la commande de la Façade appelante
+/// (`commandes::purge`).
+pub(crate) fn executer_purge_densite(
+    racine: &mut DonneesRacine,
+    horodatage: String,
+) -> PrevisualisationPurge {
+    let resume = purger(racine, identifiants_a_supprimer_densite);
+    consigner_purge(racine, &resume, "densité", horodatage);
+    resume
 }
 
 /// Prévisualise une purge par âge (RG-025) : calcule le résumé de l'opération, pour le mode désigné, sur une copie
@@ -257,8 +295,9 @@ pub(crate) fn previsualiser_purge_age(
 }
 
 /// Exécute une purge par âge (RG-025) : retire de `racine`, en place, les audits désignés par
-/// [`identifiants_a_supprimer_age`] pour le mode désigné ; la sauvegarde effective reste de la responsabilité de la
-/// commande de la Façade appelante (`commandes::purge`).
+/// [`identifiants_a_supprimer_age`] pour le mode désigné, puis consigne une entrée de journal si au moins un audit
+/// a été supprimé (RG-023, R10-17) ; la sauvegarde effective reste de la responsabilité de la commande de la Façade
+/// appelante (`commandes::purge`).
 ///
 /// # Erreurs
 ///
@@ -267,12 +306,16 @@ pub(crate) fn executer_purge_age(
     racine: &mut DonneesRacine,
     aujourdhui: NaiveDate,
     mode: &str,
+    horodatage: String,
 ) -> Result<PrevisualisationPurge, ErreurPurge> {
+    let mode_libelle = mode.to_string();
     let mode = ModePurgeAge::depuis_str(mode)?;
     let limite = limite_purge_age(aujourdhui);
-    Ok(purger(racine, |audits| {
+    let resume = purger(racine, |audits| {
         identifiants_a_supprimer_age(audits, limite, mode)
-    }))
+    });
+    consigner_purge(racine, &resume, &mode_libelle, horodatage);
+    Ok(resume)
 }
 
 #[cfg(test)]
@@ -351,7 +394,7 @@ mod tests {
             audit_de_test("a3", "2026-01-15"),
         ]);
 
-        let resume = executer_purge_densite(&mut racine);
+        let resume = executer_purge_densite(&mut racine, "2026-07-29T08:00:00Z".to_string());
 
         assert_eq!(resume.nb_audits_supprimes, 1);
         let ids_restants: Vec<&str> = racine.groupes[0].projets[0]
@@ -360,6 +403,36 @@ mod tests {
             .map(|audit| audit.id.as_str())
             .collect();
         assert_eq!(ids_restants, vec!["a1", "a3"]);
+    }
+
+    #[test]
+    fn executer_purge_densite_consigne_une_entree_de_journal_si_des_audits_sont_supprimes() {
+        let mut racine = racine_avec_audits(vec![
+            audit_de_test("a1", "2026-01-01"),
+            audit_de_test("a2", "2026-01-02"),
+            audit_de_test("a3", "2026-01-15"),
+        ]);
+
+        executer_purge_densite(&mut racine, "2026-07-29T08:00:00Z".to_string());
+
+        assert_eq!(racine.journal.len(), 1);
+        let entree = &racine.journal[0];
+        assert_eq!(entree.objet, "audits");
+        assert_eq!(entree.origine, "Purge");
+        assert_eq!(entree.detail_origine.as_deref(), Some("densité"));
+        assert_eq!(entree.apres["nbAuditsSupprimes"], json!(1));
+    }
+
+    #[test]
+    fn executer_purge_densite_ne_consigne_rien_si_aucun_audit_nest_supprime() {
+        let mut racine = racine_avec_audits(vec![
+            audit_de_test("a1", "2026-01-01"),
+            audit_de_test("a2", "2026-01-02"),
+        ]);
+
+        executer_purge_densite(&mut racine, "2026-07-29T08:00:00Z".to_string());
+
+        assert!(racine.journal.is_empty());
     }
 
     #[test]
@@ -395,7 +468,12 @@ mod tests {
         ]);
 
         let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
-        let resultat = executer_purge_age(&mut racine, aujourdhui, "agregationMensuelle");
+        let resultat = executer_purge_age(
+            &mut racine,
+            aujourdhui,
+            "agregationMensuelle",
+            "2026-07-29T08:00:00Z".to_string(),
+        );
 
         assert!(resultat.is_ok());
         let ids_restants: Vec<&str> = racine.groupes[0].projets[0]
@@ -404,6 +482,30 @@ mod tests {
             .map(|audit| audit.id.as_str())
             .collect();
         assert_eq!(ids_restants, vec!["a1", "a3", "a4", "a5"]);
+    }
+
+    #[test]
+    fn executer_purge_age_consigne_une_entree_de_journal_avec_le_mode_en_detail() {
+        let mut racine = racine_avec_audits(vec![
+            audit_de_test("a1", "2024-01-01"),
+            audit_de_test("a2", "2024-06-01"),
+            audit_de_test("a3", "2026-07-01"),
+        ]);
+        let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
+
+        let resultat = executer_purge_age(
+            &mut racine,
+            aujourdhui,
+            "suppression",
+            "2026-07-29T08:00:00Z".to_string(),
+        );
+
+        assert!(resultat.is_ok());
+        assert_eq!(racine.journal.len(), 1);
+        assert_eq!(
+            racine.journal[0].detail_origine.as_deref(),
+            Some("suppression")
+        );
     }
 
     #[test]

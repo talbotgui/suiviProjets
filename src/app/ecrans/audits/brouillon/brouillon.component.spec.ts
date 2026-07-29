@@ -175,6 +175,20 @@ describe('SqmBrouillonComponent', () => {
     expect(composant.entrees()[0].projetId).toBe('projet-1');
   });
 
+  it("ne doit afficher aucun message si aucun échec d'enregistrement du brouillon n'est en attente", () => {
+    expect(composant.messageErreur).toBeNull();
+  });
+
+  it("doit afficher, dès sa construction, l'échec d'enregistrement du brouillon retenu par le Store, puis l'acquitter (R10-06)", () => {
+    const etatSession = TestBed.inject(EtatSessionService);
+    etatSession.signalerEchecEnregistrementBrouillon({ type: 'motDePasseOuFichierInvalide' });
+
+    const nouveauComposant = TestBed.createComponent(SqmBrouillonComponent).componentInstance;
+
+    expect(nouveauComposant.messageErreur).toBe('Mot de passe incorrect.');
+    expect(etatSession.echecEnregistrementBrouillon()).toBeNull();
+  });
+
   it("ne doit pas confondre l'absence de fichier chargé avec la présence d'un brouillon", () => {
     donneesApplication.reinitialiser();
 
@@ -258,6 +272,11 @@ describe('SqmBrouillonComponent', () => {
       "Un des projets sélectionnés n'est plus présent dans ce brouillon.",
     ],
     ['fichierVerrouille', 'Le fichier de données est verrouillé par un autre processus.'],
+    ['sessionVerrouillee', 'La session est verrouillée : déverrouillez-la avant de sauvegarder.'],
+    [
+      'motDePasseSessionDivergent',
+      'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
+    ],
     ['erreurInterne', "Une erreur inattendue est survenue lors de l'enregistrement."],
   ] as const)(
     'doit afficher le message correspondant à l’anomalie « %s »',

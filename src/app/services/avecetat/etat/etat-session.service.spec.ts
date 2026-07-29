@@ -171,4 +171,26 @@ describe('EtatSessionService', () => {
       });
     });
   });
+
+  describe('échec d’enregistrement du brouillon (R10-06)', () => {
+    it('doit être `null` tant qu’aucun échec n’a été signalé', () => {
+      expect(service.echecEnregistrementBrouillon()).toBeNull();
+    });
+
+    it('doit retenir l’anomalie signalée', () => {
+      service.signalerEchecEnregistrementBrouillon({ type: 'motDePasseOuFichierInvalide' });
+
+      expect(service.echecEnregistrementBrouillon()).toEqual({
+        type: 'motDePasseOuFichierInvalide',
+      });
+    });
+
+    it('doit effacer l’anomalie une fois acquittée', () => {
+      service.signalerEchecEnregistrementBrouillon({ type: 'motDePasseOuFichierInvalide' });
+
+      service.acquitterEchecEnregistrementBrouillon();
+
+      expect(service.echecEnregistrementBrouillon()).toBeNull();
+    });
+  });
 });

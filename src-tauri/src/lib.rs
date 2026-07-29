@@ -86,6 +86,9 @@ pub fn run() {
             commandes::alertes::qualifier_alerte,
             commandes::vues::definir_vue,
             commandes::vues::supprimer_vue,
+            commandes::configuration_partageable::exporter_configuration,
+            commandes::configuration_partageable::previsualiser_import_configuration,
+            commandes::configuration_partageable::importer_configuration,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

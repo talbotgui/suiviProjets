@@ -7,6 +7,7 @@ import { SqmBrouillonComponent } from './ecrans/audits/brouillon/brouillon.compo
 import { SqmConstitutionCampagneComponent } from './ecrans/audits/constitution-campagne/constitution-campagne.component';
 import { SqmTableauDeBordComponent } from './ecrans/audits/tableau-de-bord/tableau-de-bord.component';
 import { SqmComparaisonAuditsComponent } from './ecrans/comparaison-audits/comparaison-audits.component';
+import { SqmCredentialsComponent } from './ecrans/credentials/credentials.component';
 import { SqmDemarrageComponent } from './ecrans/demarrage/demarrage.component';
 import { SqmFicheProjetComponent } from './ecrans/fiche-projet/fiche-projet.component';
 import { SqmListeTravailComponent } from './ecrans/liste-travail/liste-travail.component';
@@ -40,6 +41,10 @@ import { SqmSyntheseGraphiqueComponent } from './ecrans/synthese-graphique/synth
 //
 // Route `liste-travail` ajoutée à la Phase 8 (US-020, `SqmListeTravailComponent`), sur le même modèle.
 //
+// Route `credentials` ajoutée à la Phase 9, incrément 3 (US-003, US-004, US-031, `SqmCredentialsComponent`), sur
+// le même modèle (route enfant sans paramètre) : câblée depuis le bouton 🔑 de la barre supérieure du shell,
+// jusque-là désactivé (« à venir »).
+//
 // Point résolu (cf. tâche de câblage de l'écran de Démarrage, US-001, US-002) : la tension notée jusqu'ici entre
 // `05_reglesGestion.md` et `08_arborescenceNavigation.md` sur la nature de l'écran d'accueil est levée par
 // l'introduction d'une route racine distincte `demarrage` (`SqmDemarrageComponent`, hors Shell), qui porte
@@ -64,6 +69,7 @@ export const routes: Routes = [
       { path: 'synthese-audits', component: SqmSyntheseAuditsComponent },
       { path: 'synthese-graphique', component: SqmSyntheseGraphiqueComponent },
       { path: 'liste-travail', component: SqmListeTravailComponent },
+      { path: 'credentials', component: SqmCredentialsComponent },
       { path: 'fiche-projet/:projetId', component: SqmFicheProjetComponent },
       { path: 'comparaison-audits/:projetId', component: SqmComparaisonAuditsComponent },
       { path: 'administration', component: SqmAdministrationComponent },

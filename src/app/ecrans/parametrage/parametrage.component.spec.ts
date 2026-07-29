@@ -30,17 +30,15 @@ describe('SqmParametrageComponent', () => {
     },
   );
 
-  it.each(['exportImport'] as const)(
-    'affiche un contenu de repli explicite pour l’onglet « %s », non encore construit',
-    (onglet) => {
-      const fixture = TestBed.createComponent(SqmParametrageComponent);
-      fixture.componentInstance.selectionnerOnglet(onglet);
-      fixture.detectChanges();
-      const element = DomTestUtils.obtenirElementNatif(fixture);
+  it("affiche l'onglet Export / Import, construit à la Phase 9 (incrément 3, US-029, US-030)", () => {
+    const fixture = TestBed.createComponent(SqmParametrageComponent);
+    fixture.componentInstance.selectionnerOnglet('exportImport');
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
 
-      expect(element.textContent).toContain('Onglet à venir');
-    },
-  );
+    expect(element.textContent).not.toContain('Onglet à venir');
+    expect(element.textContent).toContain('Export / Import de configuration');
+  });
 
   it("affiche l'onglet Journal des modifications, construit à cet incrément (US-027)", () => {
     const fixture = TestBed.createComponent(SqmParametrageComponent);

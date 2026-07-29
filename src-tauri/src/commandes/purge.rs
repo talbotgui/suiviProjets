@@ -16,7 +16,7 @@ use super::fichier::ErreurFacade;
 use crate::modele::racine::DonneesRacine;
 use crate::persistance::moteur;
 use crate::persistance::purge::{self, PrevisualisationPurge};
-use chrono::Utc;
+use chrono::{SecondsFormat, Utc};
 use std::path::{Path, PathBuf};
 use tauri::State;
 
@@ -36,8 +36,10 @@ pub(crate) fn executer_purge_densite(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
-    purge::executer_purge_densite(&mut donnees);
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    purge::executer_purge_densite(&mut donnees, horodatage);
 
     let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
     etat.definir(PathBuf::from(chemin), cle_session);
@@ -74,9 +76,11 @@ pub(crate) fn executer_purge_age(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
     let mut donnees = donnees;
     let aujourdhui = Utc::now().date_naive();
-    purge::executer_purge_age(&mut donnees, aujourdhui, &mode)?;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    purge::executer_purge_age(&mut donnees, aujourdhui, &mode, horodatage)?;
 
     let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
     etat.definir(PathBuf::from(chemin), cle_session);
