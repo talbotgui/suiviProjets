@@ -1,9 +1,24 @@
-<div class="confirmation-suppression" role="alertdialog" aria-modal="true">
-  <p class="confirmation-suppression__message">{{ message() }}</p>
-  <div class="confirmation-suppression__actions">
-    <button type="button" (click)="annuler()">Annuler</button>
-    <button type="button" class="confirmation-suppression__bouton-danger" (click)="confirmer()">
-      {{ libelleConfirmation() }}
-    </button>
+<!-- Superposition modale pleine largeur (motif partagé `.superposition`, cf. src/styles/_motifs.scss), jusqu'ici
+     absente au même titre que `SqmConfirmationMotDePasseComponent` (cf. commentaire de ce composant, migré par le
+     même incrément). -->
+<div class="superposition">
+  <div
+    class="confirmation-suppression superposition__panneau carte d-flex direction-colonne ecart-4"
+    role="alertdialog"
+    aria-modal="true"
+  >
+    <p class="confirmation-suppression__message exterieur-0 texte-base">{{ message() }}</p>
+    <!-- Bouton de validation jamais pré-sélectionné par défaut (charte d'ergonomie, Modale de confirmation) :
+         aucun `autofocus` ici, l'ordre de tabulation naturel place le focus initial sur « Annuler ». -->
+    <div class="confirmation-suppression__actions d-flex justifie-fin ecart-2">
+      <button type="button" class="bouton" (click)="annuler()">Annuler</button>
+      <button
+        type="button"
+        class="confirmation-suppression__bouton-danger bouton bouton--danger"
+        (click)="confirmer()"
+      >
+        {{ libelleConfirmation() }}
+      </button>
+    </div>
   </div>
 </div>

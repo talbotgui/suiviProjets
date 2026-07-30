@@ -1,21 +1,11 @@
+// Résidu propre à ce composant (Phase 10, incrément 9, C10-06) : seule la couleur de l'identité « alerte
+// prioritaire » (RG-009) reste ici, la mise en page (flex, espacement, rayon) étant portée par les classes
+// utilitaires appliquées directement dans le gabarit (cf. bandeau-alerte.component.html). Remplace l'ancienne
+// palette rouge (identique à celle du jugement « rouge »), désormais réservée aux badges/tableaux de jugement, par
+// l'identité magenta dédiée de la maquette de référence (`--sqm-alerte-*`, cf. `src/styles/_tokens.scss`), pour
+// qu'un signal de sécurité prioritaire reste visuellement distinct d'un simple jugement défavorable.
 .bandeau-alerte {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background-color: #fdeceb;
-  color: #7a1f18;
-  border: 1px solid #b3261e;
-
-  &__message {
-    margin: 0;
-    font-weight: 600;
-  }
-
-  &__action {
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
+  background-color: var(--sqm-alerte-fond);
+  color: var(--sqm-alerte-texte);
+  border: 1px solid var(--sqm-alerte-bordure);
 }

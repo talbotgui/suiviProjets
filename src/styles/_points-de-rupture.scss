@@ -1,0 +1,29 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Points de rupture (Phase 10, incrément 9, RNF-030) : cinq paliers de largeur normalisés
+// (576/768/992/1200/1400px), valeur figée en Phase 10 faute de valeur chiffrée dans la documentation source (cf.
+// docs/02_documentation/07_exigencesNonFonctionnelles.md#accessibilité). Exposés en variables Sass — et non en
+// custom properties CSS comme le reste de la charte (`_tokens.scss`) — car consommés par des conditions `@media`,
+// évaluées à la compilation : une custom property CSS n'est pas substituable dans un descripteur de media query.
+$sqm-pr-576: 576px;
+$sqm-pr-768: 768px;
+$sqm-pr-992: 992px;
+$sqm-pr-1200: 1200px;
+$sqm-pr-1400: 1400px;
+
+/// Applique le contenu à partir du palier de largeur donné (min-width), inclus.
+/// @param {Number} $palier - Largeur de palier, typiquement une des cinq variables `$sqm-pr-*` ci-dessus.
+@mixin depuis($palier) {
+  @media (min-width: $palier) {
+    @content;
+  }
+}
+
+/// Applique le contenu en-dessous du palier de largeur donné (max-width), exclu.
+/// @param {Number} $palier - Largeur de palier, typiquement une des cinq variables `$sqm-pr-*` ci-dessus.
+@mixin jusqua($palier) {
+  @media (max-width: $palier - 0.02px) {
+    @content;
+  }
+}

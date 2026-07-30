@@ -13,7 +13,7 @@
 
 ## Structuration du code et découpage en couches
 
-*Ce chapitre décrit la structuration du code source et le découpage en couches applicatives, en cohérence avec l'architecture définie à l'étape 6. Il précise, le cas échéant, l'existence d'un fichier de référence exemplaire par pattern de fichier récurrent, conforme aux règles de la section Règles de qualité de code, servant de gabarit concret pour homogénéiser le code produit d'une génération à l'autre.*
+*Ce chapitre décrit la structuration du code source et le découpage en couches applicatives, en cohérence avec l'architecture définie à l'étape 6. Il précise, le cas échéant, l'existence d'un fichier de référence exemplaire par pattern de fichier récurrent, conforme aux règles de la section Règles de qualité de code, servant de gabarit concret pour homogénéiser le code produit d'une génération à l'autre. Pour toute application avec interface graphique, il précise également la stratégie technique de mise en forme visuelle qui traduit la [charte visuelle](./10_charteErgonomie.md#charte-visuelle) de l'étape 5 en éléments exploitables par le code (tokens de couleur/typographie/espacement en variables, classes utilitaires ou bibliothèque retenue, articulation avec toute contrainte d'exécution du socle technique — ex. Content Security Policy d'une application de bureau empaquetée) : décidée dès cette étape plutôt que laissée à une improvisation ad hoc écran par écran.*
 
 ## Conventions de nommage
 

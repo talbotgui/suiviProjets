@@ -1,17 +1,34 @@
-<div class="confirmation-mot-de-passe" role="alertdialog" aria-modal="true">
-  <p class="confirmation-mot-de-passe__message">{{ message() }}</p>
-  <label class="confirmation-mot-de-passe__champ">
-    Mot de passe du fichier
-    <input
-      type="password"
-      name="motDePasse"
-      [ngModel]="motDePasse()"
-      (ngModelChange)="motDePasse.set($event)"
-      required
-    />
-  </label>
-  <div class="confirmation-mot-de-passe__actions">
-    <button type="button" (click)="annuler()">Annuler</button>
-    <button type="button" (click)="confirmer()">Confirmer</button>
+<!-- Superposition modale pleine largeur (motif partagé `.superposition`, cf. src/styles/_motifs.scss), jusqu'ici
+     absente : ce panneau s'affichait directement dans le flux normal de la page, sans recouvrement ni centrage,
+     malgré `role="alertdialog"`/`aria-modal="true"` déjà posés. Corrigé à l'occasion de cette migration (Phase 10,
+     incrément 9). -->
+<div class="superposition">
+  <div
+    class="confirmation-mot-de-passe superposition__panneau carte d-flex direction-colonne ecart-4"
+    role="alertdialog"
+    aria-modal="true"
+  >
+    <p class="confirmation-mot-de-passe__message exterieur-0 texte-base">{{ message() }}</p>
+    <label
+      class="confirmation-mot-de-passe__champ d-flex direction-colonne ecart-1 texte-sm poids-moyen"
+    >
+      Mot de passe du fichier
+      <input
+        type="password"
+        name="motDePasse"
+        [ngModel]="motDePasse()"
+        (ngModelChange)="motDePasse.set($event)"
+        required
+        class="interieur-x-3 interieur-y-2 rayon-md bordure texte-base"
+      />
+    </label>
+    <!-- Bouton de validation jamais pré-sélectionné par défaut (charte d'ergonomie, Modale de confirmation) :
+         aucun `autofocus` ici, l'ordre de tabulation naturel place le focus initial sur le champ de saisie. -->
+    <div class="confirmation-mot-de-passe__actions d-flex justifie-fin ecart-2">
+      <button type="button" class="bouton" (click)="annuler()">Annuler</button>
+      <button type="button" class="bouton bouton--principal" (click)="confirmer()">
+        Confirmer
+      </button>
+    </div>
   </div>
 </div>

@@ -1,175 +1,104 @@
-// Tokens visuels repris de la maquette de référence (docs/01_besoin/Suivi Qualimetrie.dc.html) : sidebar 232px,
-// palette oklch neutre, police Inter. Se limite à une reprise fidèle des teintes déjà utilisées par la maquette
-// pour ce composant, sans introduire de nouveau système de tokens partagé (hors périmètre de cet incrément).
+// Résidu propre à ce composant (Phase 10, incrément 9, C10-06) : dimensions fixes (sidebar, logo, barre
+// supérieure), couleurs de l'entrée de navigation active, positionnement des panneaux flottants (erreur de
+// sauvegarde, avertissement de taille) et bascule en rail d'icônes sous 992px (RNF-030). Le reste de la mise en
+// page et les couleurs neutres/sémantiques sont portés par les classes utilitaires et motifs partagés appliqués
+// directement dans le gabarit (cf. shell.component.html), remplaçant l'ancienne feuille de style entièrement
+// propre à ce composant (tokens repris de façon manuelle, non partagés, cf. commentaire d'en-tête historique de ce
+// fichier).
+@use 'points-de-rupture' as pr;
+
 .shell {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  font-family: 'Inter', system-ui, sans-serif;
-  color: oklch(22% 0.01 250);
-  background: oklch(97.5% 0.003 250);
-  overflow: hidden;
+  font-family: var(--sqm-police-texte);
 }
 
 .shell__sidebar {
   width: 232px;
   flex: none;
-  background: oklch(96.3% 0.004 250);
-  border-right: 1px solid oklch(89% 0.006 250);
-  display: flex;
-  flex-direction: column;
-  padding: 18px 12px;
-}
-
-.shell__marque {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 4px 8px 18px;
+  background: var(--sqm-neutre-100);
+  border-right: 1px solid var(--sqm-neutre-300);
 }
 
 .shell__logo {
   width: 26px;
   height: 26px;
-  border-radius: 7px;
-  background: oklch(55% 0.16 258);
-  color: white;
-  font-weight: 800;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.shell__titre {
-  font-weight: 700;
-  font-size: 14.5px;
+  flex: none;
 }
 
 .shell__lien {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  margin-bottom: 2px;
-  font-size: 13.5px;
-  color: oklch(30% 0.01 250);
+  color: var(--sqm-neutre-950);
   text-decoration: none;
   cursor: pointer;
   border: none;
   background: transparent;
   width: 100%;
-  text-align: left;
   font-family: inherit;
 
-  &--bouton {
-    font-family: inherit;
+  &:hover {
+    background-color: var(--sqm-neutre-150);
   }
 
   &--actif {
-    background: oklch(55% 0.16 258 / 12%);
-    color: oklch(45% 0.16 258);
-    font-weight: 600;
-  }
+    background: var(--sqm-marque-fond);
+    color: var(--sqm-marque-texte);
+    font-weight: var(--sqm-poids-demi-gras);
 
-  &--a-venir {
-    color: oklch(60% 0.012 250);
-    cursor: default;
+    &:hover {
+      background: var(--sqm-marque-fond);
+    }
   }
-}
-
-.shell__zone {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
 }
 
 .shell__barre-superieure {
   height: 52px;
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  border-bottom: 1px solid oklch(89% 0.006 250);
-  background: white;
-}
-
-.shell__fichier {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: oklch(30% 0.01 250);
-}
-
-.shell__actions-globales {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  // Boutons fonctionnels (recherche, credentials, sauvegarde, verrouillage manuel) : apparence normale, cliquable.
-  button {
-    border: none;
-    background: transparent;
-    font-size: 14px;
-    cursor: pointer;
-    opacity: 1;
-
-    // Règle générique conservée pour toute future action non encore construite de cette barre.
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-  }
-}
-
-.shell__statut-sauvegarde {
-  font-size: 11.5px;
-  color: oklch(50% 0.012 250);
-}
-
-.shell__erreur-sauvegarde {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 150;
-  background: oklch(97% 0.03 25);
-  border: 1px solid oklch(70% 0.16 25);
-  color: oklch(40% 0.19 25);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 12.5px;
-  margin: 0;
-}
-
-.shell__avertissement-taille {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 150;
-  background: oklch(97% 0.05 85);
-  border: 1px solid oklch(75% 0.15 85);
-  color: oklch(35% 0.1 85);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 12.5px;
-  max-width: 320px;
-
-  p {
-    margin: 0 0 8px;
-  }
-}
-
-.shell__avertissement-taille-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
 }
 
 .shell__ecran {
-  flex: 1;
-  overflow: auto;
-  padding: 24px 28px 60px;
+  padding: var(--sqm-espace-6) var(--sqm-espace-8) var(--sqm-espace-8);
+}
+
+.shell__erreur-sauvegarde,
+.shell__avertissement-taille {
+  bottom: var(--sqm-espace-5);
+  right: var(--sqm-espace-5);
+  z-index: 150;
+  max-width: 320px;
+}
+
+.shell__erreur-sauvegarde {
+  border-color: var(--sqm-rouge-bordure);
+}
+
+.shell__avertissement-taille {
+  border-color: var(--sqm-orange-bordure);
+}
+
+// ===== RNF-030 : rail d'icônes sous le palier 992px =====
+// Un seul point de bascule (plutôt qu'une disposition distincte par palier) : la sidebar, trop étroite en dessous
+// de 992px pour rester lisible à pleine largeur (232px), passe en rail d'icônes compact ; chaque libellé reste
+// présent dans le DOM (masqué visuellement seulement, technique déjà utilisée par `.hors-ecran` de
+// `_utilitaires.scss`, reproduite ici plutôt que partagée : une classe toujours active ne peut pas être combinée à
+// une condition de largeur sans dupliquer cette même déclaration sous la media query, cf. rapport de développement
+// de cet incrément), pour rester accessible aux technologies d'assistance et ne perdre aucune fonctionnalité
+// (toutes les entrées restent cliquables/atteignables au clavier, avec un `title` explicite en repli visuel).
+@include pr.jusqua(pr.$sqm-pr-992) {
+  .shell__sidebar {
+    width: 64px;
+  }
+
+  .shell__lien-libelle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .shell__lien {
+    justify-content: center;
+  }
 }

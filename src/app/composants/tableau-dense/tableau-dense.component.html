@@ -3,7 +3,12 @@
      `<button>` natifs (accessibles au clavier sans gestionnaire dédié) ; filtres rendus comme champs texte natifs
      (accessibles au clavier). Ligne activable au clic ou à la touche Entrée (RG charte : « ligne activable pour
      naviguer vers le détail »). Déclencheur d'explication du calcul (`colonne.explication`) affiché une seule fois
-     par colonne, dans l'en-tête, jamais dupliqué par ligne (cf. commentaire d'en-tête du composant). -->
+     par colonne, dans l'en-tête, jamais dupliqué par ligne (cf. commentaire d'en-tête du composant).
+
+     RNF-031 (Phase 10, incrément 9) : `data-label` porté par chaque cellule du corps, consommé uniquement par
+     `tableau-dense.component.scss` en-dessous du palier de largeur le plus étroit (576px), pour restituer le
+     libellé de colonne devant chaque valeur d'une carte. Sans effet au-dessus de ce palier (défilement horizontal
+     à colonne fixe déjà en place). -->
 <div class="tableau-dense__conteneur">
   <table class="tableau-dense">
     <thead>
@@ -83,6 +88,7 @@
               class="tableau-dense__cellule"
               [class.tableau-dense__cellule--fixe]="estColonneFixe(i)"
               [class.tableau-dense__cellule--grisee]="cellule.grisee"
+              [attr.data-label]="colonne.libelle"
             >
               @for (segment of cellule.segments; track $index) {
                 @switch (segment.type) {

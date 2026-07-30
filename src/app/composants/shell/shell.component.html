@@ -1,93 +1,120 @@
 <div
-  class="shell"
+  class="shell d-flex hauteur-pleine largeur-pleine deborde-masque"
   tabindex="-1"
   (document:keydown)="gererRaccourciClavier($event)"
   (document:mousedown)="gererActivitePointeur()"
 >
-  <nav class="shell__sidebar" aria-label="Navigation principale">
-    <div class="shell__marque">
-      <span class="shell__logo" aria-hidden="true">Q</span>
-      <span class="shell__titre">Qualimétrie</span>
+  <!-- RNF-030 (Phase 10, incrément 9) : au-dessus du palier 992px, sidebar pleine (icône + libellé, 232px). En
+       dessous, rail d'icônes (64px) : le libellé de chaque entrée reste présent dans le DOM et accessible aux
+       technologies d'assistance (`.shell__lien-libelle`, masqué visuellement seulement, cf.
+       shell.component.scss), aucune fonctionnalité n'est donc perdue. -->
+  <nav
+    class="shell__sidebar d-flex direction-colonne ecart-1 interieur-x-3 interieur-y-4"
+    aria-label="Navigation principale"
+  >
+    <div
+      class="shell__marque d-flex aligne-centre ecart-3 interieur-x-2 interieur-y-2 exterieur-bas-2"
+    >
+      <span
+        class="shell__logo d-flex aligne-centre justifie-centre rayon-md texte-blanc fond-marque poids-extra-gras texte-sm"
+        aria-hidden="true"
+        >Q</span
+      >
+      <span class="shell__titre shell__lien-libelle poids-gras texte-md aucun-retour"
+        >Qualimétrie</span
+      >
     </div>
 
     <a
-      class="shell__lien"
+      class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/accueil"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
+      title="Accueil"
     >
       <span aria-hidden="true">⌂</span>
-      <span>Accueil</span>
+      <span class="shell__lien-libelle">Accueil</span>
     </a>
 
     <a
-      class="shell__lien"
+      class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/synthese-audits"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
+      title="Synthèse des audits"
     >
       <span aria-hidden="true">▤</span>
-      <span>Synthèse des audits</span>
+      <span class="shell__lien-libelle">Synthèse des audits</span>
     </a>
 
     <a
-      class="shell__lien"
+      class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/synthese-graphique"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
+      title="Synthèse graphique"
     >
       <span aria-hidden="true">▧</span>
-      <span>Synthèse graphique</span>
+      <span class="shell__lien-libelle">Synthèse graphique</span>
     </a>
 
     <a
-      class="shell__lien"
+      class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/liste-travail"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
+      title="Liste de travail"
     >
       <span aria-hidden="true">⚑</span>
-      <span>Liste de travail</span>
+      <span class="shell__lien-libelle">Liste de travail</span>
     </a>
 
     <button
       type="button"
-      class="shell__lien shell__lien--bouton"
+      class="shell__lien shell__lien--bouton d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       [class.shell__lien--actif]="auditsActif()"
       (click)="ouvrirAudits()"
+      title="Audits"
     >
       <span aria-hidden="true">◷</span>
-      <span>Audits</span>
+      <span class="shell__lien-libelle">Audits</span>
     </button>
 
     <a
-      class="shell__lien"
+      class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/administration"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
+      title="Administration"
     >
       <span aria-hidden="true">⚙</span>
-      <span>Administration</span>
+      <span class="shell__lien-libelle">Administration</span>
     </a>
 
     <a
-      class="shell__lien"
+      class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/parametrage"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
+      title="Paramétrage"
     >
       <span aria-hidden="true">≡</span>
-      <span>Paramétrage</span>
+      <span class="shell__lien-libelle">Paramétrage</span>
     </a>
   </nav>
 
-  <div class="shell__zone">
-    <header class="shell__barre-superieure">
-      <div class="shell__fichier">{{ nomFichier() }}</div>
-      <div class="shell__actions-globales">
-        <span class="shell__statut-sauvegarde">{{ statutSauvegarde() }}</span>
+  <div class="shell__zone d-flex direction-colonne largeur-mini-nulle deborde-masque flex-1">
+    <header
+      class="shell__barre-superieure d-flex aligne-centre justifie-espace interieur-x-5 fond-blanc bordure-bas"
+    >
+      <div class="shell__fichier poids-demi-gras texte-base tronque">{{ nomFichier() }}</div>
+      <div class="shell__actions-globales d-flex aligne-centre ecart-4">
+        <span class="shell__statut-sauvegarde texte-xs texte-discret aucun-retour">{{
+          statutSauvegarde()
+        }}</span>
         <button
           type="button"
+          class="bouton bouton--discret rayon-md"
           title="Recherche transversale (Ctrl+K)"
           aria-label="Recherche transversale"
           (click)="ouvrirRecherche()"
@@ -96,6 +123,7 @@
         </button>
         <button
           type="button"
+          class="bouton bouton--discret rayon-md"
           title="Gestion des credentials"
           aria-label="Gestion des credentials"
           (click)="ouvrirCredentials()"
@@ -104,6 +132,7 @@
         </button>
         <button
           type="button"
+          class="bouton bouton--discret rayon-md"
           title="Sauvegarder"
           aria-label="Sauvegarder"
           (click)="ouvrirSauvegarde()"
@@ -112,6 +141,7 @@
         </button>
         <button
           type="button"
+          class="bouton bouton--discret rayon-md"
           title="Verrouillage manuel"
           aria-label="Verrouillage manuel"
           (click)="verrouillerManuellement()"
@@ -121,7 +151,7 @@
       </div>
     </header>
 
-    <main class="shell__ecran">
+    <main class="shell__ecran deborde-auto flex-1">
       <router-outlet />
     </main>
   </div>
@@ -138,18 +168,28 @@
     />
   }
   @if (messageErreurSauvegarde) {
-    <p class="shell__erreur-sauvegarde" role="alert">{{ messageErreurSauvegarde }}</p>
+    <p
+      class="shell__erreur-sauvegarde fixe carte texte-rouge fond-rouge interieur-x-4 interieur-y-3 texte-sm"
+      role="alert"
+    >
+      {{ messageErreurSauvegarde }}
+    </p>
   }
 
   @if (avertissementTailleActif()) {
-    <div class="shell__avertissement-taille" role="alert">
-      <p>
+    <div
+      class="shell__avertissement-taille fixe carte texte-orange fond-orange interieur-x-4 interieur-y-3 texte-sm"
+      role="alert"
+    >
+      <p class="exterieur-bas-2 exterieur-haut-0">
         Le fichier de données dépasse le seuil de taille configuré. Pensez à purger les audits ou le
         journal des modifications anciens.
       </p>
-      <div class="shell__avertissement-taille-actions">
-        <button type="button" (click)="fermerAvertissementTaille()">Ignorer</button>
-        <button type="button" (click)="ouvrirParametragePurge()">Ouvrir le paramétrage</button>
+      <div class="d-flex justifie-fin ecart-2">
+        <button type="button" class="bouton" (click)="fermerAvertissementTaille()">Ignorer</button>
+        <button type="button" class="bouton bouton--principal" (click)="ouvrirParametragePurge()">
+          Ouvrir le paramétrage
+        </button>
       </div>
     </div>
   }

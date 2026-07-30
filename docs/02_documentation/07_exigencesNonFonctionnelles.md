@@ -61,6 +61,10 @@ Chaque exigence non fonctionnelle porte un identifiant stable de la forme `RNF-N
 |---|---|
 | RNF-019 | L'interface respecte les critères de conformité [WCAG 2.1](https://www.w3.org/TR/WCAG21/) niveau AA : contrastes suffisants, navigation clavier complète, structure sémantique, alternatives textuelles, focus visible |
 | RNF-020 | Les codes de couleur porteurs de sens (seuils verts/oranges/rouges, alerte membre inconnu, badges de statut) sont systématiquement doublés d'un libellé textuel ou d'un pictogramme, afin de rester perceptibles indépendamment de la perception des couleurs |
+| RNF-030 | Précision opérationnelle du critère de reflow de [RNF-019](#accessibilité) (WCAG 2.1 AA, critère 1.4.10) : chaque écran s'adapte sans perte de contenu ni de fonctionnalité aux cinq paliers de largeur normalisés 576px, 768px, 992px, 1200px et 1400px, valeur figée en Phase 10 faute de valeur chiffrée dans la documentation source, à valider par un humain (cf. [plan de développement, Phase 10](../03_plan/plan_13_developpement.md#phase-10--rattrapage--bugs)) |
+| RNF-031 | Un tableau dense (cf. [charte d'ergonomie, composant Tableau dense](./10_charteErgonomie.md#composants-dinterface-réutilisables)) reste lisible en dessous du palier de largeur le plus étroit applicable à son écran : chaque ligne se présente alors comme une carte (un champ par libellé), plutôt que par le seul défilement horizontal à colonne fixe déjà en place aux paliers plus larges, qui devient illisible en deçà |
+
+Sous ce palier le plus étroit, le défilement horizontal à première colonne fixe (cf. [10_charteErgonomie.md](./10_charteErgonomie.md#composants-dinterface-réutilisables)) et la présentation en cartes coexistent donc par palier plutôt que de se remplacer : le premier reste le comportement par défaut, la seconde ne s'applique qu'en deçà du seuil le plus étroit défini par [RNF-030](#accessibilité).
 
 ## Portabilité et environnements cibles
 
@@ -100,6 +104,7 @@ La qualification juridique précise du traitement (responsable de traitement, ba
 | RNF-006, RNF-007, RNF-008 | US-025 ; échelle de volumétrie retenue à l'étape 4 |
 | RNF-009, RNF-010, RNF-011 | US-010, US-011, US-013 |
 | RNF-019, RNF-020 | Ensemble des écrans de restitution (Synthèse des audits, Fiche projet, Liste de travail) |
+| RNF-030, RNF-031 | US-037 ; aucun objectif mesurable dédié de l'étape 2, trou documentaire comblé en Phase 10 (cf. [plan de développement](../03_plan/plan_13_developpement.md#phase-10--rattrapage--bugs)) |
 | RNF-021, RNF-022, RNF-023 | Contrainte d'architecture desktop ([Specification.md, section 1.1](../01_besoin/Specification.md#11-architecture-retenue)) |
 | RNF-024, RNF-025, RNF-026, RNF-029 | Principe « Français intégral » ([Specification.md, section 1.2](../01_besoin/Specification.md#12-principes-de-conception)) |
 | RNF-027, RNF-028 | [Éliminer les angles morts de sécurité liés aux membres non identifiés](./03_expressionBesoin.md#objectifs-mesurables-du-projet) ; US-022, US-023 |

@@ -1,45 +1,50 @@
-// Couleurs alignées sur les mêmes tons que `badge.component.scss`/`bandeau-alerte.component.scss` (cohérence
-// visuelle transverse), contraste vérifié WCAG 2.1 AA (cf. docs/02_documentation/10_charteErgonomie.md#rappel-des-
-// exigences-daccessibilité).
+// Résidu propre à ce composant (Phase 10, incrément 9, C10-06) : positionnement (colonne fixe au défilement
+// horizontal), interactions (survol, focus) et bascule en carte sous le palier de largeur le plus étroit (RNF-031),
+// non exprimables par les classes utilitaires génériques de src/styles/_utilitaires.scss. Couleurs et espacements
+// repris des tokens partagés de src/styles/_tokens.scss (remplace l'ancienne palette hexadécimale propre à ce seul
+// composant, alignée jusqu'ici de façon seulement manuelle sur `badge.component.scss`/`bandeau-alerte.component.
+// scss`, cf. commentaire d'en-tête historique de ce fichier).
+@use 'points-de-rupture' as pr;
+
 .tableau-dense__conteneur {
   overflow: auto;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  background-color: #fff;
+  border: 1px solid var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-xl);
+  background-color: var(--sqm-neutre-0);
 }
 
 .tableau-dense {
   border-collapse: collapse;
   width: 100%;
-  font-size: 0.85rem;
+  font-size: var(--sqm-texte-sm);
   white-space: nowrap;
 }
 
 .tableau-dense__entete,
 .tableau-dense__cellule-filtre,
 .tableau-dense__cellule {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #eee;
+  padding: var(--sqm-espace-2) var(--sqm-espace-3);
+  border-bottom: 1px solid var(--sqm-neutre-250);
   text-align: left;
-  background-color: #fff;
+  background-color: var(--sqm-neutre-0);
 }
 
 .tableau-dense__entete {
-  background-color: #f7f7f7;
-  font-size: 0.7rem;
+  background-color: var(--sqm-neutre-50);
+  font-size: var(--sqm-texte-2xs);
   letter-spacing: 0.04em;
-  font-weight: 700;
-  color: #555;
+  font-weight: var(--sqm-poids-gras);
+  color: var(--sqm-neutre-800);
 }
 
 .tableau-dense__cellule-filtre {
-  background-color: #f7f7f7;
+  background-color: var(--sqm-neutre-50);
 }
 
 .tableau-dense__bouton-tri {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--sqm-espace-1);
   background: none;
   border: none;
   font: inherit;
@@ -49,11 +54,6 @@
   text-transform: inherit;
   cursor: pointer;
   padding: 0;
-}
-
-.tableau-dense__bouton-tri:focus-visible {
-  outline: 2px solid #1a56db;
-  outline-offset: 2px;
 }
 
 .tableau-dense__label-filtre {
@@ -67,10 +67,10 @@
 
 .tableau-dense__champ-filtre {
   width: 100%;
-  font-size: 0.8rem;
-  padding: 0.2rem 0.4rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  font-size: var(--sqm-texte-xs);
+  padding: var(--sqm-espace-1) var(--sqm-espace-2);
+  border: 1px solid var(--sqm-neutre-400);
+  border-radius: var(--sqm-rayon-sm);
 }
 
 // Colonne fixe au défilement horizontal (charte d'ergonomie, tableau dense) : appliquée à la fois aux en-têtes et
@@ -83,27 +83,26 @@
 
 .tableau-dense__ligne {
   cursor: pointer;
-}
 
-.tableau-dense__ligne:hover {
-  background-color: #f5f8ff;
-}
+  &:hover {
+    background-color: var(--sqm-marque-fond-douce);
 
-.tableau-dense__ligne:hover .tableau-dense__cellule--fixe {
-  background-color: #f5f8ff;
-}
+    .tableau-dense__cellule--fixe {
+      background-color: var(--sqm-marque-fond-douce);
+    }
+  }
 
-.tableau-dense__ligne:focus-visible {
-  outline: 2px solid #1a56db;
-  outline-offset: -2px;
+  &:focus-visible {
+    outline-offset: -2px;
+  }
 }
 
 .tableau-dense__ligne--grisee {
-  color: #888;
-}
+  color: var(--sqm-neutre-700);
 
-.tableau-dense__ligne--grisee .tableau-dense__cellule {
-  background-color: #fafafa;
+  .tableau-dense__cellule {
+    background-color: var(--sqm-neutre-50);
+  }
 }
 
 // RG-013 : grisage d'une cellule isolée (ex. métriques Sonar d'une ligne SONAR_KO), indépendant du grisage de ligne
@@ -117,27 +116,86 @@
 }
 
 .tableau-dense__texte-couleur {
-  font-weight: 700;
+  font-weight: var(--sqm-poids-gras);
 }
 
 .tableau-dense__texte-couleur--vert {
-  color: #1e7d32;
+  color: var(--sqm-vert-texte);
 }
 
 .tableau-dense__texte-couleur--orange {
-  color: #8a5300;
+  color: var(--sqm-orange-texte);
 }
 
 .tableau-dense__texte-couleur--rouge {
-  color: #b3261e;
+  color: var(--sqm-rouge-texte);
 }
 
 .tableau-dense__icone {
-  margin-left: 0.3rem;
+  margin-left: var(--sqm-espace-1);
 }
 
 .tableau-dense__vide {
-  padding: 1rem;
+  padding: var(--sqm-espace-4);
   text-align: center;
-  color: #777;
+  color: var(--sqm-neutre-700);
+}
+
+// ===== RNF-031 : présentation en carte sous le palier de largeur le plus étroit (576px) =====
+// Le défilement horizontal à colonne fixe ci-dessus, illisible à cette largeur, cède la place à une carte par
+// ligne (un champ par libellé, restitué par pseudo-élément à partir de `data-label`, cf. commentaire d'en-tête du
+// gabarit). L'en-tête de tri et la ligne de filtres restent affichés (aucune perte de fonctionnalité), simplement
+// réorganisés en ligne souple plutôt qu'en colonnes de tableau désormais sans pertinence visuelle à cette largeur.
+@include pr.jusqua(pr.$sqm-pr-576) {
+  .tableau-dense {
+    white-space: normal;
+  }
+
+  .tableau-dense__entete,
+  .tableau-dense__cellule-filtre {
+    display: inline-flex;
+    align-items: center;
+    position: static;
+  }
+
+  thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sqm-espace-2);
+    padding: var(--sqm-espace-2) var(--sqm-espace-3);
+  }
+
+  tbody {
+    display: block;
+  }
+
+  .tableau-dense__ligne {
+    display: block;
+    padding: var(--sqm-espace-3);
+    border-bottom: 2px solid var(--sqm-neutre-300);
+  }
+
+  .tableau-dense__cellule {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sqm-espace-3);
+    position: static;
+    background-color: transparent;
+    border-bottom: none;
+    padding: var(--sqm-espace-1) 0;
+
+    &::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      font-size: var(--sqm-texte-2xs);
+      font-weight: var(--sqm-poids-gras);
+      letter-spacing: 0.04em;
+      color: var(--sqm-neutre-800);
+    }
+  }
+
+  .tableau-dense__ligne--grisee .tableau-dense__cellule {
+    background-color: transparent;
+  }
 }

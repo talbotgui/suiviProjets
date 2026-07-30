@@ -24,7 +24,7 @@
 | Carte | Regroupement visuel à coins arrondis, utilisé pour les actions principales et les blocs de synthèse ; met en avant un contenu sans nécessiter de défilement interne |
 | Badge / pastille | Forme pilule associant une couleur sémantique et un libellé textuel explicite ; jamais de couleur seule porteuse de sens (cf. [RNF-020](./07_exigencesNonFonctionnelles.md#accessibilité)) |
 | Bandeau d'alerte pleine largeur | Utilisé exclusivement pour les signaux prioritaires (membre inconnu) ; reste visible au-dessus du contenu qu'il concerne, y compris après filtrage |
-| Tableau dense | Première colonne fixe au défilement horizontal, en-têtes explicites, tri et filtres accessibles au clavier, ligne activable pour naviguer vers le détail |
+| Tableau dense | Première colonne fixe au défilement horizontal, en-têtes explicites, tri et filtres accessibles au clavier, ligne activable pour naviguer vers le détail ; en dessous du palier de largeur le plus étroit (cf. [RNF-030](./07_exigencesNonFonctionnelles.md#accessibilité)), chaque ligne se présente comme une carte (un champ par libellé) plutôt que par défilement horizontal, cf. [RNF-031](./07_exigencesNonFonctionnelles.md#accessibilité) |
 | Barre de progression | Utilisée pour les campagnes d'audit en cours ; toujours accompagnée d'un texte explicite (compteur, estimation), jamais de la seule barre visuelle |
 | Graphique d'évolution | Zoom temporel, séries activables/désactivables individuellement, annotations et changements de seuils affichés en lignes verticales étiquetées |
 | Modale de confirmation | Rappelle explicitement l'action et sa conséquence, bouton de validation jamais pré-sélectionné par défaut pour une action destructive |

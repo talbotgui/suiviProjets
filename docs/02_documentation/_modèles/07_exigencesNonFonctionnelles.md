@@ -51,7 +51,11 @@
 
 ## Accessibilité
 
-*Ce chapitre décrit les exigences d'accessibilité attendues.*
+*Ce chapitre décrit les exigences d'accessibilité attendues, y compris les paliers de largeur de fenêtre auxquels l'application reste pleinement utilisable sans perte de contenu ni de fonctionnalité (critère de reflow WCAG 2.1, 1.4.10) : ces paliers, une fois fixés ici avec une valeur chiffrée, sont repris tels quels par la [charte visuelle](./10_charteErgonomie.md#comportement-responsive) de l'étape 5 plutôt que redéfinis à cette étape ultérieure.*
+
+| identifiant | exigence | valeur cible |
+|---|---|---|
+| | | |
 
 ## Portabilité et environnements cibles
 

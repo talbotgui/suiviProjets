@@ -75,7 +75,7 @@ Rédige les documents décrivant les exigences non fonctionnelles :
 - scalabilité et montée en charge ;
 - disponibilité et tolérance aux pannes ;
 - sécurité (authentification, autorisation, protection des données) ;
-- accessibilité ;
+- accessibilité, en fixant notamment les paliers de largeur de fenêtre auxquels l'application doit rester pleinement utilisable sans perte de contenu ni de fonctionnalité (WCAG 2.1, critère de reflow 1.4.10), plutôt que de laisser cette valeur à une décision arbitraire ultérieure faute de valeur chiffrée (enseignement de la Phase 10 du plan de développement d'un premier projet cadré par ce prompt : ces paliers, absents de toute exigence non fonctionnelle rédigée à cette étape, ont dû être fixés arbitrairement lors d'un rattrapage tardif, une fois le trou documentaire constaté) ;
 - portabilité et environnements cibles ;
 - internationalisation et localisation (langues, formats régionaux) si applicable ;
 - contraintes réglementaires ou légales (protection des données personnelles, etc.) si applicables.
@@ -84,7 +84,7 @@ Rédige les documents décrivant les exigences non fonctionnelles :
 Rédige les documents décrivant l'expérience utilisateur cible :
 - arborescence des écrans et navigation ;
 - maquettes ou wireframes (description textuelle structurée si aucun outil graphique n'est disponible) ;
-- charte d'ergonomie et principes d'interaction communs à toute l'application ;
+- charte d'ergonomie et principes d'interaction communs à toute l'application, complétée d'une **charte visuelle** explicite (palette de couleurs, typographie, échelle d'espacements et de rayons, comportement responsive par palier de largeur) directement dérivée des maquettes disponibles quand elles existent, y compris celles du dossier source (`./docs/01_besoin`), au même titre que les feuilles de style (cf. dernière phrase de l'étape 15) : cette charte visuelle est un livrable explicite de cette étape, distinct des seuls principes d'interaction comportementaux, pour que le rendu graphique de l'application soit traité dès l'analyse plutôt que laissé à l'implémentation (enseignement de la Phase 10 du plan de développement d'un premier projet cadré par ce prompt : la charte d'ergonomie ne décrivait que des principes d'interaction et une liste de composants réutilisables sans aucun token visuel concret, laissant l'application quasiment sans mise en forme jusqu'à un rattrapage tardif) ;
 - guide utilisateur et aide en ligne destinés aux utilisateurs finaux, en cohérence avec les écrans et parcours définis ;
 - pour toute entrée de navigation regroupant plusieurs écrans (rubrique de sidebar, dossier), l'écran cible ouvert par défaut est explicitement précisé, ainsi que les règles de redirection contextuelle qui peuvent s'y substituer ;
 - la convention de présentation de l'arborescence distingue explicitement, pour chaque nœud, s'il s'agit d'un écran autonome, d'un onglet au sein d'un même écran, ou d'un écran contextuel, afin qu'aucune ambiguïté ne subsiste sur la profondeur réelle de navigation.
@@ -121,7 +121,7 @@ Rédige la conception détaillée à partir des étapes précédentes :
 ## Étape 9 — Normes de développement
 Avant de rédiger, demande-moi mes préférences de style de code pour chaque langage utilisé (rigueur de typage, documentation systématique ou non, visibilité explicite, organisation des fonctions et des classes, etc.), afin que les normes reflètent ces préférences dès la première rédaction plutôt que d'être corrigées en relecture.
 Rédige les normes de développement :
-- conception technique fine (structuration du code, découpage en couches) ;
+- conception technique fine (structuration du code, découpage en couches) ; pour toute application avec interface graphique, cette conception technique inclut explicitement la stratégie de mise en forme visuelle qui traduit la charte visuelle de l'étape 5 en éléments exploitables par le code (tokens de couleur/typographie/espacement en variables, classes utilitaires ou bibliothèque retenue, articulation avec toute contrainte d'exécution du socle technique — ex. Content Security Policy d'une application de bureau empaquetée) : décidée dès cette étape plutôt que laissée à une improvisation ad hoc écran par écran (enseignement de la Phase 10 du plan de développement d'un premier projet cadré par ce prompt : faute d'une telle stratégie actée en amont, chaque écran avait développé sa propre feuille de style disparate, sans fondation commune, jusqu'à un rattrapage tardif) ;
 - conventions de nommage (fichiers, composants, services, variables, etc.) ;
 - rigueur de typage et de documentation attendue pour chaque langage utilisé, à partir des préférences exprimées, en précisant pour chaque règle le contrôle outillé (analyse statique) qui la vérifie lorsqu'un tel contrôle existe, et en signalant explicitement toute règle demandée qui irait à l'encontre d'une recommandation par défaut de l'outillage retenu ;
 - stratégie de branches et de contribution Git (workflow, convention de messages de commit, revue des pull requests) ;

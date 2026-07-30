@@ -1,1 +1,15 @@
-/* You can add global styles to this file, and also import other style files */
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Point d'entrée de la charte visuelle (Phase 10, incrément 9, C10-06 — cf.
+// docs/03_plan/plan_13_developpement.md#phase-10--rattrapage--bugs) : jusqu'ici resté au squelette généré par
+// `ng new` (commentaire seul, aucune règle), cause première de l'absence de mise en forme visuelle constatée sur
+// l'ensemble de l'application. Se limite à assembler les partiels de `src/styles/` ; le détail de chaque famille de
+// règles (tokens, points de rupture, réinitialisation, classes utilitaires, motifs composés) est documenté en tête
+// du partiel correspondant. Ordre significatif : `utilitaires` chargé après `motifs`, pour qu'une classe
+// utilitaire (une seule propriété, ex. `.fond-rouge`) l'emporte toujours sur la déclaration correspondante d'un
+// motif composé (ex. `.carte`) à spécificité CSS égale lorsque les deux sont combinées sur un même élément.
+@use 'styles/tokens';
+@use 'styles/reinitialisation';
+@use 'styles/motifs';
+@use 'styles/utilitaires';

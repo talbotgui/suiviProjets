@@ -1,53 +1,50 @@
-// Couleurs choisies pour respecter un contraste minimal WCAG 2.1 AA (texte sur fond) entre le libellé et le fond de
-// la pastille, cf. docs/02_documentation/10_charteErgonomie.md#rappel-des-exigences-daccessibilité.
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  line-height: 1.4;
+// Résidu propre à ce composant (Phase 10, incrément 9, C10-06) : forme du point et couleurs par variante, non
+// exprimables par les classes utilitaires génériques de src/styles/_utilitaires.scss (une seule propriété CSS
+// chacune). La mise en page (espacement, rayon pilule, taille et poids de texte) est portée par des classes
+// utilitaires appliquées directement dans le gabarit (cf. badge.component.html), plutôt que dupliquée ici.
+// Couleurs reprises des tokens sémantiques de `src/styles/_tokens.scss` (contraste minimal WCAG 2.1 AA déjà
+// vérifié pour ces teintes par la maquette de référence, cf. docs/02_documentation/
+// 10_charteErgonomie.md#rappel-des-exigences-daccessibilité), remplaçant les couleurs hexadécimales jusqu'ici
+// propres à ce seul composant.
+.badge__pastille {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex: none;
+}
 
-  &__pastille {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 50%;
+.badge--vert {
+  background-color: var(--sqm-vert-fond);
+  color: var(--sqm-vert-texte);
+
+  .badge__pastille {
+    background-color: var(--sqm-vert-texte);
   }
+}
 
-  &--vert {
-    background-color: #e6f4ea;
-    color: #1e7d32;
+.badge--orange {
+  background-color: var(--sqm-orange-fond);
+  color: var(--sqm-orange-texte);
 
-    .badge__pastille {
-      background-color: #1e7d32;
-    }
+  .badge__pastille {
+    background-color: var(--sqm-orange-texte);
   }
+}
 
-  &--orange {
-    background-color: #fff4e0;
-    color: #8a5300;
+.badge--rouge {
+  background-color: var(--sqm-rouge-fond);
+  color: var(--sqm-rouge-texte);
 
-    .badge__pastille {
-      background-color: #8a5300;
-    }
+  .badge__pastille {
+    background-color: var(--sqm-rouge-texte);
   }
+}
 
-  &--rouge {
-    background-color: #fdeceb;
-    color: #b3261e;
+.badge--bleu {
+  background-color: var(--sqm-bleu-fond);
+  color: var(--sqm-bleu-texte);
 
-    .badge__pastille {
-      background-color: #b3261e;
-    }
-  }
-
-  &--bleu {
-    background-color: #e8f0fc;
-    color: #1a4b8f;
-
-    .badge__pastille {
-      background-color: #1a4b8f;
-    }
+  .badge__pastille {
+    background-color: var(--sqm-bleu-texte);
   }
 }

@@ -8,7 +8,7 @@
 
 ## Conventions de description des maquettes
 
-*Ce chapitre définit la convention retenue pour décrire textuellement les maquettes en l'absence d'outil graphique : découpage en zones, description des composants, des actions possibles et des états.*
+*Ce chapitre définit la convention retenue pour décrire textuellement les maquettes en l'absence d'outil graphique : découpage en zones, description des composants, des actions possibles et des états. Lorsqu'une maquette haute-fidélité existe (dossier source ou produite à cette étape), les valeurs visuelles concrètes qu'elle porte (couleurs, typographie, espacements, rayons) sont extraites vers la [charte visuelle](./10_charteErgonomie.md#charte-visuelle) plutôt que reformulées ici en prose : ce chapitre reste centré sur la structure (zones, composants, actions), pas sur l'apparence graphique.*
 
 ## Maquettes par écran
 

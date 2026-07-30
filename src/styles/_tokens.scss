@@ -1,0 +1,126 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Tokens visuels de la charte (Phase 10, incrément 9, US-037/RNF-030/RNF-031 — cf.
+// docs/03_plan/plan_13_developpement.md#phase-10--rattrapage--bugs), repris fidèlement des teintes, tailles et
+// espacements déjà utilisés par la maquette haute-fidélité de référence (docs/01_besoin/Suivi Qualimetrie.dc.html)
+// et par les composants transverses préexistants (`badge`, `shell`, `tableau-dense`, `bandeau-alerte`), plutôt que
+// réinventés : ce fichier centralise ce qui était jusqu'ici dupliqué en valeurs brutes (hex/oklch) dans chaque
+// fichier `*.component.scss`. Exposés en custom properties CSS (`:root`) — et non en variables Sass — pour rester
+// consultables et redéfinissables à l'exécution (ex. un futur mode sombre), à la différence des points de rupture
+// (`_points-de-rupture.scss`), nécessairement des variables Sass puisque consommés par des conditions `@media`.
+:root {
+  // ===== Couleurs neutres (échelle oklch, quasi-achromatique, reprise de la maquette de référence) =====
+  --sqm-neutre-0: oklch(100% 0 0);
+  --sqm-neutre-50: oklch(97.5% 0.003 250);
+  --sqm-neutre-100: oklch(96.3% 0.004 250);
+  --sqm-neutre-150: oklch(95% 0.004 250);
+  --sqm-neutre-200: oklch(93% 0.004 250);
+  --sqm-neutre-250: oklch(92% 0.005 250);
+  --sqm-neutre-300: oklch(89% 0.006 250);
+  --sqm-neutre-400: oklch(85% 0.006 250);
+  --sqm-neutre-500: oklch(75% 0.01 250);
+  --sqm-neutre-600: oklch(65% 0.01 250);
+  --sqm-neutre-700: oklch(60% 0.012 250);
+  --sqm-neutre-800: oklch(52% 0.012 250);
+  --sqm-neutre-850: oklch(48% 0.012 250);
+  --sqm-neutre-900: oklch(40% 0.012 250);
+  --sqm-neutre-950: oklch(30% 0.01 250);
+  --sqm-neutre-1000: oklch(22% 0.01 250);
+
+  // ===== Couleur de marque (nav active, éléments interactifs neutres, logo) =====
+  // `--sqm-marque`/`--sqm-marque-foncee` : même chroma (0.16), seule la luminosité varie (nuance claire/foncée
+  // d'une même famille de bleu), plutôt qu'une reprise littérale de chaque usage isolé de la maquette (dont le seul
+  // équivalent direct, `a:hover { color: oklch(45% 0.18 258) }`, a une chroma légèrement différente, 0.18) :
+  // harmonisation délibérée, décision arbitraire relevée en relecture (cf. rapport de développement de cet
+  // incrément), au bénéfice d'une famille de teintes interne cohérente plutôt que de multiples nuances de bleu
+  // proches mais toutes différentes.
+  --sqm-marque: oklch(55% 0.16 258);
+  --sqm-marque-foncee: oklch(45% 0.16 258);
+  --sqm-marque-fond: oklch(94% 0.03 258);
+  --sqm-marque-fond-douce: oklch(97% 0.015 258);
+  --sqm-marque-texte: oklch(45% 0.15 258);
+
+  // ===== Couleurs sémantiques de jugement, alignées sur le type `Couleur` du Moteur de jugement =====
+  // (services/sansetat/jugement/seuils-couleur.utils.ts : 'vert' | 'orange' | 'rouge' | 'bleu'), consommées par
+  // `SqmBadgeComponent` et `SqmTableauDenseComponent` : remplacent les teintes hexadécimales jusqu'ici propres à
+  // chacun de ces deux composants (deux palettes légèrement différentes pour un même sens, cf. rapport de
+  // développement de cet incrément).
+  --sqm-vert-texte: oklch(38% 0.13 150);
+  --sqm-vert-fond: oklch(93% 0.05 150);
+  --sqm-orange-texte: oklch(48% 0.15 65);
+  --sqm-orange-fond: oklch(94% 0.06 65);
+  // `--sqm-orange-bordure` : aucune valeur de bordure orange dans la maquette, ajoutée par symétrie avec
+  // `--sqm-rouge-bordure` (décision arbitraire, cf. rapport de développement de cet incrément).
+  --sqm-orange-bordure: oklch(75% 0.15 65);
+  --sqm-rouge-texte: oklch(45% 0.18 25);
+  --sqm-rouge-fond: oklch(93% 0.06 25);
+  // `--sqm-rouge-bordure` : absente elle aussi de la maquette ; reprise telle quelle de `shell.component.scss`
+  // antérieur à cet incrément (`.shell__erreur-sauvegarde`, Phase 6), pas une valeur nouvellement inventée (cf.
+  // rapport de développement de cet incrément, relevé en relecture).
+  --sqm-rouge-bordure: oklch(70% 0.16 25);
+  --sqm-bleu-texte: var(--sqm-marque-texte);
+  --sqm-bleu-fond: var(--sqm-marque-fond);
+
+  // ===== Alerte prioritaire (membre inconnu, RG-009) =====
+  // Identité visuelle volontairement distincte des couleurs de jugement ci-dessus (magenta plutôt que rouge), pour
+  // qu'un signal de sécurité prioritaire reste reconnaissable en un coup d'œil parmi les autres signaux de couleur,
+  // conformément à la maquette de référence.
+  --sqm-alerte-texte: oklch(34% 0.18 340);
+  --sqm-alerte-texte-fort: oklch(38% 0.2 340);
+  --sqm-alerte-fond: oklch(93% 0.06 340);
+  --sqm-alerte-bordure: oklch(78% 0.14 340);
+  --sqm-alerte-fort: oklch(52% 0.22 340);
+
+  // ===== Typographie =====
+  // Piles de polices système uniquement : la maquette de référence charge Inter/JetBrains Mono depuis Google Fonts
+  // (CDN externe), incompatible avec la CSP stricte de l'application (`style-src 'self'; font-src 'self'`,
+  // `src-tauri/tauri.conf.json`), volontairement inchangée par cet incrément (arbitrage humain explicite, cf.
+  // plan de développement). Piles choisies pour leur ressemblance visuelle la plus proche disponible nativement.
+  --sqm-police-texte:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --sqm-police-mono:
+    ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', 'SFMono-Regular', Consolas, 'Liberation Mono',
+    monospace;
+
+  --sqm-texte-2xs: 0.6875rem; // 11px
+  --sqm-texte-xs: 0.75rem; // 12px
+  --sqm-texte-sm: 0.8125rem; // 13px
+  --sqm-texte-base: 0.875rem; // 14px
+  --sqm-texte-md: 0.9375rem; // 15px
+  --sqm-texte-lg: 1rem; // 16px
+  --sqm-texte-xl: 1.1875rem; // 19px
+  --sqm-texte-2xl: 1.25rem; // 20px
+
+  --sqm-poids-normal: 400;
+  --sqm-poids-moyen: 500;
+  --sqm-poids-demi-gras: 600;
+  --sqm-poids-gras: 700;
+  --sqm-poids-extra-gras: 800;
+
+  // ===== Espacements (échelle en rem, base 4px, quelques valeurs intermédiaires reprises de la maquette) =====
+  --sqm-espace-0: 0;
+  --sqm-espace-1: 0.25rem; // 4px
+  --sqm-espace-2: 0.5rem; // 8px
+  --sqm-espace-3: 0.75rem; // 12px
+  --sqm-espace-4: 1rem; // 16px
+  --sqm-espace-5: 1.25rem; // 20px
+  --sqm-espace-6: 1.5rem; // 24px
+  --sqm-espace-8: 2rem; // 32px
+  --sqm-espace-10: 2.5rem; // 40px
+  --sqm-espace-12: 3rem; // 48px
+
+  // ===== Rayons de bordure =====
+  --sqm-rayon-sm: 0.25rem; // 4px
+  --sqm-rayon-md: 0.375rem; // 6px
+  --sqm-rayon-lg: 0.5rem; // 8px
+  --sqm-rayon-xl: 0.625rem; // 10px
+  --sqm-rayon-pilule: 999px;
+
+  // ===== Recouvrement (fond assombri d'une superposition modale) =====
+  --sqm-recouvrement: oklch(22% 0.01 250 / 45%);
+
+  // ===== Focus visible (RNF-019 : chaque composant interactif dispose d'un état de focus visible) =====
+  --sqm-focus-couleur: oklch(45% 0.18 258);
+  --sqm-focus-epaisseur: 2px;
+}

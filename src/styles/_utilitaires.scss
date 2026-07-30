@@ -1,0 +1,387 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Classes utilitaires (Phase 10, incrément 9, C10-06) : bibliothèque « faite main » (arbitrage humain explicite,
+// cf. plan de développement, plutôt qu'un framework existant type Bootstrap/Tailwind — incompatible de toute façon
+// avec la CSP stricte sans lien de style externe), volontairement limitée aux besoins déjà couverts par les cinq
+// composants transverses migrés par cet incrément (Badge, Bandeau d'alerte, Shell, Modales de confirmation,
+// Tableau dense) : périmètre étendu au fil des incréments suivants (10 à 20) à mesure que chaque écran migré révèle
+// un nouveau besoin, plutôt que construit intégralement par anticipation. Une seule propriété CSS par classe
+// (utilitaire « atomique »), à deux exceptions près : `.sans-liste` et `.hors-ecran` ci-dessous, dont chacune des
+// déclarations sert un seul et même motif indissociable (réinitialisation complète d'une liste ; masquage visuel
+// accessible complet), pas plusieurs comportements combinés — sans variante responsive à ce stade (aucun des cinq
+// composants transverses n'en a eu besoin ; les deux qui ont un comportement dépendant de la largeur — Shell,
+// Tableau dense — l'expriment dans leur propre feuille de style résiduelle via le mixin `depuis`/`jusqua` de
+// `_points-de-rupture.scss`, cf. rapport de développement de cet incrément).
+//
+// Nommage en français, conformément à RNF-024 (aucune autre langue prise en charge dans le périmètre actuel) :
+// décision arbitraire à valider par un humain, aucune convention de nommage de classes utilitaires n'étant imposée
+// par la documentation source, à la différence des identifiants de code (variables, fonctions) qu'elle couvre déjà.
+
+// ===== Affichage =====
+.d-flex {
+  display: flex;
+}
+.d-inline-flex {
+  display: inline-flex;
+}
+.d-grid {
+  display: grid;
+}
+.d-block {
+  display: block;
+}
+.d-inline-block {
+  display: inline-block;
+}
+.d-none {
+  display: none;
+}
+
+// ===== Flexbox =====
+.direction-ligne {
+  flex-direction: row;
+}
+.direction-colonne {
+  flex-direction: column;
+}
+.retour-ligne {
+  flex-wrap: wrap;
+}
+.aligne-debut {
+  align-items: flex-start;
+}
+.aligne-centre {
+  align-items: center;
+}
+.aligne-fin {
+  align-items: flex-end;
+}
+.aligne-etire {
+  align-items: stretch;
+}
+.justifie-debut {
+  justify-content: flex-start;
+}
+.justifie-centre {
+  justify-content: center;
+}
+.justifie-fin {
+  justify-content: flex-end;
+}
+.justifie-espace {
+  justify-content: space-between;
+}
+.flex-1 {
+  flex: 1 1 0%;
+}
+.flex-aucun {
+  flex: none;
+}
+.retrecit-non {
+  flex-shrink: 0;
+}
+
+// ===== Espacement entre éléments flex/grid =====
+.ecart-1 {
+  gap: var(--sqm-espace-1);
+}
+.ecart-2 {
+  gap: var(--sqm-espace-2);
+}
+.ecart-3 {
+  gap: var(--sqm-espace-3);
+}
+.ecart-4 {
+  gap: var(--sqm-espace-4);
+}
+.ecart-5 {
+  gap: var(--sqm-espace-5);
+}
+.ecart-6 {
+  gap: var(--sqm-espace-6);
+}
+
+// ===== Marges intérieures (padding) =====
+@each $cle,
+  $valeur
+    in (
+      0: var(--sqm-espace-0),
+      1: var(--sqm-espace-1),
+      2: var(--sqm-espace-2),
+      3: var(--sqm-espace-3),
+      4: var(--sqm-espace-4),
+      5: var(--sqm-espace-5),
+      6: var(--sqm-espace-6),
+      8: var(--sqm-espace-8)
+    )
+{
+  .interieur-#{$cle} {
+    padding: #{$valeur};
+  }
+  .interieur-x-#{$cle} {
+    padding-left: #{$valeur};
+    padding-right: #{$valeur};
+  }
+  .interieur-y-#{$cle} {
+    padding-top: #{$valeur};
+    padding-bottom: #{$valeur};
+  }
+}
+
+// ===== Marges extérieures (margin) =====
+@each $cle,
+  $valeur
+    in (
+      0: var(--sqm-espace-0),
+      1: var(--sqm-espace-1),
+      2: var(--sqm-espace-2),
+      3: var(--sqm-espace-3),
+      4: var(--sqm-espace-4),
+      5: var(--sqm-espace-5),
+      6: var(--sqm-espace-6),
+      8: var(--sqm-espace-8)
+    )
+{
+  .exterieur-#{$cle} {
+    margin: #{$valeur};
+  }
+  .exterieur-x-#{$cle} {
+    margin-left: #{$valeur};
+    margin-right: #{$valeur};
+  }
+  .exterieur-y-#{$cle} {
+    margin-top: #{$valeur};
+    margin-bottom: #{$valeur};
+  }
+  .exterieur-haut-#{$cle} {
+    margin-top: #{$valeur};
+  }
+  .exterieur-bas-#{$cle} {
+    margin-bottom: #{$valeur};
+  }
+}
+.exterieur-x-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+.exterieur-haut-auto {
+  margin-top: auto;
+}
+
+// ===== Dimensions =====
+.largeur-pleine {
+  width: 100%;
+}
+.largeur-mini-nulle {
+  min-width: 0;
+}
+.hauteur-pleine {
+  height: 100%;
+}
+
+// ===== Typographie =====
+.texte-2xs {
+  font-size: var(--sqm-texte-2xs);
+}
+.texte-xs {
+  font-size: var(--sqm-texte-xs);
+}
+.texte-sm {
+  font-size: var(--sqm-texte-sm);
+}
+.texte-base {
+  font-size: var(--sqm-texte-base);
+}
+.texte-md {
+  font-size: var(--sqm-texte-md);
+}
+.texte-lg {
+  font-size: var(--sqm-texte-lg);
+}
+.texte-xl {
+  font-size: var(--sqm-texte-xl);
+}
+.texte-2xl {
+  font-size: var(--sqm-texte-2xl);
+}
+
+.poids-normal {
+  font-weight: var(--sqm-poids-normal);
+}
+.poids-moyen {
+  font-weight: var(--sqm-poids-moyen);
+}
+.poids-demi-gras {
+  font-weight: var(--sqm-poids-demi-gras);
+}
+.poids-gras {
+  font-weight: var(--sqm-poids-gras);
+}
+.poids-extra-gras {
+  font-weight: var(--sqm-poids-extra-gras);
+}
+
+.police-mono {
+  font-family: var(--sqm-police-mono);
+}
+.majuscules {
+  text-transform: uppercase;
+}
+.espace-lettres {
+  letter-spacing: 0.05em;
+}
+.texte-gauche {
+  text-align: left;
+}
+.texte-centre {
+  text-align: center;
+}
+.texte-droite {
+  text-align: right;
+}
+.aucun-retour {
+  white-space: nowrap;
+}
+.tronque {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// ===== Couleurs de texte =====
+.texte-fort {
+  color: var(--sqm-neutre-1000);
+}
+.texte-secondaire {
+  color: var(--sqm-neutre-850);
+}
+.texte-discret {
+  color: var(--sqm-neutre-800);
+}
+.texte-tenue {
+  color: var(--sqm-neutre-700);
+}
+.texte-blanc {
+  color: var(--sqm-neutre-0);
+}
+.texte-marque {
+  color: var(--sqm-marque-texte);
+}
+.texte-vert {
+  color: var(--sqm-vert-texte);
+}
+.texte-orange {
+  color: var(--sqm-orange-texte);
+}
+.texte-rouge {
+  color: var(--sqm-rouge-texte);
+}
+.texte-alerte {
+  color: var(--sqm-alerte-texte);
+}
+
+// ===== Couleurs de fond =====
+.fond-blanc {
+  background-color: var(--sqm-neutre-0);
+}
+.fond-surface {
+  background-color: var(--sqm-neutre-50);
+}
+.fond-douce {
+  background-color: var(--sqm-neutre-100);
+}
+.fond-neutre {
+  background-color: var(--sqm-neutre-150);
+}
+.fond-marque {
+  background-color: var(--sqm-marque-fond);
+}
+.fond-vert {
+  background-color: var(--sqm-vert-fond);
+}
+.fond-orange {
+  background-color: var(--sqm-orange-fond);
+}
+.fond-rouge {
+  background-color: var(--sqm-rouge-fond);
+}
+.fond-alerte {
+  background-color: var(--sqm-alerte-fond);
+}
+.transparent {
+  background-color: transparent;
+}
+
+// ===== Bordures et rayons =====
+.bordure {
+  border: 1px solid var(--sqm-neutre-300);
+}
+.bordure-haut {
+  border-top: 1px solid var(--sqm-neutre-250);
+}
+.bordure-bas {
+  border-bottom: 1px solid var(--sqm-neutre-250);
+}
+.sans-bordure {
+  border: none;
+}
+.rayon-sm {
+  border-radius: var(--sqm-rayon-sm);
+}
+.rayon-md {
+  border-radius: var(--sqm-rayon-md);
+}
+.rayon-lg {
+  border-radius: var(--sqm-rayon-lg);
+}
+.rayon-xl {
+  border-radius: var(--sqm-rayon-xl);
+}
+.rayon-pilule {
+  border-radius: var(--sqm-rayon-pilule);
+}
+
+// ===== Défilement, position, divers =====
+.deborde-auto {
+  overflow: auto;
+}
+.deborde-masque {
+  overflow: hidden;
+}
+.relatif {
+  position: relative;
+}
+.fixe {
+  position: fixed;
+}
+.curseur-pointeur {
+  cursor: pointer;
+}
+.curseur-defaut {
+  cursor: default;
+}
+.sans-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sans-decoration {
+  text-decoration: none;
+}
+
+// Visuellement masqué mais toujours accessible aux technologies d'assistance (RNF-019/RNF-020) : réservé au
+// contenu réellement redondant à l'écran (ex. libellé de champ de filtre déjà porté par l'en-tête de colonne
+// visible juste au-dessus, cf. `tableau-dense.component.scss`), jamais à un contenu qui n'aurait aucun équivalent
+// visuel ailleurs sur l'écran.
+.hors-ecran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

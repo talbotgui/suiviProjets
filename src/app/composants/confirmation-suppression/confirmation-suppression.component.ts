@@ -15,7 +15,6 @@ import type { InputSignal, OutputEmitterRef } from '@angular/core';
 @Component({
   selector: 'app-confirmation-suppression',
   templateUrl: './confirmation-suppression.component.html',
-  styleUrl: './confirmation-suppression.component.scss',
 })
 export class SqmConfirmationSuppressionComponent {
   /**

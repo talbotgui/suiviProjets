@@ -1,0 +1,110 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Motifs composés (Phase 10, incrément 9, C10-06) : à la différence des classes utilitaires de `_utilitaires.scss`
+// (une seule propriété CSS chacune), ces classes assemblent plusieurs déclarations pour un motif visuel récurrent
+// de la charte d'ergonomie (docs/02_documentation/10_charteErgonomie.md#composants-dinterface-réutilisables) —
+// Carte, Bouton (non listé séparément par la charte mais support de la plupart des autres composants), Modale de
+// confirmation. Réutilisées par les cinq composants transverses migrés par cet incrément, et destinées à l'être par
+// les écrans des incréments suivants (10 à 20) plutôt que redéfinies à chaque fois.
+@use 'points-de-rupture' as pr;
+
+// ===== Carte =====
+// « Regroupement visuel à coins arrondis, utilisé pour les actions principales et les blocs de synthèse ».
+.carte {
+  background-color: var(--sqm-neutre-0);
+  border: 1px solid var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-xl);
+}
+
+// ===== Bouton =====
+// Base commune, sans couleur porteuse de sens propre (état neutre) : les variantes ci-dessous n'en changent que la
+// couleur de texte/fond, jamais la forme.
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sqm-espace-2);
+  border: 1px solid var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-md);
+  background-color: var(--sqm-neutre-0);
+  color: var(--sqm-neutre-1000);
+  font: inherit;
+  font-weight: var(--sqm-poids-demi-gras);
+  font-size: var(--sqm-texte-sm);
+  padding: var(--sqm-espace-2) var(--sqm-espace-4);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--sqm-neutre-50);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+// Action principale d'un panneau (ex. « Confirmer » d'une modale non destructive) : jamais appliquée par défaut à
+// une action destructive (charte d'ergonomie, Modale de confirmation : « bouton de validation jamais pré-
+// sélectionné par défaut pour une action destructive »), l'attribut `autofocus` restant donc du seul ressort du
+// composant appelant, jamais de cette classe.
+.bouton--principal {
+  border-color: var(--sqm-marque);
+  background-color: var(--sqm-marque);
+  color: var(--sqm-neutre-0);
+
+  &:hover {
+    background-color: var(--sqm-marque-foncee);
+  }
+}
+
+// Action destructive (suppression, rejet), jamais appliquée avec `.bouton--principal` en même temps.
+.bouton--danger {
+  border-color: var(--sqm-rouge-bordure);
+  background-color: var(--sqm-rouge-fond);
+  color: var(--sqm-rouge-texte);
+
+  &:hover {
+    background-color: var(--sqm-rouge-fond);
+    opacity: 0.85;
+  }
+}
+
+// Action discrète, sans bordure ni fond (ex. bouton icône de la barre supérieure du Shell).
+.bouton--discret {
+  border: none;
+  background: transparent;
+  padding: var(--sqm-espace-1) var(--sqm-espace-2);
+
+  &:hover {
+    background-color: var(--sqm-neutre-100);
+  }
+}
+
+// ===== Superposition modale =====
+// « Superposition modale »/« Superposition plein écran » (charte d'ergonomie, Recherche globale et Écran de
+// verrouillage) : fond assombri plein écran centrant un panneau, motif commun à toute superposition bloquante de
+// l'application (recherche transversale, verrouillage, modales de confirmation ci-dessous).
+.superposition {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sqm-espace-4);
+  background-color: var(--sqm-recouvrement);
+}
+
+.superposition__panneau {
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100% - var(--sqm-espace-8));
+  overflow: auto;
+  padding: var(--sqm-espace-5) var(--sqm-espace-6);
+
+  @include pr.jusqua(pr.$sqm-pr-576) {
+    max-width: 100%;
+  }
+}

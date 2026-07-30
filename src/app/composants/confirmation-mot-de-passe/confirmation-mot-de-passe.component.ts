@@ -19,7 +19,6 @@ import { FormsModule } from '@angular/forms';
   selector: 'app-confirmation-mot-de-passe',
   imports: [FormsModule],
   templateUrl: './confirmation-mot-de-passe.component.html',
-  styleUrl: './confirmation-mot-de-passe.component.scss',
 })
 export class SqmConfirmationMotDePasseComponent {
   /**

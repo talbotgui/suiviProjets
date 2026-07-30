@@ -1,0 +1,55 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Réinitialisation et styles de base (Phase 10, incrément 9) : reprend fidèlement les règles globales déjà posées
+// par la maquette de référence (docs/01_besoin/Suivi Qualimetrie.dc.html : `box-sizing`, marge de `body`,
+// ascenseur, liens), jusqu'ici absentes de `src/styles.scss` (resté au squelette généré par `ng new`, cf. C10-06).
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--sqm-police-texte);
+  font-size: var(--sqm-texte-base);
+  color: var(--sqm-neutre-1000);
+  background: var(--sqm-neutre-50);
+}
+
+a {
+  color: var(--sqm-marque);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--sqm-marque-foncee);
+    text-decoration: underline;
+  }
+}
+
+// État de focus visible systématique (RNF-019), indépendant du navigateur/agent de rendu par défaut : cohérent
+// avec `--sqm-focus-couleur`/`--sqm-focus-epaisseur` de `_tokens.scss`.
+:focus-visible {
+  outline: var(--sqm-focus-epaisseur) solid var(--sqm-focus-couleur);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sqm-neutre-400);
+  border-radius: var(--sqm-rayon-md);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
