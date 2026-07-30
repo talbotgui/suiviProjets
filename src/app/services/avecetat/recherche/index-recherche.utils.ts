@@ -313,9 +313,43 @@ export class IndexRechercheUtils {
     return { dependances, membres, outilsIa, entites };
   }
 
+  /** Borne inférieure (incluse) du bloc Unicode des marques diacritiques combinantes (U+0300). */
+  private static readonly DEBUT_MARQUES_DIACRITIQUES = 0x0300;
+
+  /** Borne supérieure (incluse) du bloc Unicode des marques diacritiques combinantes (U+036F). */
+  private static readonly FIN_MARQUES_DIACRITIQUES = 0x036f;
+
+  /**
+   * Replie les accents d'une chaîne (décomposition Unicode NFD, qui sépare chaque lettre accentuée en une lettre de
+   * base suivie d'une marque diacritique combinante, puis suppression de ces seules marques), pour que la
+   * comparaison de termes de {@link rechercher} soit insensible aux accents (R10-18) en plus de la casse.
+   * @param valeur - Chaîne à traiter.
+   * @returns La chaîne sans accents.
+   */
+  private static replierAccents(valeur: string): string {
+    return Array.from(valeur.normalize('NFD'))
+      .filter((caractere) => {
+        const codePoint = caractere.codePointAt(0) ?? 0;
+        return (
+          codePoint < IndexRechercheUtils.DEBUT_MARQUES_DIACRITIQUES ||
+          codePoint > IndexRechercheUtils.FIN_MARQUES_DIACRITIQUES
+        );
+      })
+      .join('');
+  }
+
+  /**
+   * Normalise une chaîne pour comparaison : casse et accents repliés (R10-18).
+   * @param valeur - Chaîne à normaliser.
+   * @returns La chaîne normalisée.
+   */
+  private static normaliser(valeur: string): string {
+    return IndexRechercheUtils.replierAccents(valeur.toLowerCase());
+  }
+
   /**
    * Interroge l'index de recherche transversale par terme et options (US-021, F16). Comparaison insensible à la
-   * casse, par inclusion simple (aucun repliement des accents, décision pragmatique de portée limitée).
+   * casse et aux accents (R10-18), par inclusion simple.
    * @param index - Index construit par {@link construireIndex}.
    * @param terme - Terme recherché, saisi par l'utilisateur.
    * @param options - Options de recherche (extension à l'historique).
@@ -326,7 +360,7 @@ export class IndexRechercheUtils {
     terme: string,
     options: OptionsRechercheTransversale,
   ): ResultatsRechercheTransversale {
-    const termeNormalise = terme.trim().toLowerCase();
+    const termeNormalise = IndexRechercheUtils.normaliser(terme.trim());
     if (termeNormalise.length < IndexRechercheUtils.LONGUEUR_MINIMALE_TERME) {
       return IndexRechercheUtils.resultatsVides();
     }
@@ -335,26 +369,28 @@ export class IndexRechercheUtils {
       index.dependances.filter(
         (occurrence) =>
           (options.inclureHistorique || occurrence.dansDernierAudit) &&
-          occurrence.reference.toLowerCase().includes(termeNormalise),
+          IndexRechercheUtils.normaliser(occurrence.reference).includes(termeNormalise),
       ),
     );
     const membres = IndexRechercheUtils.plafonner(
       index.membres.filter(
         (occurrence) =>
           (options.inclureHistorique || occurrence.dansDernierAudit) &&
-          (occurrence.identifiant.toLowerCase().includes(termeNormalise) ||
-            occurrence.nom.toLowerCase().includes(termeNormalise)),
+          (IndexRechercheUtils.normaliser(occurrence.identifiant).includes(termeNormalise) ||
+            IndexRechercheUtils.normaliser(occurrence.nom).includes(termeNormalise)),
       ),
     );
     const outilsIa = IndexRechercheUtils.plafonner(
       index.outilsIa.filter(
         (occurrence) =>
           (options.inclureHistorique || occurrence.dansDernierAudit) &&
-          occurrence.outil.toLowerCase().includes(termeNormalise),
+          IndexRechercheUtils.normaliser(occurrence.outil).includes(termeNormalise),
       ),
     );
     const entites = IndexRechercheUtils.plafonner(
-      index.entites.filter((entite) => entite.libelle.toLowerCase().includes(termeNormalise)),
+      index.entites.filter((entite) =>
+        IndexRechercheUtils.normaliser(entite.libelle).includes(termeNormalise),
+      ),
     );
 
     return {

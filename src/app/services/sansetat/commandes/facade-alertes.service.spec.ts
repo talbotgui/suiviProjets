@@ -67,6 +67,47 @@ describe('FacadeAlertesService', () => {
     );
   });
 
+  it('invoque supprimer_annotation avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.supprimerAnnotation({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      groupeId: 'g1',
+      projetId: 'p1',
+      annotationId: 'a1',
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('supprimer_annotation', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      groupeId: 'g1',
+      projetId: 'p1',
+      annotationId: 'a1',
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque supprimer_annotation sans projetId pour une annotation de portée groupe', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    await service.supprimerAnnotation({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      groupeId: 'g1',
+      projetId: undefined,
+      annotationId: 'a1',
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith(
+      'supprimer_annotation',
+      expect.objectContaining({ groupeId: 'g1', projetId: undefined }),
+    );
+  });
+
   it('invoque qualifier_alerte avec les paramètres fournis et renvoie la racine native', async () => {
     invokeSimule.mockResolvedValue({ versionSchema: 2 });
 

@@ -121,4 +121,169 @@ describe('FacadeParametrageService', () => {
     });
     expect(resultat).toEqual({ versionSchema: 2 });
   });
+
+  it('invoque supprimer_regle_dependance avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.supprimerRegleDependance({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      id: 'd1',
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('supprimer_regle_dependance', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      id: 'd1',
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque supprimer_regle_marqueur_ia avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.supprimerRegleMarqueurIA({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      id: 'm1',
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('supprimer_regle_marqueur_ia', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      id: 'm1',
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque definir_verrouillage avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.definirVerrouillage({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      delaiInactiviteMinutes: 30,
+      echecsAvantFermeture: 3,
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('definir_verrouillage', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      delaiInactiviteMinutes: 30,
+      echecsAvantFermeture: 3,
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque definir_concurrence_audit avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.definirConcurrenceAudit({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      concurrence: 8,
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('definir_concurrence_audit', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      concurrence: 8,
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque definir_proxy avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.definirProxy({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      url: 'http://proxy.exemple.local:3128',
+      cheminBundleCa: undefined,
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('definir_proxy', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      url: 'http://proxy.exemple.local:3128',
+      cheminBundleCa: undefined,
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque definir_nombre_sauvegardes_securite avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.definirNombreSauvegardesSecurite({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      nombre: 10,
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('definir_nombre_sauvegardes_securite', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      nombre: 10,
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque definir_seuil_avertissement_taille avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.definirSeuilAvertissementTaille({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      seuilOctets: 5_000_000,
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('definir_seuil_avertissement_taille', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      seuilOctets: 5_000_000,
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
+  it('invoque previsualiser_purge_journal avec les paramètres fournis et renvoie le résumé natif', async () => {
+    invokeSimule.mockResolvedValue({ nbEntreesSupprimees: 4 });
+
+    const resultat = await service.previsualiserPurgeJournal({ donnees: { versionSchema: 1 } });
+
+    expect(invokeSimule).toHaveBeenCalledWith('previsualiser_purge_journal', {
+      donnees: { versionSchema: 1 },
+    });
+    expect(resultat).toEqual({ nbEntreesSupprimees: 4 });
+  });
+
+  it('invoque executer_purge_journal avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.executerPurgeJournal({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('executer_purge_journal', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
 });

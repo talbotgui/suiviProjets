@@ -8,10 +8,12 @@
 // `SqmMembresConnusAdminComponent` (Phase 4), avec un unique discriminant d'action en attente pour les trois
 // sous-formulaires plutôt que trois indicateurs distincts (une seule action possible à la fois).
 //
+// Suppression d'une entrée de référentiel (US-033, RG-035, Phase 10 incrément 8) : deux commandes dédiées
+// (`supprimerRegleDependance`/`supprimerRegleMarqueurIA`), retenues par arbitrage humain plutôt qu'une commande
+// générique paramétrée par type, sur le modèle à deux étapes (confirmation puis mot de passe) déjà utilisé par
+// `SqmMembresConnusAdminComponent` pour une action irréversible.
+//
 // Décisions arbitraires (à valider par un humain, cf. rapport de développement de cet incrément) :
-// - Aucune commande de suppression d'une entrée de référentiel n'existe (`definirReferentiel` ne couvre que
-//   l'ajout/la modification par `id`, cf. `docs/02_documentation/13_conceptionDetaillee.md`) : la suppression
-//   d'une règle de dépendances ou de marqueur IA reste hors périmètre de cet incrément.
 // - L'identifiant d'une nouvelle règle est généré côté interface (`crypto.randomUUID()`, réutilisé tel quel du
 //   Store, cf. `DonneesApplicationService`), le cœur natif ne générant jamais lui-même cet identifiant pour
 //   `definirReferentiel` (à la différence de `qualifierMembre`, Phase 4).
@@ -23,6 +25,7 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
+import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import type {
   NatureMarqueur,
   PorteeMarqueur,
@@ -37,17 +40,35 @@ import type {
 import type { VersionDependance } from '../../../services/sansetat/jugement/parametres-jugement.utils';
 
 /**
- * Action de référentiel actuellement en attente de ressaisie du mot de passe (RG-002), `null` si aucune.
+ * Action de référentiel actuellement en attente de ressaisie du mot de passe (RG-002), `null` si aucune. Les deux
+ * variantes `suppression*` (US-033, RG-035, Phase 10 incrément 8) sont atteintes après confirmation de la
+ * suppression elle-même (`SqmConfirmationSuppressionComponent`), sur le modèle à deux étapes déjà utilisé par
+ * `SqmMembresConnusAdminComponent` pour une action irréversible.
  */
-type ActionReferentielEnAttente = 'dependance' | 'marqueurIA' | 'motifNommage' | null;
+type ActionReferentielEnAttente =
+  | 'dependance'
+  | 'marqueurIA'
+  | 'motifNommage'
+  | 'suppressionDependance'
+  | 'suppressionMarqueurIA'
+  | null;
 
 /**
- * Section « Référentiels » : CRUD (ajout/modification, sans suppression) des règles de dépendances et de
- * marqueurs IA, et remplacement du motif de nommage des branches (US-033, RG-023, RG-030).
+ * Suppression d'entrée de référentiel en attente de confirmation (avant ressaisie du mot de passe), `null` si
+ * aucune (US-033, RG-035, Phase 10 incrément 8).
+ */
+interface SuppressionEnAttente {
+  readonly type: 'dependance' | 'marqueurIA';
+  readonly id: string;
+}
+
+/**
+ * Section « Référentiels » : CRUD complet (ajout/modification/suppression, US-033, RG-023, RG-030, RG-035) des
+ * règles de dépendances et de marqueurs IA, et remplacement du motif de nommage des branches.
  */
 @Component({
   selector: 'app-referentiels-parametrage',
-  imports: [FormsModule, SqmConfirmationMotDePasseComponent],
+  imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
   templateUrl: './referentiels-parametrage.component.html',
   styleUrl: './referentiels-parametrage.component.scss',
 })
@@ -376,6 +397,79 @@ export class SqmReferentielsParametrageComponent {
     this.formulaireMotifNommageVisible = false;
   }
 
+  // --- Suppression d'une entrée de référentiel (US-033, RG-035, Phase 10 incrément 8) ---
+
+  /**
+   * Suppression d'entrée de référentiel actuellement en attente de confirmation, `null` si aucune.
+   */
+  public suppressionEnAttente: SuppressionEnAttente | null = null;
+
+  /**
+   * Demande la suppression d'une règle de dépendances : ouvre la confirmation de suppression (avant ressaisie du
+   * mot de passe).
+   * @param id - Identifiant de la règle à supprimer.
+   */
+  public demanderSuppressionDependance(id: string): void {
+    this.messageErreur = null;
+    this.suppressionEnAttente = { type: 'dependance', id };
+  }
+
+  /**
+   * Demande la suppression d'une règle de marqueur IA : ouvre la confirmation de suppression (avant ressaisie du
+   * mot de passe).
+   * @param id - Identifiant de la règle à supprimer.
+   */
+  public demanderSuppressionMarqueurIa(id: string): void {
+    this.messageErreur = null;
+    this.suppressionEnAttente = { type: 'marqueurIA', id };
+  }
+
+  /**
+   * Annule la suppression en attente de confirmation.
+   */
+  public annulerSuppression(): void {
+    this.suppressionEnAttente = null;
+  }
+
+  /**
+   * Confirme la suppression : ouvre la ressaisie du mot de passe (RG-002).
+   */
+  public confirmerSuppression(): void {
+    if (!this.suppressionEnAttente) {
+      return;
+    }
+    this.actionEnAttenteMotDePasse =
+      this.suppressionEnAttente.type === 'dependance'
+        ? 'suppressionDependance'
+        : 'suppressionMarqueurIA';
+  }
+
+  /**
+   * Supprime l'entrée de référentiel désignée après confirmation du mot de passe (US-033, RG-002, RG-035).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerSuppressionMotDePasse(motDePasse: string): Promise<void> {
+    if (!this.suppressionEnAttente) {
+      return;
+    }
+    const { type, id } = this.suppressionEnAttente;
+
+    this.enCours = true;
+    const resultat =
+      type === 'dependance'
+        ? await this.donneesApplication.supprimerRegleDependance(id, motDePasse)
+        : await this.donneesApplication.supprimerRegleMarqueurIA(id, motDePasse);
+    this.enCours = false;
+    this.actionEnAttenteMotDePasse = null;
+
+    if (resultat.type === 'echec') {
+      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.suppressionEnAttente = null;
+      return;
+    }
+    this.suppressionEnAttente = null;
+  }
+
   /**
    * Annule la ressaisie du mot de passe en cours, quelle que soit l'action qui l'avait demandée.
    */
@@ -392,6 +486,8 @@ export class SqmReferentielsParametrageComponent {
     switch (anomalie.type) {
       case 'entreeReferentielInvalide':
         return "Cette entrée n'est pas valide : vérifiez les champs obligatoires.";
+      case 'entreeReferentielIntrouvable':
+        return "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).";
       case 'motifNommageBranchesInvalide':
         return "Ce motif n'est pas une expression régulière valide, ou est vide.";
       case 'typeReferentielInconnu':
@@ -409,6 +505,7 @@ export class SqmReferentielsParametrageComponent {
       case 'projetIntrouvable':
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
+      case 'conflitReglesMembreConnu':
       case 'brouillonDejaExistant':
       case 'aucunBrouillonCourant':
       case 'projetAbsentDuBrouillon':
@@ -423,6 +520,9 @@ export class SqmReferentielsParametrageComponent {
       case 'versionSchemaConfigurationSuperieure':
       case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
+      case 'reglageApplicatifInvalide':
+      case 'annotationIntrouvable':
+      case 'annotationSystemeNonSupprimable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

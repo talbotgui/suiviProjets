@@ -58,9 +58,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -386,6 +387,60 @@ describe('SqmShellComponent', () => {
       fixture.detectChanges();
 
       expect(element.textContent).toContain('La sauvegarde a échoué. Réessayez.');
+    });
+
+    it('affiche l’avertissement de taille après une sauvegarde dépassant le seuil (US-035, RG-032)', async () => {
+      const racine: DonneesRacine = {
+        ...DonneesDeTest.racineVide(),
+        parametres: {
+          ...DonneesDeTest.racineVide().parametres,
+          seuilAvertissementTailleOctets: 10,
+        },
+      };
+      invokeSimule.mockResolvedValue(undefined);
+      donneesApplication.chargerRacine(racine);
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+
+      await fixture.componentInstance.confirmerSauvegarde('mot-de-passe');
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(fixture.componentInstance.avertissementTailleActif()).toBe(true);
+      expect(element.textContent).toContain('dépasse le seuil de taille configuré');
+    });
+
+    it('ne déclenche pas l’avertissement de taille sous le seuil configuré', async () => {
+      invokeSimule.mockResolvedValue(undefined);
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+
+      await fixture.componentInstance.confirmerSauvegarde('mot-de-passe');
+
+      expect(fixture.componentInstance.avertissementTailleActif()).toBe(false);
+    });
+
+    it('referme l’avertissement de taille sans naviguer', async () => {
+      const racine: DonneesRacine = {
+        ...DonneesDeTest.racineVide(),
+        parametres: {
+          ...DonneesDeTest.racineVide().parametres,
+          seuilAvertissementTailleOctets: 10,
+        },
+      };
+      invokeSimule.mockResolvedValue(undefined);
+      donneesApplication.chargerRacine(racine);
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      await fixture.componentInstance.confirmerSauvegarde('mot-de-passe');
+
+      fixture.componentInstance.fermerAvertissementTaille();
+
+      expect(fixture.componentInstance.avertissementTailleActif()).toBe(false);
     });
   });
 });

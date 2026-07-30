@@ -28,8 +28,10 @@ use std::path::{Path, PathBuf};
 use tauri::State;
 
 /// Réponse de la commande `qualifierMembre` : la racine mise à jour et les identifiants des règles de membres
-/// connus actuellement en conflit au sein du groupe concerné (RG-008). Cette détection ne bloque jamais la saisie
-/// (seul le doublon de username l'est) : elle est uniquement signalée à l'UI pour affichage, cf.
+/// connus encore en conflit au sein du groupe concerné (RG-008) après cette qualification. Depuis R10-07, la
+/// saisie d'une règle email/domaineEmail créant un nouveau conflit est bloquée (symétrique du doublon de
+/// username) ; ce champ ne peut donc plus signaler qu'un conflit résiduel préexistant dans les données (import de
+/// configuration antérieur à ce blocage), purement informatif, cf.
 /// `persistance::administration::qualifier_membre`.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

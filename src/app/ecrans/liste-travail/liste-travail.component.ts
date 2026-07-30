@@ -49,6 +49,7 @@ import type {
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import type { Groupe, TraitementAlerte } from '../../services/avecetat/etat/types-donnees';
 import { StatutTraitementAlerte } from '../../services/avecetat/etat/types-donnees';
+import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 import type { GraviteAlerteMembreInconnu } from '../../services/sansetat/jugement/statut-membre.utils';
 import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
@@ -405,7 +406,9 @@ export class SqmListeTravailComponent {
         triable: true,
         extraireTexteBrut: (ligne) => ligne.detecteeDepuis ?? '',
         extraireCellule: (ligne) => ({
-          segments: [{ type: 'texte', valeur: this.formaterHorodatage(ligne.detecteeDepuis) }],
+          segments: [
+            { type: 'texte', valeur: HorodatageUtils.formaterDateAvecRepli(ligne.detecteeDepuis) },
+          ],
         }),
       },
       {
@@ -678,19 +681,5 @@ export class SqmListeTravailComponent {
         : plusAncienneConnue,
     );
     return plusAncienne.horodatage;
-  }
-
-  /**
-   * Met en forme un horodatage ISO 8601 en libellé court `AAAA-MM-JJ`, `—` si absent.
-   * @param horodatageIso - Horodatage ISO 8601 à mettre en forme, absent si non calculable.
-   * @returns Le libellé court correspondant.
-   */
-  private formaterHorodatage(horodatageIso: string | undefined): string {
-    if (horodatageIso === undefined) {
-      return '—';
-    }
-    const date = new Date(horodatageIso);
-    const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;
   }
 }

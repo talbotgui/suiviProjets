@@ -52,6 +52,7 @@ import type {
   ModePurgeAge,
   DifferentielImportConfiguration,
   PrevisualisationPurge,
+  PrevisualisationPurgeJournal,
   Projet,
   ReponseQualificationMembre,
   ResultatBrouillonProjet,
@@ -59,6 +60,7 @@ import type {
   ResultatMutationAdministration,
   ResultatPrevisualisationImportConfiguration,
   ResultatPrevisualisationPurge,
+  ResultatPrevisualisationPurgeJournal,
   ResultatQualificationMembre,
   Source,
   StatutMembre,
@@ -830,6 +832,249 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Supprime une entrée du référentiel des règles de dépendances (US-033, RG-035, Phase 10 incrément 8) : invoque
+   * la commande native `supprimerRegleDependance`, qui consigne la suppression au journal et sauvegarde
+   * effectivement le fichier (RG-002, RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant
+   * de ce Store.
+   * @param id - Identifiant de l'entrée de référentiel à supprimer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerRegleDependance(
+    id: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.supprimerRegleDependance<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, id, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Supprime une entrée du référentiel des règles de marqueurs IA (US-033, RG-035, Phase 10 incrément 8) : invoque
+   * la commande native `supprimerRegleMarqueurIA`, sur le même modèle que {@link supprimerRegleDependance}.
+   * @param id - Identifiant de l'entrée de référentiel à supprimer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerRegleMarqueurIA(
+    id: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.supprimerRegleMarqueurIA<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, id, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Modifie les réglages de verrouillage de session (US-034, RG-031, Phase 10 incrément 8) : invoque la commande
+   * native `definirVerrouillage`, qui consigne la modification au journal et sauvegarde effectivement le fichier
+   * (RG-002, RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param delaiInactiviteMinutes - Délai d'inactivité, en minutes, avant verrouillage automatique.
+   * @param echecsAvantFermeture - Nombre d'échecs consécutifs de déverrouillage avant fermeture du fichier.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirVerrouillage(
+    delaiInactiviteMinutes: number,
+    echecsAvantFermeture: number,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirVerrouillage<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        delaiInactiviteMinutes,
+        echecsAvantFermeture,
+        motDePasse,
+      });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Modifie la concurrence par défaut d'une campagne d'audit (US-034, RG-031, Phase 10 incrément 8) : invoque la
+   * commande native `definirConcurrenceAudit`, sur le même modèle que {@link definirVerrouillage}.
+   * @param concurrence - Concurrence par défaut d'une campagne d'audit (RNF-004).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirConcurrenceAudit(
+    concurrence: number,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirConcurrenceAudit<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, concurrence, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Modifie le réglage de proxy sortant (US-034, RG-031, Phase 10 incrément 8) : invoque la commande native
+   * `definirProxy`, sur le même modèle que {@link definirVerrouillage}. Une URL et un chemin de fascicule de
+   * certificats tous deux absents ou vides effacent le réglage (retour au seul proxy système).
+   * @param url - URL du proxy, absente ou vide pour l'effacer.
+   * @param cheminBundleCa - Chemin vers un fascicule de certificats d'autorité supplémentaire, absent ou vide pour
+   * l'effacer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirProxy(
+    url: string | undefined,
+    cheminBundleCa: string | undefined,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirProxy<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, url, cheminBundleCa, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Modifie le nombre de sauvegardes de sécurité conservées avant rotation (US-034, RG-003, RG-031, Phase 10
+   * incrément 8) : invoque la commande native `definirNombreSauvegardesSecurite`, sur le même modèle que
+   * {@link definirVerrouillage}.
+   * @param nombre - Nombre de sauvegardes de sécurité horodatées conservées avant rotation.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirNombreSauvegardesSecurite(
+    nombre: number,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirNombreSauvegardesSecurite<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, nombre, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Modifie le seuil de taille déclenchant l'avertissement contextuel de purge à la sauvegarde (US-035, RG-031,
+   * RG-032, Phase 10 incrément 8) : invoque la commande native `definirSeuilAvertissementTaille`, sur le même
+   * modèle que {@link definirVerrouillage}.
+   * @param seuilOctets - Seuil de taille, en octets, déclenchant l'avertissement.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirSeuilAvertissementTaille(
+    seuilOctets: number,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirSeuilAvertissementTaille<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, seuilOctets, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Prévisualise une purge du journal des modifications lui-même (US-036, RG-034, Phase 10 incrément 8) : invoque
+   * la commande native `previsualiserPurgeJournal` sur la racine actuellement chargée, sans aucune modification ni
+   * sauvegarde. Limite fixe de deux ans, non paramétrable (arbitrage humain, à la différence de la purge des
+   * audits par âge, RG-025).
+   * @returns Le Résultat typé de l'opération, portant le résumé de la purge qui serait effectuée.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  public async previsualiserPurgeJournal(): Promise<ResultatPrevisualisationPurgeJournal> {
+    const racine = this.racineActuelle();
+    try {
+      const previsualisation = await this.facadeParametrage.previsualiserPurgeJournal<
+        DonneesRacine,
+        PrevisualisationPurgeJournal
+      >({ donnees: racine });
+      return { type: 'succes', previsualisation };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Exécute une purge du journal des modifications lui-même (US-036, RG-034, Phase 10 incrément 8) : invoque la
+   * commande native `executerPurgeJournal`, qui sauvegarde effectivement le fichier (RG-002) avant de renvoyer la
+   * racine mise à jour, substituée à l'état courant de ce Store.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async executerPurgeJournal(motDePasse: string): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.executerPurgeJournal<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Crée une annotation de portée groupe ou projet (US-019) : invoque la commande native `creerAnnotation`, qui
    * ajoute l'annotation, consigne la création au journal et sauvegarde effectivement le fichier (RG-002, RG-023)
    * avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
@@ -862,6 +1107,44 @@ export class DonneesApplicationService {
           motDePasse,
         },
       );
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Supprime une annotation de portée groupe ou projet (US-019, RG-033, Phase 10 incrément 8) : invoque la
+   * commande native `supprimerAnnotation`, qui consigne la suppression au journal et sauvegarde effectivement le
+   * fichier (RG-002, RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
+   * @param groupeId - Identifiant du groupe de rattachement de l'annotation.
+   * @param projetId - Identifiant du projet de rattachement, `undefined` pour une annotation de portée groupe.
+   * @param annotationId - Identifiant de l'annotation à supprimer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerAnnotation(
+    groupeId: string,
+    projetId: string | undefined,
+    annotationId: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeAlertes.supprimerAnnotation<
+        DonneesRacine,
+        DonneesRacine
+      >({
+        chemin,
+        donnees: racine,
+        groupeId,
+        projetId,
+        annotationId,
+        motDePasse,
+      });
       this.racineInterne.set(nouvelleRacine);
       return { type: 'succes' };
     } catch (erreur: unknown) {
@@ -1233,6 +1516,7 @@ export class DonneesApplicationService {
       'projetIntrouvable',
       'membreIntrouvable',
       'doublonUsernameMembreConnu',
+      'conflitReglesMembreConnu',
       'brouillonDejaExistant',
       'aucunBrouillonCourant',
       'projetAbsentDuBrouillon',
@@ -1240,6 +1524,10 @@ export class DonneesApplicationService {
       'typeReferentielInconnu',
       'entreeReferentielInvalide',
       'motifNommageBranchesInvalide',
+      'reglageApplicatifInvalide',
+      'entreeReferentielIntrouvable',
+      'annotationIntrouvable',
+      'annotationSystemeNonSupprimable',
       'modePurgeAgeInconnu',
       'vueIntrouvable',
       'fichierConfigurationIllisible',

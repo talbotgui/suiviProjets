@@ -54,9 +54,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -235,6 +236,21 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     expect(composant.messageErreur).toBe(
       'Ce username est déjà utilisé par une autre règle de ce groupe.',
+    );
+    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+  });
+
+  it('affiche un message d’erreur en cas de conflit de règles courriel/domaine (RG-008, R10-07)', async () => {
+    invokeSimule.mockRejectedValue({ type: 'conflitReglesMembreConnu' });
+    composant.selectionnerGroupe(groupeId);
+    composant.ouvrirCreation();
+    composant.critere = 'alice';
+    composant.demanderEnregistrement();
+
+    await composant.confirmerEnregistrement('mot-de-passe');
+
+    expect(composant.messageErreur).toBe(
+      'Cette règle entre en conflit avec une autre règle de ce groupe portant le même critère et un statut différent.',
     );
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
   });

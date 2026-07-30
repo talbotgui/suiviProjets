@@ -41,7 +41,7 @@
 
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
-use crate::connecteurs::commun::{ErreurConnecteur, client_http};
+use crate::connecteurs::commun::ErreurConnecteur;
 use crate::connecteurs::gitlab::RegleMarqueurIA;
 use crate::connecteurs::{gitlab, sonar};
 use crate::modele::racine::{
@@ -92,7 +92,7 @@ pub(crate) async fn interroger_vitalite(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -125,7 +125,7 @@ pub(crate) async fn interroger_taille_depot(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -158,7 +158,7 @@ pub(crate) async fn interroger_contributeurs(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -190,7 +190,7 @@ pub(crate) async fn interroger_merge_requests(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -222,7 +222,7 @@ pub(crate) async fn interroger_membres(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -257,7 +257,7 @@ pub(crate) async fn interroger_branches_completes(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -291,7 +291,7 @@ pub(crate) async fn interroger_dependances(
                 &source_id,
                 &id_externe,
                 ref_auditee.as_deref(),
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -330,7 +330,7 @@ pub(crate) async fn interroger_marqueurs_ia(
                 &id_externe,
                 ref_auditee.as_deref(),
                 &regles_marqueurs_ia,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -361,7 +361,7 @@ pub(crate) async fn interroger_violations(
                 &credential,
                 &source_id,
                 &id_externe,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -392,7 +392,7 @@ pub(crate) async fn interroger_dette(
                 &credential,
                 &source_id,
                 &id_externe,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -422,7 +422,7 @@ pub(crate) async fn interroger_couverture(
                 &credential,
                 &source_id,
                 &id_externe,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -452,7 +452,7 @@ pub(crate) async fn interroger_notes(
                 &credential,
                 &source_id,
                 &id_externe,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -482,7 +482,7 @@ pub(crate) async fn interroger_ncloc(
                 &credential,
                 &source_id,
                 &id_externe,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }
@@ -516,7 +516,7 @@ pub(crate) async fn interroger_derniere_analyse(
                 &instance.url_base,
                 &credential,
                 &id_externe,
-                client_http(),
+                &etat.client_http(),
             )
             .await
         }

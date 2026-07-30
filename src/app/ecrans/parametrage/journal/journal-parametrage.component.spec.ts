@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmJournalParametrageComponent } from './journal-parametrage.component';
 
@@ -51,9 +52,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -163,5 +165,258 @@ describe('SqmJournalParametrageComponent', () => {
 
     expect(element.textContent).toContain('Paramétrage');
     expect(element.textContent).toContain('Édition manuelle');
+  });
+
+  describe('filtre par origine et par date (R10-16)', () => {
+    /**
+     * Construit trois entrées de journal d'origines et de dates distinctes, pour couvrir le filtre par origine et
+     * par intervalle de dates.
+     * @returns Les trois entrées de test.
+     */
+    function troisEntrees(): DonneesRacine['journal'] {
+      return [
+        {
+          id: 'j1',
+          horodatage: '2026-07-01T08:00:00Z',
+          objet: 'parametres.seuils.vitalite.mortJours',
+          avant: 365,
+          apres: 400,
+          origine: 'Paramétrage',
+        },
+        {
+          id: 'j2',
+          horodatage: '2026-07-10T08:00:00Z',
+          objet: 'groupes.groupe-1.membresConnus',
+          avant: undefined,
+          apres: { username: 'jdupont' },
+          origine: 'Administration',
+        },
+        {
+          id: 'j3',
+          horodatage: '2026-07-20T08:00:00Z',
+          objet: 'referentiels.motifNommageBranches',
+          avant: '^(main)$',
+          apres: '^(main|develop)$',
+          origine: 'Paramétrage',
+        },
+      ];
+    }
+
+    it('propose les origines distinctes des entrées chargées, triées alphabétiquement', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      expect(composant.origines()).toEqual(['Administration', 'Paramétrage']);
+    });
+
+    it('restreint les entrées affichées à l’origine sélectionnée', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.definirFiltreOrigine('Administration');
+
+      expect(composant.entreesFiltrees().map((entree) => entree.id)).toEqual(['j2']);
+    });
+
+    it('restreint les entrées affichées à l’intervalle de dates sélectionné', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.definirFiltreDateDebut('2026-07-05');
+      composant.definirFiltreDateFin('2026-07-15');
+
+      expect(composant.entreesFiltrees().map((entree) => entree.id)).toEqual(['j2']);
+    });
+
+    it('combine le filtre d’origine et le filtre de date', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.definirFiltreOrigine('Paramétrage');
+      composant.definirFiltreDateDebut('2026-07-15');
+
+      expect(composant.entreesFiltrees().map((entree) => entree.id)).toEqual(['j3']);
+    });
+
+    it('affiche un message explicite quand aucune entrée ne correspond aux filtres', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const fixture = TestBed.createComponent(SqmJournalParametrageComponent);
+      fixture.detectChanges();
+
+      fixture.componentInstance.definirFiltreOrigine('Administration');
+      fixture.componentInstance.definirFiltreDateDebut('2026-07-01');
+      fixture.componentInstance.definirFiltreDateFin('2026-07-05');
+      fixture.detectChanges();
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.textContent).toContain('Aucune entrée de journal ne correspond');
+      expect(element.querySelector('table')).toBeNull();
+    });
+
+    it('réinitialise l’ensemble des filtres', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.definirFiltreOrigine('Administration');
+      composant.definirFiltreDateDebut('2026-07-05');
+      composant.definirFiltreDateFin('2026-07-15');
+      expect(composant.auMoinsUnFiltreActif()).toBe(true);
+
+      composant.reinitialiserFiltres();
+
+      expect(composant.auMoinsUnFiltreActif()).toBe(false);
+      expect(composant.entreesFiltrees()).toHaveLength(3);
+    });
+
+    it('revient à la première page à chaque changement de filtre', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(troisEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.pageSuivante();
+      composant.definirFiltreOrigine('Paramétrage');
+
+      expect(composant.pageAffichee()).toBe(1);
+    });
+  });
+
+  describe('pagination (R10-16)', () => {
+    /**
+     * Construit vingt-cinq entrées de journal, pour dépasser la taille de page (20) et couvrir la navigation entre
+     * pages.
+     * @returns Les vingt-cinq entrées de test, de la plus ancienne (j0) à la plus récente (j24).
+     */
+    function vingtCinqEntrees(): DonneesRacine['journal'] {
+      return Array.from({ length: 25 }, (_valeur, indice) => ({
+        id: `j${indice}`,
+        horodatage: `2026-07-${String(indice + 1).padStart(2, '0')}T08:00:00Z`,
+        objet: `parametres.seuils.mrOuvertes.ageOrangeJours`,
+        avant: indice,
+        apres: indice + 1,
+        origine: 'Paramétrage',
+      }));
+    }
+
+    it('plafonne la première page à vingt entrées, la plus récente en tête', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(vingtCinqEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      expect(composant.entreesPage()).toHaveLength(20);
+      expect(composant.entreesPage()[0]?.id).toBe('j24');
+      expect(composant.nombrePages()).toBe(2);
+      expect(composant.pagePrecedenteDisponible()).toBe(false);
+      expect(composant.pageSuivanteDisponible()).toBe(true);
+    });
+
+    it('affiche les entrées restantes sur la seconde page', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(vingtCinqEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.pageSuivante();
+
+      expect(composant.pageAffichee()).toBe(2);
+      expect(composant.entreesPage()).toHaveLength(5);
+      expect(composant.pagePrecedenteDisponible()).toBe(true);
+      expect(composant.pageSuivanteDisponible()).toBe(false);
+    });
+
+    it('ignore une nouvelle demande de page suivante au-delà de la dernière page', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(vingtCinqEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.pageSuivante();
+      composant.pageSuivante();
+
+      expect(composant.pageAffichee()).toBe(2);
+    });
+
+    it('écrête la page affichée quand la racine chargée change et réduit le nombre de pages disponibles', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine(vingtCinqEntrees()));
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.pageSuivante();
+      expect(composant.pageAffichee()).toBe(2);
+
+      // Rechargement d'une racine ne portant plus qu'une seule entrée : le nombre de pages disponibles retombe à 1,
+      // {@link pageAffichee} doit refléter cet écrêtage sans action explicite de l'utilisateur sur la pagination.
+      donneesApplication.chargerRacine(DonneesDeTest.racine([vingtCinqEntrees()[0]]));
+
+      expect(composant.nombrePages()).toBe(1);
+      expect(composant.pageAffichee()).toBe(1);
+    });
+  });
+
+  describe('purge du journal des modifications (US-036, RG-034, Phase 10 incrément 8)', () => {
+    beforeEach(() => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    });
+
+    it('prévisualise la purge et affiche le nombre d’entrées concernées', async () => {
+      invokeSimule.mockResolvedValue({ nbEntreesSupprimees: 4, octetsAvant: 100, octetsApres: 40 });
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      await composant.previsualiserPurge();
+
+      expect(invokeSimule).toHaveBeenCalledWith('previsualiser_purge_journal', expect.anything());
+      expect(composant.previsualisationPurge).toEqual({
+        nbEntreesSupprimees: 4,
+        octetsAvant: 100,
+        octetsApres: 40,
+      });
+    });
+
+    it('ne demande pas l’exécution tant qu’aucune prévisualisation n’a été faite, ou si elle est nulle', () => {
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+
+      composant.demanderExecutionPurge();
+      expect(composant.purgeEnAttenteMotDePasse).toBe(false);
+
+      composant.previsualisationPurge = {
+        nbEntreesSupprimees: 0,
+        octetsAvant: 10,
+        octetsApres: 10,
+      };
+      composant.demanderExecutionPurge();
+      expect(composant.purgeEnAttenteMotDePasse).toBe(false);
+    });
+
+    it('exécute la purge après confirmation du mot de passe et réinitialise la prévisualisation', async () => {
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+      composant.previsualisationPurge = {
+        nbEntreesSupprimees: 2,
+        octetsAvant: 100,
+        octetsApres: 60,
+      };
+      invokeSimule.mockResolvedValue(DonneesDeTest.racine([]));
+
+      composant.demanderExecutionPurge();
+      expect(composant.purgeEnAttenteMotDePasse).toBe(true);
+      await composant.confirmerExecutionPurge('mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'executer_purge_journal',
+        expect.objectContaining({ motDePasse: 'mot-de-passe' }),
+      );
+      expect(composant.previsualisationPurge).toBeNull();
+      expect(composant.purgeEnAttenteMotDePasse).toBe(false);
+      expect(composant.messageSuccesPurge).not.toBeNull();
+    });
+
+    it('convertit un rejet typé « sessionVerrouillee » en message explicite à la purge', async () => {
+      const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
+      composant.previsualisationPurge = {
+        nbEntreesSupprimees: 2,
+        octetsAvant: 100,
+        octetsApres: 60,
+      };
+      invokeSimule.mockRejectedValue({ type: 'sessionVerrouillee' });
+
+      composant.demanderExecutionPurge();
+      await composant.confirmerExecutionPurge('mot-de-passe');
+
+      expect(composant.messageErreurPurge).toBe(
+        'La session est verrouillée : déverrouillez-la avant de purger.',
+      );
+    });
   });
 });

@@ -115,9 +115,124 @@ export interface ParametresExecutionPurgeAge<TDonnees> {
 }
 
 /**
+ * Paramètres transmis aux commandes natives `supprimerRegleDependance`/`supprimerRegleMarqueurIA` (US-033, RG-035,
+ * Phase 10 incrément 8), génériques sur le type concret de la racine échangée (`TDonnees`).
+ */
+export interface ParametresSuppressionEntreeReferentiel<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Identifiant de l'entrée de référentiel à supprimer. */
+  readonly id: string;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis à la commande native `definirVerrouillage` (US-034, RG-031, Phase 10 incrément 8), générique
+ * sur le type concret de la racine échangée (`TDonnees`).
+ */
+export interface ParametresDefinitionVerrouillage<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Délai d'inactivité, en minutes, avant verrouillage automatique. */
+  readonly delaiInactiviteMinutes: number;
+  /** Nombre d'échecs consécutifs de déverrouillage avant fermeture du fichier. */
+  readonly echecsAvantFermeture: number;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis à la commande native `definirConcurrenceAudit` (US-034, RG-031, Phase 10 incrément 8).
+ */
+export interface ParametresDefinitionConcurrenceAudit<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Concurrence par défaut d'une campagne d'audit (RNF-004). */
+  readonly concurrence: number;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis à la commande native `definirProxy` (US-034, RG-031, Phase 10 incrément 8).
+ */
+export interface ParametresDefinitionProxy<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** URL du proxy, absente ou vide pour l'effacer. */
+  readonly url?: string;
+  /** Chemin vers un fascicule de certificats d'autorité supplémentaire, absent ou vide pour l'effacer. */
+  readonly cheminBundleCa?: string;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis à la commande native `definirNombreSauvegardesSecurite` (US-034, RG-003, RG-031, Phase 10
+ * incrément 8).
+ */
+export interface ParametresDefinitionNombreSauvegardesSecurite<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Nombre de sauvegardes de sécurité horodatées conservées avant rotation. */
+  readonly nombre: number;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis à la commande native `definirSeuilAvertissementTaille` (US-035, RG-031, RG-032, Phase 10
+ * incrément 8).
+ */
+export interface ParametresDefinitionSeuilAvertissementTaille<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Seuil de taille, en octets, déclenchant l'avertissement contextuel de purge à la sauvegarde. */
+  readonly seuilOctets: number;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Paramètres transmis à la commande native `previsualiserPurgeJournal` (US-036, RG-034, Phase 10 incrément 8).
+ */
+export interface ParametresPrevisualisationPurgeJournal<TDonnees> {
+  /** Racine des données courante. */
+  readonly donnees: TDonnees;
+}
+
+/**
+ * Paramètres transmis à la commande native `executerPurgeJournal` (US-036, RG-034, Phase 10 incrément 8).
+ */
+export interface ParametresExecutionPurgeJournal<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
  * Client typé de la Façade de commandes pour le paramétrage des seuils et référentiels (US-033) et la purge des
  * audits anciens (US-025, Phase 7, incrément 4). Cf. commentaire d'en-tête de ce fichier pour la justification de
- * son existence distincte de `FacadeCommandesService`/`FacadeAdministrationService`.
+ * son existence distincte de `FacadeCommandesService`/`FacadeAdministrationService`. Étendu à la Phase 10,
+ * incrément 8 : suppression d'une entrée de référentiel (US-033, RG-035, C10-05), réglages applicatifs (US-034,
+ * RG-031, C10-01), seuil d'avertissement de taille (US-035, RG-032, C10-02) et purge du journal des modifications
+ * (US-036, RG-034, C10-03).
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeParametrageService {
@@ -187,5 +302,113 @@ export class FacadeParametrageService {
     parametres: ParametresExecutionPurgeAge<TDonnees>,
   ): Promise<TReponse> {
     return invoke<TReponse>('executer_purge_age', { ...parametres });
+  }
+
+  /**
+   * Supprime une entrée du référentiel des règles de dépendances, sauvegarde le fichier et consigne la
+   * suppression au journal (US-033, RG-035, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresSuppressionEntreeReferentiel}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async supprimerRegleDependance<TDonnees, TReponse>(
+    parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('supprimer_regle_dependance', { ...parametres });
+  }
+
+  /**
+   * Supprime une entrée du référentiel des règles de marqueurs IA, sauvegarde le fichier et consigne la
+   * suppression au journal (US-033, RG-035, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresSuppressionEntreeReferentiel}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async supprimerRegleMarqueurIA<TDonnees, TReponse>(
+    parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('supprimer_regle_marqueur_ia', { ...parametres });
+  }
+
+  /**
+   * Modifie les réglages de verrouillage de session, sauvegarde le fichier et consigne la modification au
+   * journal (US-034, RG-031, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionVerrouillage}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async definirVerrouillage<TDonnees, TReponse>(
+    parametres: ParametresDefinitionVerrouillage<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('definir_verrouillage', { ...parametres });
+  }
+
+  /**
+   * Modifie la concurrence par défaut d'une campagne d'audit, sauvegarde le fichier et consigne la modification
+   * au journal (US-034, RG-031, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionConcurrenceAudit}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async definirConcurrenceAudit<TDonnees, TReponse>(
+    parametres: ParametresDefinitionConcurrenceAudit<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('definir_concurrence_audit', { ...parametres });
+  }
+
+  /**
+   * Modifie le réglage de proxy sortant, sauvegarde le fichier et consigne la modification au journal (US-034,
+   * RG-031, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionProxy}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async definirProxy<TDonnees, TReponse>(
+    parametres: ParametresDefinitionProxy<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('definir_proxy', { ...parametres });
+  }
+
+  /**
+   * Modifie le nombre de sauvegardes de sécurité conservées avant rotation, sauvegarde le fichier et consigne la
+   * modification au journal (US-034, RG-003, RG-031, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionNombreSauvegardesSecurite}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async definirNombreSauvegardesSecurite<TDonnees, TReponse>(
+    parametres: ParametresDefinitionNombreSauvegardesSecurite<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('definir_nombre_sauvegardes_securite', { ...parametres });
+  }
+
+  /**
+   * Modifie le seuil de taille déclenchant l'avertissement contextuel de purge à la sauvegarde, sauvegarde le
+   * fichier et consigne la modification au journal (US-035, RG-031, RG-032, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionSeuilAvertissementTaille}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async definirSeuilAvertissementTaille<TDonnees, TReponse>(
+    parametres: ParametresDefinitionSeuilAvertissementTaille<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('definir_seuil_avertissement_taille', { ...parametres });
+  }
+
+  /**
+   * Prévisualise une purge du journal des modifications lui-même (US-036, RG-034, Phase 10 incrément 8), limite
+   * fixe de deux ans, sans aucune modification ni sauvegarde.
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresPrevisualisationPurgeJournal}.
+   * @returns Le résumé de la purge qui serait effectuée, typé par l'appelant via `TReponse`.
+   */
+  public async previsualiserPurgeJournal<TDonnees, TReponse>(
+    parametres: ParametresPrevisualisationPurgeJournal<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('previsualiser_purge_journal', { ...parametres });
+  }
+
+  /**
+   * Exécute une purge du journal des modifications lui-même, sauvegarde le fichier (US-036, RG-034, Phase 10
+   * incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresExecutionPurgeJournal}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async executerPurgeJournal<TDonnees, TReponse>(
+    parametres: ParametresExecutionPurgeJournal<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('executer_purge_journal', { ...parametres });
   }
 }

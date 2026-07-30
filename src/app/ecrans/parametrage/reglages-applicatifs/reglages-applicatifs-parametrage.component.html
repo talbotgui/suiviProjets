@@ -1,0 +1,219 @@
+<section class="reglages-applicatifs-parametrage">
+  <h2>Réglages applicatifs</h2>
+
+  @if (messageErreur) {
+    <p class="reglages-applicatifs-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+  }
+
+  <section class="reglages-applicatifs-parametrage__bloc">
+    <header class="reglages-applicatifs-parametrage__entete">
+      <h3>Délai de verrouillage</h3>
+      <button type="button" [disabled]="enCours" (click)="ouvrirEditionVerrouillage()">
+        Modifier
+      </button>
+    </header>
+
+    <p>
+      Verrouillage après {{ delaiInactiviteMinutesFormulaire }} min d'inactivité,
+      {{ echecsAvantFermetureFormulaire }} échec(s) avant fermeture.
+    </p>
+
+    @if (verrouillageEditVisible) {
+      <form
+        class="reglages-applicatifs-parametrage__formulaire"
+        (ngSubmit)="demanderEnregistrementVerrouillage()"
+      >
+        <label>
+          Délai d'inactivité (minutes)
+          <input
+            type="number"
+            min="1"
+            name="delaiInactiviteMinutesFormulaire"
+            [(ngModel)]="delaiInactiviteMinutesFormulaire"
+            required
+          />
+        </label>
+        <label>
+          Échecs de déverrouillage avant fermeture
+          <input
+            type="number"
+            min="1"
+            name="echecsAvantFermetureFormulaire"
+            [(ngModel)]="echecsAvantFermetureFormulaire"
+            required
+          />
+        </label>
+        <div class="reglages-applicatifs-parametrage__actions-formulaire">
+          <button type="button" (click)="fermerEditionVerrouillage()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+
+    @if (reglageEnAttenteMotDePasse === 'verrouillage') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer le délai de verrouillage."
+        (confirmee)="confirmerEnregistrementVerrouillage($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+
+  <section class="reglages-applicatifs-parametrage__bloc">
+    <header class="reglages-applicatifs-parametrage__entete">
+      <h3>Concurrence d'audit par défaut</h3>
+      <button type="button" [disabled]="enCours" (click)="ouvrirEditionConcurrence()">
+        Modifier
+      </button>
+    </header>
+
+    @if (concurrenceEditVisible) {
+      <form
+        class="reglages-applicatifs-parametrage__formulaire"
+        (ngSubmit)="demanderEnregistrementConcurrence()"
+      >
+        <label>
+          Nombre de projets audités simultanément
+          <input
+            type="number"
+            min="1"
+            name="concurrenceFormulaire"
+            [(ngModel)]="concurrenceFormulaire"
+            required
+          />
+        </label>
+        <div class="reglages-applicatifs-parametrage__actions-formulaire">
+          <button type="button" (click)="fermerEditionConcurrence()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+
+    @if (reglageEnAttenteMotDePasse === 'concurrenceAudit') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer la concurrence d'audit."
+        (confirmee)="confirmerEnregistrementConcurrence($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+
+  <section class="reglages-applicatifs-parametrage__bloc">
+    <header class="reglages-applicatifs-parametrage__entete">
+      <h3>Proxy sortant</h3>
+      <button type="button" [disabled]="enCours" (click)="ouvrirEditionProxy()">Modifier</button>
+    </header>
+
+    @if (proxyEditVisible) {
+      <form
+        class="reglages-applicatifs-parametrage__formulaire"
+        (ngSubmit)="demanderEnregistrementProxy()"
+      >
+        <label>
+          URL du proxy (laisser vide pour utiliser uniquement le proxy système)
+          <input type="url" name="urlProxyFormulaire" [(ngModel)]="urlProxyFormulaire" />
+        </label>
+        <label>
+          Chemin du fascicule de certificats d'autorité supplémentaire
+          <input
+            type="text"
+            name="cheminBundleCaFormulaire"
+            [(ngModel)]="cheminBundleCaFormulaire"
+          />
+        </label>
+        <div class="reglages-applicatifs-parametrage__actions-formulaire">
+          <button type="button" (click)="fermerEditionProxy()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+
+    @if (reglageEnAttenteMotDePasse === 'proxy') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer le réglage de proxy."
+        (confirmee)="confirmerEnregistrementProxy($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+
+  <section class="reglages-applicatifs-parametrage__bloc">
+    <header class="reglages-applicatifs-parametrage__entete">
+      <h3>Nombre de sauvegardes de sécurité</h3>
+      <button type="button" [disabled]="enCours" (click)="ouvrirEditionNombreSauvegardes()">
+        Modifier
+      </button>
+    </header>
+
+    @if (nombreSauvegardesEditVisible) {
+      <form
+        class="reglages-applicatifs-parametrage__formulaire"
+        (ngSubmit)="demanderEnregistrementNombreSauvegardes()"
+      >
+        <label>
+          Nombre de sauvegardes conservées avant rotation
+          <input
+            type="number"
+            min="1"
+            name="nombreSauvegardesFormulaire"
+            [(ngModel)]="nombreSauvegardesFormulaire"
+            required
+          />
+        </label>
+        <div class="reglages-applicatifs-parametrage__actions-formulaire">
+          <button type="button" (click)="fermerEditionNombreSauvegardes()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+
+    @if (reglageEnAttenteMotDePasse === 'nombreSauvegardes') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer le nombre de sauvegardes de sécurité."
+        (confirmee)="confirmerEnregistrementNombreSauvegardes($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+
+  <section class="reglages-applicatifs-parametrage__bloc">
+    <header class="reglages-applicatifs-parametrage__entete">
+      <h3>Avertissement de taille à la sauvegarde</h3>
+      <button type="button" [disabled]="enCours" (click)="ouvrirEditionSeuilAvertissement()">
+        Modifier
+      </button>
+    </header>
+
+    <p>Seuil actuel : {{ seuilAvertissementMoActuel() }} Mo.</p>
+
+    @if (seuilAvertissementEditVisible) {
+      <form
+        class="reglages-applicatifs-parametrage__formulaire"
+        (ngSubmit)="demanderEnregistrementSeuilAvertissement()"
+      >
+        <label>
+          Seuil déclenchant l'avertissement (Mo)
+          <input
+            type="number"
+            min="1"
+            name="seuilAvertissementMoFormulaire"
+            [(ngModel)]="seuilAvertissementMoFormulaire"
+            required
+          />
+        </label>
+        <div class="reglages-applicatifs-parametrage__actions-formulaire">
+          <button type="button" (click)="fermerEditionSeuilAvertissement()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+
+    @if (reglageEnAttenteMotDePasse === 'seuilAvertissement') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer le seuil d'avertissement de taille."
+        (confirmee)="confirmerEnregistrementSeuilAvertissement($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
+</section>

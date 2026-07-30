@@ -263,23 +263,54 @@ export interface Verrouillage {
 }
 
 /**
- * Seuils et réglages applicatifs (`parametres`), mirroir partiel de `Parametres` côté cœur natif : `seuils` et
- * `verrouillage` sont typés en toutes lettres, les autres sous-branches (`audit`, `proxy`, `sauvegarde`), pourtant
- * typées côté cœur natif, restent en `unknown` côté interface faute d'être énumérées par la conception détaillée
- * d'un incrément ayant besoin de les lire — décision arbitraire de portée limitée, cf. rapport de développement de
- * cette phase.
+ * Réglages d'exécution des campagnes d'audit (RNF-004), mirroir de `ParametresAudit` côté cœur natif. Typé
+ * intégralement depuis la Phase 10, incrément 8 (US-034), à l'occasion de la construction de la zone « Réglages
+ * applicatifs » de l'écran de Paramétrage.
+ */
+export interface ParametresAudit {
+  /** Concurrence par défaut des appels d'audit. */
+  readonly concurrence: number;
+  /** Fenêtre en jours de calcul des contributeurs récents, si déjà fixée. */
+  readonly fenetreContributeursJours?: number;
+  /** Borne de pages de recherche du premier commit interne, si déjà fixée. */
+  readonly borneRecherchePremierCommitPages?: number;
+}
+
+/**
+ * Réglages de proxy sortant, mirroir de `Proxy` côté cœur natif. Typé depuis la Phase 10, incrément 8 (US-034).
+ */
+export interface Proxy {
+  /** URL du proxy. */
+  readonly url?: string;
+  /** Chemin vers un fascicule de certificats d'autorité supplémentaire. */
+  readonly cheminBundleCa?: string;
+}
+
+/**
+ * Réglages de sauvegarde de sécurité (RG-003), mirroir de `Sauvegarde` côté cœur natif. Typé depuis la Phase 10,
+ * incrément 8 (US-034).
+ */
+export interface Sauvegarde {
+  /** Nombre de sauvegardes de sécurité horodatées conservées avant rotation. */
+  readonly nombreSauvegardesSecurite: number;
+}
+
+/**
+ * Seuils et réglages applicatifs (`parametres`), mirroir de `Parametres` côté cœur natif.
  */
 export interface Parametres {
   /** Grille de seuils du Moteur de jugement. */
   readonly seuils: SeuilsJugement;
   /** Réglages de verrouillage de session (US-026). */
   readonly verrouillage: Verrouillage;
-  /** Réglages d'exécution des campagnes d'audit, non interprétés côté interface au-delà de `audit.concurrence`. */
-  readonly audit: unknown;
-  /** Réglages de proxy sortant, non interprétés côté interface. */
-  readonly proxy: unknown;
-  /** Réglages de sauvegarde de sécurité, non interprétés côté interface. */
-  readonly sauvegarde: unknown;
+  /** Réglages d'exécution des campagnes d'audit (US-034). */
+  readonly audit: ParametresAudit;
+  /** Réglages de proxy sortant, absents si non configurés (US-034). */
+  readonly proxy?: Proxy;
+  /** Réglages de sauvegarde de sécurité (US-034). */
+  readonly sauvegarde: Sauvegarde;
+  /** Seuil de taille, en octets, déclenchant l'avertissement contextuel de purge à la sauvegarde (US-035). */
+  readonly seuilAvertissementTailleOctets: number;
 }
 
 /**
@@ -445,9 +476,7 @@ export interface Projet {
 }
 
 /**
- * Groupe, racine de la grappe principale (US-006, US-022, US-023), mirroir de `Groupe` côté cœur natif. Les
- * annotations de groupe (US-019) restent hors périmètre de l'Administration (Phase 8) et sont conservées telles
- * quelles.
+ * Groupe, racine de la grappe principale (US-006, US-022, US-023), mirroir de `Groupe` côté cœur natif.
  */
 export interface Groupe {
   /** Identifiant UUID v4 du groupe. */
@@ -460,8 +489,8 @@ export interface Groupe {
   readonly instances: readonly Instance[];
   /** Membres connus du groupe (US-022, US-023), donnée jamais exportée en clair (RG-006 à RG-008). */
   readonly membresConnus: readonly MembreConnu[];
-  /** Annotations de portée groupe (hors périmètre de l'Administration, Phase 8). */
-  readonly annotations: readonly unknown[];
+  /** Annotations de portée groupe (US-019), typées depuis la Phase 10, incrément 8. */
+  readonly annotations: readonly Annotation[];
   /** Types d'indicateurs désactivés pour ce groupe (hors périmètre de l'Administration, Phase 3). */
   readonly indicateursDesactives: readonly string[];
   /** Projets rattachés au groupe. */
@@ -667,6 +696,7 @@ export type CategorieErreurAdministration =
   | 'projetIntrouvable'
   | 'membreIntrouvable'
   | 'doublonUsernameMembreConnu'
+  | 'conflitReglesMembreConnu'
   | 'brouillonDejaExistant'
   | 'aucunBrouillonCourant'
   | 'projetAbsentDuBrouillon'
@@ -674,6 +704,10 @@ export type CategorieErreurAdministration =
   | 'typeReferentielInconnu'
   | 'entreeReferentielInvalide'
   | 'motifNommageBranchesInvalide'
+  | 'reglageApplicatifInvalide'
+  | 'entreeReferentielIntrouvable'
+  | 'annotationIntrouvable'
+  | 'annotationSystemeNonSupprimable'
   | 'modePurgeAgeInconnu'
   | 'vueIntrouvable'
   | 'fichierConfigurationIllisible'
@@ -757,6 +791,27 @@ export type ResultatPrevisualisationPurge =
  * Mode de purge par âge (RG-025), transmis tel quel à `previsualiserPurgeAge`/`executerPurgeAge`.
  */
 export type ModePurgeAge = 'suppression' | 'agregationMensuelle';
+
+/**
+ * Résumé d'une prévisualisation ou d'une exécution de purge du journal des modifications lui-même (US-036,
+ * RG-034, Phase 10 incrément 8), mirroir de `PrevisualisationPurgeJournal` côté cœur natif.
+ */
+export interface PrevisualisationPurgeJournal {
+  /** Nombre d'entrées du journal concernées par la purge. */
+  readonly nbEntreesSupprimees: number;
+  /** Taille compressée estimée du fichier de données avant la purge (octets). */
+  readonly octetsAvant: number;
+  /** Taille compressée estimée du fichier de données après la purge (octets). */
+  readonly octetsApres: number;
+}
+
+/**
+ * Résultat typé d'une prévisualisation de purge du journal (`previsualiserPurgeJournal`), sur le modèle de
+ * {@link ResultatPrevisualisationPurge}.
+ */
+export type ResultatPrevisualisationPurgeJournal =
+  | { readonly type: 'succes'; readonly previsualisation: PrevisualisationPurgeJournal }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
 
 /**
  * Catégorie d'une ligne du différentiel d'import de configuration partageable (US-030, RG-029), mirroir de

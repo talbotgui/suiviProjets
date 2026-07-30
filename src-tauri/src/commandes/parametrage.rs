@@ -75,3 +75,194 @@ pub(crate) fn definir_referentiel(
 
     Ok(donnees)
 }
+
+/// Supprime une entrée du référentiel des règles de dépendances, sauvegarde le fichier et consigne la suppression
+/// au journal (US-033, RG-035, Phase 10 incrément 8).
+///
+/// # Erreurs
+///
+/// [`parametrage::ErreurParametrage::EntreeReferentielIntrouvable`] si `id` ne désigne aucune entrée existante ;
+/// les anomalies de sauvegarde héritées de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn supprimer_regle_dependance(
+    chemin: String,
+    donnees: DonneesRacine,
+    id: String,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::supprimer_regle_dependance(&mut donnees, &id, horodatage)?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}
+
+/// Supprime une entrée du référentiel des règles de marqueurs IA, sauvegarde le fichier et consigne la suppression
+/// au journal (US-033, RG-035, Phase 10 incrément 8).
+///
+/// # Erreurs
+///
+/// Voir [`supprimer_regle_dependance`].
+#[tauri::command]
+pub(crate) fn supprimer_regle_marqueur_ia(
+    chemin: String,
+    donnees: DonneesRacine,
+    id: String,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::supprimer_regle_marqueur_ia(&mut donnees, &id, horodatage)?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}
+
+/// Modifie les réglages de verrouillage de session, sauvegarde le fichier et consigne la modification au journal
+/// (US-034, RG-031, Phase 10 incrément 8).
+///
+/// # Erreurs
+///
+/// [`parametrage::ErreurParametrage::ReglageApplicatifInvalide`] si un des deux champs est nul ; les anomalies de
+/// sauvegarde héritées de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn definir_verrouillage(
+    chemin: String,
+    donnees: DonneesRacine,
+    delai_inactivite_minutes: u32,
+    echecs_avant_fermeture: u32,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::definir_verrouillage(
+        &mut donnees,
+        delai_inactivite_minutes,
+        echecs_avant_fermeture,
+        horodatage,
+    )?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}
+
+/// Modifie la concurrence par défaut d'une campagne d'audit, sauvegarde le fichier et consigne la modification au
+/// journal (US-034, RG-031, Phase 10 incrément 8).
+///
+/// # Erreurs
+///
+/// [`parametrage::ErreurParametrage::ReglageApplicatifInvalide`] si `concurrence` est nulle ; les anomalies de
+/// sauvegarde héritées de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn definir_concurrence_audit(
+    chemin: String,
+    donnees: DonneesRacine,
+    concurrence: u32,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::definir_concurrence_audit(&mut donnees, concurrence, horodatage)?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}
+
+/// Modifie le réglage de proxy sortant, sauvegarde le fichier, consigne la modification au journal et met à jour
+/// le proxy en cache de la session courante (US-034, RG-031, Phase 10 incrément 8) : les commandes d'interrogation
+/// d'indicateurs (`audit.rs`, `connectivite.rs`), qui ne reçoivent jamais la racine complète du fichier, lisent ce
+/// réglage exclusivement via `EtatSession::client_http`.
+///
+/// # Erreurs
+///
+/// [`parametrage::ErreurParametrage::ReglageApplicatifInvalide`] si `url` est non vide mais syntaxiquement
+/// invalide ; les anomalies de sauvegarde héritées de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn definir_proxy(
+    chemin: String,
+    donnees: DonneesRacine,
+    url: Option<String>,
+    chemin_bundle_ca: Option<String>,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::definir_proxy(&mut donnees, url, chemin_bundle_ca, horodatage)?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+    etat.definir_proxy(donnees.parametres.proxy.clone());
+
+    Ok(donnees)
+}
+
+/// Modifie le nombre de sauvegardes de sécurité conservées avant rotation, sauvegarde le fichier et consigne la
+/// modification au journal (US-034, RG-003, RG-031, Phase 10 incrément 8).
+///
+/// # Erreurs
+///
+/// [`parametrage::ErreurParametrage::ReglageApplicatifInvalide`] si `nombre` est nul ; les anomalies de
+/// sauvegarde héritées de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn definir_nombre_sauvegardes_securite(
+    chemin: String,
+    donnees: DonneesRacine,
+    nombre: u32,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::definir_nombre_sauvegardes_securite(&mut donnees, nombre, horodatage)?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}
+
+/// Modifie le seuil de taille déclenchant l'avertissement contextuel de purge à la sauvegarde, sauvegarde le
+/// fichier et consigne la modification au journal (US-035, RG-031, RG-032, Phase 10 incrément 8).
+///
+/// # Erreurs
+///
+/// [`parametrage::ErreurParametrage::ReglageApplicatifInvalide`] si `seuil_octets` est nul ; les anomalies de
+/// sauvegarde héritées de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn definir_seuil_avertissement_taille(
+    chemin: String,
+    donnees: DonneesRacine,
+    seuil_octets: u64,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    parametrage::definir_seuil_avertissement_taille(&mut donnees, seuil_octets, horodatage)?;
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}

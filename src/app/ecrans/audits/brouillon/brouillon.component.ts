@@ -446,6 +446,7 @@ export class SqmBrouillonComponent {
       case 'projetIntrouvable':
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
+      case 'conflitReglesMembreConnu':
       case 'brouillonDejaExistant':
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
@@ -462,6 +463,10 @@ export class SqmBrouillonComponent {
       case 'versionSchemaConfigurationSuperieure':
       case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
+      case 'reglageApplicatifInvalide':
+      case 'entreeReferentielIntrouvable':
+      case 'annotationIntrouvable':
+      case 'annotationSystemeNonSupprimable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

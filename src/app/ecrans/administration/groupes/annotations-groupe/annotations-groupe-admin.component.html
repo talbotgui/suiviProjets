@@ -1,0 +1,102 @@
+<section class="annotations-groupe-admin">
+  <label class="annotations-groupe-admin__selecteur-groupe">
+    Groupe
+    <select [ngModel]="groupeSelectionneId" (ngModelChange)="selectionnerGroupe($event)">
+      @if (!groupeSelectionneId) {
+        <option [ngValue]="null" disabled>Sélectionner un groupe</option>
+      }
+      @for (groupe of groupes(); track groupe.id) {
+        <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
+      }
+    </select>
+  </label>
+
+  @if (!groupeSelectionneId) {
+    <p class="annotations-groupe-admin__vide">Sélectionnez un groupe pour gérer ses annotations.</p>
+  } @else {
+    <header class="annotations-groupe-admin__entete">
+      <h2>Annotations</h2>
+      <button type="button" [disabled]="enCours" (click)="ouvrirCreation()">
+        Créer une annotation
+      </button>
+    </header>
+
+    <ul class="annotations-groupe-admin__liste">
+      @for (annotation of annotations(); track annotation.id) {
+        <li class="annotations-groupe-admin__ligne">
+          <span class="annotations-groupe-admin__date">{{ annotation.date }}</span>
+          <span class="annotations-groupe-admin__libelle">{{ annotation.libelle }}</span>
+          <span class="annotations-groupe-admin__categorie">{{ annotation.categorie }}</span>
+          @if (!annotation.systeme) {
+            <button type="button" [disabled]="enCours" (click)="demanderSuppression(annotation.id)">
+              Supprimer
+            </button>
+          }
+        </li>
+      } @empty {
+        <li class="annotations-groupe-admin__vide">
+          Aucune annotation n'est encore définie pour ce groupe.
+        </li>
+      }
+    </ul>
+
+    @if (messageErreur) {
+      <p class="annotations-groupe-admin__erreur" role="alert">{{ messageErreur }}</p>
+    }
+
+    @if (annotationASupprimerId && actionEnAttenteMotDePasse === null) {
+      <app-confirmation-suppression
+        message="La suppression d'une annotation est immédiate et irréversible."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse === 'creation') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour créer cette annotation."
+        (confirmee)="confirmerCreation($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse === 'suppression') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette annotation."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (formulaireVisible) {
+      <form class="annotations-groupe-admin__formulaire" (ngSubmit)="demanderCreation()">
+        <h3>Créer une annotation</h3>
+
+        <label>
+          Date
+          <input type="date" name="date" [(ngModel)]="date" required />
+        </label>
+
+        <label>
+          Libellé
+          <input type="text" name="libelle" [(ngModel)]="libelle" required />
+        </label>
+
+        <label>
+          Catégorie
+          <input type="text" name="categorie" [(ngModel)]="categorie" />
+        </label>
+
+        <label>
+          Description
+          <textarea name="description" rows="3" [(ngModel)]="description"></textarea>
+        </label>
+
+        <div class="annotations-groupe-admin__actions-formulaire">
+          <button type="button" (click)="fermerFormulaire()">Annuler</button>
+          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        </div>
+      </form>
+    }
+  }
+</section>

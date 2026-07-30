@@ -67,6 +67,42 @@ pub(crate) fn creer_annotation(
     Ok(donnees)
 }
 
+/// Supprime une annotation de portée groupe ou projet, sauvegarde le fichier et consigne la suppression au journal
+/// (US-019, RG-023, RG-033, Phase 10 incrément 8). `projet_id` distingue la portée exactement comme pour
+/// [`creer_annotation`] (cf. [`persistance::alertes::supprimer_annotation`]).
+///
+/// # Erreurs
+///
+/// Voir [`persistance::alertes::supprimer_annotation`] pour le détail des anomalies de validation métier
+/// (groupe/projet/annotation introuvable, annotation système) ; les anomalies de sauvegarde héritées de
+/// [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn supprimer_annotation(
+    chemin: String,
+    donnees: DonneesRacine,
+    groupe_id: String,
+    projet_id: Option<String>,
+    annotation_id: String,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    alertes::supprimer_annotation(
+        &mut donnees,
+        &groupe_id,
+        projet_id.as_deref(),
+        &annotation_id,
+        horodatage,
+    )?;
+
+    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle);
+
+    Ok(donnees)
+}
+
 /// Qualifie une alerte (statut vu/traité, commentaire optionnel), sauvegarde le fichier (US-020, RG-002, RG-026).
 /// Ajoute toujours une nouvelle entrée à l'historique `traitementsAlertes` plutôt que de muter une entrée existante
 /// (cf. [`persistance::alertes::qualifier_alerte`]) ; aucune entrée de journal n'est consignée, `TraitementAlerte`

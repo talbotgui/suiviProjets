@@ -56,6 +56,7 @@ import { SqmRechercheTransversaleComponent } from '../recherche-transversale/rec
 import { SqmVerrouillageComponent } from '../verrouillage/verrouillage.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatFichier, EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 
 /**
  * Délai d'inactivité par défaut, en minutes, avant verrouillage automatique de la session (RNF-014), utilisé tant
@@ -103,6 +104,20 @@ export class SqmShellComponent {
    * Message d'erreur de la dernière sauvegarde tentée, `null` si aucune erreur.
    */
   public messageErreurSauvegarde: string | null = null;
+
+  /**
+   * Indique si l'avertissement de taille du fichier de données est actuellement affiché (US-035, RG-032, Phase 10
+   * incrément 8) : calculé côté interface (solution B retenue par arbitrage humain, sans nouvelle commande
+   * native) à partir d'une estimation de la taille sérialisée JSON de la racine, comparée au seuil paramétrable
+   * `parametres.seuilAvertissementTailleOctets`. Cette estimation est volontairement approximative, à plusieurs
+   * titres : elle ne reflète ni la compression (zstd) ni le chiffrement (AES-256-GCM) réellement appliqués par le
+   * cœur natif à la sauvegarde (seule la taille exacte sur disque, cf. `PrevisualisationPurge.octetsAvant` de
+   * l'onglet Purge, le refléterait fidèlement), ni même la taille JSON exacte en octets UTF-8 : `String.length`
+   * compte des unités UTF-16, systématiquement inférieures ou égales au nombre d'octets UTF-8 réel dès qu'un
+   * caractère accentué apparaît (2 octets UTF-8 pour 1 unité UTF-16) — l'estimation est donc structurellement
+   * optimiste, sans conséquence pratique compte tenu de la marge laissée par le seuil par défaut (10 Mio).
+   */
+  public readonly avertissementTailleActif: WritableSignal<boolean> = signal(false);
 
   /**
    * Construit le Shell : met en place l'effet réactif qui arme ou désarme le minuteur de verrouillage automatique
@@ -195,9 +210,41 @@ export class SqmShellComponent {
     if (resultat.type === 'succes') {
       this.messageErreurSauvegarde = null;
       this.sauvegardeOuverte.set(false);
+      this.avertissementTailleActif.set(this.tailleEstimeeDepasseLeSeuil());
       return;
     }
     this.messageErreurSauvegarde = 'La sauvegarde a échoué. Réessayez.';
+  }
+
+  /**
+   * Estime si la taille du fichier de données dépasse le seuil d'avertissement paramétrable (US-035, RG-032),
+   * d'après une sérialisation JSON approximative de la racine courante (cf. commentaire de
+   * {@link avertissementTailleActif} pour les limites de cette estimation).
+   * @returns `true` si l'estimation dépasse le seuil courant, `false` sinon ou si aucun fichier n'est chargé.
+   */
+  private tailleEstimeeDepasseLeSeuil(): boolean {
+    const racine = this.donneesApplication.racine();
+    if (!racine) {
+      return false;
+    }
+    const tailleEstimeeOctets = JSON.stringify(racine).length;
+    return tailleEstimeeOctets >= racine.parametres.seuilAvertissementTailleOctets;
+  }
+
+  /**
+   * Referme l'avertissement de taille du fichier de données sans naviguer (US-035).
+   */
+  public fermerAvertissementTaille(): void {
+    this.avertissementTailleActif.set(false);
+  }
+
+  /**
+   * Referme l'avertissement de taille et ouvre l'écran de Paramétrage, onglets Purge des audits/Journal des
+   * modifications (US-035, RG-032).
+   */
+  public ouvrirParametragePurge(): void {
+    this.avertissementTailleActif.set(false);
+    void this.router.navigateByUrl('/parametrage');
   }
 
   /**
@@ -222,7 +269,7 @@ export class SqmShellComponent {
     if (racine === null) {
       return '—';
     }
-    return `sauvegardé ${this.formaterHorodatage(racine.meta.modifieLe)}`;
+    return `sauvegardé ${HorodatageUtils.formaterHorodatageCourt(racine.meta.modifieLe)}`;
   }
 
   /**
@@ -298,17 +345,5 @@ export class SqmShellComponent {
   private desarmerMinuteurInactivite(): void {
     clearTimeout(this.minuteurInactivite);
     this.minuteurInactivite = undefined;
-  }
-
-  /**
-   * Met en forme un horodatage ISO 8601 en un libellé court `JJ/MM HH:mm`, sur le modèle de la maquette de
-   * référence (`docs/01_besoin/Suivi Qualimetrie.dc.html`, barre supérieure : « sauvegardé 08/07 17:45 »).
-   * @param horodatageIso - Horodatage ISO 8601 à mettre en forme.
-   * @returns Le libellé court correspondant.
-   */
-  private formaterHorodatage(horodatageIso: string): string {
-    const date = new Date(horodatageIso);
-    const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
-    return `${deuxChiffres(date.getDate())}/${deuxChiffres(date.getMonth() + 1)} ${deuxChiffres(date.getHours())}:${deuxChiffres(date.getMinutes())}`;
   }
 }

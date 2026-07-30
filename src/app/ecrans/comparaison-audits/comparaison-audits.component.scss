@@ -90,6 +90,15 @@
   width: 100%;
 }
 
+.comparaison-audits__message-repli {
+  font-size: 0.85rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background-color: #fff4e0;
+  color: #8a5300;
+}
+
 .comparaison-audits__volet {
   display: flex;
   flex-direction: column;

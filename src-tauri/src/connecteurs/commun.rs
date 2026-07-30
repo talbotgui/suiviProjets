@@ -4,7 +4,6 @@
 //! Types et utilitaires partagés entre le Connecteur GitLab et le Connecteur Sonar (US-004, RG-021), afin d'éviter
 //! toute duplication entre `gitlab.rs` et `sonar.rs`, chacun ne conservant que sa logique HTTP propre.
 
-use std::sync::OnceLock;
 use std::time::Duration;
 
 /// Délai maximal accordé à un appel de test de connectivité avant anomalie « délai dépassé ».
@@ -76,17 +75,38 @@ pub(crate) struct VerdictConnectivite {
     pub(crate) portee_excessive: bool,
 }
 
-/// Construit (une seule fois par processus) le client HTTP partagé par les deux connecteurs, avec le délai de
-/// requête fixe ci-dessus. Le proxy du poste est pris en compte nativement par `reqwest` (`Proxy::system()`,
-/// activé par défaut), conformément à `docs/02_documentation/17_posteDeveloppeur.md#variables-denvironnement`.
-pub(crate) fn client_http() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .timeout(DELAI_REQUETE)
-            .build()
-            .unwrap_or_default()
-    })
+/// Construit un client HTTP tenant compte du réglage applicatif de proxy optionnel fourni (US-034, RG-031), en
+/// complément du proxy système déjà pris en compte nativement par `reqwest` (`Proxy::system()`, actif par défaut
+/// pour toute requête, y compris avec ce réglage additionnel). `None` reproduit le comportement du client par
+/// défaut d'avant la Phase 10 (proxy système seul), utilisé par exemple par les tests d'intégration hors CI
+/// (`connecteurs::tests_integration_reelle`). Reconstruit un client à chaque appel plutôt que de le mettre en cache
+/// pour le processus entier (à la différence du choix initial de la Phase 2) : le réglage de proxy peut changer en
+/// cours de session (`definirProxy`), ce qu'un singleton `OnceLock` ne pourrait jamais refléter ; ce coût de
+/// reconstruction reste négligeable au regard de la latence réseau de chaque appel HTTP effectué avec ce client.
+///
+/// Une URL de proxy syntaxiquement invalide ou un fascicule de certificats illisible/invalide sont ignorés
+/// silencieusement (repli sur le comportement par défaut) plutôt que de faire échouer la construction du client :
+/// ces deux valeurs ont déjà été validées à leur saisie (`definirProxy`, RG-031), ce cas ne devrait donc survenir
+/// qu'en cas de modification externe du fichier de données entre-temps, auquel cas dégrader silencieusement vers
+/// le proxy système reste préférable à l'échec de toute interrogation d'indicateur.
+pub(crate) fn client_http_avec_proxy(
+    proxy: Option<&crate::modele::racine::Proxy>,
+) -> reqwest::Client {
+    let mut builder = reqwest::Client::builder().timeout(DELAI_REQUETE);
+    if let Some(proxy) = proxy {
+        if let Some(url) = proxy.url.as_deref().filter(|url| !url.is_empty())
+            && let Ok(proxy_reqwest) = reqwest::Proxy::all(url)
+        {
+            builder = builder.proxy(proxy_reqwest);
+        }
+        if let Some(chemin) = proxy.chemin_bundle_ca.as_deref()
+            && let Ok(pem) = std::fs::read(chemin)
+            && let Ok(certificat) = reqwest::Certificate::from_pem(&pem)
+        {
+            builder = builder.add_root_certificate(certificat);
+        }
+    }
+    builder.build().unwrap_or_default()
 }
 
 /// Traduit une erreur de bas niveau du client HTTP en anomalie typée (RG-021). Conserve désormais le message

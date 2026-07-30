@@ -21,6 +21,13 @@
           <button type="button" [disabled]="enCours" (click)="ouvrirEditionDependance(regle.id)">
             Modifier
           </button>
+          <button
+            type="button"
+            [disabled]="enCours"
+            (click)="demanderSuppressionDependance(regle.id)"
+          >
+            Supprimer
+          </button>
         </li>
       } @empty {
         <li class="referentiels-parametrage__vide">
@@ -58,6 +65,22 @@
         (annulee)="annulerMotDePasse()"
       />
     }
+
+    @if (suppressionEnAttente?.type === 'dependance') {
+      <app-confirmation-suppression
+        message="Cette règle de dépendances sera supprimée définitivement du référentiel."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse === 'suppressionDependance') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette règle de dépendances."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
   </section>
 
   <section class="referentiels-parametrage__bloc">
@@ -75,6 +98,13 @@
           <span>{{ regle.outil }}</span>
           <button type="button" [disabled]="enCours" (click)="ouvrirEditionMarqueurIa(regle.id)">
             Modifier
+          </button>
+          <button
+            type="button"
+            [disabled]="enCours"
+            (click)="demanderSuppressionMarqueurIa(regle.id)"
+          >
+            Supprimer
           </button>
         </li>
       } @empty {
@@ -133,6 +163,22 @@
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle de marqueur IA."
         (confirmee)="confirmerEnregistrementMarqueurIa($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (suppressionEnAttente?.type === 'marqueurIA') {
+      <app-confirmation-suppression
+        message="Cette règle de marqueur IA sera supprimée définitivement du référentiel."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse === 'suppressionMarqueurIA') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette règle de marqueur IA."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
         (annulee)="annulerMotDePasse()"
       />
     }

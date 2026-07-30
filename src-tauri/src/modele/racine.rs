@@ -30,7 +30,13 @@ use std::collections::HashMap;
 /// étape réelle enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`
 /// (`migration_2_vers_3`), sur le modèle de la précédente (bump de version seul, aucune transformation de donnée
 /// nécessaire).
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 3;
+///
+/// Passage de `3` à `4` (Phase 10, incrément 8) : ajout du champ `seuilAvertissementTailleOctets` sur
+/// [`Parametres`] (US-035, RG-031, RG-032), reprenant sa valeur par défaut
+/// ([`SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT`], `#[serde(default = "...")]`) ; voir la troisième étape
+/// réelle enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_3_vers_4`), sur
+/// le même modèle que les deux précédentes.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 4;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -49,15 +55,26 @@ pub(crate) const ECHECS_AVANT_FERMETURE_PAR_DEFAUT: u32 = 5;
 /// complétude du modèle de paramètres.
 pub(crate) const CONCURRENCE_AUDIT_PAR_DEFAUT: u32 = 4;
 
+/// Seuil de taille par défaut, en octets, déclenchant l'avertissement contextuel de purge à la sauvegarde (US-035,
+/// RG-031, RG-032, Phase 10 incrément 8).
+///
+/// Décision arbitraire (à valider par un humain, cf. rapport de développement de cet incrément), faute de valeur
+/// chiffrée dans `docs/01_besoin/exemple-donnees.json` ou dans tout texte normatif : dix mébioctets, jugée
+/// suffisamment élevée pour ne pas alerter prématurément un fichier de données récent, tout en restant sous la
+/// taille à laquelle la dérivation de clé (Argon2id, RNF-002) ou le rendu de la synthèse (RNF-001) commenceraient
+/// à se dégrader perceptiblement.
+pub(crate) const SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT: u64 = 10 * 1024 * 1024;
+
 /// Motif d'expression régulière de nommage de branche par défaut (RG-030,
 /// `docs/02_documentation/05_reglesGestion.md`), appliqué en l'absence de valeur explicite dans
-/// `referentiels.motifNommageBranches` : représente la convention Gitflow (`main`/`master`, `develop`,
-/// `feature/*`, `release/*`, `hotfix/*`, `bugfix/*`). Champ absent de tout document antérieur à la Phase 6,
+/// `referentiels.motifNommageBranches` : représente la convention Gitflow canonique (`main`/`master`, `develop`,
+/// `feature/*`, `release/*`, `hotfix/*`), sans le segment `bugfix/*` (R10-11 : extension non strictement
+/// canonique de Gitflow, retirée par arbitrage). Champ absent de tout document antérieur à la Phase 6,
 /// incrément 1, y compris `docs/01_besoin/exemple-donnees.json` (jamais modifié, cf.
 /// `.claude/rules/09-normes-developpement.md`) : sans ce repli, une valeur saisie par l'utilisateur serait
 /// silencieusement perdue à chaque sauvegarde d'un document créé avant ce champ.
 pub(crate) const MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT: &str =
-    r"^(main|master|develop|feature/.+|release/.+|hotfix/.+|bugfix/.+)$";
+    r"^(main|master|develop|feature/.+|release/.+|hotfix/.+)$";
 
 /// Fonction de repli pour `#[serde(default = "...")]` sur [`Referentiels::motif_nommage_branches`] : seule forme
 /// acceptée par `serde` pour une valeur par défaut non triviale (une constante `&str` ne se convertit pas
@@ -796,12 +813,19 @@ impl Default for Sauvegarde {
     }
 }
 
+/// Valeur par défaut de [`Parametres::seuil_avertissement_taille_octets`], utilisée par `#[serde(default = "...")]`
+/// (une fonction est requise ici, `#[derive(Default)]` seul appliquerait `0` plutôt que
+/// [`SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT`]).
+fn seuil_avertissement_taille_octets_par_defaut() -> u64 {
+    SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT
+}
+
 /// Seuils et réglages applicatifs (racine `parametres`).
 ///
 /// Décision de modélisation (cf. commentaire d'en-tête du fichier) : `seuils` reste une valeur JSON générique, le
 /// détail des grilles de seuils relevant du Moteur de jugement (Phase 6, hors périmètre de la Phase 1) et la règle
 /// « aucune valeur de seuil codée en dur » imposant de ne jamais figer ici une liste de seuils par anticipation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Parametres {
     /// Grille de seuils du Moteur de jugement (structure détaillée hors périmètre de la Phase 1).
@@ -819,6 +843,23 @@ pub(crate) struct Parametres {
     /// Réglages de sauvegarde de sécurité.
     #[serde(default)]
     pub(crate) sauvegarde: Sauvegarde,
+    /// Seuil de taille, en octets, déclenchant l'avertissement contextuel de purge à la sauvegarde (US-035,
+    /// RG-031, RG-032).
+    #[serde(default = "seuil_avertissement_taille_octets_par_defaut")]
+    pub(crate) seuil_avertissement_taille_octets: u64,
+}
+
+impl Default for Parametres {
+    fn default() -> Self {
+        Self {
+            seuils: Value::default(),
+            verrouillage: Verrouillage::default(),
+            audit: ParametresAudit::default(),
+            proxy: None,
+            sauvegarde: Sauvegarde::default(),
+            seuil_avertissement_taille_octets: SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT,
+        }
+    }
 }
 
 /// Verdict d'exécution d'un projet au sein d'une campagne.
@@ -1184,7 +1225,6 @@ mod tests {
             "feature/paiement-sepa",
             "release/1.2.0",
             "hotfix/urgent",
-            "bugfix/correction-typo",
         ] {
             assert!(
                 motif.is_match(nom_conforme),
@@ -1194,6 +1234,11 @@ mod tests {
         assert!(
             !motif.is_match("n-importe-quoi"),
             "un nom de branche hors convention Gitflow ne devrait pas être reconnu conforme"
+        );
+        // R10-11 : `bugfix/*` est une extension non strictement canonique de Gitflow, retirée du motif par défaut.
+        assert!(
+            !motif.is_match("bugfix/correction-typo"),
+            "'bugfix/*' ne fait plus partie du motif Gitflow par défaut depuis R10-11"
         );
         Ok(())
     }

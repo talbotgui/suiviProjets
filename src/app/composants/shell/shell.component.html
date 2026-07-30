@@ -141,6 +141,19 @@
     <p class="shell__erreur-sauvegarde" role="alert">{{ messageErreurSauvegarde }}</p>
   }
 
+  @if (avertissementTailleActif()) {
+    <div class="shell__avertissement-taille" role="alert">
+      <p>
+        Le fichier de données dépasse le seuil de taille configuré. Pensez à purger les audits ou le
+        journal des modifications anciens.
+      </p>
+      <div class="shell__avertissement-taille-actions">
+        <button type="button" (click)="fermerAvertissementTaille()">Ignorer</button>
+        <button type="button" (click)="ouvrirParametragePurge()">Ouvrir le paramétrage</button>
+      </div>
+    </div>
+  }
+
   @if (verrouillageActif()) {
     <app-verrouillage />
   }

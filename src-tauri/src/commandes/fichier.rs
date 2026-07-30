@@ -55,6 +55,9 @@ pub(crate) enum ErreurFacade {
     MembreIntrouvable,
     /// La règle soumise porte un doublon de username déjà utilisé par une autre règle du groupe (Phase 4, RG-008).
     DoublonUsernameMembreConnu,
+    /// La règle soumise, de type email/domaineEmail, entre en conflit avec une autre règle du groupe portant le
+    /// même critère et un statut différent (Phase 4, Phase 10 R10-07, RG-008).
+    ConflitReglesMembreConnu,
     /// Un brouillon existe déjà et doit être traité avant d'en enregistrer un nouveau (Phase 5, incrément 2,
     /// `enregistrerBrouillon`, RG-019).
     BrouillonDejaExistant,
@@ -75,6 +78,19 @@ pub(crate) enum ErreurFacade {
     EntreeReferentielInvalide,
     /// Le motif de nommage de branche soumis est vide ou syntaxiquement invalide (Phase 7, incrément 1, RG-030).
     MotifNommageBranchesInvalide,
+    /// Un réglage applicatif soumis ne respecte pas sa borne de validité minimale (Phase 10, incrément 8, US-034,
+    /// US-035, `definirVerrouillage`/`definirConcurrenceAudit`/`definirProxy`/
+    /// `definirNombreSauvegardesSecurite`/`definirSeuilAvertissementTaille`).
+    ReglageApplicatifInvalide,
+    /// L'entrée de référentiel désignée par son identifiant n'existe pas (Phase 10, incrément 8, US-033,
+    /// `supprimerRegleDependance`/`supprimerRegleMarqueurIA`).
+    EntreeReferentielIntrouvable,
+    /// L'annotation désignée n'existe pas dans la portée demandée (Phase 10, incrément 8, US-019,
+    /// `supprimerAnnotation`).
+    AnnotationIntrouvable,
+    /// L'annotation désignée est une annotation système, jamais supprimable (Phase 10, incrément 8, US-019, RG-015,
+    /// RG-033, `supprimerAnnotation`).
+    AnnotationSystemeNonSupprimable,
     /// Le mode de purge par âge désigné n'est ni `"suppression"` ni `"agregationMensuelle"` (Phase 7, incrément 4,
     /// `previsualiserPurgeAge`/`executerPurgeAge`, RG-025).
     ModePurgeAgeInconnu,
@@ -144,6 +160,7 @@ impl From<crate::persistance::administration::ErreurAdministration> for ErreurFa
             ErreurAdministration::ProjetIntrouvable => Self::ProjetIntrouvable,
             ErreurAdministration::MembreIntrouvable => Self::MembreIntrouvable,
             ErreurAdministration::DoublonUsernameMembreConnu => Self::DoublonUsernameMembreConnu,
+            ErreurAdministration::ConflitReglesMembreConnu => Self::ConflitReglesMembreConnu,
         }
     }
 }
@@ -154,6 +171,8 @@ impl From<crate::persistance::alertes::ErreurAlertes> for ErreurFacade {
         match erreur {
             ErreurAlertes::GroupeIntrouvable => Self::GroupeIntrouvable,
             ErreurAlertes::ProjetIntrouvable => Self::ProjetIntrouvable,
+            ErreurAlertes::AnnotationIntrouvable => Self::AnnotationIntrouvable,
+            ErreurAlertes::AnnotationSystemeNonSupprimable => Self::AnnotationSystemeNonSupprimable,
         }
     }
 }
@@ -166,6 +185,8 @@ impl From<crate::persistance::parametrage::ErreurParametrage> for ErreurFacade {
             ErreurParametrage::TypeReferentielInconnu => Self::TypeReferentielInconnu,
             ErreurParametrage::EntreeReferentielInvalide => Self::EntreeReferentielInvalide,
             ErreurParametrage::MotifNommageBranchesInvalide => Self::MotifNommageBranchesInvalide,
+            ErreurParametrage::ReglageApplicatifInvalide => Self::ReglageApplicatifInvalide,
+            ErreurParametrage::EntreeReferentielIntrouvable => Self::EntreeReferentielIntrouvable,
         }
     }
 }
@@ -252,6 +273,7 @@ pub(crate) fn creer_fichier(
         NOM_APPLICATION,
     )?;
     etat.definir(PathBuf::from(chemin), cle);
+    etat.definir_proxy(racine.parametres.proxy.clone());
     Ok(racine)
 }
 
@@ -264,6 +286,7 @@ pub(crate) fn charger_fichier(
 ) -> Result<DonneesRacine, ErreurFacade> {
     let (racine, cle) = moteur::charger_fichier(Path::new(&chemin), &mot_de_passe)?;
     etat.definir(PathBuf::from(chemin), cle);
+    etat.definir_proxy(racine.parametres.proxy.clone());
     Ok(racine)
 }
 
@@ -300,8 +323,9 @@ pub(crate) fn deverrouiller_session(
     let chemin = etat
         .chemin_fichier()
         .ok_or(ErreurFacade::AucunFichierOuvert)?;
-    let (_racine, cle) = moteur::charger_fichier(&chemin, &mot_de_passe)?;
+    let (racine, cle) = moteur::charger_fichier(&chemin, &mot_de_passe)?;
     etat.definir(chemin, cle);
+    etat.definir_proxy(racine.parametres.proxy);
     Ok(())
 }
 

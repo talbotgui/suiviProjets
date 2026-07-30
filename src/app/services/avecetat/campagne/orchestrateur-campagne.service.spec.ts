@@ -65,9 +65,10 @@ const PARAMETRES_DE_TEST: Parametres = {
     materialiteBrouillon: { variationRelative: 0.1 },
   },
   verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-  audit: {},
+  audit: { concurrence: 4 },
   proxy: {},
-  sauvegarde: {},
+  sauvegarde: { nombreSauvegardesSecurite: 5 },
+  seuilAvertissementTailleOctets: 10_485_760,
 };
 
 /** Référentiels de test, mêmes principes que {@link PARAMETRES_DE_TEST}. */
@@ -700,64 +701,91 @@ describe('OrchestrateurCampagneService', () => {
     });
 
     it('doit respecter la concurrence configurée (RG-017)', async () => {
-      let enCours = 0;
-      let maxSimultane = 0;
-      invokeSimule.mockImplementation(async (commande: string) => {
-        enCours += 1;
-        maxSimultane = Math.max(maxSimultane, enCours);
-        await new Promise((resolve) => setTimeout(resolve, 15));
-        enCours -= 1;
-        return REPONSES_PAR_DEFAUT[commande];
-      });
-      const projets = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id) =>
-        DonneesDeTest.projet(id, [DonneesDeTest.sourceGitlab(`${id}-source`)]),
-      );
-      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
-      donneesApplicationMock.racine.mockReturnValue({
-        parametres: { ...PARAMETRES_DE_TEST, audit: { concurrence: 2 } },
-        referentiels: REFERENTIELS_DE_TEST,
-      });
+      // R10-10 : délai simulé par des timers Jest (plutôt qu'un `setTimeout` réel) pour fiabiliser ce test en CI,
+      // sa réussite ne dépendant plus de la vitesse effective d'exécution de la machine. `runAllTimersAsync` (et
+      // non une avancée par un montant fixe) est nécessaire ici : chaque projet enchaîne plusieurs appels
+      // d'indicateurs strictement séquentiels (`auditerProjet`), chacun retardé de 15 ms par ce bouchon, sans
+      // borne fixée à l'avance qu'un montant arbitraire risquerait de sous-estimer ; `runAllTimersAsync` épuise
+      // exactement les délais réellement programmés, en laissant les micro-tâches (Promises) s'intercaler entre
+      // chaque avancée, condition requise pour que la concurrence `mergeMap` enchaîne correctement les projets
+      // suivants.
+      jest.useFakeTimers();
+      try {
+        let enCours = 0;
+        let maxSimultane = 0;
+        invokeSimule.mockImplementation(async (commande: string) => {
+          enCours += 1;
+          maxSimultane = Math.max(maxSimultane, enCours);
+          await new Promise((resolve) => setTimeout(resolve, 15));
+          enCours -= 1;
+          return REPONSES_PAR_DEFAUT[commande];
+        });
+        const projets = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id) =>
+          DonneesDeTest.projet(id, [DonneesDeTest.sourceGitlab(`${id}-source`)]),
+        );
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
+        donneesApplicationMock.racine.mockReturnValue({
+          parametres: { ...PARAMETRES_DE_TEST, audit: { concurrence: 2 } },
+          referentiels: REFERENTIELS_DE_TEST,
+        });
 
-      await service.lancerCampagne(
-        projets.map((projet) => projet.id),
-        'mot-de-passe',
-      );
+        const promesseCampagne = service.lancerCampagne(
+          projets.map((projet) => projet.id),
+          'mot-de-passe',
+        );
+        await jest.runAllTimersAsync();
+        await promesseCampagne;
 
-      expect(maxSimultane).toBeLessThanOrEqual(2);
-      expect(maxSimultane).toBeGreaterThan(1);
-    }, 10_000);
+        expect(maxSimultane).toBeLessThanOrEqual(2);
+        expect(maxSimultane).toBeGreaterThan(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
 
     it('doit annuler proprement une campagne en cours : le projet en vol va à son terme, les suivants sont ignorés (RG-018)', async () => {
-      invokeSimule.mockImplementation(async (commande: string) => {
-        await new Promise((resolve) => setTimeout(resolve, 15));
-        return REPONSES_PAR_DEFAUT[commande];
-      });
-      const projets = ['p1', 'p2', 'p3'].map((id) =>
-        DonneesDeTest.projet(id, [DonneesDeTest.sourceGitlab(`${id}-source`)]),
-      );
-      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
-      donneesApplicationMock.racine.mockReturnValue({
-        parametres: { ...PARAMETRES_DE_TEST, audit: { concurrence: 1 } },
-        referentiels: REFERENTIELS_DE_TEST,
-      });
-      const etatSession = TestBed.inject(EtatSessionService);
+      // R10-10 : mêmes raisons qu'au test précédent. L'annulation est demandée après une avancée de 20 ms
+      // (identique au délai réel qu'elle remplace) : suffisant pour être certain que p1 a déjà démarré (au moins
+      // un appel d'indicateur en cours) mais bien avant que p2 ne puisse être soumis (concurrence 1 : p2 ne peut
+      // démarrer qu'une fois la chaîne complète, bien plus longue, des indicateurs de p1 entièrement résolue).
+      // `runAllTimersAsync` laisse ensuite p1 aller à son terme (RG-018), quel que soit le nombre d'indicateurs
+      // qu'il lui reste à interroger.
+      jest.useFakeTimers();
+      try {
+        invokeSimule.mockImplementation(async (commande: string) => {
+          await new Promise((resolve) => setTimeout(resolve, 15));
+          return REPONSES_PAR_DEFAUT[commande];
+        });
+        const projets = ['p1', 'p2', 'p3'].map((id) =>
+          DonneesDeTest.projet(id, [DonneesDeTest.sourceGitlab(`${id}-source`)]),
+        );
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe(projets)]);
+        donneesApplicationMock.racine.mockReturnValue({
+          parametres: { ...PARAMETRES_DE_TEST, audit: { concurrence: 1 } },
+          referentiels: REFERENTIELS_DE_TEST,
+        });
+        const etatSession = TestBed.inject(EtatSessionService);
 
-      const promesse = service.lancerCampagne(
-        projets.map((projet) => projet.id),
-        'mot-de-passe',
-      );
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      service.annulerCampagne();
-      await promesse;
+        const promesse = service.lancerCampagne(
+          projets.map((projet) => projet.id),
+          'mot-de-passe',
+        );
+        await jest.advanceTimersByTimeAsync(20);
+        service.annulerCampagne();
+        await jest.runAllTimersAsync();
+        await promesse;
 
-      const [, , , verdicts] = donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
-      const statuts: readonly string[] = verdicts.map((verdict: Verdict) => verdict.statut);
-      expect(statuts[0]).toBe('succes');
-      expect(statuts.slice(1)).toEqual(['ignore', 'ignore']);
-      const progressionCampagne = etatSession.progressionCampagne();
-      expect(progressionCampagne?.projets['p1']?.statut).toBe('termine');
-      expect(progressionCampagne?.projets['p2']?.statut).toBe('ignore');
-      expect(progressionCampagne?.projets['p3']?.statut).toBe('ignore');
-    }, 10_000);
+        const [, , , verdicts] = donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        const statuts: readonly string[] = verdicts.map((verdict: Verdict) => verdict.statut);
+        expect(statuts[0]).toBe('succes');
+        expect(statuts.slice(1)).toEqual(['ignore', 'ignore']);
+        const progressionCampagne = etatSession.progressionCampagne();
+        expect(progressionCampagne?.projets['p1']?.statut).toBe('termine');
+        expect(progressionCampagne?.projets['p2']?.statut).toBe('ignore');
+        expect(progressionCampagne?.projets['p3']?.statut).toBe('ignore');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

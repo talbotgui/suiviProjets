@@ -334,6 +334,7 @@ export class SqmSeuilsParametrageComponent {
       case 'projetIntrouvable':
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
+      case 'conflitReglesMembreConnu':
       case 'brouillonDejaExistant':
       case 'aucunBrouillonCourant':
       case 'projetAbsentDuBrouillon':
@@ -348,6 +349,10 @@ export class SqmSeuilsParametrageComponent {
       case 'versionSchemaConfigurationSuperieure':
       case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
+      case 'reglageApplicatifInvalide':
+      case 'entreeReferentielIntrouvable':
+      case 'annotationIntrouvable':
+      case 'annotationSystemeNonSupprimable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

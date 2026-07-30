@@ -15,7 +15,7 @@ use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
 use crate::modele::racine::DonneesRacine;
 use crate::persistance::moteur;
-use crate::persistance::purge::{self, PrevisualisationPurge};
+use crate::persistance::purge::{self, PrevisualisationPurge, PrevisualisationPurgeJournal};
 use chrono::{SecondsFormat, Utc};
 use std::path::{Path, PathBuf};
 use tauri::State;
@@ -40,6 +40,37 @@ pub(crate) fn executer_purge_densite(
     let mut donnees = donnees;
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     purge::executer_purge_densite(&mut donnees, horodatage);
+
+    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    etat.definir(PathBuf::from(chemin), cle_session);
+
+    Ok(donnees)
+}
+
+/// Prévisualise une purge du journal des modifications lui-même (US-036, RG-034, Phase 10 incrément 8), limite
+/// fixe de deux ans, sans aucune modification ni sauvegarde.
+#[tauri::command]
+pub(crate) fn previsualiser_purge_journal(
+    donnees: DonneesRacine,
+) -> Result<PrevisualisationPurgeJournal, ErreurFacade> {
+    let aujourdhui = Utc::now().date_naive();
+    Ok(purge::previsualiser_purge_journal(&donnees, aujourdhui))
+}
+
+/// Exécute une purge du journal des modifications lui-même, sauvegarde le fichier (US-036, RG-034, Phase 10
+/// incrément 8).
+#[tauri::command]
+pub(crate) fn executer_purge_journal(
+    chemin: String,
+    donnees: DonneesRacine,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+    let mut donnees = donnees;
+    let aujourdhui = Utc::now().date_naive();
+    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    purge::executer_purge_journal(&mut donnees, aujourdhui, horodatage);
 
     let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
     etat.definir(PathBuf::from(chemin), cle_session);

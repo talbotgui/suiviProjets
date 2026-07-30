@@ -36,6 +36,14 @@ pub(crate) enum ErreurAdministration {
     /// « la saisie d'un doublon de username est bloquée à l'administration »).
     #[error("cette règle porte un doublon de username déjà utilisé par une autre règle du groupe")]
     DoublonUsernameMembreConnu,
+    /// La règle soumise, de `typeCritere` `email`/`domaineEmail`, porte le même critère qu'une autre règle du
+    /// groupe avec un statut différent (RG-008 : conflit de règles) — bloqué à la saisie depuis R10-07 par
+    /// symétrie avec [`ErreurAdministration::DoublonUsernameMembreConnu`], ce conflit n'étant auparavant que
+    /// signalé après coup (`identifiants_en_conflit`), jamais bloqué.
+    #[error(
+        "cette règle entre en conflit avec une autre règle du groupe portant le même critère et un statut différent"
+    )]
+    ConflitReglesMembreConnu,
 }
 
 /// Qualifie un membre connu d'un groupe (US-022, US-023) : ajoute une nouvelle règle ou met à jour une règle
@@ -54,14 +62,18 @@ pub(crate) enum ErreurAdministration {
 /// [`ErreurAdministration::GroupeIntrouvable`] si `groupe_id` ne désigne aucun groupe ;
 /// [`ErreurAdministration::MembreIntrouvable`] si `membre_id` est fourni mais ne désigne aucune règle du groupe ;
 /// [`ErreurAdministration::DoublonUsernameMembreConnu`] si la règle soumise porte un `typeCritere` `username` déjà
-/// utilisé par une autre règle du groupe (RG-008).
+/// utilisé par une autre règle du groupe (RG-008) ; [`ErreurAdministration::ConflitReglesMembreConnu`] si la règle
+/// soumise, de `typeCritere` `email`/`domaineEmail`, porte le même critère qu'une autre règle du groupe avec un
+/// statut différent (RG-008, R10-07 : bloqué à la saisie depuis cet incrément, par symétrie avec le doublon de
+/// username).
 ///
 /// # Retour
 ///
-/// Les identifiants des règles de membres connus du groupe désormais en conflit (RG-008 : même `typeCritere` et
-/// même `critere`, statuts contradictoires). Cette détection est purement informative et ne bloque jamais la
-/// saisie (seul le doublon de username l'est) : décision arbitraire documentée dans le compte-rendu de
-/// développement de cette phase, RG-008 ne décrivant explicitement le blocage que pour le doublon de username.
+/// Les identifiants des règles de membres connus du groupe encore en conflit après cette qualification (RG-008 :
+/// même `typeCritere` et même `critere`, statuts contradictoires). Depuis R10-07, aucune nouvelle règle soumise ne
+/// peut plus créer un tel conflit (bloqué ci-dessus) : ce retour reste utile pour signaler d'éventuels conflits
+/// résiduels préexistants dans les données (import de configuration antérieur à ce blocage, document migré),
+/// purement informatif et sans effet sur la saisie courante.
 #[allow(
     clippy::too_many_arguments,
     reason = "un `MembreConnu` complet (5 champs métier) plus les métadonnées de journalisation (origine, horodatage) et les identifiants de résolution (groupe, membre) ; regrouper ces paramètres dans une structure dédiée n'apporterait pas de clarté supplémentaire pour un seul point d'appel"
@@ -107,6 +119,21 @@ pub(crate) fn qualifier_membre(
         })
     {
         return Err(ErreurAdministration::DoublonUsernameMembreConnu);
+    }
+
+    // R10-07 : blocage strict du conflit de règles email/domaineEmail à la saisie, symétrique du blocage du
+    // doublon de username ci-dessus (RG-008). Seule une règle avec un statut différent constitue un conflit :
+    // deux règles identiques (même critère, même statut) restent tolérées, comme avant cet incrément (cf.
+    // `identifiants_en_conflit_ignore_les_regles_identiques_ou_isolees`).
+    if (type_critere == TypeCritere::Email || type_critere == TypeCritere::DomaineEmail)
+        && groupe.membres_connus.iter().any(|membre| {
+            membre.id != cible_id
+                && membre.type_critere == type_critere
+                && membre.critere == critere
+                && membre.statut != statut
+        })
+    {
+        return Err(ErreurAdministration::ConflitReglesMembreConnu);
     }
 
     let avant = groupe
@@ -513,8 +540,9 @@ mod tests {
     }
 
     #[test]
-    fn qualifier_membre_detecte_le_conflit_de_regles_apres_edition()
-    -> Result<(), ErreurAdministration> {
+    fn qualifier_membre_bloque_le_conflit_de_regles_courriel_domaine_a_la_saisie() {
+        // R10-07 : ce scénario créait auparavant un conflit signalé après coup (`membres_en_conflit`) sans jamais
+        // bloquer la saisie ; il est désormais bloqué à la saisie, symétrique du doublon de username.
         let mut groupe = groupe_vide("g1");
         groupe.membres_connus.push(membre(
             "m1",
@@ -530,7 +558,7 @@ mod tests {
         ));
         let mut racine = racine_avec_groupe(groupe);
 
-        let conflits = qualifier_membre(
+        let resultat = qualifier_membre(
             &mut racine,
             "g1",
             Some("m2".to_string()),
@@ -541,11 +569,109 @@ mod tests {
             None,
             "Administration".to_string(),
             "2026-07-21T09:15:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurAdministration::ConflitReglesMembreConnu)
+        );
+        assert_eq!(
+            racine.groupes[0].membres_connus[1].critere, "*@y.fr",
+            "la règle existante ne doit pas avoir été modifiée par la tentative rejetée"
+        );
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn qualifier_membre_autorise_une_regle_courriel_domaine_identique_de_meme_statut()
+    -> Result<(), ErreurAdministration> {
+        // Deux règles identiques (même critère, même statut) restent tolérées : ce n'est pas un conflit au sens de
+        // RG-008 (cf. `identifiants_en_conflit_ignore_les_regles_identiques_ou_isolees`), donc pas davantage bloqué
+        // par R10-07. `membre_id` absent ne suffit pas à recréer un doublon exact : `qualifier_membre` retrouverait
+        // alors la règle existante par correspondance de critère et la mettrait à jour (cf. commentaire de
+        // `qualifier_membre`) ; les deux règles identiques sont donc ici déjà présentes dans le groupe, et c'est
+        // l'édition explicite (par `membre_id`) de l'une d'elles, conservant le même critère et le même statut,
+        // qui est exercée.
+        let mut groupe = groupe_vide("g1");
+        groupe.membres_connus.push(membre(
+            "m1",
+            "*@x.fr",
+            TypeCritere::DomaineEmail,
+            StatutMembre::Interne,
+        ));
+        groupe.membres_connus.push(membre(
+            "m2",
+            "*@x.fr",
+            TypeCritere::DomaineEmail,
+            StatutMembre::Interne,
+        ));
+        let mut racine = racine_avec_groupe(groupe);
+
+        let conflits = qualifier_membre(
+            &mut racine,
+            "g1",
+            Some("m2".to_string()),
+            "*@x.fr".to_string(),
+            TypeCritere::DomaineEmail,
+            StatutMembre::Interne,
+            Some("Domaine interne (libellé mis à jour)".to_string()),
+            None,
+            "Administration".to_string(),
+            "2026-07-21T09:16:00Z".to_string(),
+        )?;
+
+        assert!(conflits.is_empty());
+        assert_eq!(racine.groupes[0].membres_connus.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn qualifier_membre_signale_un_conflit_residuel_sans_bloquer_une_edition_non_liee()
+    -> Result<(), ErreurAdministration> {
+        // R10-07 ne bloque que la règle SOUMISE si elle crée un nouveau conflit ; un conflit résiduel préexistant
+        // entre deux AUTRES règles (ex. import de configuration antérieur à ce blocage) reste signalé de façon
+        // purement informative, sans empêcher une édition non liée à ce conflit.
+        let mut groupe = groupe_vide("g1");
+        groupe.membres_connus.push(membre(
+            "m1",
+            "bob@x.fr",
+            TypeCritere::Email,
+            StatutMembre::Interne,
+        ));
+        groupe.membres_connus.push(membre(
+            "m2",
+            "bob@x.fr",
+            TypeCritere::Email,
+            StatutMembre::Client,
+        ));
+        groupe.membres_connus.push(membre(
+            "m3",
+            "carol",
+            TypeCritere::Username,
+            StatutMembre::Interne,
+        ));
+        let mut racine = racine_avec_groupe(groupe);
+
+        let conflits = qualifier_membre(
+            &mut racine,
+            "g1",
+            Some("m3".to_string()),
+            "carol".to_string(),
+            TypeCritere::Username,
+            StatutMembre::Partenaire,
+            None,
+            None,
+            "Administration".to_string(),
+            "2026-07-21T09:17:00Z".to_string(),
         )?;
 
         assert_eq!(conflits.len(), 2);
         assert!(conflits.contains(&"m1".to_string()));
         assert!(conflits.contains(&"m2".to_string()));
+        assert_eq!(
+            racine.groupes[0].membres_connus[2].statut,
+            StatutMembre::Partenaire
+        );
         Ok(())
     }
 

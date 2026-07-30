@@ -214,12 +214,15 @@ interface SeuilsResolus {
 export class SqmSyntheseAuditsComponent {
   /**
    * Ordre de gravité des couleurs sémantiques, utilisé pour retenir la plus grave de deux jugements combinés (ex.
-   * âge et taux de conflit des MR ouvertes).
+   * âge et taux de conflit des MR ouvertes). `bleu` n'appartient pas à ce dégradé de gravité (statut IA dédié,
+   * R10-03) et n'est jamais produit par les fonctions combinées ici ; sa présence n'est requise que par
+   * l'exhaustivité du type `Couleur`.
    */
   private static readonly GRAVITE_COULEUR: Readonly<Record<Couleur, number>> = {
     vert: 0,
     orange: 1,
     rouge: 2,
+    bleu: -1,
   };
 
   /**
@@ -1277,7 +1280,8 @@ export class SqmSyntheseAuditsComponent {
         return { label: `interdite — violation (${outils.join(', ')})`, couleur: 'rouge' };
       }
       case 'conformeSousReserve':
-        return { label: 'interdite — ok', couleur: 'vert' };
+        // Couleur dédiée (R10-03) distincte de 'autorisee' (vert) et harmonisée avec la Fiche projet.
+        return { label: 'interdite — ok', couleur: 'bleu' };
     }
   }
 }

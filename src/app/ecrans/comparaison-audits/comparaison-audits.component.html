@@ -76,6 +76,11 @@
           <p class="comparaison-audits__intervalle">
             Comparaison de {{ donnees.dateAvantLabel }} à {{ donnees.dateApresLabel }}.
           </p>
+          @if (donnees.messageSelectionRepliee; as messageSelectionRepliee) {
+            <p class="comparaison-audits__message-repli" role="status">
+              {{ messageSelectionRepliee }}
+            </p>
+          }
         </section>
 
         <!-- Premier volet : indicateurs avant/après/delta. -->

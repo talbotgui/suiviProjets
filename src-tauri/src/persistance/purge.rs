@@ -318,6 +318,119 @@ pub(crate) fn executer_purge_age(
     Ok(resume)
 }
 
+/// Limite d'ancienneté fixe, en années, de la purge du journal des modifications lui-même (US-036, RG-034, Phase
+/// 10 incrément 8) : valeur fixe actée par arbitrage humain (solution A, non paramétrable), à la différence des
+/// six mois de la purge des audits par âge (RG-025).
+const LIMITE_PURGE_JOURNAL_ANNEES: u32 = 2;
+
+/// Résumé d'une prévisualisation ou d'une exécution de purge du journal des modifications (US-036, RG-034),
+/// restitué à l'utilisateur avant toute confirmation. Pas de `nb_projets_concernes` ici, à la différence de
+/// [`PrevisualisationPurge`] : le journal n'est pas structuré par projet.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PrevisualisationPurgeJournal {
+    pub(crate) nb_entrees_supprimees: u32,
+    pub(crate) octets_avant: u64,
+    pub(crate) octets_apres: u64,
+}
+
+/// Date limite de la purge du journal (RG-034) : deux ans avant `aujourdhui`, ou `aujourdhui` elle-même si ce
+/// calcul échoue (cas non atteignable en pratique, garde défensive), pour ne jamais supprimer une entrée par excès
+/// de prudence.
+fn limite_purge_journal(aujourdhui: NaiveDate) -> NaiveDate {
+    aujourdhui
+        .checked_sub_months(Months::new(12 * LIMITE_PURGE_JOURNAL_ANNEES))
+        .unwrap_or(aujourdhui)
+}
+
+/// Interprète `EntreeJournal.horodatage` (format RFC 3339, cf. `Utc::now().to_rfc3339_opts` dans les commandes de
+/// la Façade) en date calendaire ; `None` si la valeur n'est pas syntaxiquement valide (aucune entrée connue n'est
+/// dans ce cas, garde défensive uniquement).
+fn date_entree_journal(entree: &EntreeJournal) -> Option<NaiveDate> {
+    chrono::DateTime::parse_from_rfc3339(&entree.horodatage)
+        .ok()
+        .map(|horodatage| horodatage.date_naive())
+}
+
+/// Identifiants des entrées du journal des modifications antérieures à `limite` (RG-034). Une entrée dont
+/// l'horodatage n'est pas interprétable est conservée par prudence plutôt que supprimée.
+fn identifiants_a_supprimer_journal(
+    journal: &[EntreeJournal],
+    limite: NaiveDate,
+) -> HashSet<String> {
+    journal
+        .iter()
+        .filter(|entree| date_entree_journal(entree).is_some_and(|date| date < limite))
+        .map(|entree| entree.id.clone())
+        .collect()
+}
+
+/// Applique une purge du journal des modifications à `racine`, en place, puis renvoie le résumé de l'opération.
+fn purger_journal(racine: &mut DonneesRacine, limite: NaiveDate) -> PrevisualisationPurgeJournal {
+    let octets_avant = taille_compressee(racine);
+    let a_supprimer = identifiants_a_supprimer_journal(&racine.journal, limite);
+    let nb_entrees_supprimees = a_supprimer.len() as u32;
+    racine
+        .journal
+        .retain(|entree| !a_supprimer.contains(&entree.id));
+    let octets_apres = taille_compressee(racine);
+    PrevisualisationPurgeJournal {
+        nb_entrees_supprimees,
+        octets_avant,
+        octets_apres,
+    }
+}
+
+/// Prévisualise une purge du journal des modifications (RG-034) : calcule le résumé de l'opération sur une copie
+/// jetable de `racine`, sans aucune modification ni sauvegarde effective.
+pub(crate) fn previsualiser_purge_journal(
+    racine: &DonneesRacine,
+    aujourdhui: NaiveDate,
+) -> PrevisualisationPurgeJournal {
+    let limite = limite_purge_journal(aujourdhui);
+    let mut copie = racine.clone();
+    purger_journal(&mut copie, limite)
+}
+
+/// Consigne une entrée récapitulative au journal des modifications (RG-034) pour une exécution effective de purge
+/// du journal ayant réellement supprimé au moins une entrée ; sans effet si `resume.nb_entrees_supprimees` est nul
+/// (cohérent avec RG-023 : une entrée de journal représente une modification réelle, jamais un no-op). L'entrée
+/// ajoutée porte l'horodatage de l'exécution, toujours postérieur à `limite` : elle n'est donc jamais elle-même
+/// sélectionnée par cette même exécution.
+fn consigner_purge_journal(
+    donnees: &mut DonneesRacine,
+    resume: &PrevisualisationPurgeJournal,
+    horodatage: String,
+) {
+    if resume.nb_entrees_supprimees == 0 {
+        return;
+    }
+    donnees.journal.push(EntreeJournal {
+        id: uuid::Uuid::new_v4().to_string(),
+        horodatage,
+        objet: "journal".to_string(),
+        avant: Value::Null,
+        apres: json!({ "nbEntreesSupprimees": resume.nb_entrees_supprimees }),
+        origine: "Purge".to_string(),
+        detail_origine: Some(format!("âge ({LIMITE_PURGE_JOURNAL_ANNEES} ans)")),
+    });
+}
+
+/// Exécute une purge du journal des modifications (RG-034) : retire de `racine`, en place, les entrées désignées
+/// par [`identifiants_a_supprimer_journal`], puis consigne une entrée récapitulative si au moins une entrée a été
+/// supprimée ; la sauvegarde effective reste de la responsabilité de la commande de la Façade appelante
+/// (`commandes::purge`).
+pub(crate) fn executer_purge_journal(
+    racine: &mut DonneesRacine,
+    aujourdhui: NaiveDate,
+    horodatage: String,
+) -> PrevisualisationPurgeJournal {
+    let limite = limite_purge_journal(aujourdhui);
+    let resume = purger_journal(racine, limite);
+    consigner_purge_journal(racine, &resume, horodatage);
+    resume
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -520,5 +633,97 @@ mod tests {
         let resultat = previsualiser_purge_age(&racine, aujourdhui, "modeInconnu");
 
         assert_eq!(resultat, Err(ErreurPurge::ModePurgeAgeInconnu));
+    }
+
+    fn entree_journal_de_test(id: &str, horodatage: &str) -> EntreeJournal {
+        EntreeJournal {
+            id: id.to_string(),
+            horodatage: horodatage.to_string(),
+            objet: "parametres.seuils.test".to_string(),
+            avant: Value::Null,
+            apres: Value::Null,
+            origine: "Paramétrage".to_string(),
+            detail_origine: None,
+        }
+    }
+
+    #[test]
+    fn purge_journal_conserve_les_entrees_recentes() {
+        let mut racine = DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z");
+        racine
+            .journal
+            .push(entree_journal_de_test("j1", "2026-01-01T08:00:00Z"));
+        let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
+
+        let resume = previsualiser_purge_journal(&racine, aujourdhui);
+
+        assert_eq!(resume.nb_entrees_supprimees, 0);
+    }
+
+    #[test]
+    fn purge_journal_supprime_les_entrees_de_plus_de_deux_ans() {
+        let mut racine = DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z");
+        racine
+            .journal
+            .push(entree_journal_de_test("j1", "2023-01-01T08:00:00Z"));
+        racine
+            .journal
+            .push(entree_journal_de_test("j2", "2026-06-01T08:00:00Z"));
+        let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
+
+        let resume = previsualiser_purge_journal(&racine, aujourdhui);
+
+        assert_eq!(resume.nb_entrees_supprimees, 1);
+        // La prévisualisation n'altère jamais la racine transmise.
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn executer_purge_journal_retire_effectivement_les_entrees_et_consigne_le_journal() {
+        let mut racine = DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z");
+        racine
+            .journal
+            .push(entree_journal_de_test("j1", "2023-01-01T08:00:00Z"));
+        racine
+            .journal
+            .push(entree_journal_de_test("j2", "2026-06-01T08:00:00Z"));
+        let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
+
+        let resume =
+            executer_purge_journal(&mut racine, aujourdhui, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(resume.nb_entrees_supprimees, 1);
+        // L'entrée récente est conservée, l'ancienne retirée, la nouvelle entrée récapitulative ajoutée.
+        assert_eq!(racine.journal.len(), 2);
+        assert_eq!(racine.journal[0].id, "j2");
+        assert_eq!(racine.journal[1].objet, "journal");
+        assert_eq!(racine.journal[1].origine, "Purge");
+        assert_eq!(racine.journal[1].apres["nbEntreesSupprimees"], json!(1));
+    }
+
+    #[test]
+    fn executer_purge_journal_ne_consigne_rien_si_aucune_entree_nest_supprimee() {
+        let mut racine = DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z");
+        racine
+            .journal
+            .push(entree_journal_de_test("j1", "2026-06-01T08:00:00Z"));
+        let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
+
+        executer_purge_journal(&mut racine, aujourdhui, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(racine.journal.len(), 1);
+    }
+
+    #[test]
+    fn purge_journal_conserve_une_entree_dhorodatage_non_interpretable() {
+        let mut racine = DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z");
+        racine
+            .journal
+            .push(entree_journal_de_test("j1", "horodatage-invalide"));
+        let aujourdhui = NaiveDate::from_ymd_opt(2026, 7, 27).unwrap_or_default();
+
+        let resume = previsualiser_purge_journal(&racine, aujourdhui);
+
+        assert_eq!(resume.nb_entrees_supprimees, 0);
     }
 }

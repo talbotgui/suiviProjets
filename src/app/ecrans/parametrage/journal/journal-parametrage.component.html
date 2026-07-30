@@ -6,34 +6,125 @@
       Aucune entrée de journal des modifications pour le moment.
     </p>
   } @else {
-    <table class="journal-parametrage__tableau">
-      <thead>
-        <tr>
-          <th scope="col">Horodatage</th>
-          <th scope="col">Objet</th>
-          <th scope="col">Avant</th>
-          <th scope="col">Après</th>
-          <th scope="col">Origine</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (entree of entrees(); track entree.id) {
+    <div class="journal-parametrage__filtres">
+      <div class="journal-parametrage__champ-filtre">
+        <label for="journal-parametrage-filtre-origine">Origine</label>
+        <select
+          id="journal-parametrage-filtre-origine"
+          [ngModel]="valeurFiltreOrigine()"
+          (ngModelChange)="definirFiltreOrigine($event)"
+        >
+          <option value="">Toutes</option>
+          @for (origine of origines(); track origine) {
+            <option [value]="origine">{{ origine }}</option>
+          }
+        </select>
+      </div>
+      <div class="journal-parametrage__champ-filtre">
+        <label for="journal-parametrage-filtre-date-debut">Du</label>
+        <input
+          id="journal-parametrage-filtre-date-debut"
+          type="date"
+          [ngModel]="valeurFiltreDateDebut()"
+          (ngModelChange)="definirFiltreDateDebut($event)"
+        />
+      </div>
+      <div class="journal-parametrage__champ-filtre">
+        <label for="journal-parametrage-filtre-date-fin">Au</label>
+        <input
+          id="journal-parametrage-filtre-date-fin"
+          type="date"
+          [ngModel]="valeurFiltreDateFin()"
+          (ngModelChange)="definirFiltreDateFin($event)"
+        />
+      </div>
+      @if (auMoinsUnFiltreActif()) {
+        <button type="button" (click)="reinitialiserFiltres()">Réinitialiser les filtres</button>
+      }
+    </div>
+
+    @if (entreesFiltrees().length === 0) {
+      <p class="journal-parametrage__vide">
+        Aucune entrée de journal ne correspond aux filtres sélectionnés.
+      </p>
+    } @else {
+      <table class="journal-parametrage__tableau">
+        <thead>
           <tr>
-            <td>{{ entree.horodatage }}</td>
-            <td>{{ entree.objet }}</td>
-            <td>{{ formaterValeur(entree.avant) }}</td>
-            <td>{{ formaterValeur(entree.apres) }}</td>
-            <td>
-              {{ entree.origine }}
-              @if (entree.detailOrigine) {
-                <span class="journal-parametrage__detail-origine"
-                  >({{ entree.detailOrigine }})</span
-                >
-              }
-            </td>
+            <th scope="col">Horodatage</th>
+            <th scope="col">Objet</th>
+            <th scope="col">Avant</th>
+            <th scope="col">Après</th>
+            <th scope="col">Origine</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (entree of entreesPage(); track entree.id) {
+            <tr>
+              <td>{{ entree.horodatage }}</td>
+              <td>{{ entree.objet }}</td>
+              <td>{{ formaterValeur(entree.avant) }}</td>
+              <td>{{ formaterValeur(entree.apres) }}</td>
+              <td>
+                {{ entree.origine }}
+                @if (entree.detailOrigine) {
+                  <span class="journal-parametrage__detail-origine"
+                    >({{ entree.detailOrigine }})</span
+                  >
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="journal-parametrage__pagination">
+        <button type="button" [disabled]="!pagePrecedenteDisponible()" (click)="pagePrecedente()">
+          Page précédente
+        </button>
+        <span aria-live="polite">Page {{ pageAffichee() }} / {{ nombrePages() }}</span>
+        <button type="button" [disabled]="!pageSuivanteDisponible()" (click)="pageSuivante()">
+          Page suivante
+        </button>
+      </div>
+    }
   }
+
+  <section class="journal-parametrage__purge">
+    <h3>Purge du journal des modifications</h3>
+    <p>
+      Les entrées remontant à plus de deux ans peuvent être purgées, avec prévisualisation préalable
+      du nombre d'entrées concernées.
+    </p>
+
+    @if (messageErreurPurge) {
+      <p class="journal-parametrage__erreur" role="alert">{{ messageErreurPurge }}</p>
+    }
+    @if (messageSuccesPurge) {
+      <p class="journal-parametrage__succes">{{ messageSuccesPurge }}</p>
+    }
+
+    <button type="button" [disabled]="purgeEnCours" (click)="previsualiserPurge()">
+      Prévisualiser la purge
+    </button>
+
+    @if (previsualisationPurge) {
+      <p>{{ previsualisationPurge.nbEntreesSupprimees }} entrée(s) seraient supprimée(s).</p>
+      <button
+        type="button"
+        [disabled]="purgeEnCours || previsualisationPurge.nbEntreesSupprimees === 0"
+        (click)="demanderExecutionPurge()"
+      >
+        Exécuter la purge
+      </button>
+    }
+
+    @if (purgeEnAttenteMotDePasse) {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour exécuter la purge du journal des modifications."
+        (confirmee)="confirmerExecutionPurge($event)"
+        (annulee)="annulerExecutionPurge()"
+      />
+    }
+  </section>
 </section>

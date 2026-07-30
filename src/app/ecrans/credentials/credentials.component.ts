@@ -261,25 +261,15 @@ export class SqmCredentialsComponent {
   }
 
   /**
-   * Extrait la concurrence paramétrée d'une campagne (`parametres.audit.concurrence`, RG-017), sans accès non sûr
-   * à la racine `unknown`, avec repli documenté sur {@link CONCURRENCE_PAR_DEFAUT} (même convention que
-   * `OrchestrateurCampagneService.extraireConcurrence`, dupliquée ici, cf. commentaire d'en-tête de ce fichier).
+   * Extrait la concurrence paramétrée d'une campagne (`parametres.audit.concurrence`, RG-017), avec repli
+   * documenté sur {@link CONCURRENCE_PAR_DEFAUT}. Simplifié à la Phase 10, incrément 8 (`parametres.audit`
+   * désormais typé `ParametresAudit`, cf. `types-donnees.ts`) : accès direct sans traversée générique, la seule
+   * prudence restante portant sur l'absence de racine chargée (`racine()` nullable) et sur une valeur paramétrée
+   * invalide (zéro ou négative), même convention que `OrchestrateurCampagneService.extraireConcurrence`.
    * @returns La concurrence à appliquer.
    */
   private extraireConcurrence(): number {
-    const audit = this.donneesApplication.racine()?.parametres.audit;
-    const valeur = this.estObjetIndexable(audit) ? audit['concurrence'] : undefined;
+    const valeur = this.donneesApplication.racine()?.parametres.audit.concurrence;
     return typeof valeur === 'number' && valeur > 0 ? valeur : CONCURRENCE_PAR_DEFAUT;
-  }
-
-  /**
-   * Vérifie, sans assertion de type, qu'une valeur `unknown` est un objet non nul indexable (sur le modèle de
-   * `OrchestrateurCampagneService.estObjetIndexable`, dupliqué ici plutôt que partagé, cf. commentaire d'en-tête
-   * de ce fichier).
-   * @param valeur - Valeur à vérifier.
-   * @returns `true` si `valeur` est un objet non nul.
-   */
-  private estObjetIndexable(valeur: unknown): valeur is Record<string, unknown> {
-    return typeof valeur === 'object' && valeur !== null;
   }
 }

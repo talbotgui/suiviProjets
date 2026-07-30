@@ -41,4 +41,13 @@
       background-color: #b3261e;
     }
   }
+
+  &--bleu {
+    background-color: #e8f0fc;
+    color: #1a4b8f;
+
+    .badge__pastille {
+      background-color: #1a4b8f;
+    }
+  }
 }

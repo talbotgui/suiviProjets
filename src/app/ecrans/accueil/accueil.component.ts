@@ -40,6 +40,7 @@ import type {
   CauseAlerteActive,
   TraitementAlerteConnu,
 } from '../../services/sansetat/jugement/alertes-accueil.utils';
+import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 import { ParametresJugementUtils } from '../../services/sansetat/jugement/parametres-jugement.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 
@@ -112,7 +113,9 @@ export class SqmAccueilComponent {
           : plusRecente,
       undefined,
     );
-    return derniere === undefined ? 'Aucune campagne' : this.formaterHorodatage(derniere.date);
+    return derniere === undefined
+      ? 'Aucune campagne'
+      : HorodatageUtils.formaterHorodatageCourt(derniere.date);
   }
 
   /**
@@ -275,17 +278,5 @@ export class SqmAccueilComponent {
     return ParametresJugementUtils.lireAncienJoursAvecRepli(
       this.donneesApplication.racine()?.parametres.seuils,
     );
-  }
-
-  /**
-   * Met en forme un horodatage ISO 8601 en un libellé court `JJ/MM HH:mm`, sur le modèle de
-   * `SqmShellComponent.formaterHorodatage` (même maquette de référence).
-   * @param horodatageIso - Horodatage ISO 8601 à mettre en forme.
-   * @returns Le libellé court correspondant.
-   */
-  private formaterHorodatage(horodatageIso: string): string {
-    const date = new Date(horodatageIso);
-    const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
-    return `${deuxChiffres(date.getDate())}/${deuxChiffres(date.getMonth() + 1)} ${deuxChiffres(date.getHours())}:${deuxChiffres(date.getMinutes())}`;
   }
 }

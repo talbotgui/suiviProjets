@@ -325,6 +325,7 @@ export class SqmExportImportParametrageComponent {
       case 'projetIntrouvable':
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
+      case 'conflitReglesMembreConnu':
       case 'brouillonDejaExistant':
       case 'aucunBrouillonCourant':
       case 'projetAbsentDuBrouillon':
@@ -335,6 +336,10 @@ export class SqmExportImportParametrageComponent {
       case 'credentialInvalide':
       case 'modePurgeAgeInconnu':
       case 'vueIntrouvable':
+      case 'reglageApplicatifInvalide':
+      case 'entreeReferentielIntrouvable':
+      case 'annotationIntrouvable':
+      case 'annotationSystemeNonSupprimable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'opération.";
     }

@@ -17,16 +17,16 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 |---|---|---|
 | Écran d'accueil | Point d'entrée : créer ou charger le fichier de données, résumé de l'état depuis la dernière session | RG-001, RG-002, RG-003, RG-009, RG-026 |
 | Gestion des credentials | Saisie en mémoire des credentials par instance, assistant de création de token, test de connectivité | RG-004 |
-| Administration | Gestion des groupes, projets, sources, membres connus et politique IA | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015, RG-023 |
+| Administration | Gestion des groupes, projets, sources, membres connus, politique IA et annotations de groupe | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015, RG-023, RG-033 |
 | Constitution de campagne | Sélection du périmètre d'une campagne d'audit, contrôle des credentials nécessaires | RG-017, RG-019 |
 | Tableau de bord d'exécution | Suivi temps réel d'une campagne, annulation propre | RG-017, RG-018 |
 | Brouillon (et rapport d'anomalies) | Différentiel d'une campagne avant intégration à l'historique, anomalies d'exécution | RG-011, RG-019, RG-020, RG-021 |
 | Synthèse des audits | Dernier audit intégré de chaque projet, seuils de couleur, filtres | RG-006, RG-009, RG-011, RG-013, RG-016, RG-022, RG-027 |
 | Synthèse graphique | Évolution des indicateurs dans le temps, annotations et changements de seuils | RG-011, RG-022, RG-023, RG-027 |
-| Fiche projet (et comparaison entre deux audits) | Détail complet d'un projet, historique, différentiel entre deux dates | RG-006, RG-009, RG-010, RG-011, RG-013, RG-014, RG-015, RG-016, RG-022, RG-023 |
+| Fiche projet (et comparaison entre deux audits) | Détail complet d'un projet, historique, différentiel entre deux dates | RG-006, RG-009, RG-010, RG-011, RG-013, RG-014, RG-015, RG-016, RG-022, RG-023, RG-033 |
 | Liste de travail | Agrégation des alertes actives et suivi de leur traitement | RG-009, RG-010, RG-026, RG-027 |
-| Écran de paramétrage | Seuils, référentiels, journal des modifications, purge, export/import de configuration | RG-003, RG-012, RG-022, RG-023, RG-024, RG-025, RG-028, RG-029, RG-030 |
-| Écran de verrouillage | Verrouillage de session sur inactivité ou action manuelle | RG-004, RG-005 |
+| Écran de paramétrage | Seuils, référentiels (et leur suppression), journal des modifications (et sa purge), purge des audits, export/import de configuration, réglages applicatifs, avertissement de taille du fichier | RG-003, RG-012, RG-022, RG-023, RG-024, RG-025, RG-028, RG-029, RG-030, RG-031, RG-032, RG-034, RG-035 |
+| Écran de verrouillage | Verrouillage de session sur inactivité ou action manuelle | RG-004, RG-005, RG-031 |
 
 ## Règles de gestion par domaine fonctionnel
 
@@ -80,6 +80,10 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-024 | La purge par densité conserve le premier audit de chaque projet, puis un audit au minimum [tous les sept jours](../01_besoin/Specification.md#519-f19--purge-des-audits) parmi les audits rapprochés ; le premier et le dernier audit de chaque projet sont toujours conservés | Écran de paramétrage (purge) | Exécution d'une purge par densité |
 | RG-025 | La purge par âge, [au-delà de six mois](../01_besoin/Specification.md#519-f19--purge-des-audits), est toujours proposée avec prévisualisation du volume libéré et n'est jamais déclenchée automatiquement ; l'utilisateur choisit entre suppression et agrégation mensuelle | Écran de paramétrage (purge) | Proposition ou déclenchement d'une purge par âge |
 | RG-030 | La conformité de nommage d'une branche d'un dépôt GitLab audité n'est jamais stockée comme un constat d'audit : elle est calculée à l'affichage par confrontation du nom de branche constaté au motif d'expression régulière paramétrable `referentiels.motifNommageBranches`, initialisé par défaut à une valeur représentant la convention Gitflow | Écran de paramétrage | Restitution de l'indicateur de nommage d'une branche, modification du motif |
+| RG-031 | Les réglages applicatifs de session — délai d'inactivité avant verrouillage, nombre d'échecs avant fermeture, concurrence par défaut d'une campagne d'audit, proxy HTTP (URL et éventuel fascicule de certificats additionnels) et nombre de sauvegardes de sécurité conservées — sont ajustables depuis l'écran de paramétrage et s'appliquent immédiatement, sans redémarrage de l'application ; le proxy défini, une fois enregistré, est effectivement utilisé par l'ensemble des appels HTTP des connecteurs GitLab et Sonar, en complément du proxy système déjà pris en compte nativement | Écran de paramétrage, Écran de verrouillage | Modification d'un réglage applicatif ; ouverture d'une connexion HTTP vers une instance GitLab ou Sonar |
+| RG-032 | Lorsque la taille du fichier de données dépasse le seuil paramétrable défini par [RG-031](#seuils-référentiels-et-historisation) à l'issue d'une sauvegarde, un avertissement non bloquant invite l'utilisateur à consulter les onglets de purge (audits, journal) de l'écran de paramétrage, sans déclencher aucune purge automatique | Écran de paramétrage | À l'issue de chaque sauvegarde du fichier de données |
+| RG-034 | Le journal des modifications conserve uniquement les entrées horodatées de moins de deux ans ; une purge par âge, toujours proposée avec prévisualisation du nombre d'entrées concernées et jamais déclenchée automatiquement, retire sur confirmation les entrées plus anciennes que cette limite fixe, à l'exception de l'entrée consignant la purge elle-même | Écran de paramétrage (journal) | Prévisualisation ou exécution d'une purge du journal des modifications |
+| RG-035 | Une entrée des référentiels de règles de dépendances ou de règles de marqueurs IA peut être supprimée individuellement par son identifiant ; le motif de nommage des branches, valeur scalaire unique et non une liste, n'est pas concerné par cette suppression | Écran de paramétrage | Suppression d'une entrée de référentiel |
 
 ### Vues, alertes, export et import
 
@@ -89,6 +93,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-027 | Une vue enregistrée mémorise l'état des filtres d'un écran (groupes, projets, indicateurs, période, tri) sous un nom réutilisable, avec possibilité de la définir comme vue par défaut de son écran | Synthèse des audits, Synthèse graphique, Liste de travail | Enregistrement ou sélection d'une vue |
 | RG-028 | L'export en clair de la configuration est strictement limité aux seuils et référentiels partageables ; il exclut structurellement les membres connus et toute autre donnée de groupe, les campagnes, le brouillon, le journal et les vues enregistrées | Écran de paramétrage (export/import) | Export de configuration |
 | RG-029 | L'import d'une configuration applique un différentiel explicite entre ajouts, modifications et éléments identiques, n'écrase aucune valeur sans décision explicite de l'utilisateur, et s'applique de façon transactionnelle (tout ou rien) | Écran de paramétrage (export/import) | Import d'une configuration |
+| RG-033 | Une annotation peut être créée directement sur un groupe et non sur l'un de ses projets, auquel cas elle est rattachée au groupe ; une annotation non système peut être supprimée depuis son écran de portée (Fiche projet pour une annotation de projet, Administration pour une annotation de groupe) ; une annotation système ([RG-015](#constat-jugement-et-politique-ia)) n'est jamais supprimable | Fiche projet, Administration | Création ou suppression d'une annotation |
 
 ## Matrice de traçabilité
 
@@ -124,3 +129,8 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-028 | [US-029](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-029 | [US-030](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-030 | [US-033](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-031 | [US-034](./04_casUsage.md#cas-dusage--user-stories), [US-035](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-032 | [US-035](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-033 | [US-019](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-034 | [US-036](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-035 | [US-033](./04_casUsage.md#cas-dusage--user-stories) |

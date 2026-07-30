@@ -16,7 +16,7 @@
 
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
-use crate::connecteurs::commun::{ErreurConnecteur, VerdictConnectivite, client_http};
+use crate::connecteurs::commun::{ErreurConnecteur, VerdictConnectivite};
 use crate::connecteurs::{gitlab, sonar};
 use crate::modele::racine::{Instance, TypeInstance};
 use std::collections::HashMap;
@@ -29,8 +29,10 @@ use tauri::State;
 pub(crate) async fn tester_connectivite(
     instance: Instance,
     credential: String,
+    etat: State<'_, EtatSession>,
 ) -> Result<VerdictConnectivite, ErreurConnecteur> {
-    let client = client_http();
+    let client = etat.client_http();
+    let client = &client;
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::tester_connectivite(&instance.url_base, &credential, client).await
@@ -84,6 +86,7 @@ pub(crate) async fn interroger_branches(
             .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
                 message: "Aucun credential en mémoire pour cette instance".to_string(),
             })?;
+    let client = etat.client_http();
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_branches(
@@ -91,7 +94,7 @@ pub(crate) async fn interroger_branches(
                 &credential,
                 &id_externe,
                 recherche.as_deref(),
-                client_http(),
+                &client,
             )
             .await
         }

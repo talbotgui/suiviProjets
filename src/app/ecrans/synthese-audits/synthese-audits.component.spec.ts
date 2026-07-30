@@ -229,9 +229,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes,
       brouillon: null,
@@ -577,6 +578,24 @@ describe('SqmSyntheseAuditsComponent', () => {
     // Âge (orange) et taux de conflit (rouge) combinés : la couleur la plus grave (rouge) l'emporte.
     expect(badgeMr?.classList.contains('badge--rouge')).toBe(true);
     expect(ligne.textContent).toContain('autorisée · claude');
+  });
+
+  it('distingue par une couleur dédiée (bleu) le statut IA « interdite — ok sous réserve » du statut « autorisée » (R10-03)', () => {
+    const fixture = creerFixture(DonneesDeTest.racineDeBase());
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const lignes = Array.from(element.querySelectorAll('tbody tr'));
+    const ligne = lignes.find((candidate) => candidate.textContent?.includes('Projet Sain'));
+    expect(ligne).not.toBeUndefined();
+    if (ligne === undefined) {
+      throw new Error('Ligne introuvable.');
+    }
+
+    expect(ligne.textContent).toContain('interdite — ok');
+    const badgeIa = Array.from(ligne.querySelectorAll('.badge')).find((badge) =>
+      badge.textContent?.includes('interdite — ok'),
+    );
+    expect(badgeIa?.classList.contains('badge--bleu')).toBe(true);
+    expect(badgeIa?.classList.contains('badge--vert')).toBe(false);
   });
 
   it('trie correctement selon chacune des colonnes triables (couvre chaque fonction d’extraction de texte brut)', () => {

@@ -273,9 +273,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -452,6 +453,28 @@ describe('SqmComparaisonAuditsComponent', () => {
         throw new Error('État "pret" attendu.');
       }
       expect(etatValue.donnees.idAvant).not.toBe(etatValue.donnees.idApres);
+    });
+
+    it('affiche un message explicite (R10-15) plutôt que de replier silencieusement la sélection quand les deux dates désignent le même audit', () => {
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projetQuatreAudits()));
+      fixture.componentInstance.definirIdAvant('a3');
+      fixture.detectChanges();
+      const etatValue = fixture.componentInstance.etat();
+      if (etatValue.type !== 'pret') {
+        throw new Error('État "pret" attendu.');
+      }
+      expect(etatValue.donnees.messageSelectionRepliee).toBeDefined();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.textContent).toContain('désignaient le même audit');
+    });
+
+    it('ne restitue aucun message de repli quand la sélection ne le nécessite pas', () => {
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projetQuatreAudits()));
+      const etatValue = fixture.componentInstance.etat();
+      if (etatValue.type !== 'pret') {
+        throw new Error('État "pret" attendu.');
+      }
+      expect(etatValue.donnees.messageSelectionRepliee).toBeUndefined();
     });
 
     it('ignore une sélection explicite qui n’appartient plus aux audits du projet courant (repli automatique)', () => {

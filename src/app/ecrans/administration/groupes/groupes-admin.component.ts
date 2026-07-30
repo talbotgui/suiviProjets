@@ -2,10 +2,11 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Onglet Groupes de l'écran Administration (US-006, Phase 3 ; US-022, US-023, Phase 4) : sous-onglet Groupes
-// (liste, création, modification et suppression des groupes, avec gestion inline de leurs instances GitLab/Sonar)
-// et sous-onglet Membres connus (`SqmMembresConnusAdminComponent`, CRUD des règles d'identification des membres
-// d'un groupe, RG-006 à RG-008). Le sous-onglet Annotations de groupe (également porté par `Groupe`) est différé
-// à la Phase 8 (US-020) et n'est pas traité ici.
+// (liste, création, modification et suppression des groupes, avec gestion inline de leurs instances GitLab/Sonar),
+// sous-onglet Membres connus (`SqmMembresConnusAdminComponent`, CRUD des règles d'identification des membres d'un
+// groupe, RG-006 à RG-008) et sous-onglet Annotations (`SqmAnnotationsGroupeAdminComponent`, US-019, RG-033,
+// Phase 10 incrément 8, C10-04 : création et suppression des annotations de portée groupe, également porté par
+// `Groupe`), construit sur le même patron que le sous-onglet Membres connus.
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -14,6 +15,7 @@ import type { DonneesGroupe } from '../../../services/avecetat/etat/donnees-appl
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
 import type { Instance } from '../../../services/sansetat/commandes/types-facade';
 import type { Groupe } from '../../../services/avecetat/etat/types-donnees';
+import { SqmAnnotationsGroupeAdminComponent } from './annotations-groupe/annotations-groupe-admin.component';
 import { SqmMembresConnusAdminComponent } from './membres-connus/membres-connus-admin.component';
 
 /**
@@ -31,15 +33,21 @@ interface InstanceEnEdition extends Omit<Instance, 'type' | 'nom' | 'urlBase'> {
 /**
  * Identifiant d'un sous-onglet de l'onglet Groupes (cf. `docs/02_documentation/08_arborescenceNavigation.md`).
  */
-type SousOngletGroupes = 'groupes' | 'membresConnus';
+type SousOngletGroupes = 'groupes' | 'membresConnus' | 'annotations';
 
 /**
- * Onglet Groupes de l'écran Administration : deux sous-onglets, CRUD complet des groupes (US-006) et CRUD des
- * membres connus du groupe sélectionné (US-022, US-023).
+ * Onglet Groupes de l'écran Administration : trois sous-onglets, CRUD complet des groupes (US-006), CRUD des
+ * membres connus du groupe sélectionné (US-022, US-023) et création/suppression des annotations de portée groupe
+ * (US-019, RG-033, Phase 10 incrément 8).
  */
 @Component({
   selector: 'app-groupes-admin',
-  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmMembresConnusAdminComponent],
+  imports: [
+    FormsModule,
+    SqmConfirmationSuppressionComponent,
+    SqmMembresConnusAdminComponent,
+    SqmAnnotationsGroupeAdminComponent,
+  ],
   templateUrl: './groupes-admin.component.html',
   styleUrl: './groupes-admin.component.scss',
 })

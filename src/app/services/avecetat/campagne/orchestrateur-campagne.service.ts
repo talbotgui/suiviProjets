@@ -679,9 +679,9 @@ export class OrchestrateurCampagneService {
   /**
    * Type-guard sans assertion `as` : vérifie qu'une valeur `unknown` est un objet non nul, donc indexable en
    * sûreté par une clé dynamique (contrairement à l'opérateur `in` seul, qui ne suffit pas à narrower un type
-   * indexable pour une clé non littérale). Reste utilisé par {@link extraireValeurParametres} (sous-branches de
-   * `parametres` non typées, cf. commentaire de `Parametres` dans `types-donnees.ts`) et par
-   * {@link validerRegleMarqueurIa} (contenu de `referentiels.reglesMarqueursIA` non typé item par item).
+   * indexable pour une clé non littérale). Utilisé par la détection du type de résultat brut d'un audit (ligne
+   * ~596) et par {@link validerRegleMarqueurIa} (contenu de `referentiels.reglesMarqueursIA` non typé item par
+   * item).
    * @param valeur - Valeur à vérifier.
    * @returns `true` si `valeur` est un objet non nul.
    */
@@ -690,12 +690,15 @@ export class OrchestrateurCampagneService {
   }
 
   /**
-   * Extrait la concurrence paramétrée d'une campagne (`parametres.audit.concurrence`, RG-017), sans accès non sûr
-   * à la racine `unknown`, avec repli documenté sur {@link CONCURRENCE_PAR_DEFAUT}.
+   * Extrait la concurrence paramétrée d'une campagne (`parametres.audit.concurrence`, RG-017), avec repli
+   * documenté sur {@link CONCURRENCE_PAR_DEFAUT}. Simplifié à la Phase 10, incrément 8 (`parametres.audit`
+   * désormais typé `ParametresAudit`, cf. `types-donnees.ts`) : accès direct sans traversée générique, la seule
+   * prudence restante portant sur l'absence de racine chargée (`racine()` nullable) et sur une valeur paramétrée
+   * invalide (zéro ou négative).
    * @returns La concurrence à appliquer.
    */
   private extraireConcurrence(): number {
-    const valeur = this.extraireValeurParametres(['audit', 'concurrence']);
+    const valeur = this.donneesApplication.racine()?.parametres.audit.concurrence;
     return typeof valeur === 'number' && valeur > 0 ? valeur : CONCURRENCE_PAR_DEFAUT;
   }
 
@@ -711,23 +714,6 @@ export class OrchestrateurCampagneService {
     const valeur =
       this.donneesApplication.racine()?.parametres.seuils.materialiteBrouillon.variationRelative;
     return typeof valeur === 'number' && valeur > 0 ? valeur : VARIATION_RELATIVE_PAR_DEFAUT;
-  }
-
-  /**
-   * Traverse en sûreté une racine `parametres` de type `unknown` (jamais typée avant le Moteur de jugement, Phase
-   * 6) selon un chemin de clés, sans jamais recourir à une assertion `as` non justifiée.
-   * @param chemin - Suite de clés à traverser depuis `parametres`.
-   * @returns La valeur trouvée en bout de chemin, `undefined` si une étape est absente ou n'est pas un objet.
-   */
-  private extraireValeurParametres(chemin: readonly string[]): unknown {
-    let courant: unknown = this.donneesApplication.racine()?.parametres;
-    for (const cle of chemin) {
-      if (!this.estObjetIndexable(courant)) {
-        return undefined;
-      }
-      courant = courant[cle];
-    }
-    return courant;
   }
 
   /**

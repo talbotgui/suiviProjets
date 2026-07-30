@@ -13,6 +13,7 @@ import { SqmExportImportParametrageComponent } from './export-import/export-impo
 import { SqmJournalParametrageComponent } from './journal/journal-parametrage.component';
 import { SqmPurgeParametrageComponent } from './purge/purge-parametrage.component';
 import { SqmReferentielsParametrageComponent } from './referentiels/referentiels-parametrage.component';
+import { SqmReglagesApplicatifsParametrageComponent } from './reglages-applicatifs/reglages-applicatifs-parametrage.component';
 import { SqmSeuilsParametrageComponent } from './seuils/seuils-parametrage.component';
 
 /**
@@ -29,6 +30,7 @@ type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImp
   imports: [
     SqmSeuilsParametrageComponent,
     SqmReferentielsParametrageComponent,
+    SqmReglagesApplicatifsParametrageComponent,
     SqmJournalParametrageComponent,
     SqmPurgeParametrageComponent,
     SqmExportImportParametrageComponent,

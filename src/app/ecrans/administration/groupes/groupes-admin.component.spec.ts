@@ -40,9 +40,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -78,6 +79,12 @@ describe('SqmGroupesAdminComponent', () => {
     composant.selectionnerSousOnglet('membresConnus');
 
     expect(composant.sousOngletActif).toBe('membresConnus');
+  });
+
+  it('bascule vers le sous-onglet Annotations (US-019, RG-033, Phase 10 incrément 8)', () => {
+    composant.selectionnerSousOnglet('annotations');
+
+    expect(composant.sousOngletActif).toBe('annotations');
   });
 
   it('refuse la création sans nom', () => {

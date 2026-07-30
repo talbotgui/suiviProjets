@@ -23,8 +23,15 @@
 //! ces tests ne tournent jamais en CI (`#[ignore]`), et une variable d'environnement absente doit interrompre
 //! immédiatement et lisiblement le test déclenché manuellement, plutôt que de propager une anomalie ambiguë.
 
-use super::commun::client_http;
+use super::commun::client_http_avec_proxy;
 use super::{gitlab, sonar};
+
+/// Client HTTP sans réglage de proxy applicatif, pour ces tests d'intégration hors CI (cf.
+/// [`client_http_avec_proxy`]) : reproduit le comportement du client par défaut d'avant la Phase 10 (proxy système
+/// seul).
+fn client_http() -> reqwest::Client {
+    client_http_avec_proxy(None)
+}
 
 /// Lit une variable d'environnement requise pour un test d'intégration hors CI, ou panique avec `message` si elle
 /// est absente. `message` est reçu déjà construit par l'appelant (plutôt qu'assemblé ici via `format!` à
@@ -55,7 +62,7 @@ async fn tester_connectivite_reussit_contre_une_vraie_instance_gitlab() {
         "SQM_TEST_GITLAB_TOKEN doit être définie pour ce test d'intégration",
     );
 
-    let verdict = gitlab::tester_connectivite(&url, &jeton, client_http()).await;
+    let verdict = gitlab::tester_connectivite(&url, &jeton, &client_http()).await;
 
     assert!(
         verdict.is_ok(),
@@ -75,7 +82,7 @@ async fn tester_connectivite_reussit_contre_une_vraie_instance_sonar() {
         "SQM_TEST_SONAR_TOKEN doit être définie pour ce test d'intégration",
     );
 
-    let verdict = sonar::tester_connectivite(&url, &jeton, client_http()).await;
+    let verdict = sonar::tester_connectivite(&url, &jeton, &client_http()).await;
 
     assert!(
         verdict.is_ok(),
@@ -105,7 +112,7 @@ async fn interroger_vitalite_reussit_contre_une_vraie_instance_gitlab() {
         "source-integration-reelle",
         &projet_id,
         None,
-        client_http(),
+        &client_http(),
     )
     .await;
 
@@ -136,7 +143,7 @@ async fn interroger_violations_reussit_contre_une_vraie_instance_sonar() {
         &jeton,
         "source-integration-reelle",
         &projet_cle,
-        client_http(),
+        &client_http(),
     )
     .await;
 
@@ -179,7 +186,7 @@ async fn interroger_marqueurs_ia_reussit_contre_une_vraie_instance_gitlab() {
         &projet_id,
         None,
         &regles,
-        client_http(),
+        &client_http(),
     )
     .await;
 

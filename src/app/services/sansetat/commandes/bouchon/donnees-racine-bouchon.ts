@@ -47,10 +47,10 @@ export interface RacineBouchon {
 
 /**
  * Motif de nommage de branche par défaut (RG-030), repli exact de
- * `src-tauri/src/modele/racine.rs#MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT` (convention Gitflow).
+ * `src-tauri/src/modele/racine.rs#MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT` (convention Gitflow canonique, sans le
+ * segment `bugfix/*` retiré par R10-11).
  */
-const MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT =
-  '^(main|master|develop|feature/.+|release/.+|hotfix/.+|bugfix/.+)$';
+const MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT = '^(main|master|develop|feature/.+|release/.+|hotfix/.+)$';
 
 /**
  * Seuils et réglages applicatifs (`parametres`), partagés par les deux variantes de racine bouchonnée ci-dessous :
@@ -74,8 +74,9 @@ const PARAMETRES_BOUCHON: Readonly<Record<string, unknown>> = {
   },
   verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
   audit: { concurrence: 4, fenetreContributeursJours: 90, borneRecherchePremierCommitPages: 50 },
-  proxy: { url: 'http://proxy.entreprise.fr:3128', cheminBundleCA: 'C:/certs/ca-entreprise.pem' },
+  proxy: { url: 'http://proxy.entreprise.fr:3128', cheminBundleCa: 'C:/certs/ca-entreprise.pem' },
   sauvegarde: { nombreSauvegardesSecurite: 5 },
+  seuilAvertissementTailleOctets: 10_485_760,
 };
 
 /**

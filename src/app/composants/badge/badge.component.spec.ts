@@ -43,6 +43,19 @@ describe('SqmBadgeComponent', () => {
     expect(pastille?.classList.contains('badge--orange')).toBe(true);
   });
 
+  it('applique la classe correspondant à la couleur bleu', () => {
+    const fixture = TestBed.createComponent(SqmBadgeComponent);
+    fixture.componentRef.setInput('couleur', 'bleu');
+    fixture.componentRef.setInput('libelle', 'IA interdite — ok sous réserve');
+    fixture.detectChanges();
+
+    const pastille = DomTestUtils.obtenirElementNatif(fixture).querySelector('.badge');
+    expect(pastille?.classList.contains('badge--bleu')).toBe(true);
+    expect(pastille?.classList.contains('badge--vert')).toBe(false);
+    expect(pastille?.classList.contains('badge--orange')).toBe(false);
+    expect(pastille?.classList.contains('badge--rouge')).toBe(false);
+  });
+
   it('expose un rôle status pour les technologies d’assistance', () => {
     const fixture = TestBed.createComponent(SqmBadgeComponent);
     fixture.componentRef.setInput('couleur', 'rouge');

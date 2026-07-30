@@ -222,6 +222,7 @@ export class SqmPurgeParametrageComponent {
       case 'projetIntrouvable':
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
+      case 'conflitReglesMembreConnu':
       case 'brouillonDejaExistant':
       case 'aucunBrouillonCourant':
       case 'projetAbsentDuBrouillon':
@@ -235,6 +236,10 @@ export class SqmPurgeParametrageComponent {
       case 'versionSchemaConfigurationSuperieure':
       case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
+      case 'reglageApplicatifInvalide':
+      case 'entreeReferentielIntrouvable':
+      case 'annotationIntrouvable':
+      case 'annotationSystemeNonSupprimable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'opération.";
     }

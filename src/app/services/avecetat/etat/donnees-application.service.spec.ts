@@ -61,9 +61,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -499,6 +500,23 @@ describe('DonneesApplicationService', () => {
       expect(service.racine()?.versionSchema).toBe(1);
     });
 
+    it('convertit un rejet typé « conflitReglesMembreConnu » en Résultat « echec » (RG-008, R10-07)', async () => {
+      invokeSimule.mockRejectedValue({ type: 'conflitReglesMembreConnu' });
+
+      const resultat = await service.qualifierMembre(
+        groupeId,
+        DONNEES_MEMBRE,
+        'Administration',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'conflitReglesMembreConnu' },
+      });
+      expect(service.racine()?.versionSchema).toBe(1);
+    });
+
     it('convertit un rejet non structuré en anomalie « erreurInterne »', async () => {
       invokeSimule.mockRejectedValue('erreur non structurée');
 
@@ -706,6 +724,237 @@ describe('DonneesApplicationService', () => {
       );
 
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'membreIntrouvable' } });
+    });
+
+    it('invoque supprimer_regle_dependance avec les paramètres attendus et met à jour la racine (US-033, RG-035)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.supprimerRegleDependance('d1', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('supprimer_regle_dependance', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        id: 'd1',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque supprimer_regle_marqueur_ia avec les paramètres attendus et met à jour la racine (US-033, RG-035)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.supprimerRegleMarqueurIA('m1', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('supprimer_regle_marqueur_ia', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        id: 'm1',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « entreeReferentielIntrouvable » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'entreeReferentielIntrouvable' });
+
+      const resultat = await service.supprimerRegleDependance('inconnu', 'mot-de-passe');
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'entreeReferentielIntrouvable' },
+      });
+    });
+
+    it('invoque definir_verrouillage avec les paramètres attendus et met à jour la racine (US-034, RG-031)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirVerrouillage(30, 3, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_verrouillage', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        delaiInactiviteMinutes: 30,
+        echecsAvantFermeture: 3,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque definir_concurrence_audit avec les paramètres attendus et met à jour la racine (US-034, RG-031)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirConcurrenceAudit(8, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_concurrence_audit', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        concurrence: 8,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque definir_proxy avec les paramètres attendus et met à jour la racine (US-034, RG-031)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirProxy(
+        'http://proxy.exemple.local:3128',
+        undefined,
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_proxy', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        url: 'http://proxy.exemple.local:3128',
+        cheminBundleCa: undefined,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque definir_nombre_sauvegardes_securite avec les paramètres attendus et met à jour la racine (US-034, RG-031)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirNombreSauvegardesSecurite(10, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_nombre_sauvegardes_securite', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        nombre: 10,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque definir_seuil_avertissement_taille avec les paramètres attendus et met à jour la racine (US-035, RG-032)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.definirSeuilAvertissementTaille(5_000_000, 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_seuil_avertissement_taille', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        seuilOctets: 5_000_000,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « reglageApplicatifInvalide » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'reglageApplicatifInvalide' });
+
+      const resultat = await service.definirConcurrenceAudit(0, 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'reglageApplicatifInvalide' } });
+    });
+
+    it('invoque previsualiser_purge_journal et renvoie le résumé natif (US-036, RG-034)', async () => {
+      invokeSimule.mockResolvedValue({ nbEntreesSupprimees: 3, octetsAvant: 100, octetsApres: 40 });
+
+      const resultat = await service.previsualiserPurgeJournal();
+
+      expect(invokeSimule).toHaveBeenCalledWith('previsualiser_purge_journal', {
+        donnees: DonneesDeTest.racineActuelle(service),
+      });
+      expect(resultat).toEqual({
+        type: 'succes',
+        previsualisation: { nbEntreesSupprimees: 3, octetsAvant: 100, octetsApres: 40 },
+      });
+    });
+
+    it('invoque executer_purge_journal avec les paramètres attendus et met à jour la racine (US-036, RG-034)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.executerPurgeJournal('mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('executer_purge_journal', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque creer_annotation sans projetId pour une annotation de portée groupe (US-019)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.creerAnnotation(
+        groupeId,
+        undefined,
+        { date: '2026-07-27', libelle: 'Rupture', categorie: 'incident' },
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('creer_annotation', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        groupeId,
+        projetId: undefined,
+        date: '2026-07-27',
+        libelle: 'Rupture',
+        categorie: 'incident',
+        description: undefined,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque supprimer_annotation avec les paramètres attendus et met à jour la racine (US-019, RG-033)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.supprimerAnnotation(groupeId, undefined, 'a1', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('supprimer_annotation', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        groupeId,
+        projetId: undefined,
+        annotationId: 'a1',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet typé « annotationSystemeNonSupprimable » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'annotationSystemeNonSupprimable' });
+
+      const resultat = await service.supprimerAnnotation(groupeId, undefined, 'a1', 'mot-de-passe');
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'annotationSystemeNonSupprimable' },
+      });
     });
   });
 

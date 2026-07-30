@@ -49,10 +49,29 @@ fn migration_2_vers_3(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Troisième migration réelle du projet (Phase 10, incrément 8), faisant progresser `versionSchema` de `3` à `4`
+/// suite à l'ajout du champ `seuilAvertissementTailleOctets` sur `Parametres` (US-035, RG-031, RG-032, cf.
+/// [`crate::modele::racine::Parametres`]).
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_2_vers_3`] : le nouveau
+/// champ porte `#[serde(default = "...")]`, donc son absence sur un document existant se désérialise directement à
+/// cette valeur par défaut sans qu'aucune valeur n'ait à être recalculée ni déplacée ; seule la version de schéma
+/// progresse.
+fn migration_3_vers_4(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(4));
+    }
+    Ok(())
+}
+
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
-/// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`] et [`migration_2_vers_3`].
-pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] =
-    &[(1, migration_1_vers_2), (2, migration_2_vers_3)];
+/// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`] et
+/// [`migration_3_vers_4`].
+pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
+    (1, migration_1_vers_2),
+    (2, migration_2_vers_3),
+    (3, migration_3_vers_4),
+];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
 fn lire_version_schema(valeur: &Value) -> u32 {

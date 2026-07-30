@@ -65,9 +65,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes: [],
       brouillon: null,
@@ -325,5 +326,70 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.messageErreur).toBe(
       "Cette entrée n'est pas valide : vérifiez les champs obligatoires.",
     );
+  });
+
+  it('demande puis annule la suppression d’une règle de dépendances sans appeler la commande native (US-033, RG-035)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    composant.demanderSuppressionDependance('d1');
+    expect(composant.suppressionEnAttente).toEqual({ type: 'dependance', id: 'd1' });
+
+    composant.annulerSuppression();
+    expect(composant.suppressionEnAttente).toBeNull();
+    expect(invokeSimule).not.toHaveBeenCalled();
+  });
+
+  it('supprime une règle de dépendances après confirmation puis ressaisie du mot de passe (US-033, RG-035)', async () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+
+    composant.demanderSuppressionDependance('d1');
+    composant.confirmerSuppression();
+    expect(composant.actionEnAttenteMotDePasse).toBe('suppressionDependance');
+    await composant.confirmerSuppressionMotDePasse('mot-de-passe');
+
+    expect(invokeSimule).toHaveBeenCalledWith(
+      'supprimer_regle_dependance',
+      expect.objectContaining({ id: 'd1', motDePasse: 'mot-de-passe' }),
+    );
+    expect(composant.suppressionEnAttente).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+  });
+
+  it('supprime une règle de marqueur IA après confirmation puis ressaisie du mot de passe (US-033, RG-035)', async () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+
+    composant.demanderSuppressionMarqueurIa('m1');
+    composant.confirmerSuppression();
+    expect(composant.actionEnAttenteMotDePasse).toBe('suppressionMarqueurIA');
+    await composant.confirmerSuppressionMotDePasse('mot-de-passe');
+
+    expect(invokeSimule).toHaveBeenCalledWith(
+      'supprimer_regle_marqueur_ia',
+      expect.objectContaining({ id: 'm1', motDePasse: 'mot-de-passe' }),
+    );
+  });
+
+  it('convertit un rejet typé « entreeReferentielIntrouvable » en message explicite à la suppression', async () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    invokeSimule.mockRejectedValue({ type: 'entreeReferentielIntrouvable' });
+
+    composant.demanderSuppressionDependance('d1');
+    composant.confirmerSuppression();
+    await composant.confirmerSuppressionMotDePasse('mot-de-passe');
+
+    expect(composant.messageErreur).toBe(
+      "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).",
+    );
+    expect(composant.suppressionEnAttente).toBeNull();
   });
 });

@@ -167,6 +167,9 @@ export class SeuilsCouleurUtils {
 
 /**
  * Couleur sémantique d'un jugement (RG-022), toujours doublée d'un libellé textuel à l'affichage (jamais de couleur
- * seule porteuse de sens, cf. `docs/02_documentation/10_charteErgonomie.md#rappel-des-exigences-daccessibilité`).
+ * seule porteuse de sens, cf. `docs/02_documentation/10_charteErgonomie.md#rappel-des-exigences-daccessibilité).
+ * `vert`/`orange`/`rouge` forment le dégradé de gravité des seuils de jugement (RG-022) ; `bleu` est une couleur
+ * dédiée hors dégradé, réservée au statut IA « interdite — conforme sous réserve » (RG-016, R10-03), pour ne pas la
+ * confondre avec un niveau de gravité de seuil.
  */
-export type Couleur = 'vert' | 'orange' | 'rouge';
+export type Couleur = 'vert' | 'orange' | 'rouge' | 'bleu';

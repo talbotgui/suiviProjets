@@ -16,7 +16,8 @@
 //! la Phase 6 : cf. `interroger_dependances` et `interroger_branches_completes` plus bas.
 //!
 //! Décision arbitraire (cf. rapport de développement de cette phase) : le délai de requête reste le délai fixe
-//! partagé de `commun.rs` (`client_http()`) plutôt que le délai configurable envisagé par
+//! partagé de `commun.rs` (`DELAI_REQUETE`, appliqué par `client_http_avec_proxy()` depuis la Phase 10, incrément 8
+//! — auparavant `client_http()`, supprimée à cette occasion) plutôt que le délai configurable envisagé par
 //! `parametres.audit` en conception détaillée — aucun appelant ne fait encore varier cette valeur, l'Orchestrateur
 //! de campagne (seul consommateur prévu de ce réglage) n'existant pas encore.
 
@@ -1773,6 +1774,46 @@ mod tests {
             Ok(crate::modele::racine::ResultatGitlabVitalite {
                 source_id: "f0000000-0000-4000-8000-000000000001".to_string(),
                 ref_effective: "develop".to_string(),
+                sha_tete: "8c1d0e44".to_string(),
+                dernier_commit_le: "2026-06-05T10:00:00Z".to_string(),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn interroger_vitalite_encode_correctement_une_ref_porteuse_dun_slash() {
+        // R10-08 : une ref telle que `feature/paiement-sepa` doit rester un unique segment de chemin
+        // percent-encodé (`%2F`) dans l'appel HTTP, plutôt que d'introduire un sous-chemin à trois segments ; le
+        // round-trip (ref transmise telle quelle en entrée, retrouvée telle quelle dans `ref_effective` en sortie)
+        // vérifie à la fois l'encodage à l'aller et l'absence de décodage/altération au retour.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(
+                "/api/v4/projects/1234/repository/commits/feature%2Fpaiement-sepa",
+            ))
+            .and(header("PRIVATE-TOKEN", "jeton-valide"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "8c1d0e44",
+                "committed_date": "2026-06-05T10:00:00Z"
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_vitalite(
+            &serveur.uri(),
+            "jeton-valide",
+            "f0000000-0000-4000-8000-000000000001",
+            "1234",
+            Some("feature/paiement-sepa"),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(
+            resultat,
+            Ok(crate::modele::racine::ResultatGitlabVitalite {
+                source_id: "f0000000-0000-4000-8000-000000000001".to_string(),
+                ref_effective: "feature/paiement-sepa".to_string(),
                 sha_tete: "8c1d0e44".to_string(),
                 dernier_commit_le: "2026-06-05T10:00:00Z".to_string(),
             })

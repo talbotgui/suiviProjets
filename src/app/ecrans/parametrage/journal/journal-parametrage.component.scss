@@ -1,4 +1,19 @@
 .journal-parametrage {
+  &__filtres {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  &__champ-filtre {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+  }
+
   &__tableau {
     width: 100%;
     border-collapse: collapse;
@@ -13,5 +28,25 @@
 
   &__detail-origine {
     color: #666;
+  }
+
+  &__pagination {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  &__purge {
+    margin-top: 1.5rem;
+  }
+
+  &__erreur {
+    color: #b00020;
+  }
+
+  &__succes {
+    color: #1b5e20;
   }
 }

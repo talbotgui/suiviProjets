@@ -15,6 +15,7 @@
 //! Géré par Tauri comme état managé ([`tauri::Manager::manage`]), partagé entre toutes les commandes de la
 //! session applicative.
 
+use crate::modele::racine::Proxy;
 use crate::persistance::kdf::TAILLE_CLE;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -41,6 +42,14 @@ struct EtatSessionInterieur {
     /// Credentials en mémoire de la session courante, par identifiant d'instance (RG-004) : jamais persistés sur
     /// disque, effacés explicitement (mise à zéro) avec la structure qui les porte.
     credentials: HashMap<String, Zeroizing<String>>,
+    /// Réglage applicatif de proxy actuellement en vigueur (US-034, RG-031), mis en cache ici depuis
+    /// `parametres.proxy` des données chargées afin que les commandes d'interrogation d'indicateurs (`audit.rs`,
+    /// `connectivite.rs`), qui ne reçoivent jamais la racine complète du fichier (décision arbitraire de la
+    /// Phase 5, cf. commentaire d'en-tête de `commandes::audit`), puissent construire un client HTTP qui en tient
+    /// compte sans changement de leur signature. À la différence de `cle_derivee`/`credentials`, n'est jamais
+    /// effacé par [`EtatSession::purger`] : ce n'est pas un secret, et le proxy réseau du poste reste pertinent
+    /// même verrouillé.
+    proxy: Option<Proxy>,
 }
 
 /// État de session de la Façade de commandes, partagé entre les commandes via l'état managé de Tauri.
@@ -133,6 +142,23 @@ impl EtatSession {
         let mut interieur = deverrouiller_mutex(self.interieur.lock());
         interieur.cle_derivee = None;
         interieur.credentials.clear();
+    }
+
+    /// Met à jour le réglage applicatif de proxy en cache (US-034, RG-031), depuis `parametres.proxy` des données
+    /// couramment chargées : appelé à la création/au chargement/au rechargement du fichier ainsi qu'à chaque
+    /// modification de ce réglage par `definirProxy`.
+    pub(crate) fn definir_proxy(&self, proxy: Option<Proxy>) {
+        deverrouiller_mutex(self.interieur.lock()).proxy = proxy;
+    }
+
+    /// Construit un client HTTP tenant compte du réglage applicatif de proxy actuellement en cache (US-034,
+    /// RG-031), en plus du proxy système déjà pris en compte nativement. Reconstruit un client à chaque appel
+    /// plutôt que de le mettre en cache pour le processus entier (à la différence de
+    /// `connecteurs::commun::client_http`) : le réglage peut changer en cours de session, ce qu'un singleton ne
+    /// pourrait jamais refléter.
+    pub(crate) fn client_http(&self) -> reqwest::Client {
+        let proxy = deverrouiller_mutex(self.interieur.lock()).proxy.clone();
+        crate::connecteurs::commun::client_http_avec_proxy(proxy.as_ref())
     }
 
     /// Indique si une clé dérivée est actuellement détenue (session déverrouillée avec un fichier ouvert).
@@ -308,5 +334,46 @@ mod tests {
         etat.purger();
 
         assert!(!etat.correspond_a(&[7u8; TAILLE_CLE]));
+    }
+
+    #[test]
+    fn proxy_absent_par_defaut() {
+        let etat = EtatSession::nouveau();
+
+        // Doit pouvoir construire un client HTTP même sans réglage de proxy défini.
+        let _client = etat.client_http();
+    }
+
+    #[test]
+    fn definir_proxy_est_repris_par_client_http() {
+        let etat = EtatSession::nouveau();
+
+        etat.definir_proxy(Some(Proxy {
+            url: Some("http://proxy.exemple.local:3128".to_string()),
+            chemin_bundle_ca: None,
+        }));
+
+        // Le client se construit sans panique avec un réglage de proxy valide.
+        let _client = etat.client_http();
+    }
+
+    #[test]
+    fn purger_ne_touche_pas_au_proxy_en_cache() {
+        let etat = EtatSession::nouveau();
+        etat.definir(PathBuf::from("/tmp/donnees-test.sqm"), [1u8; TAILLE_CLE]);
+        etat.definir_proxy(Some(Proxy {
+            url: Some("http://proxy.exemple.local:3128".to_string()),
+            chemin_bundle_ca: None,
+        }));
+
+        etat.purger();
+
+        assert_eq!(
+            deverrouiller_mutex(etat.interieur.lock())
+                .proxy
+                .as_ref()
+                .and_then(|proxy| proxy.url.clone()),
+            Some("http://proxy.exemple.local:3128".to_string())
+        );
     }
 }

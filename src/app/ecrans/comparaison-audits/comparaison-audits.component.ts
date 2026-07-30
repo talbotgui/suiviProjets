@@ -146,6 +146,12 @@ interface DonneesComparaisonAudits {
   readonly dateAvantLabel: string;
   /** Libellé de la date de l'audit le plus récent actuellement comparé. */
   readonly dateApresLabel: string;
+  /**
+   * Message explicite à afficher à l'utilisateur lorsque la sélection courante des deux dates désignait le même
+   * audit et a dû être automatiquement ajustée sur l'audit adjacent (R10-15 : ce repli restait jusqu'ici
+   * silencieux), absent sinon.
+   */
+  readonly messageSelectionRepliee?: string;
   /** Premier volet : indicateurs avant/après/delta. */
   readonly indicateurs: readonly LigneIndicateurAffiche[];
   /** Deuxième volet : dépendances. */
@@ -420,11 +426,18 @@ export class SqmComparaisonAuditsComponent {
       options,
       options[options.length - 2].id,
     );
+    // R10-15 : ce repli restait jusqu'ici silencieux (la sélection de l'utilisateur était modifiée sans avertissement
+    // dès lors que les deux dates désignaient le même audit) ; un message explicite est désormais restitué via
+    // `messageSelectionRepliee` plutôt que de se limiter au changement silencieux de sélection.
+    let messageSelectionRepliee: string | undefined;
     if (idAvant === idApres) {
       const indexApres = options.findIndex((option) => option.id === idApres);
       const indexRepli =
         indexApres > 0 ? indexApres - 1 : Math.min(indexApres + 1, options.length - 1);
       idAvant = options[indexRepli].id;
+      messageSelectionRepliee =
+        'Les deux dates sélectionnées désignaient le même audit : la sélection a été ' +
+        'automatiquement ajustée sur l’audit adjacent.';
     }
 
     const auditApresChoisi = projet.audits.find((audit) => audit.id === idApres);
@@ -449,6 +462,7 @@ export class SqmComparaisonAuditsComponent {
         options,
         racine.parametres.seuils,
         racine.referentiels,
+        messageSelectionRepliee,
       ),
     };
   }
@@ -474,6 +488,8 @@ export class SqmComparaisonAuditsComponent {
    * @param options - Options de sélection (tous les audits du projet).
    * @param seuilsBruts - Valeur brute de `parametres.seuils`.
    * @param referentielsBruts - Valeur brute de `referentiels`.
+   * @param messageSelectionRepliee - Message explicite à restituer si la sélection a dû être ajustée
+   * automatiquement (R10-15), absent sinon.
    * @returns Les données complètes de l'écran.
    */
   private construireDonnees(
@@ -484,6 +500,7 @@ export class SqmComparaisonAuditsComponent {
     options: readonly OptionAudit[],
     seuilsBruts: unknown,
     referentielsBruts: unknown,
+    messageSelectionRepliee: string | undefined,
   ): DonneesComparaisonAudits {
     const seuilsCouverture = ParametresJugementUtils.lireSeuilsCouverture(seuilsBruts);
     const seuilsCouleursViolations =
@@ -511,6 +528,7 @@ export class SqmComparaisonAuditsComponent {
       idApres: auditApres.id,
       dateAvantLabel: this.formaterDateCourte(auditAvant.date),
       dateApresLabel: this.formaterDateCourte(auditApres.date),
+      messageSelectionRepliee,
       indicateurs: this.construireLignesIndicateurs(
         differentiel.indicateurs,
         seuilsCouverture,

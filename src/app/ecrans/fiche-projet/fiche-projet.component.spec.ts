@@ -54,11 +54,14 @@ class DonneesDeTest {
    * @param options - Valeurs personnalisées de l'audit de test.
    * @param options.derniereAnalyseLe - Date de la dernière analyse Sonar (`croise.fraicheur_sonar`).
    * @param options.dernierCommitLe - Date du dernier commit constaté.
+   * @param options.niveauAccesInconnu - Niveau d'accès GitLab du membre inconnu `inconnu1` (RG-010, 40 = gravité
+   * élevée par défaut).
    * @returns L'audit de test.
    */
   public static auditComplet(options: {
     readonly derniereAnalyseLe?: string;
     readonly dernierCommitLe?: string;
+    readonly niveauAccesInconnu?: number;
   }): Audit {
     const dernierCommitLe = options.dernierCommitLe ?? DonneesDeTest.ilYA(-2);
     return {
@@ -88,7 +91,12 @@ class DonneesDeTest {
           shaTete: 'abc123',
           membres: [
             { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
-            { username: 'inconnu1', nom: 'Inconnu Un', niveauAcces: 40, herite: false },
+            {
+              username: 'inconnu1',
+              nom: 'Inconnu Un',
+              niveauAcces: options.niveauAccesInconnu ?? 40,
+              herite: false,
+            },
           ],
         },
         {
@@ -259,9 +267,10 @@ class DonneesDeTest {
           materialiteBrouillon: { variationRelative: 0.1 },
         },
         verrouillage: { delaiInactiviteMinutes: 15, echecsAvantFermeture: 5 },
-        audit: {},
+        audit: { concurrence: 4 },
         proxy: {},
-        sauvegarde: {},
+        sauvegarde: { nombreSauvegardesSecurite: 5 },
+        seuilAvertissementTailleOctets: 10_485_760,
       },
       campagnes,
       brouillon: null,
@@ -335,6 +344,32 @@ describe('SqmFicheProjetComponent', () => {
   });
 
   it(
+    'distingue visuellement les deux niveaux de gravité de l’alerte membre inconnu, jamais par le seul texte ' +
+      '(RG-010, R10-14)',
+    () => {
+      const projetGraviteElevee = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditComplet({ niveauAccesInconnu: 40 }),
+      ]);
+      const fixtureElevee = creerFixture('projet-1', DonneesDeTest.racine(projetGraviteElevee));
+      const elementElevee = DomTestUtils.obtenirElementNatif(fixtureElevee);
+      const graviteElevee = elementElevee.querySelector('.fiche-projet__gravite');
+      expect(graviteElevee?.textContent).toContain('gravité elevee');
+      expect(graviteElevee?.classList.contains('fiche-projet__gravite--elevee')).toBe(true);
+      expect(graviteElevee?.classList.contains('fiche-projet__gravite--moderee')).toBe(false);
+
+      const projetGraviteModeree = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditComplet({ niveauAccesInconnu: 20 }),
+      ]);
+      const fixtureModeree = creerFixture('projet-1', DonneesDeTest.racine(projetGraviteModeree));
+      const elementModeree = DomTestUtils.obtenirElementNatif(fixtureModeree);
+      const graviteModeree = elementModeree.querySelector('.fiche-projet__gravite');
+      expect(graviteModeree?.textContent).toContain('gravité moderee');
+      expect(graviteModeree?.classList.contains('fiche-projet__gravite--moderee')).toBe(true);
+      expect(graviteModeree?.classList.contains('fiche-projet__gravite--elevee')).toBe(false);
+    },
+  );
+
+  it(
     'affiche la réserve RG-016 explicitement pour un projet IA interdite sans marqueur détecté ' +
       '(« absence de preuve ≠ preuve d’absence »), jamais un simple badge conforme opaque',
     () => {
@@ -343,6 +378,9 @@ describe('SqmFicheProjetComponent', () => {
       const element = DomTestUtils.obtenirElementNatif(fixture);
       expect(element.textContent).toContain('conforme sous réserve');
       expect(element.textContent).toContain("ne prouve pas l'absence d'usage réel");
+      const badgeIa = element.querySelector('.fiche-projet__badges .badge');
+      expect(badgeIa?.classList.contains('badge--bleu')).toBe(true);
+      expect(badgeIa?.classList.contains('badge--orange')).toBe(false);
     },
   );
 
@@ -548,5 +586,46 @@ describe('SqmFicheProjetComponent', () => {
 
     expect(composant.messageErreurAnnotation).not.toBeNull();
     expect(composant.formulaireAnnotationVisible()).toBe(true);
+  });
+
+  it('supprime une annotation de portée projet après confirmation puis ressaisie du mot de passe (US-019, RG-033)', async () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const racine = DonneesDeTest.racine(projet);
+    const fixture = creerFixture('projet-1', racine);
+    TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    jest.mocked(invoke).mockResolvedValue(racine);
+    const composant = fixture.componentInstance;
+
+    composant.demanderSuppressionAnnotation('a1');
+    expect(composant.annotationASupprimerId()).toBe('a1');
+    composant.confirmerSuppressionAnnotation();
+    expect(composant.attenteMotDePasseSuppressionAnnotation()).toBe(true);
+
+    await composant.confirmerSuppressionAnnotationMotDePasse('mot-de-passe');
+
+    expect(invoke).toHaveBeenCalledWith(
+      'supprimer_annotation',
+      expect.objectContaining({
+        groupeId: 'groupe-1',
+        projetId: 'projet-1',
+        annotationId: 'a1',
+        motDePasse: 'mot-de-passe',
+      }),
+    );
+    expect(composant.annotationASupprimerId()).toBeNull();
+  });
+
+  it("affiche un message d'erreur lorsque la suppression d'annotation échoue", async () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    jest.mocked(invoke).mockRejectedValue({ type: 'annotationSystemeNonSupprimable' });
+    const composant = fixture.componentInstance;
+
+    composant.demanderSuppressionAnnotation('a1');
+    composant.confirmerSuppressionAnnotation();
+    await composant.confirmerSuppressionAnnotationMotDePasse('mot-de-passe');
+
+    expect(composant.messageErreurAnnotation).not.toBeNull();
   });
 });

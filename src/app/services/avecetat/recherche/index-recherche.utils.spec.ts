@@ -278,6 +278,24 @@ describe('IndexRechercheUtils', () => {
       expect(resultats.entites.occurrences[0]?.type).toBe('projet');
     });
 
+    it('trouve une entité en repliant les accents du terme saisi (R10-18)', () => {
+      const resultats = IndexRechercheUtils.rechercher(index, 'Equipe Paiement', {
+        inclureHistorique: false,
+      });
+
+      expect(resultats.entites.nombreTotal).toBe(1);
+      expect(resultats.entites.occurrences[0]?.type).toBe('groupe');
+    });
+
+    it('trouve une entité en repliant les accents de la valeur indexée (R10-18)', () => {
+      const resultats = IndexRechercheUtils.rechercher(index, 'Depot GitLab', {
+        inclureHistorique: false,
+      });
+
+      expect(resultats.entites.nombreTotal).toBe(1);
+      expect(resultats.entites.occurrences[0]?.type).toBe('source');
+    });
+
     it('plafonne le nombre d’occurrences restituées par nature tout en conservant le décompte réel', () => {
       const grappeVolumineuse = DonneesDeTest.grappeAvecHistorique().map((groupe) => ({
         ...groupe,

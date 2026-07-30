@@ -26,8 +26,10 @@ const ORIGINE_ADMINISTRATION = 'Administration';
 
 /**
  * Sous-onglet Membres connus : sélection d'un groupe, puis CRUD complet de ses règles de membres connus (US-022,
- * US-023), avec ressaisie du mot de passe du fichier à chaque enregistrement ou suppression (RG-002) et
- * signalement non bloquant des conflits de règles (RG-008).
+ * US-023), avec ressaisie du mot de passe du fichier à chaque enregistrement ou suppression (RG-002). Un conflit
+ * de règles courriel/domaine créé par la règle soumise est désormais bloqué à la saisie (Phase 10, R10-07,
+ * symétrique du doublon de username) ; un conflit résiduel préexistant, non lié à la saisie courante, reste
+ * seulement signalé (RG-008).
  */
 @Component({
   selector: 'app-membres-connus-admin',
@@ -113,8 +115,10 @@ export class SqmMembresConnusAdminComponent {
   public actionEnAttenteMotDePasse: 'enregistrement' | 'suppression' | null = null;
 
   /**
-   * Identifiants des règles de membres connus du groupe sélectionné actuellement en conflit (RG-008), signalement
-   * non bloquant recalculé après chaque enregistrement réussi.
+   * Identifiants des règles de membres connus du groupe sélectionné encore en conflit (RG-008) après le dernier
+   * enregistrement réussi : depuis R10-07, un conflit créé par la règle soumise est bloqué avant enregistrement
+   * (cf. `libelleAnomalie`) ; ce tableau ne signale donc plus qu'un conflit résiduel préexistant, non lié à la
+   * saisie courante.
    */
   public membresEnConflitIds: readonly string[] = [];
 
@@ -317,6 +321,8 @@ export class SqmMembresConnusAdminComponent {
     switch (anomalie.type) {
       case 'doublonUsernameMembreConnu':
         return 'Ce username est déjà utilisé par une autre règle de ce groupe.';
+      case 'conflitReglesMembreConnu':
+        return 'Cette règle entre en conflit avec une autre règle de ce groupe portant le même critère et un statut différent.';
       case 'groupeIntrouvable':
         return 'Le groupe sélectionné est introuvable.';
       case 'membreIntrouvable':
@@ -348,6 +354,10 @@ export class SqmMembresConnusAdminComponent {
       case 'versionSchemaConfigurationSuperieure':
       case 'ligneDifferentielInconnue':
       case 'vueIntrouvable':
+      case 'reglageApplicatifInvalide':
+      case 'entreeReferentielIntrouvable':
+      case 'annotationIntrouvable':
+      case 'annotationSystemeNonSupprimable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

@@ -19,10 +19,11 @@
 //! expression régulière syntaxiquement correcte, à l'aide de la dépendance `regex` déjà présente dans
 //! `Cargo.toml` (introduite pour le Connecteur GitLab, aucune nouvelle dépendance requise par cet incrément).
 
-use crate::modele::racine::DonneesRacine;
+use crate::modele::racine::{DonneesRacine, Proxy};
 use regex::Regex;
 use serde_json::Value;
 use thiserror::Error;
+use url::Url;
 
 /// Anomalie de validation métier levée avant toute tentative de sauvegarde (RG-023, RG-030).
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -44,6 +45,16 @@ pub(crate) enum ErreurParametrage {
     /// (RG-030).
     #[error("le motif de nommage de branche soumis est invalide")]
     MotifNommageBranchesInvalide,
+    /// Un réglage applicatif soumis (délai de verrouillage, nombre d'échecs, concurrence d'audit, URL de proxy,
+    /// nombre de sauvegardes de sécurité ou seuil d'avertissement de taille) ne respecte pas sa borne de validité
+    /// minimale (US-034, US-035, RG-031, RG-032) : revalidation côté cœur natif d'une saisie déjà validée côté
+    /// interface.
+    #[error("le réglage applicatif soumis est invalide")]
+    ReglageApplicatifInvalide,
+    /// L'identifiant soumis à `supprimerRegleDependance`/`supprimerRegleMarqueurIA` ne désigne aucune entrée
+    /// existante du référentiel concerné (US-033, RG-035).
+    #[error("l'entrée de référentiel désignée est introuvable")]
+    EntreeReferentielIntrouvable,
 }
 
 /// Modifie un seuil de couleur (`parametres.seuils`), désigné par un chemin pointé (segments séparés par `.`, ex.
@@ -253,6 +264,234 @@ pub(crate) fn definir_referentiel(
         detail_origine: None,
     });
 
+    Ok(())
+}
+
+/// Consigne au journal une modification ou une suppression, factorisé pour les cinq fonctions de réglages
+/// applicatifs (`definir_verrouillage`/`definir_concurrence_audit`/`definir_proxy`/
+/// `definir_nombre_sauvegardes_securite`/`definir_seuil_avertissement_taille`, US-034, US-035, RG-031, RG-032) et
+/// pour les deux fonctions de suppression d'entrée de référentiel ci-dessous (US-033, RG-035).
+fn consigner_modification(
+    donnees: &mut DonneesRacine,
+    objet: &str,
+    avant: Value,
+    apres: Value,
+    horodatage: String,
+) {
+    donnees.journal.push(crate::modele::racine::EntreeJournal {
+        id: uuid::Uuid::new_v4().to_string(),
+        horodatage,
+        objet: objet.to_string(),
+        avant,
+        apres,
+        origine: "Paramétrage".to_string(),
+        detail_origine: None,
+    });
+}
+
+/// Modifie les réglages de verrouillage de session (`parametres.verrouillage`), puis consigne la modification au
+/// journal (US-034, RG-031).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::ReglageApplicatifInvalide`] si `delai_inactivite_minutes` ou `echecs_avant_fermeture` est
+/// nul.
+pub(crate) fn definir_verrouillage(
+    donnees: &mut DonneesRacine,
+    delai_inactivite_minutes: u32,
+    echecs_avant_fermeture: u32,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    if delai_inactivite_minutes == 0 || echecs_avant_fermeture == 0 {
+        return Err(ErreurParametrage::ReglageApplicatifInvalide);
+    }
+    let avant = serde_json::to_value(&donnees.parametres.verrouillage).unwrap_or(Value::Null);
+    donnees.parametres.verrouillage = crate::modele::racine::Verrouillage {
+        delai_inactivite_minutes,
+        echecs_avant_fermeture,
+    };
+    let apres = serde_json::to_value(&donnees.parametres.verrouillage).unwrap_or(Value::Null);
+    consigner_modification(donnees, "parametres.verrouillage", avant, apres, horodatage);
+    Ok(())
+}
+
+/// Modifie la concurrence par défaut d'une campagne d'audit (`parametres.audit.concurrence`), puis consigne la
+/// modification au journal (US-034, RG-031, RNF-004).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::ReglageApplicatifInvalide`] si `concurrence` est nulle.
+pub(crate) fn definir_concurrence_audit(
+    donnees: &mut DonneesRacine,
+    concurrence: u32,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    if concurrence == 0 {
+        return Err(ErreurParametrage::ReglageApplicatifInvalide);
+    }
+    let avant = Value::from(donnees.parametres.audit.concurrence);
+    donnees.parametres.audit.concurrence = concurrence;
+    consigner_modification(
+        donnees,
+        "parametres.audit.concurrence",
+        avant,
+        Value::from(concurrence),
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Modifie le réglage de proxy sortant (`parametres.proxy`), puis consigne la modification au journal (US-034,
+/// RG-031). Une URL et un chemin de fascicule de certificats tous deux vides efface le réglage (retour au seul
+/// proxy système).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::ReglageApplicatifInvalide`] si `url` est non vide mais syntaxiquement invalide comme URL
+/// (revalidation côté cœur natif d'une saisie déjà validée côté interface, cf.
+/// `docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`).
+pub(crate) fn definir_proxy(
+    donnees: &mut DonneesRacine,
+    url: Option<String>,
+    chemin_bundle_ca: Option<String>,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    let url = url.filter(|url| !url.is_empty());
+    let chemin_bundle_ca = chemin_bundle_ca.filter(|chemin| !chemin.is_empty());
+    if let Some(url) = url.as_deref()
+        && Url::parse(url).is_err()
+    {
+        return Err(ErreurParametrage::ReglageApplicatifInvalide);
+    }
+
+    let nouveau_proxy = match (&url, &chemin_bundle_ca) {
+        (None, None) => None,
+        _ => Some(Proxy {
+            url,
+            chemin_bundle_ca,
+        }),
+    };
+
+    let avant = serde_json::to_value(&donnees.parametres.proxy).unwrap_or(Value::Null);
+    let apres = serde_json::to_value(&nouveau_proxy).unwrap_or(Value::Null);
+    donnees.parametres.proxy = nouveau_proxy;
+    consigner_modification(donnees, "parametres.proxy", avant, apres, horodatage);
+    Ok(())
+}
+
+/// Modifie le nombre de sauvegardes de sécurité conservées avant rotation
+/// (`parametres.sauvegarde.nombreSauvegardesSecurite`), puis consigne la modification au journal (US-034, RG-003,
+/// RG-031).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::ReglageApplicatifInvalide`] si `nombre` est nul.
+pub(crate) fn definir_nombre_sauvegardes_securite(
+    donnees: &mut DonneesRacine,
+    nombre: u32,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    if nombre == 0 {
+        return Err(ErreurParametrage::ReglageApplicatifInvalide);
+    }
+    let avant = Value::from(donnees.parametres.sauvegarde.nombre_sauvegardes_securite);
+    donnees.parametres.sauvegarde.nombre_sauvegardes_securite = nombre;
+    consigner_modification(
+        donnees,
+        "parametres.sauvegarde.nombreSauvegardesSecurite",
+        avant,
+        Value::from(nombre),
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Modifie le seuil de taille, en octets, déclenchant l'avertissement contextuel de purge à la sauvegarde
+/// (`parametres.seuilAvertissementTailleOctets`), puis consigne la modification au journal (US-035, RG-031,
+/// RG-032).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::ReglageApplicatifInvalide`] si `seuil_octets` est nul.
+pub(crate) fn definir_seuil_avertissement_taille(
+    donnees: &mut DonneesRacine,
+    seuil_octets: u64,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    if seuil_octets == 0 {
+        return Err(ErreurParametrage::ReglageApplicatifInvalide);
+    }
+    let avant = Value::from(donnees.parametres.seuil_avertissement_taille_octets);
+    donnees.parametres.seuil_avertissement_taille_octets = seuil_octets;
+    consigner_modification(
+        donnees,
+        "parametres.seuilAvertissementTailleOctets",
+        avant,
+        Value::from(seuil_octets),
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Position d'une entrée de référentiel-liste désignée par son identifiant, `None` si absente. Factorisé pour les
+/// deux fonctions de suppression ci-dessous, sur le modèle de recherche déjà utilisé par [`upsert_par_id`].
+fn position_par_id(regles: &[Value], id: &str) -> Option<usize> {
+    regles.iter().position(|regle| {
+        regle.as_object().and_then(|objet| objet.get("id")) == Some(&Value::String(id.to_string()))
+    })
+}
+
+/// Supprime une entrée du référentiel des règles de dépendances (`referentiels.reglesDependances`), par son
+/// identifiant, puis consigne la suppression au journal (US-033, RG-035).
+///
+/// Commande symétrique de `supprimerMembreConnu` (`persistance::administration`), retenue par arbitrage humain
+/// (solution B, Phase 10 incrément 8) plutôt qu'une commande générique paramétrée par type de référentiel : le
+/// motif de nommage des branches, valeur scalaire et non une liste, n'est structurellement pas concerné par cette
+/// fonction (RG-035).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::EntreeReferentielIntrouvable`] si `id` ne désigne aucune entrée existante.
+pub(crate) fn supprimer_regle_dependance(
+    donnees: &mut DonneesRacine,
+    id: &str,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    let position = position_par_id(&donnees.referentiels.regles_dependances, id)
+        .ok_or(ErreurParametrage::EntreeReferentielIntrouvable)?;
+    let supprimee = donnees.referentiels.regles_dependances.remove(position);
+    consigner_modification(
+        donnees,
+        &format!("referentiels.reglesDependances/{id}"),
+        supprimee,
+        Value::Null,
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Supprime une entrée du référentiel des règles de marqueurs IA (`referentiels.reglesMarqueursIA`), par son
+/// identifiant, puis consigne la suppression au journal (US-033, RG-035). Cf. [`supprimer_regle_dependance`] pour
+/// la justification du choix de deux fonctions dédiées plutôt qu'une commande générique.
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::EntreeReferentielIntrouvable`] si `id` ne désigne aucune entrée existante.
+pub(crate) fn supprimer_regle_marqueur_ia(
+    donnees: &mut DonneesRacine,
+    id: &str,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    let position = position_par_id(&donnees.referentiels.regles_marqueurs_ia, id)
+        .ok_or(ErreurParametrage::EntreeReferentielIntrouvable)?;
+    let supprimee = donnees.referentiels.regles_marqueurs_ia.remove(position);
+    consigner_modification(
+        donnees,
+        &format!("referentiels.reglesMarqueursIA/{id}"),
+        supprimee,
+        Value::Null,
+        horodatage,
+    );
     Ok(())
 }
 
@@ -513,5 +752,254 @@ mod tests {
         );
 
         assert_eq!(resultat, Err(ErreurParametrage::TypeReferentielInconnu));
+    }
+
+    #[test]
+    fn definir_verrouillage_remplace_les_deux_champs() -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_verrouillage(&mut racine, 30, 3, "2026-07-27T09:00:00Z".to_string())?;
+
+        assert_eq!(racine.parametres.verrouillage.delai_inactivite_minutes, 30);
+        assert_eq!(racine.parametres.verrouillage.echecs_avant_fermeture, 3);
+        assert_eq!(racine.journal[0].objet, "parametres.verrouillage");
+        Ok(())
+    }
+
+    #[test]
+    fn definir_verrouillage_delai_nul_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_verrouillage(&mut racine, 0, 3, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn definir_verrouillage_echecs_nul_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_verrouillage(&mut racine, 30, 0, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+    }
+
+    #[test]
+    fn definir_concurrence_audit_remplace_la_valeur() -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_concurrence_audit(&mut racine, 8, "2026-07-27T09:00:00Z".to_string())?;
+
+        assert_eq!(racine.parametres.audit.concurrence, 8);
+        assert_eq!(racine.journal[0].objet, "parametres.audit.concurrence");
+        Ok(())
+    }
+
+    #[test]
+    fn definir_concurrence_audit_nulle_est_rejetee() {
+        let mut racine = racine_de_test();
+
+        let resultat =
+            definir_concurrence_audit(&mut racine, 0, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn definir_proxy_enregistre_url_et_bundle_ca() -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_proxy(
+            &mut racine,
+            Some("http://proxy.exemple.local:3128".to_string()),
+            Some("/etc/ssl/ca-supplementaire.pem".to_string()),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine
+                .parametres
+                .proxy
+                .as_ref()
+                .and_then(|proxy| proxy.url.as_deref()),
+            Some("http://proxy.exemple.local:3128")
+        );
+        assert_eq!(
+            racine
+                .parametres
+                .proxy
+                .as_ref()
+                .and_then(|proxy| proxy.chemin_bundle_ca.as_deref()),
+            Some("/etc/ssl/ca-supplementaire.pem")
+        );
+        assert_eq!(racine.journal[0].objet, "parametres.proxy");
+        Ok(())
+    }
+
+    #[test]
+    fn definir_proxy_url_et_chemin_vides_efface_le_reglage() -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_proxy(
+            &mut racine,
+            Some("http://proxy.exemple.local:3128".to_string()),
+            None,
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        definir_proxy(&mut racine, None, None, "2026-07-27T10:00:00Z".to_string())?;
+
+        assert_eq!(racine.parametres.proxy, None);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_proxy_url_syntaxiquement_invalide_est_rejetee() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_proxy(
+            &mut racine,
+            Some("pas-une-url".to_string()),
+            None,
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn definir_nombre_sauvegardes_securite_remplace_la_valeur() -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_nombre_sauvegardes_securite(&mut racine, 10, "2026-07-27T09:00:00Z".to_string())?;
+
+        assert_eq!(racine.parametres.sauvegarde.nombre_sauvegardes_securite, 10);
+        assert_eq!(
+            racine.journal[0].objet,
+            "parametres.sauvegarde.nombreSauvegardesSecurite"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn definir_nombre_sauvegardes_securite_nul_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat =
+            definir_nombre_sauvegardes_securite(&mut racine, 0, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn definir_seuil_avertissement_taille_remplace_la_valeur() -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_seuil_avertissement_taille(
+            &mut racine,
+            5_000_000,
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.parametres.seuil_avertissement_taille_octets,
+            5_000_000
+        );
+        assert_eq!(
+            racine.journal[0].objet,
+            "parametres.seuilAvertissementTailleOctets"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn definir_seuil_avertissement_taille_nul_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat =
+            definir_seuil_avertissement_taille(&mut racine, 0, "2026-07-27T09:00:00Z".to_string());
+
+        assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+    }
+
+    #[test]
+    fn supprimer_regle_dependance_retire_lentree_et_consigne_le_journal()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        supprimer_regle_dependance(&mut racine, "d1", "2026-07-27T10:00:00Z".to_string())?;
+
+        assert!(racine.referentiels.regles_dependances.is_empty());
+        let derniere_entree = &racine.journal[1];
+        assert_eq!(derniere_entree.objet, "referentiels.reglesDependances/d1");
+        assert_eq!(derniere_entree.apres, Value::Null);
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_regle_dependance_introuvable_est_rejetee() {
+        let mut racine = racine_de_test();
+
+        let resultat = supprimer_regle_dependance(
+            &mut racine,
+            "inexistante",
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurParametrage::EntreeReferentielIntrouvable)
+        );
+    }
+
+    #[test]
+    fn supprimer_regle_marqueur_ia_retire_lentree_et_consigne_le_journal()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "reglesMarqueursIA",
+            json!({
+                "id": "m1",
+                "motif": "CLAUDE.md",
+                "typeCorrespondance": "exact",
+                "portee": "racine",
+                "nature": "fichier",
+                "outil": "claude"
+            }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        supprimer_regle_marqueur_ia(&mut racine, "m1", "2026-07-27T10:00:00Z".to_string())?;
+
+        assert!(racine.referentiels.regles_marqueurs_ia.is_empty());
+        let derniere_entree = &racine.journal[1];
+        assert_eq!(derniere_entree.objet, "referentiels.reglesMarqueursIA/m1");
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_regle_marqueur_ia_introuvable_est_rejetee() {
+        let mut racine = racine_de_test();
+
+        let resultat = supprimer_regle_marqueur_ia(
+            &mut racine,
+            "inexistante",
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurParametrage::EntreeReferentielIntrouvable)
+        );
     }
 }

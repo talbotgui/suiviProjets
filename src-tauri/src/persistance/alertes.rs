@@ -28,18 +28,31 @@ pub(crate) enum ErreurAlertes {
     /// Le projet désigné n'existe pas dans les données courantes.
     #[error("le projet désigné est introuvable")]
     ProjetIntrouvable,
+    /// L'annotation désignée par son identifiant n'existe pas dans la portée demandée (groupe ou projet, Phase 10
+    /// incrément 8, US-019, RG-033).
+    #[error("l'annotation désignée est introuvable")]
+    AnnotationIntrouvable,
+    /// L'annotation désignée est une annotation système (RG-015), jamais supprimable (Phase 10 incrément 8,
+    /// US-019, RG-033).
+    #[error("une annotation système n'est jamais supprimable")]
+    AnnotationSystemeNonSupprimable,
 }
 
 /// Crée une annotation de portée groupe ou projet (US-019), puis consigne la création au journal (RG-023).
 ///
 /// `projet_id` distingue la portée : présent, l'annotation est ajoutée aux annotations du projet désigné (qui doit
 /// appartenir au groupe désigné) ; absent, elle est ajoutée aux annotations du groupe lui-même. Décision arbitraire
-/// documentée dans le compte-rendu de développement de cette phase : une `Annotation`, à la différence d'un
-/// `TraitementAlerte` (donnée de travail personnelle jamais exportée, cf.
-/// `docs/02_documentation/12_modeleDonnees.md#gouvernance-et-propriété-des-données`), est une donnée métier exportée
-/// au même titre qu'une règle de membre connu (`MembreConnu`) ; sa création est donc consignée au journal sur le
-/// même modèle que `qualifier_membre`, bien que RG-023 ne liste pas explicitement les annotations parmi les
-/// modifications consignées.
+/// documentée dans le compte-rendu de développement de cette phase, dont la justification écrite a été corrigée en
+/// relecture de la Phase 10 (R10-05) : une première rédaction présentait à tort une `Annotation` comme une donnée
+/// métier **exportée** au même titre qu'une règle de membre connu (`MembreConnu`), en invoquant RG-028 à l'appui —
+/// or RG-028 dispose au contraire que l'export en clair de la configuration partageable (F23) exclut
+/// structurellement `MembreConnu` et toute autre donnée de groupe, catégorie dont relève également une `Annotation`
+/// (cf. `docs/02_documentation/12_modeleDonnees.md#gouvernance-et-propriété-des-données`) : les deux entités sont
+/// donc exclues de l'export, aucune des deux n'y est incluse, l'analogie initiale était inversée. La journalisation
+/// de la création d'une annotation reste néanmoins retenue, non pour un motif d'export, mais pour la traçabilité
+/// d'une donnée adjacente au jugement (un repère posé sur un graphique d'évolution éclaire la lecture ultérieure des
+/// indicateurs dans le temps), sur le même modèle que `qualifier_membre`, bien que RG-023 ne liste pas explicitement
+/// les annotations parmi les modifications consignées.
 ///
 /// # Erreurs
 ///
@@ -104,6 +117,74 @@ pub(crate) fn creer_annotation(
     });
 
     Ok(annotation)
+}
+
+/// Supprime une annotation de portée groupe ou projet (US-019, RG-033), puis consigne la suppression au journal
+/// (RG-023).
+///
+/// `projet_id` distingue la portée exactement comme pour [`creer_annotation`] : présent, l'annotation est retirée
+/// des annotations du projet désigné ; absent, elle est retirée des annotations du groupe lui-même. Commande
+/// ajoutée par arbitrage humain (Phase 10, incrément 8) en complément du sous-onglet Annotations de groupe de
+/// l'écran Administration, couvrant les deux portées (et non la seule portée groupe nouvellement construite) : la
+/// Fiche projet, qui ne permettait jusqu'ici que la création d'une annotation, en bénéficie donc également.
+///
+/// # Erreurs
+///
+/// [`ErreurAlertes::GroupeIntrouvable`] si `groupe_id` ne désigne aucun groupe ; [`ErreurAlertes::ProjetIntrouvable`]
+/// si `projet_id` est fourni mais ne désigne aucun projet de ce groupe ; [`ErreurAlertes::AnnotationIntrouvable`] si
+/// `annotation_id` ne désigne aucune annotation de la portée demandée ;
+/// [`ErreurAlertes::AnnotationSystemeNonSupprimable`] si l'annotation désignée est une annotation système (RG-015).
+pub(crate) fn supprimer_annotation(
+    donnees: &mut DonneesRacine,
+    groupe_id: &str,
+    projet_id: Option<&str>,
+    annotation_id: &str,
+    horodatage: String,
+) -> Result<(), ErreurAlertes> {
+    let groupe = donnees
+        .groupes
+        .iter_mut()
+        .find(|groupe| groupe.id == groupe_id)
+        .ok_or(ErreurAlertes::GroupeIntrouvable)?;
+
+    let (annotations, objet) = match projet_id {
+        Some(projet_id) => {
+            let projet = groupe
+                .projets
+                .iter_mut()
+                .find(|projet| projet.id == projet_id)
+                .ok_or(ErreurAlertes::ProjetIntrouvable)?;
+            (
+                &mut projet.annotations,
+                format!("groupes/{groupe_id}/projets/{projet_id}/annotations/{annotation_id}"),
+            )
+        }
+        None => (
+            &mut groupe.annotations,
+            format!("groupes/{groupe_id}/annotations/{annotation_id}"),
+        ),
+    };
+
+    let position = annotations
+        .iter()
+        .position(|annotation| annotation.id == annotation_id)
+        .ok_or(ErreurAlertes::AnnotationIntrouvable)?;
+    if annotations[position].systeme == Some(true) {
+        return Err(ErreurAlertes::AnnotationSystemeNonSupprimable);
+    }
+    let supprimee = annotations.remove(position);
+
+    donnees.journal.push(EntreeJournal {
+        id: uuid::Uuid::new_v4().to_string(),
+        horodatage,
+        objet,
+        avant: serde_json::to_value(&supprimee).unwrap_or(serde_json::Value::Null),
+        apres: serde_json::Value::Null,
+        origine: ORIGINE_ANNOTATION.to_string(),
+        detail_origine: None,
+    });
+
+    Ok(())
 }
 
 /// Qualifie une alerte (US-020) : ajoute une nouvelle entrée de traitement (statut vu/traité, commentaire optionnel)
@@ -327,5 +408,111 @@ mod tests {
             racine.traitements_alertes[1].commentaire,
             Some("Qualifié comme partenaire".to_string())
         );
+    }
+
+    #[test]
+    fn supprimer_annotation_portee_groupe_retire_lannotation_et_consigne_le_journal()
+    -> Result<(), ErreurAlertes> {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+        let annotation = creer_annotation(
+            &mut racine,
+            "g1",
+            None,
+            "2026-07-27".to_string(),
+            "Rupture de charge".to_string(),
+            "incident".to_string(),
+            None,
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        supprimer_annotation(
+            &mut racine,
+            "g1",
+            None,
+            &annotation.id,
+            "2026-07-27T10:00:00Z".to_string(),
+        )?;
+
+        assert!(racine.groupes[0].annotations.is_empty());
+        let derniere_entree = &racine.journal[1];
+        assert_eq!(
+            derniere_entree.objet,
+            format!("groupes/g1/annotations/{}", annotation.id)
+        );
+        assert_eq!(derniere_entree.apres, serde_json::Value::Null);
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_annotation_portee_projet_retire_lannotation_du_projet() -> Result<(), ErreurAlertes>
+    {
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        let mut racine = racine_avec_groupe(groupe);
+        let annotation = creer_annotation(
+            &mut racine,
+            "g1",
+            Some("p1"),
+            "2026-07-27".to_string(),
+            "Migration majeure".to_string(),
+            "technique".to_string(),
+            None,
+            "2026-07-27T09:05:00Z".to_string(),
+        )?;
+
+        supprimer_annotation(
+            &mut racine,
+            "g1",
+            Some("p1"),
+            &annotation.id,
+            "2026-07-27T10:05:00Z".to_string(),
+        )?;
+
+        assert!(racine.groupes[0].projets[0].annotations.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_annotation_introuvable_est_rejetee() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        let resultat = supprimer_annotation(
+            &mut racine,
+            "g1",
+            None,
+            "annotation-inexistante",
+            "2026-07-27T10:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurAlertes::AnnotationIntrouvable));
+    }
+
+    #[test]
+    fn supprimer_annotation_systeme_est_rejetee() {
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        let mut racine = racine_avec_groupe(groupe);
+        racine.groupes[0].projets[0].annotations.push(Annotation {
+            id: "annotation-systeme".to_string(),
+            date: "2026-07-27".to_string(),
+            libelle: "Usage de l'IA autorisé".to_string(),
+            categorie: "politiqueIA".to_string(),
+            description: None,
+            systeme: Some(true),
+        });
+
+        let resultat = supprimer_annotation(
+            &mut racine,
+            "g1",
+            Some("p1"),
+            "annotation-systeme",
+            "2026-07-27T10:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurAlertes::AnnotationSystemeNonSupprimable)
+        );
+        assert_eq!(racine.groupes[0].projets[0].annotations.len(), 1);
     }
 }

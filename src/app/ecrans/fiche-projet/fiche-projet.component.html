@@ -243,7 +243,12 @@
                       [libelle]="membre.statut.label"
                     />
                     @if (membre.graviteAlerte; as gravite) {
-                      <span>gravité {{ gravite }}</span>
+                      <span
+                        class="fiche-projet__gravite"
+                        [class.fiche-projet__gravite--elevee]="gravite === 'elevee'"
+                        [class.fiche-projet__gravite--moderee]="gravite === 'moderee'"
+                        >gravité {{ gravite }}</span
+                      >
                       <a routerLink="/administration">Qualifier ce membre</a>
                     }
                   </li>
@@ -284,9 +289,34 @@
                     @if (annotation.description; as description) {
                       <p>{{ description }}</p>
                     }
+                    @if (!annotation.systeme) {
+                      <button
+                        type="button"
+                        [disabled]="enCoursAnnotation"
+                        (click)="demanderSuppressionAnnotation(annotation.id)"
+                      >
+                        Supprimer
+                      </button>
+                    }
                   </li>
                 }
               </ul>
+            }
+
+            @if (annotationASupprimerId() && !attenteMotDePasseSuppressionAnnotation()) {
+              <app-confirmation-suppression
+                message="La suppression d'une annotation est immédiate et irréversible."
+                (confirmee)="confirmerSuppressionAnnotation()"
+                (annulee)="annulerSuppressionAnnotation()"
+              />
+            }
+
+            @if (attenteMotDePasseSuppressionAnnotation()) {
+              <app-confirmation-mot-de-passe
+                message="Ressaisissez le mot de passe du fichier pour supprimer cette annotation."
+                (confirmee)="confirmerSuppressionAnnotationMotDePasse($event)"
+                (annulee)="annulerSuppressionAnnotation()"
+              />
             }
 
             @if (!formulaireAnnotationVisible()) {

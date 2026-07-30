@@ -44,6 +44,26 @@ export interface ParametresCreationAnnotation<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `supprimerAnnotation` (US-019, RG-033, Phase 10 incrément 8),
+ * génériques sur le type concret de la racine échangée (`TDonnees`) pour ne jamais importer ce type depuis
+ * `services/avecetat/etat/`.
+ */
+export interface ParametresSuppressionAnnotation<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Identifiant du groupe de rattachement de l'annotation. */
+  readonly groupeId: string;
+  /** Identifiant du projet de rattachement, absent pour une annotation de portée groupe. */
+  readonly projetId: string | undefined;
+  /** Identifiant de l'annotation à supprimer. */
+  readonly annotationId: string;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
  * Paramètres transmis à la commande native `qualifierAlerte` (US-020), génériques sur le type concret de la racine
  * échangée (`TDonnees`) pour ne jamais importer ce type depuis `services/avecetat/etat/`.
  */
@@ -79,6 +99,18 @@ export class FacadeAlertesService {
     parametres: ParametresCreationAnnotation<TDonnees>,
   ): Promise<TReponse> {
     return invoke<TReponse>('creer_annotation', { ...parametres });
+  }
+
+  /**
+   * Supprime une annotation de portée groupe ou projet, sauvegarde le fichier et consigne la suppression au
+   * journal (US-019, RG-023, RG-033, Phase 10 incrément 8).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresSuppressionAnnotation}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async supprimerAnnotation<TDonnees, TReponse>(
+    parametres: ParametresSuppressionAnnotation<TDonnees>,
+  ): Promise<TReponse> {
+    return invoke<TReponse>('supprimer_annotation', { ...parametres });
   }
 
   /**

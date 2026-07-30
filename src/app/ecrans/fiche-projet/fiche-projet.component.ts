@@ -19,6 +19,7 @@ import { RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBadgeComponent } from '../../composants/badge/badge.component';
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
+import { SqmConfirmationSuppressionComponent } from '../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
 import { RapportAnomaliesUtils } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { AnomalieResolue } from '../../services/avecetat/campagne/rapport-anomalies.utils';
@@ -61,7 +62,10 @@ import {
 } from '../../services/sansetat/jugement/seuils-couleur.utils';
 import { StatutIaUtils } from '../../services/sansetat/jugement/statut-ia.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
-import type { ResolutionStatutMembre } from '../../services/sansetat/jugement/statut-membre.utils';
+import type {
+  GraviteAlerteMembreInconnu,
+  ResolutionStatutMembre,
+} from '../../services/sansetat/jugement/statut-membre.utils';
 import { StatutObsolescenceUtils } from '../../services/sansetat/jugement/statut-obsolescence.utils';
 import type { ResultatObsolescence } from '../../services/sansetat/jugement/statut-obsolescence.utils';
 
@@ -139,7 +143,7 @@ interface LigneMembre {
   /** `true` si le membre est de statut `inconnu` ou `conflit` (RG-006 à RG-009). */
   readonly inconnu: boolean;
   /** Gravité de l'alerte associée (RG-010), présente uniquement si {@link inconnu}. */
-  readonly graviteAlerte: string | undefined;
+  readonly graviteAlerte: GraviteAlerteMembreInconnu | undefined;
 }
 
 /**
@@ -276,6 +280,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmBadgeComponent,
     SqmExplicationJugementComponent,
     SqmConfirmationMotDePasseComponent,
+    SqmConfirmationSuppressionComponent,
   ],
   templateUrl: './fiche-projet.component.html',
   styleUrl: './fiche-projet.component.scss',
@@ -411,6 +416,68 @@ export class SqmFicheProjetComponent {
    */
   public annulerMotDePasseAnnotation(): void {
     this.attenteMotDePasseAnnotation.set(false);
+  }
+
+  /**
+   * Identifiant de l'annotation dont la suppression est en cours de confirmation (US-019, RG-033, Phase 10
+   * incrément 8, C10-04), `null` si aucune n'est en cours.
+   */
+  public readonly annotationASupprimerId: WritableSignal<string | null> = signal(null);
+
+  /**
+   * Indique si la ressaisie du mot de passe (RG-002) est en cours d'affichage pour la suppression d'annotation.
+   */
+  public readonly attenteMotDePasseSuppressionAnnotation: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Demande la confirmation de suppression d'une annotation de portée projet.
+   * @param annotationId - Identifiant de l'annotation à supprimer.
+   */
+  public demanderSuppressionAnnotation(annotationId: string): void {
+    this.annotationASupprimerId.set(annotationId);
+  }
+
+  /**
+   * Confirme la suppression désignée par {@link demanderSuppressionAnnotation} : ouvre la ressaisie du mot de
+   * passe avant la suppression effective (RG-002).
+   */
+  public confirmerSuppressionAnnotation(): void {
+    this.attenteMotDePasseSuppressionAnnotation.set(true);
+  }
+
+  /**
+   * Annule la suppression d'annotation demandée.
+   */
+  public annulerSuppressionAnnotation(): void {
+    this.annotationASupprimerId.set(null);
+  }
+
+  /**
+   * Supprime l'annotation après confirmation du mot de passe (US-019, RG-002, RG-033).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerSuppressionAnnotationMotDePasse(motDePasse: string): Promise<void> {
+    const etatCourant = this.etat();
+    const annotationId = this.annotationASupprimerId();
+    this.attenteMotDePasseSuppressionAnnotation.set(false);
+    if (etatCourant.type !== 'trouve' || !annotationId) {
+      this.annotationASupprimerId.set(null);
+      return;
+    }
+
+    this.enCoursAnnotation = true;
+    const resultat = await this.donneesApplication.supprimerAnnotation(
+      etatCourant.donnees.groupeId,
+      etatCourant.donnees.projetId,
+      annotationId,
+      motDePasse,
+    );
+    this.enCoursAnnotation = false;
+    this.annotationASupprimerId.set(null);
+
+    if (resultat.type === 'echec') {
+      this.messageErreurAnnotation = 'Une erreur inattendue est survenue lors de la suppression.';
+    }
   }
 
   /**
@@ -911,7 +978,10 @@ export class SqmFicheProjetComponent {
       pourcentageConflit,
       seuils.valeur.pourcentageConflitRouge,
     );
-    const couleurs: Readonly<Record<Couleur, number>> = { vert: 0, orange: 1, rouge: 2 };
+    // `bleu` n'appartient pas à ce dégradé de gravité (statut IA dédié, R10-03) et n'est jamais produit par
+    // `calculerCouleurAgeMrOuverte`/`calculerCouleurConflitMrOuvertes` ; requis seulement par l'exhaustivité de
+    // `Couleur`.
+    const couleurs: Readonly<Record<Couleur, number>> = { vert: 0, orange: 1, rouge: 2, bleu: -1 };
     const couleur = couleurs[couleurAge] >= couleurs[couleurConflit] ? couleurAge : couleurConflit;
     return { label, couleur };
   }
@@ -984,11 +1054,10 @@ export class SqmFicheProjetComponent {
 
   /**
    * Construit l'étiquette du statut IA du projet (RG-016), avec la réserve « absence de preuve ≠ preuve d'absence »
-   * affichée explicitement pour le cas `conformeSousReserve` (jamais un simple badge « conforme » opaque). Décision
-   * d'ergonomie prise à cet incrément (à valider par un humain) : couleur ORANGE distincte du vert `autorisee`,
-   * reprenant la recommandation laissée ouverte en relecture de la Phase 6 incrément 4 (Synthèse des audits, où les
-   * deux états partageaient la même couleur verte, point signalé comme discutable) — ici tranchée en faveur d'une
-   * distinction visuelle, la réserve RG-016 devant être visible et non un badge « conforme » opaque.
+   * affichée explicitement pour le cas `conformeSousReserve` (jamais un simple badge « conforme » opaque). Couleur
+   * BLEU dédiée (R10-03), harmonisée avec l'écran Synthèse des audits, qui affichait auparavant la même couleur
+   * verte que le statut `autorisee` — incohérence corrigée par l'ajout d'une quatrième couleur transverse au
+   * composant Badge, appliquée identiquement sur les deux écrans plutôt que l'orange retenu initialement ici.
    * @param iaAutorisee - Politique d'autorisation de l'IA du projet.
    * @param marqueurs - Marqueurs d'outils IA détectés par le dernier audit intégré.
    * @returns L'étiquette calculée.
@@ -1018,7 +1087,7 @@ export class SqmFicheProjetComponent {
       case 'conformeSousReserve':
         return {
           label: 'IA interdite · conforme sous réserve',
-          couleur: 'orange',
+          couleur: 'bleu',
           reserve:
             "Aucun marqueur d'outil IA détecté par le dernier audit, mais l'absence de preuve ne prouve pas l'absence d'usage réel (RG-016).",
         };

@@ -144,6 +144,30 @@
   margin: 0;
 }
 
+.shell__avertissement-taille {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 150;
+  background: oklch(97% 0.05 85);
+  border: 1px solid oklch(75% 0.15 85);
+  color: oklch(35% 0.1 85);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  max-width: 320px;
+
+  p {
+    margin: 0 0 8px;
+  }
+}
+
+.shell__avertissement-taille-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .shell__ecran {
   flex: 1;
   overflow: auto;
