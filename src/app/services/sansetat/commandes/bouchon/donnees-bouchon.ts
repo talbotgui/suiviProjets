@@ -16,6 +16,12 @@
 // - `sonar.couverture.couvertureNouveauCode` vaut `null` dans le fichier source pour la source `api-portail`
 //   (métrique jamais calculée), valeur non représentable par `ResultatSonarCouverture` (`number` non optionnel) :
 //   repliée sur `0`.
+//
+// Évolution du 2026-08-02 (US-008, RG-036) : `SOURCES_DISPONIBLES_PAR_INSTANCE`, jeu de données du bouchon de
+// `listerSourcesDisponibles`, reprend les identifiants externes déjà attachés dans
+// `docs/01_besoin/exemple-donnees.json` (mêmes valeurs que `SOURCE_ID_PAR_ID_EXTERNE_GITLAB`/`_SONAR` de
+// `bouchon-commandes.utils.ts`), complétés d'un dépôt/projet supplémentaire non encore attaché par instance, afin
+// de montrer que la liste ne se limite pas aux seules sources déjà en place.
 import type {
   Branche,
   Contributeur,
@@ -28,6 +34,7 @@ import type {
   ResultatSonarNcloc,
   ResultatSonarNotes,
   ResultatSonarViolations,
+  SourceDisponible,
 } from '../types-facade';
 
 /**
@@ -335,3 +342,47 @@ export const CONSTAT_GITLAB_REPLI: ConstatGitlabBouchon = {
   branches: [{ nom: 'main', avecMR: false, dernierCommitLe: '2026-07-01' }],
   branchesAutocompletion: ['main'],
 };
+
+/**
+ * Dépôts GitLab et projets Sonar disponibles du bouchon de `listerSourcesDisponibles` (US-008, RG-036, ajouté le
+ * 2026-08-02), indexés par `Instance.id` (`docs/01_besoin/exemple-donnees.json#groupes[].instances[]`) : non triés
+ * ici, le tri alphabétique insensible à la casse (RG-036) est appliqué par `BouchonCommandesUtils`, sur le même
+ * principe que le cœur natif.
+ */
+export const SOURCES_DISPONIBLES_PAR_INSTANCE: ReadonlyMap<string, readonly SourceDisponible[]> =
+  new Map([
+    [
+      'b0000000-0000-4000-8000-000000000001', // gitlab-prod (groupe Socle Comptable)
+      [
+        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+        { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+        { idExterne: '402', libelle: 'entreprise/referentiel-tiers' },
+        { idExterne: '77', libelle: 'entreprise/outil-interne' },
+      ],
+    ],
+    [
+      'b0000000-0000-4000-8000-000000000002', // sonar-core (groupe Socle Comptable)
+      [
+        { idExterne: 'entreprise:api-facturation', libelle: 'API Facturation' },
+        { idExterne: 'entreprise:batch-comptable', libelle: 'Batch Comptable' },
+        { idExterne: 'entreprise:referentiel-tiers', libelle: 'Référentiel Tiers' },
+      ],
+    ],
+    [
+      'b0000000-0000-4000-8000-000000000003', // gitlab-nova (groupe Portail Nova)
+      [
+        { idExterne: '88', libelle: 'nova/front-portail' },
+        { idExterne: '91', libelle: 'nova/api-portail' },
+        { idExterne: '104', libelle: 'nova/mobile-nova' },
+        { idExterne: '120', libelle: 'nova/legacy-batch' },
+      ],
+    ],
+    [
+      'b0000000-0000-4000-8000-000000000004', // sonar-nova (groupe Portail Nova)
+      [
+        { idExterne: 'nova:front-portail', libelle: 'Front Portail' },
+        { idExterne: 'nova:api-portail', libelle: 'API Portail' },
+        { idExterne: 'nova:mobile-nova', libelle: 'Mobile Nova' },
+      ],
+    ],
+  ]);

@@ -94,6 +94,41 @@ describe('BouchonCommandesUtils', () => {
     );
   });
 
+  describe('lister_sources_disponibles (US-008, RG-036)', () => {
+    it('doit résoudre la liste triée par libellé pour une instance connue', async () => {
+      const disponibles = await BouchonCommandesUtils.invoquer<
+        readonly { readonly idExterne: string; readonly libelle: string }[]
+      >('lister_sources_disponibles', {
+        instance: { id: 'b0000000-0000-4000-8000-000000000001', type: 'gitlab' },
+      });
+
+      expect(disponibles.map((source) => source.libelle)).toEqual([
+        'entreprise/api-facturation',
+        'entreprise/batch-comptable',
+        'entreprise/outil-interne',
+        'entreprise/referentiel-tiers',
+      ]);
+    });
+
+    it('doit retourner une liste vide pour une instance inconnue du jeu de données', async () => {
+      const disponibles = await BouchonCommandesUtils.invoquer<readonly unknown[]>(
+        'lister_sources_disponibles',
+        { instance: { id: 'instance-inconnue', type: 'gitlab' } },
+      );
+
+      expect(disponibles).toEqual([]);
+    });
+
+    it('doit retourner une liste vide si le paramètre instance est absent ou mal formé', async () => {
+      const disponibles = await BouchonCommandesUtils.invoquer<readonly unknown[]>(
+        'lister_sources_disponibles',
+        {},
+      );
+
+      expect(disponibles).toEqual([]);
+    });
+  });
+
   describe('aléatoire des résultats Sonar', () => {
     it('ne doit pas altérer les valeurs quand le tirage tombe au centre de l’amplitude', async () => {
       jest.spyOn(Math, 'random').mockReturnValue(0.5);

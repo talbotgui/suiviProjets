@@ -21,7 +21,9 @@
 //! `parametres.audit` en conception détaillée — aucun appelant ne fait encore varier cette valeur, l'Orchestrateur
 //! de campagne (seul consommateur prévu de ce réglage) n'existant pas encore.
 
-use super::commun::{ErreurConnecteur, VerdictConnectivite, erreur_depuis_reqwest};
+use super::commun::{
+    ErreurConnecteur, SourceDisponible, VerdictConnectivite, erreur_depuis_reqwest,
+};
 use crate::modele::racine::{
     Branche, Contributeur, Dependance, Marqueur, MembreGitlab, MergeRequestOuverte,
     ResultatGitlabBranches, ResultatGitlabContributeurs, ResultatGitlabDependances,
@@ -162,6 +164,92 @@ pub(crate) async fn interroger_branches(
             message: erreur.to_string(),
         })?;
     Ok(corps.into_iter().map(|branche| branche.name).collect())
+}
+
+/// Nombre maximal de pages parcourues lors du listing des dépôts accessibles avec le credential courant
+/// (`lister_projets`, US-008, RG-036, ajouté le 2026-08-02) : borne de sécurité arbitraire (cf. rapport de
+/// développement de cette évolution), sur le même principe que [`MAX_PAGES_CONTRIBUTEURS`] plus bas.
+const MAX_PAGES_PROJETS: u32 = 20;
+
+/// Nombre d'éléments par page du listing des dépôts accessibles (RG-036), aligné sur le maximum autorisé par
+/// l'API GitLab, sur le même principe que [`TAILLE_PAGE_AUDIT`] plus bas.
+const TAILLE_PAGE_PROJETS: &str = "100";
+
+/// Réponse d'un élément de la liste des projets accessibles de l'API GitLab (`GET /projects`), réduite aux champs
+/// exploités par [`lister_projets`] (RG-036).
+#[derive(Debug, Deserialize)]
+struct ReponseProjetDisponible {
+    id: u64,
+    path_with_namespace: String,
+}
+
+/// Liste l'ensemble des dépôts GitLab accessibles avec le credential courant (`membership=true`), pour
+/// l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le 2026-08-02) : un seul appel
+/// (paginé jusqu'à épuisement ou [`MAX_PAGES_PROJETS`]) par sélection d'instance côté appelant, celui-ci restant
+/// responsable de la mise en cache. Résultat trié par ordre alphabétique du libellé (`path_with_namespace`),
+/// insensible à la casse (RG-036).
+///
+/// # Erreurs
+///
+/// Voir [`interroger_branches`] : authentification refusée, droits insuffisants, instance injoignable, délai
+/// dépassé, ou réponse inattendue.
+pub(crate) async fn lister_projets(
+    url_base: &str,
+    credential: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
+    let mut projets = Vec::new();
+    for page in 1..=MAX_PAGES_PROJETS {
+        let url = format!("{}/api/v4/projects", url_base.trim_end_matches('/'));
+        let reponse = client
+            .get(url)
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("membership", "true"),
+                ("simple", "true"),
+                ("per_page", TAILLE_PAGE_PROJETS),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        let page_projets = reponse
+            .json::<Vec<ReponseProjetDisponible>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_projets.is_empty() {
+            break;
+        }
+        projets.extend(page_projets);
+    }
+
+    let mut disponibles: Vec<SourceDisponible> = projets
+        .into_iter()
+        .map(|projet| SourceDisponible {
+            id_externe: projet.id.to_string(),
+            libelle: projet.path_with_namespace,
+        })
+        .collect();
+    disponibles.sort_by_key(|projet| projet.libelle.to_lowercase());
+    Ok(disponibles)
 }
 
 /// Nombre d'éléments par page pour les appels paginés du Moteur d'audit (listes de commits, de demandes de
@@ -1742,6 +1830,108 @@ mod tests {
 
         assert!(matches!(
             branches,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn lister_projets_trie_par_libelle_insensible_a_la_casse() -> Result<(), ErreurConnecteur>
+    {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .and(header("PRIVATE-TOKEN", "jeton-valide"))
+            .and(wiremock::matchers::query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 91, "path_with_namespace": "nova/api-portail" },
+                { "id": 1234, "path_with_namespace": "Entreprise/api-facturation" },
+                { "id": 88, "path_with_namespace": "nova/Front-Portail" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .and(wiremock::matchers::query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let disponibles =
+            lister_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+
+        assert_eq!(
+            disponibles
+                .iter()
+                .map(|projet| projet.libelle.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Entreprise/api-facturation",
+                "nova/api-portail",
+                "nova/Front-Portail"
+            ]
+        );
+        assert_eq!(disponibles[0].id_externe, "1234");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_projets_pagine_jusqua_epuisement() -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .and(wiremock::matchers::query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 1, "path_with_namespace": "groupe/un" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .and(wiremock::matchers::query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let disponibles =
+            lister_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+
+        assert_eq!(disponibles.len(), 1);
+        assert_eq!(disponibles[0].libelle, "groupe/un");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_projets_signale_authentification_refusee() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let resultat =
+            lister_projets(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn lister_projets_signale_des_droits_insuffisants() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&serveur)
+            .await;
+
+        let resultat =
+            lister_projets(&serveur.uri(), "jeton-limite", &client_test_delai_court()).await;
+
+        assert!(matches!(
+            resultat,
             Err(ErreurConnecteur::DroitsInsuffisants { .. })
         ));
     }

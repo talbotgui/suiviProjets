@@ -26,7 +26,10 @@
 //! catalogue figé des résultats d'audit restées différées ; à cette occasion, `Branche` perd ses champs
 //! `rebasee`/`nommageConforme` (cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`). Phase 8 (US-019,
 //! US-020 ; RG-026) : s'y ajoutent `creerAnnotation` et `qualifierAlerte`, qui mutent et sauvegardent elles-mêmes le
-//! fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`.
+//! fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`. Évolution du 2026-08-02 (US-008,
+//! RG-036) : s'y ajoute `listerSourcesDisponibles`, qui liste les dépôts GitLab ou projets Sonar accessibles avec
+//! le credential courant d'une Instance, pour l'autocomplétion de l'identifiant externe d'une source (remplace la
+//! saisie libre), sur le même gabarit que `interrogerBranches`.
 
 mod commandes;
 mod connecteurs;
@@ -56,6 +59,7 @@ pub fn run() {
             commandes::connectivite::tester_connectivite,
             commandes::connectivite::definir_credentials,
             commandes::connectivite::interroger_branches,
+            commandes::connectivite::lister_sources_disponibles,
             commandes::administration::qualifier_membre,
             commandes::administration::definir_politique_ia,
             commandes::administration::supprimer_membre_connu,

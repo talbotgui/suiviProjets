@@ -6,6 +6,11 @@
 // auditée d'une source GitLab (`FacadeCommandesService.interrogerBranches`, débouncée). L'absence de ref auditée
 // est affichée explicitement comme « branche par défaut du dépôt », sans tenter de résoudre la valeur effective
 // (nécessite un audit réel, hors périmètre de cette phase, cf. `docs/02_documentation/12_modeleDonnees.md#invariants-et-règles-de-cohérence`).
+//
+// Évolution du 2026-08-02 (US-008, RG-036) : l'identifiant externe n'est plus saisi en texte libre mais choisi
+// dans une liste avec autocomplétion (`FacadeCommandesService.listerSourcesDisponibles`), chargée en un seul appel
+// à la sélection de l'instance et mise en cache pour la durée de la session (`sourcesDisponiblesParInstance`), à
+// la différence de l'autocomplétion des branches ci-dessus (rechargée à chaque frappe débouncée).
 import { Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -22,6 +27,7 @@ import { TypeInstance } from '../../../services/sansetat/commandes/types-facade'
 import type {
   Instance,
   ResultatInterrogationBranches,
+  SourceDisponible,
 } from '../../../services/sansetat/commandes/types-facade';
 
 /**
@@ -45,6 +51,12 @@ export class SqmSourcesAdminComponent {
   private readonly facadeCommandes: FacadeCommandesService = inject(FacadeCommandesService);
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
   private readonly rechercheBranche$: Subject<string> = new Subject<string>();
+
+  /**
+   * Dépôts GitLab ou projets Sonar disponibles déjà chargés, indexés par `Instance.id` (US-008, RG-036) : un seul
+   * appel par instance pour la durée de la session, plutôt qu'un appel à chaque sélection de cette même instance.
+   */
+  private readonly sourcesDisponiblesParInstance = new Map<string, readonly SourceDisponible[]>();
 
   /**
    * Types de source proposés au formulaire (dépôt GitLab, projet Sonar).
@@ -105,8 +117,16 @@ export class SqmSourcesAdminComponent {
   public suggestionsBranches: readonly string[] = [];
 
   /**
-   * Indique qu'aucun credential n'est actuellement mémorisé pour l'instance sélectionnée : l'autocomplétion des
-   * branches n'est pas disponible, l'utilisateur doit d'abord saisir un credential (Gestion des credentials).
+   * Dépôts GitLab ou projets Sonar disponibles pour l'instance actuellement sélectionnée dans le formulaire,
+   * proposés en autocomplétion de l'identifiant externe (US-008, RG-036), triés par ordre alphabétique du libellé
+   * insensible à la casse (déjà garanti par `FacadeCommandesService.listerSourcesDisponibles`).
+   */
+  public sourcesDisponibles: readonly SourceDisponible[] = [];
+
+  /**
+   * Indique qu'aucun credential n'est actuellement mémorisé pour l'instance sélectionnée : ni l'autocomplétion des
+   * branches ni celle de l'identifiant externe (RG-036) ne sont disponibles, l'utilisateur doit d'abord saisir un
+   * credential (Gestion des credentials).
    */
   public credentialAbsent = false;
 
@@ -197,6 +217,7 @@ export class SqmSourcesAdminComponent {
     this.refAuditee = '';
     this.messageErreur = null;
     this.suggestionsBranches = [];
+    this.sourcesDisponibles = [];
     this.credentialAbsent = false;
     this.formulaireVisible = true;
   }
@@ -217,8 +238,10 @@ export class SqmSourcesAdminComponent {
     this.refAuditee = source.refAuditee ?? '';
     this.messageErreur = null;
     this.suggestionsBranches = [];
+    this.sourcesDisponibles = [];
     this.credentialAbsent = false;
     this.formulaireVisible = true;
+    void this.chargerSourcesDisponibles(source.instanceId);
   }
 
   /**
@@ -237,6 +260,17 @@ export class SqmSourcesAdminComponent {
     this.type = nouveauType;
     this.instanceId = '';
     this.suggestionsBranches = [];
+    this.sourcesDisponibles = [];
+  }
+
+  /**
+   * Sélectionne l'instance du formulaire de source et déclenche le chargement (mis en cache) de la liste des
+   * dépôts/projets disponibles pour l'autocomplétion de l'identifiant externe (US-008, RG-036).
+   * @param instanceId - Identifiant de l'instance désormais sélectionnée dans le formulaire.
+   */
+  public selectionnerInstance(instanceId: string): void {
+    this.instanceId = instanceId;
+    void this.chargerSourcesDisponibles(instanceId);
   }
 
   /**
@@ -317,6 +351,39 @@ export class SqmSourcesAdminComponent {
    */
   public annulerSuppression(): void {
     this.sourceASupprimerId = null;
+  }
+
+  /**
+   * Charge, en un seul appel mis en cache pour la durée de la session (US-008, RG-036), la liste des dépôts
+   * GitLab ou des projets Sonar disponibles pour l'instance désignée, pour l'autocomplétion de l'identifiant
+   * externe. Sans effet si `instanceId` est vide ou déjà présente dans le cache.
+   * @param instanceId - Identifiant de l'instance dont on charge la liste des dépôts/projets disponibles.
+   */
+  private async chargerSourcesDisponibles(instanceId: string): Promise<void> {
+    if (instanceId.length === 0) {
+      this.sourcesDisponibles = [];
+      return;
+    }
+    const enCache = this.sourcesDisponiblesParInstance.get(instanceId);
+    if (enCache) {
+      this.sourcesDisponibles = enCache;
+      this.credentialAbsent = false;
+      return;
+    }
+    const instance = this.instancesCompatibles().find((candidat) => candidat.id === instanceId);
+    if (!instance) {
+      this.sourcesDisponibles = [];
+      return;
+    }
+    const resultat = await this.facadeCommandes.listerSourcesDisponibles(instance);
+    if (resultat.type === 'succes') {
+      this.sourcesDisponiblesParInstance.set(instanceId, resultat.sourcesDisponibles);
+      this.sourcesDisponibles = resultat.sourcesDisponibles;
+      this.credentialAbsent = false;
+      return;
+    }
+    this.sourcesDisponibles = [];
+    this.credentialAbsent = resultat.anomalie.type === 'credentialAbsent';
   }
 
   /**

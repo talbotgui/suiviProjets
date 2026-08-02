@@ -75,6 +75,18 @@ pub(crate) struct VerdictConnectivite {
     pub(crate) portee_excessive: bool,
 }
 
+/// Élément de la liste des dépôts GitLab ou des projets Sonar accessibles avec le credential courant d'une
+/// Instance, proposé par l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le
+/// 2026-08-02).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SourceDisponible {
+    /// Valeur à retenir comme `Source.idExterne` (identifiant du projet côté GitLab, clé du projet côté Sonar).
+    pub(crate) id_externe: String,
+    /// Libellé lisible affiché dans la liste (chemin complet du dépôt GitLab, nom du projet Sonar).
+    pub(crate) libelle: String,
+}
+
 /// Construit un client HTTP tenant compte du réglage applicatif de proxy optionnel fourni (US-034, RG-031), en
 /// complément du proxy système déjà pris en compte nativement par `reqwest` (`Proxy::system()`, actif par défaut
 /// pour toute requête, y compris avec ce réglage additionnel). `None` reproduit le comportement du client par

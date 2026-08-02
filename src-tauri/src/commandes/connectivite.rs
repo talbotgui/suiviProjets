@@ -16,7 +16,7 @@
 
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
-use crate::connecteurs::commun::{ErreurConnecteur, VerdictConnectivite};
+use crate::connecteurs::commun::{ErreurConnecteur, SourceDisponible, VerdictConnectivite};
 use crate::connecteurs::{gitlab, sonar};
 use crate::modele::racine::{Instance, TypeInstance};
 use std::collections::HashMap;
@@ -103,5 +103,37 @@ pub(crate) async fn interroger_branches(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
+    }
+}
+
+/// Liste les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une Instance, pour
+/// l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le 2026-08-02). Le credential
+/// utilisé est celui déjà mémorisé en mémoire pour l'instance concernée (US-003), sur le même principe que
+/// [`interroger_branches`] : il n'est jamais retransmis en clair par l'appelant. Nom de commande choisi par
+/// symétrie avec `interrogerBranches`/`testerConnectivite`, faute de nom fourni littéralement par
+/// `docs/02_documentation/13_conceptionDetaillee.md` (décision, cf. rapport de développement de cette évolution).
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::CredentialAbsent`] si aucun credential n'a été saisi pour cette instance ; les autres
+/// catégories de [`ErreurConnecteur`] en cas d'échec de l'appel réseau.
+#[tauri::command]
+pub(crate) async fn lister_sources_disponibles(
+    instance: Instance,
+    etat: State<'_, EtatSession>,
+) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
+    let credential =
+        etat.credential(&instance.id)
+            .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
+                message: "Aucun credential en mémoire pour cette instance".to_string(),
+            })?;
+    let client = etat.client_http();
+    match instance.type_instance {
+        TypeInstance::Gitlab => {
+            gitlab::lister_projets(&instance.url_base, &credential, &client).await
+        }
+        TypeInstance::Sonar => {
+            sonar::rechercher_projets(&instance.url_base, &credential, &client).await
+        }
     }
 }

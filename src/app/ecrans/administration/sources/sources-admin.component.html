@@ -112,13 +112,26 @@
 
         <label class="champ">
           Instance
-          <select class="champ__controle" name="instanceId" [(ngModel)]="instanceId">
+          <select
+            class="champ__controle"
+            name="instanceId"
+            [ngModel]="instanceId"
+            (ngModelChange)="selectionnerInstance($event)"
+          >
             <option value="" disabled>Sélectionner une instance</option>
             @for (instance of instancesCompatibles(); track instance.id) {
               <option [value]="instance.id">{{ instance.nom }}</option>
             }
           </select>
         </label>
+
+        @if (credentialAbsent) {
+          <p class="sources-admin__avertissement texte-orange texte-sm">
+            Aucun credential n'est mémorisé pour cette instance : saisissez-le depuis la Gestion des
+            credentials pour bénéficier de l'autocomplétion de l'identifiant externe et des
+            branches.
+          </p>
+        }
 
         <label class="champ">
           Identifiant externe
@@ -127,8 +140,14 @@
             class="champ__controle"
             name="idExterne"
             [(ngModel)]="idExterne"
+            list="sources-admin-id-externe"
             required
           />
+          <datalist id="sources-admin-id-externe">
+            @for (source of sourcesDisponibles; track source.idExterne) {
+              <option [value]="source.idExterne">{{ source.libelle }}</option>
+            }
+          </datalist>
         </label>
 
         @if (type === typesSource[0]) {
@@ -149,12 +168,6 @@
               }
             </datalist>
           </label>
-          @if (credentialAbsent) {
-            <p class="sources-admin__avertissement texte-orange texte-sm">
-              Aucun credential n'est mémorisé pour cette instance : saisissez-le depuis la Gestion
-              des credentials pour bénéficier de l'autocomplétion des branches.
-            </p>
-          }
         }
 
         <div class="sources-admin__actions-formulaire d-flex justifie-fin ecart-2">

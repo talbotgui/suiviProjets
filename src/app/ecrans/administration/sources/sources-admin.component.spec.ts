@@ -6,6 +6,7 @@ import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnee
 import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
 import { FacadeCommandesService } from '../../../services/sansetat/commandes/facade-commandes.service';
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmSourcesAdminComponent } from './sources-admin.component';
 
 /**
@@ -253,5 +254,147 @@ describe('SqmSourcesAdminComponent', () => {
     composant.rechercherBranches();
 
     expect(interroger).not.toHaveBeenCalled();
+  });
+
+  describe('autocomplétion de l’identifiant externe (US-008, RG-036)', () => {
+    it('rend la liste des options du datalist dans le gabarit après sélection de l’instance', async () => {
+      const facade = TestBed.inject(FacadeCommandesService);
+      jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'succes',
+        sourcesDisponibles: [
+          { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+          { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+        ],
+      });
+
+      const fixture = TestBed.createComponent(SqmSourcesAdminComponent);
+      const composant = fixture.componentInstance;
+      composant.selectionnerGroupe(groupeId);
+      composant.selectionnerProjet(projetId);
+      composant.ouvrirCreation();
+      fixture.detectChanges();
+
+      composant.selectionnerInstance('instance-gitlab');
+      await Promise.resolve();
+      await Promise.resolve();
+      fixture.detectChanges();
+
+      const elementNatif = DomTestUtils.obtenirElementNatif(fixture);
+      const datalist = elementNatif.querySelector<HTMLDataListElement>('#sources-admin-id-externe');
+      expect(datalist).not.toBeNull();
+      const options = Array.from(datalist?.querySelectorAll('option') ?? []).map((option) => ({
+        value: option.value,
+        libelle: option.textContent?.trim(),
+      }));
+      expect(options).toEqual([
+        { value: '1234', libelle: 'entreprise/api-facturation' },
+        { value: '1567', libelle: 'entreprise/batch-comptable' },
+      ]);
+
+      const champIdExterne =
+        elementNatif.querySelector<HTMLInputElement>('input[name="idExterne"]');
+      expect(champIdExterne?.getAttribute('list')).toBe('sources-admin-id-externe');
+    });
+
+    it('charge la liste des sources disponibles à la sélection de l’instance', async () => {
+      const facade = TestBed.inject(FacadeCommandesService);
+      const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'succes',
+        sourcesDisponibles: [
+          { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+          { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+        ],
+      });
+
+      const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+      composant.selectionnerGroupe(groupeId);
+      composant.selectionnerProjet(projetId);
+      composant.ouvrirCreation();
+
+      composant.selectionnerInstance('instance-gitlab');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(lister).toHaveBeenCalledWith(expect.objectContaining({ id: 'instance-gitlab' }));
+      expect(composant.instanceId).toBe('instance-gitlab');
+      expect(composant.sourcesDisponibles).toEqual([
+        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+        { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+      ]);
+    });
+
+    it("n'invoque qu'un seul appel par instance, la seconde sélection réutilisant le cache", async () => {
+      const facade = TestBed.inject(FacadeCommandesService);
+      const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'succes',
+        sourcesDisponibles: [{ idExterne: '1234', libelle: 'entreprise/api-facturation' }],
+      });
+
+      const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+      composant.selectionnerGroupe(groupeId);
+      composant.selectionnerProjet(projetId);
+      composant.ouvrirCreation();
+
+      composant.selectionnerInstance('instance-gitlab');
+      await Promise.resolve();
+      await Promise.resolve();
+      composant.selectionnerInstance('instance-gitlab');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(lister).toHaveBeenCalledTimes(1);
+      expect(composant.sourcesDisponibles).toEqual([
+        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+      ]);
+    });
+
+    it("signale l'absence de credential plutôt que de proposer des sources disponibles", async () => {
+      const facade = TestBed.inject(FacadeCommandesService);
+      jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'echec',
+        anomalie: {
+          type: 'credentialAbsent',
+          message: 'Aucun credential en mémoire pour cette instance',
+        },
+      });
+
+      const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+      composant.selectionnerGroupe(groupeId);
+      composant.selectionnerProjet(projetId);
+      composant.ouvrirCreation();
+
+      composant.selectionnerInstance('instance-gitlab');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(composant.credentialAbsent).toBe(true);
+      expect(composant.sourcesDisponibles).toEqual([]);
+    });
+
+    it('précharge la liste des sources disponibles à l’ouverture de l’édition d’une source existante', async () => {
+      const facade = TestBed.inject(FacadeCommandesService);
+      const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'succes',
+        sourcesDisponibles: [{ idExterne: '1234', libelle: 'entreprise/api-facturation' }],
+      });
+      const sourceId = donneesApplication.creerSource(groupeId, projetId, {
+        instanceId: 'instance-gitlab',
+        type: TypeSource.DepotGitlab,
+        idExterne: '1234',
+        refAuditee: undefined,
+      });
+
+      const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+      composant.selectionnerGroupe(groupeId);
+      composant.selectionnerProjet(projetId);
+      composant.ouvrirEdition(sourceId);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(lister).toHaveBeenCalledWith(expect.objectContaining({ id: 'instance-gitlab' }));
+      expect(composant.sourcesDisponibles).toEqual([
+        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+      ]);
+    });
   });
 });

@@ -13,6 +13,9 @@
 // Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis le 2026-07-28 : point de
 // passage unique permettant le bouchon TS des commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
 // `invocation-commande.utils.ts`.
+// Évolution du 2026-08-02 (US-008, RG-036) : `listerSourcesDisponibles`, qui remplace la saisie libre de
+// l'identifiant externe d'une source par une liste avec autocomplétion, chargée en un seul appel à la sélection de
+// l'instance.
 import { Injectable } from '@angular/core';
 import { InvocationCommandeUtils } from './invocation-commande.utils';
 import type {
@@ -42,12 +45,14 @@ import type {
   ResultatInterrogationTailleDepot,
   ResultatInterrogationVitalite,
   ResultatInterrogationViolations,
+  ResultatListerSourcesDisponibles,
   ResultatSonarCouverture,
   ResultatSonarDette,
   ResultatSonarNcloc,
   ResultatSonarNotes,
   ResultatSonarViolations,
   ResultatTestConnectivite,
+  SourceDisponible,
   VerdictConnectivite,
 } from './types-facade';
 
@@ -128,6 +133,37 @@ export class FacadeCommandesService {
         },
       );
       return { type: 'succes', branches };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
+    }
+  }
+
+  /**
+   * Liste les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une instance, pour
+   * l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le 2026-08-02) : remplace la
+   * saisie libre. Le credential utilisé est celui déjà mémorisé côté cœur natif pour cette instance
+   * (`definirCredentials`) : il n'est jamais retransmis par cette méthode, sur le même principe que
+   * {@link interrogerBranches}.
+   * @param instance - Instance GitLab ou Sonar dont on liste les dépôts/projets accessibles.
+   * @returns La liste des dépôts/projets disponibles en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async listerSourcesDisponibles(
+    instance: Instance,
+  ): Promise<ResultatListerSourcesDisponibles> {
+    try {
+      const sourcesDisponibles = await InvocationCommandeUtils.invoquer<
+        readonly SourceDisponible[]
+      >('lister_sources_disponibles', { instance });
+      return { type: 'succes', sourcesDisponibles };
     } catch (erreur: unknown) {
       if (this.estErreurConnecteur(erreur)) {
         return { type: 'echec', anomalie: erreur };

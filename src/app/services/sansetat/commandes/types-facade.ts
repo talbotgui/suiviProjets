@@ -15,6 +15,10 @@
 // l'autocomplétion `interrogerBranches` ci-dessus, US-008) sont livrées à l'incrément de rattrapage de la Phase 5
 // (précédant la Phase 6) : mirroir strict de `ResultatGitlabDependances`/`ResultatGitlabBranches` côté cœur natif,
 // sans `rebasee`/`nommageConforme` (cf. `docs/02_documentation/02_glossaire.md#journal-des-décisions`).
+//
+// Évolution du 2026-08-02 (US-008, RG-036) : `SourceDisponible`/`ResultatListerSourcesDisponibles`, mirroir de
+// `SourceDisponible` côté cœur natif, exposés par `FacadeCommandesService.listerSourcesDisponibles` : remplace la
+// saisie libre de l'identifiant externe d'une source par une liste avec autocomplétion.
 
 /**
  * Type d'instance externe déclarée par un groupe (mirroir de `TypeInstance` côté cœur natif).
@@ -96,6 +100,26 @@ export type ResultatTestConnectivite =
  */
 export type ResultatInterrogationBranches =
   | { readonly type: 'succes'; readonly branches: readonly string[] }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * Élément de la liste des dépôts GitLab ou des projets Sonar accessibles avec le credential courant d'une
+ * Instance (mirroir de `SourceDisponible` côté cœur natif), proposé par l'autocomplétion de l'identifiant externe
+ * d'une source (US-008, RG-036, ajouté le 2026-08-02).
+ */
+export interface SourceDisponible {
+  /** Valeur à retenir comme `Source.idExterne` (identifiant du projet côté GitLab, clé du projet côté Sonar). */
+  readonly idExterne: string;
+  /** Libellé lisible affiché dans la liste (chemin complet du dépôt GitLab, nom du projet Sonar). */
+  readonly libelle: string;
+}
+
+/**
+ * Résultat typé de `FacadeCommandesService.listerSourcesDisponibles` (US-008, RG-036, ajouté le 2026-08-02), sur
+ * le modèle de {@link ResultatInterrogationBranches}.
+ */
+export type ResultatListerSourcesDisponibles =
+  | { readonly type: 'succes'; readonly sourcesDisponibles: readonly SourceDisponible[] }
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**

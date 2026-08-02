@@ -17,7 +17,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 |---|---|---|
 | Écran d'accueil | Point d'entrée : créer ou charger le fichier de données, résumé de l'état depuis la dernière session | RG-001, RG-002, RG-003, RG-009, RG-026 |
 | Gestion des credentials | Saisie en mémoire des credentials par instance, assistant de création de token, test de connectivité | RG-004 |
-| Administration | Gestion des groupes, projets, sources, membres connus, politique IA et annotations de groupe | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015, RG-023, RG-033 |
+| Administration | Gestion des groupes, projets, sources, membres connus, politique IA et annotations de groupe | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015, RG-023, RG-033, RG-036 |
 | Constitution de campagne | Sélection du périmètre d'une campagne d'audit, contrôle des credentials nécessaires | RG-017, RG-019 |
 | Tableau de bord d'exécution | Suivi temps réel d'une campagne, annulation propre | RG-017, RG-018 |
 | Brouillon (et rapport d'anomalies) | Différentiel d'une campagne avant intégration à l'historique, anomalies d'exécution | RG-011, RG-019, RG-020, RG-021 |
@@ -70,6 +70,12 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-019 | Le lancement d'une nouvelle campagne est bloqué tant qu'un brouillon existant n'a pas été traité (intégré ou rejeté) ; au plus un brouillon existe à la fois | Constitution de campagne, Brouillon | Tentative de lancement d'une campagne |
 | RG-020 | Une variation d'indicateur jugée aberrante par rapport au dernier audit intégré du même projet est signalée automatiquement dans le brouillon avant toute intégration | Brouillon | Présentation du brouillon d'une campagne |
 | RG-021 | Une anomalie d'exécution est distinguée d'un indicateur métier, typée selon une catégorie fixe (authentification refusée, ref introuvable, instance injoignable, délai dépassé, réponse inattendue, droits insuffisants), et accompagnée d'une action suggérée en langage clair ; les anomalies de même cause sont regroupées | Brouillon (rapport d'anomalies) | Restitution des anomalies d'une campagne |
+
+### Sources et connecteurs
+
+| identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
+|---|---|---|---|
+| RG-036 | À la sélection d'une Instance dans le formulaire de rattachement d'une source, la liste complète des dépôts GitLab (instance de type `gitlab`) ou des projets Sonar (instance de type `sonar`) accessibles avec le credential courant est chargée en un seul appel, mis en cache pour la durée de la session par instance ; l'identifiant externe de la source est saisi par sélection avec autocomplétion dans cette liste, présentée triée par ordre alphabétique insensible à la casse, y compris avant toute saisie de l'utilisateur (ajouté le 2026-08-02, besoin identifié en Phase 10, absent de `Specification.md`) | Administration | Sélection d'une Instance dans le formulaire de rattachement d'une source |
 
 ### Seuils, référentiels et historisation
 
@@ -134,3 +140,4 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-033 | [US-019](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-034 | [US-036](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-035 | [US-033](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-036 | [US-008](./04_casUsage.md#cas-dusage--user-stories) |

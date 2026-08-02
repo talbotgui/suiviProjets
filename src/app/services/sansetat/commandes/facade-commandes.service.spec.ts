@@ -184,6 +184,59 @@ describe('FacadeCommandesService', () => {
     });
   });
 
+  describe('listerSourcesDisponibles (US-008, RG-036)', () => {
+    it('doit invoquer lister_sources_disponibles avec l’instance fournie', async () => {
+      invokeSimule.mockResolvedValue([
+        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+        { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+      ]);
+
+      const resultat = await service.listerSourcesDisponibles(INSTANCE_GITLAB);
+
+      expect(invokeSimule).toHaveBeenCalledWith('lister_sources_disponibles', {
+        instance: INSTANCE_GITLAB,
+      });
+      expect(resultat).toEqual({
+        type: 'succes',
+        sourcesDisponibles: [
+          { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+          { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+        ],
+      });
+    });
+
+    it('doit convertir un rejet « credentialAbsent » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({
+        type: 'credentialAbsent',
+        message: 'Aucun credential en mémoire pour cette instance',
+      });
+
+      const resultat = await service.listerSourcesDisponibles(INSTANCE_SONAR);
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: {
+          type: 'credentialAbsent',
+          message: 'Aucun credential en mémoire pour cette instance',
+        },
+      });
+    });
+
+    it('doit convertir un rejet non structuré en anomalie « reponseInattendue »', async () => {
+      invokeSimule.mockRejectedValue('erreur non structurée');
+
+      const resultat = await service.listerSourcesDisponibles(INSTANCE_GITLAB);
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      });
+    });
+  });
+
   describe('opérations d’interrogation d’indicateurs GitLab (Phase 5)', () => {
     it.each([
       ['interrogerVitalite', 'interroger_vitalite'],

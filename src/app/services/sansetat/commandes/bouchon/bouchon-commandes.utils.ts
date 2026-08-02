@@ -10,6 +10,9 @@
 //   varient d'un rafraîchissement à l'autre plutôt qu'un jeu de données figé. Les notes Sonar (`interroger_notes`,
 //   échelle discrète 1.0–5.0) et le volume de code (`interroger_ncloc`) restent volontairement fixes : les
 //   randomiser produirait des grades ou des répartitions par langage incohérents plutôt que réalistes.
+//
+// Évolution du 2026-08-02 (US-008, RG-036) : `lister_sources_disponibles`, résolue par `instance.id` depuis
+// `SOURCES_DISPONIBLES_PAR_INSTANCE` (`donnees-bouchon.ts`), triée par libellé insensible à la casse.
 import type {
   Branche,
   Dependance,
@@ -26,6 +29,7 @@ import type {
   ResultatSonarNcloc,
   ResultatSonarNotes,
   ResultatSonarViolations,
+  SourceDisponible,
   VerdictConnectivite,
 } from '../types-facade';
 import {
@@ -33,6 +37,7 @@ import {
   CONSTATS_SONAR_BOUCHON,
   CONSTAT_GITLAB_REPLI,
   CONSTAT_SONAR_REPLI,
+  SOURCES_DISPONIBLES_PAR_INSTANCE,
   type ConstatGitlabBouchon,
   type ConstatSonarBouchon,
 } from './donnees-bouchon';
@@ -64,7 +69,8 @@ type ReponseBouchon =
   | ResultatSonarDette
   | ResultatSonarCouverture
   | ResultatSonarNotes
-  | ResultatSonarNcloc;
+  | ResultatSonarNcloc
+  | readonly SourceDisponible[];
 
 /**
  * Correspondance `Source.idExterne` (dépôt GitLab) -> `Source.id`, nécessaire à `interrogerBranches` (US-008,
@@ -142,6 +148,8 @@ export class BouchonCommandesUtils {
         return undefined;
       case 'interroger_branches':
         return BouchonCommandesUtils.interrogerBranches(parametres);
+      case 'lister_sources_disponibles':
+        return BouchonCommandesUtils.listerSourcesDisponibles(parametres);
       case 'interroger_vitalite':
         return BouchonCommandesUtils.constatVitalite(parametres);
       case 'interroger_taille_depot':
@@ -379,6 +387,31 @@ export class BouchonCommandesUtils {
       return constat.branchesAutocompletion;
     }
     return constat.branchesAutocompletion.filter((nom) => nom.includes(recherche));
+  }
+
+  /**
+   * Résout la commande `lister_sources_disponibles` (US-008, RG-036, ajouté le 2026-08-02), triée par libellé par
+   * ordre alphabétique insensible à la casse, sur le même principe que le cœur natif.
+   * @param parametres - Paramètres de la commande, portant `instance` (dont `instance.id`).
+   * @returns La liste des dépôts/projets disponibles bouchonnée pour cette instance, vide si l'instance est
+   * inconnue du jeu de données du bouchon.
+   */
+  private static listerSourcesDisponibles(
+    parametres: Readonly<Record<string, unknown>>,
+  ): readonly SourceDisponible[] {
+    const instance = parametres['instance'];
+    const instanceId =
+      typeof instance === 'object' &&
+      instance !== null &&
+      'id' in instance &&
+      typeof instance.id === 'string'
+        ? instance.id
+        : undefined;
+    const disponibles =
+      instanceId === undefined ? [] : (SOURCES_DISPONIBLES_PAR_INSTANCE.get(instanceId) ?? []);
+    return [...disponibles].sort((a, b) =>
+      a.libelle.toLowerCase().localeCompare(b.libelle.toLowerCase()),
+    );
   }
 
   /**

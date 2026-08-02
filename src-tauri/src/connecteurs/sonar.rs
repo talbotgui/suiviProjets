@@ -13,7 +13,9 @@
 //! une branche fixe (généralement gérée côté CI, hors périmètre de cette application), sans équivalent du
 //! `refAuditee` d'une source GitLab dans la conception détaillée.
 
-use super::commun::{ErreurConnecteur, VerdictConnectivite, erreur_depuis_reqwest};
+use super::commun::{
+    ErreurConnecteur, SourceDisponible, VerdictConnectivite, erreur_depuis_reqwest,
+};
 use crate::modele::racine::{
     ParSeverite, ResultatSonarCouverture, ResultatSonarDette, ResultatSonarNcloc,
     ResultatSonarNotes, ResultatSonarViolations,
@@ -424,6 +426,102 @@ pub(crate) async fn interroger_derniere_analyse(
         .into_iter()
         .next()
         .map(|analyse| analyse.date))
+}
+
+/// Nombre maximal de pages parcourues lors du listing des projets Sonar accessibles avec le credential courant
+/// (`rechercher_projets`, US-008, RG-036, ajouté le 2026-08-02) : borne de sécurité arbitraire (cf. rapport de
+/// développement de cette évolution), sur le même principe que côté GitLab (`gitlab::MAX_PAGES_PROJETS`).
+const MAX_PAGES_PROJETS: u32 = 20;
+
+/// Nombre d'éléments par page du listing des projets Sonar accessibles (RG-036), maximum autorisé par l'API Sonar
+/// pour ce point d'entrée.
+const TAILLE_PAGE_PROJETS: &str = "500";
+
+/// Élément de la liste des projets de l'API Sonar (`GET /api/components/search`), réduit aux champs exploités par
+/// [`rechercher_projets`] (RG-036).
+#[derive(Debug, Deserialize)]
+struct ComposantDisponible {
+    key: String,
+    name: String,
+}
+
+/// Réponse du point d'API `components/search` de Sonar.
+#[derive(Debug, Deserialize)]
+struct ReponseComponentsSearch {
+    #[serde(default)]
+    components: Vec<ComposantDisponible>,
+}
+
+/// Recherche l'ensemble des projets Sonar accessibles avec le credential courant (`qualifiers=TRK`, seuls les
+/// projets, jamais les autres types de composants Sonar), pour l'autocomplétion de l'identifiant externe d'une
+/// source (US-008, RG-036, ajouté le 2026-08-02) : un seul appel (paginé jusqu'à épuisement ou
+/// [`MAX_PAGES_PROJETS`]) par sélection d'instance côté appelant, celui-ci restant responsable de la mise en
+/// cache. Résultat trié par ordre alphabétique du libellé (`name`), insensible à la casse (RG-036).
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::AuthentificationRefusee`] (401), [`ErreurConnecteur::DroitsInsuffisants`] (403),
+/// [`ErreurConnecteur::ReponseInattendue`] pour tout autre statut ou JSON non conforme ; délai/injoignabilité selon
+/// [`erreur_depuis_reqwest`].
+pub(crate) async fn rechercher_projets(
+    url_base: &str,
+    credential: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
+    let mut composants = Vec::new();
+    for page in 1..=MAX_PAGES_PROJETS {
+        let url = format!("{}/api/components/search", url_base.trim_end_matches('/'));
+        let reponse = client
+            .get(url)
+            .bearer_auth(credential)
+            .query(&[
+                ("qualifiers", "TRK"),
+                ("ps", TAILLE_PAGE_PROJETS),
+                ("p", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+
+        let page_composants = reponse
+            .json::<ReponseComponentsSearch>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?
+            .components;
+        if page_composants.is_empty() {
+            break;
+        }
+        composants.extend(page_composants);
+    }
+
+    let mut disponibles: Vec<SourceDisponible> = composants
+        .into_iter()
+        .map(|composant| SourceDisponible {
+            id_externe: composant.key,
+            libelle: composant.name,
+        })
+        .collect();
+    disponibles.sort_by_key(|projet| projet.libelle.to_lowercase());
+    Ok(disponibles)
 }
 
 #[cfg(test)]
@@ -985,6 +1083,110 @@ mod tests {
         assert!(matches!(
             resultat,
             Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn rechercher_projets_trie_par_libelle_insensible_a_la_casse()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .and(header("Authorization", "Bearer jeton-valide"))
+            .and(wiremock::matchers::query_param("p", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "components": [
+                    { "key": "nova:api-portail", "name": "API Portail" },
+                    { "key": "entreprise:api-facturation", "name": "api Facturation" },
+                    { "key": "nova:front-portail", "name": "Front Portail" }
+                ]
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .and(wiremock::matchers::query_param("p", "2"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "components": [] })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let disponibles =
+            rechercher_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+
+        assert_eq!(
+            disponibles
+                .iter()
+                .map(|projet| projet.libelle.as_str())
+                .collect::<Vec<_>>(),
+            vec!["api Facturation", "API Portail", "Front Portail"]
+        );
+        assert_eq!(disponibles[0].id_externe, "entreprise:api-facturation");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_projets_pagine_jusqua_epuisement() -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .and(wiremock::matchers::query_param("p", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "components": [{ "key": "groupe:un", "name": "Un" }]
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .and(wiremock::matchers::query_param("p", "2"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "components": [] })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let disponibles =
+            rechercher_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+
+        assert_eq!(disponibles.len(), 1);
+        assert_eq!(disponibles[0].libelle, "Un");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_projets_signale_authentification_refusee() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let resultat =
+            rechercher_projets(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn rechercher_projets_signale_des_droits_insuffisants() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&serveur)
+            .await;
+
+        let resultat =
+            rechercher_projets(&serveur.uri(), "jeton-limite", &client_test_delai_court()).await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
         ));
     }
 
