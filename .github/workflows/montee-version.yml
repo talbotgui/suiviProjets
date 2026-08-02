@@ -94,6 +94,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # Rend le workflow rejouable pour une même version : sans cette purge, une exécution précédente non encore
+      # fusionnée (branche distante déjà existante, historique divergent de master) fait échouer le push suivant
+      # (rejet non fast-forward). La branche `version/X.Y.Z` n'est créée que par ce workflow (aucun travail humain
+      # dessus), sa suppression est donc sans risque ; la Pull Request associée, si elle existe encore, est fermée
+      # automatiquement par GitHub à la suppression de sa branche source.
+      - name: Suppression d'une branche distante résiduelle d'une exécution précédente pour cette même version
+        run: |
+          branch="version/${{ inputs.version }}"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "::notice::Branche distante résiduelle '$branch' détectée (exécution précédente non fusionnée) : suppression avant recréation."
+            git push origin --delete "$branch"
+          fi
+
       - name: Création de la branche courte et du commit de montée de version
         id: commit
         run: |
