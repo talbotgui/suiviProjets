@@ -1,51 +1,68 @@
 <section class="reglages-applicatifs-parametrage">
-  <h2>Réglages applicatifs</h2>
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Réglages applicatifs</h2>
 
   @if (messageErreur) {
-    <p class="reglages-applicatifs-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+    <p class="reglages-applicatifs-parametrage__erreur texte-rouge" role="alert">
+      {{ messageErreur }}
+    </p>
   }
 
-  <section class="reglages-applicatifs-parametrage__bloc">
-    <header class="reglages-applicatifs-parametrage__entete">
-      <h3>Délai de verrouillage</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirEditionVerrouillage()">
+  <section class="reglages-applicatifs-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Délai de verrouillage</h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirEditionVerrouillage()"
+      >
         Modifier
       </button>
     </header>
 
-    <p>
+    <p class="texte-sm texte-discret">
       Verrouillage après {{ delaiInactiviteMinutesFormulaire }} min d'inactivité,
       {{ echecsAvantFermetureFormulaire }} échec(s) avant fermeture.
     </p>
 
     @if (verrouillageEditVisible) {
       <form
-        class="reglages-applicatifs-parametrage__formulaire"
+        class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementVerrouillage()"
       >
-        <label>
+        <label class="champ">
           Délai d'inactivité (minutes)
           <input
             type="number"
             min="1"
+            class="champ__controle"
             name="delaiInactiviteMinutesFormulaire"
             [(ngModel)]="delaiInactiviteMinutesFormulaire"
             required
           />
         </label>
-        <label>
+        <label class="champ">
           Échecs de déverrouillage avant fermeture
           <input
             type="number"
             min="1"
+            class="champ__controle"
             name="echecsAvantFermetureFormulaire"
             [(ngModel)]="echecsAvantFermetureFormulaire"
             required
           />
         </label>
-        <div class="reglages-applicatifs-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerEditionVerrouillage()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div
+          class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
+        >
+          <button type="button" class="bouton" (click)="fermerEditionVerrouillage()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }
@@ -59,32 +76,46 @@
     }
   </section>
 
-  <section class="reglages-applicatifs-parametrage__bloc">
-    <header class="reglages-applicatifs-parametrage__entete">
-      <h3>Concurrence d'audit par défaut</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirEditionConcurrence()">
+  <section class="reglages-applicatifs-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Concurrence d'audit par défaut
+      </h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirEditionConcurrence()"
+      >
         Modifier
       </button>
     </header>
 
     @if (concurrenceEditVisible) {
       <form
-        class="reglages-applicatifs-parametrage__formulaire"
+        class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementConcurrence()"
       >
-        <label>
+        <label class="champ">
           Nombre de projets audités simultanément
           <input
             type="number"
             min="1"
+            class="champ__controle"
             name="concurrenceFormulaire"
             [(ngModel)]="concurrenceFormulaire"
             required
           />
         </label>
-        <div class="reglages-applicatifs-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerEditionConcurrence()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div
+          class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
+        >
+          <button type="button" class="bouton" (click)="fermerEditionConcurrence()">Annuler</button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }
@@ -98,32 +129,46 @@
     }
   </section>
 
-  <section class="reglages-applicatifs-parametrage__bloc">
-    <header class="reglages-applicatifs-parametrage__entete">
-      <h3>Proxy sortant</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirEditionProxy()">Modifier</button>
+  <section class="reglages-applicatifs-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Proxy sortant</h3>
+      <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirEditionProxy()">
+        Modifier
+      </button>
     </header>
 
     @if (proxyEditVisible) {
       <form
-        class="reglages-applicatifs-parametrage__formulaire"
+        class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementProxy()"
       >
-        <label>
+        <label class="champ">
           URL du proxy (laisser vide pour utiliser uniquement le proxy système)
-          <input type="url" name="urlProxyFormulaire" [(ngModel)]="urlProxyFormulaire" />
+          <input
+            type="url"
+            class="champ__controle"
+            name="urlProxyFormulaire"
+            [(ngModel)]="urlProxyFormulaire"
+          />
         </label>
-        <label>
+        <label class="champ">
           Chemin du fascicule de certificats d'autorité supplémentaire
           <input
             type="text"
+            class="champ__controle"
             name="cheminBundleCaFormulaire"
             [(ngModel)]="cheminBundleCaFormulaire"
           />
         </label>
-        <div class="reglages-applicatifs-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerEditionProxy()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div
+          class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
+        >
+          <button type="button" class="bouton" (click)="fermerEditionProxy()">Annuler</button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }
@@ -137,32 +182,48 @@
     }
   </section>
 
-  <section class="reglages-applicatifs-parametrage__bloc">
-    <header class="reglages-applicatifs-parametrage__entete">
-      <h3>Nombre de sauvegardes de sécurité</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirEditionNombreSauvegardes()">
+  <section class="reglages-applicatifs-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Nombre de sauvegardes de sécurité
+      </h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirEditionNombreSauvegardes()"
+      >
         Modifier
       </button>
     </header>
 
     @if (nombreSauvegardesEditVisible) {
       <form
-        class="reglages-applicatifs-parametrage__formulaire"
+        class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementNombreSauvegardes()"
       >
-        <label>
+        <label class="champ">
           Nombre de sauvegardes conservées avant rotation
           <input
             type="number"
             min="1"
+            class="champ__controle"
             name="nombreSauvegardesFormulaire"
             [(ngModel)]="nombreSauvegardesFormulaire"
             required
           />
         </label>
-        <div class="reglages-applicatifs-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerEditionNombreSauvegardes()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div
+          class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
+        >
+          <button type="button" class="bouton" (click)="fermerEditionNombreSauvegardes()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }
@@ -176,34 +237,50 @@
     }
   </section>
 
-  <section class="reglages-applicatifs-parametrage__bloc">
-    <header class="reglages-applicatifs-parametrage__entete">
-      <h3>Avertissement de taille à la sauvegarde</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirEditionSeuilAvertissement()">
+  <section class="reglages-applicatifs-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Avertissement de taille à la sauvegarde
+      </h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirEditionSeuilAvertissement()"
+      >
         Modifier
       </button>
     </header>
 
-    <p>Seuil actuel : {{ seuilAvertissementMoActuel() }} Mo.</p>
+    <p class="texte-sm texte-discret">Seuil actuel : {{ seuilAvertissementMoActuel() }} Mo.</p>
 
     @if (seuilAvertissementEditVisible) {
       <form
-        class="reglages-applicatifs-parametrage__formulaire"
+        class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementSeuilAvertissement()"
       >
-        <label>
+        <label class="champ">
           Seuil déclenchant l'avertissement (Mo)
           <input
             type="number"
             min="1"
+            class="champ__controle"
             name="seuilAvertissementMoFormulaire"
             [(ngModel)]="seuilAvertissementMoFormulaire"
             required
           />
         </label>
-        <div class="reglages-applicatifs-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerEditionSeuilAvertissement()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div
+          class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
+        >
+          <button type="button" class="bouton" (click)="fermerEditionSeuilAvertissement()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }

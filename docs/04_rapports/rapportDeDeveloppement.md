@@ -1496,3 +1496,313 @@ Deux écarts mineurs relevés sur la fidélité annoncée des tokens de couleur 
 Point de vigilance n° 8 examiné (troncature du nom de fichier du Shell sous 576px) : confirmé comme limite réelle mais hors du périmètre garanti par RNF-030 (576px minimum), honnêtement signalée par le Codeur plutôt que passée sous silence, sans perte constatée au palier 576px lui-même (`.shell__sidebar` déjà passée en rail de 64px à ce palier, libérant la place nécessaire) : laissé en l'état, un durcissement (`min-width` sur `.shell__fichier`) restant possible pour un incrément ultérieur si jugé utile, sans urgence.
 
 Points vérifiés favorablement, à noter pour mémoire : ordre de cascade réel de `src/styles.scss` (`motifs` avant `utilitaires`), conforme à la règle de cascade CSS invoquée (spécificité égale, la déclaration la plus tardive l'emporte) et confirmé par le build ; les deux points de rupture (`shell.component.scss` sous 992px, `tableau-dense.component.scss` sous 576px) utilisent bien les variables `$sqm-pr-992`/`$sqm-pr-576` de `_points-de-rupture.scss`, sans valeur en dur ; les deux modales conservent intégralement `role="alertdialog"`/`aria-modal="true"`, aucun `autofocus`, et n'associent jamais `.bouton--principal` et `.bouton--danger` sur un même bouton ; le résidu CSS nul des deux modales est réel (`.scss` et `styleUrl` bien supprimés) ; la limitation `content: attr(data-label)` du Tableau dense (RNF-031) est honnêtement caractérisée par le Codeur (perte de la sémantique `scope="col"` native, support inégal par les technologies d'assistance sous 576px), sans information perdue au-delà de ce qui est documenté, l'en-tête de tri et la ligne de filtres restant effectivement visibles et fonctionnels au palier étroit ; aucun doublon ni incohérence de nommage dans `_utilitaires.scss`. L'interprétation « résidu CSS zéro » retenue par le Codeur (cf. ci-dessus) a depuis été validée explicitement par l'utilisateur. Cet incrément peut donc être considéré comme acquis, sous la seule réserve encore ouverte de la vérification sous Tauri packagé différée à l'incrément 10.
+
+## Étape 10 (incrément 10) — Rattrapage & bugs : C10-06, écran Paramétrage
+
+### Codeur
+
+Dixième incrément de la Phase 10, pilote de la généralisation de C10-06 aux dix écrans restants (US-037, RNF-030, RNF-031) : migre en résidu CSS zéro l'écran Paramétrage dans son intégralité — la coquille à quatre onglets (`SqmParametrageComponent`) et ses six sous-composants réels (Seuils, Référentiels, Réglages applicatifs, regroupés visuellement sous le seul onglet « Seuils et référentiels » ; Journal des modifications ; Purge des audits ; Export/Import) — en appliquant le même pattern que les cinq composants transverses de l'incrément 9 (`docs/04_rapports/rapportDeDeveloppement.md#étape-10-incrément-9--rattrapage--bugs--c10-06-socle-de-la-charte-visuelle`).
+
+**Analyse préalable.** Exploration complète de l'écran (six sous-dossiers, 196 lignes de SCSS non migré au total, valeurs `#b00020`/`#1a7f37`/`#1b5e20`/`#666`/`#ddd`/`#eee`/`#8a5a00` en dur) : premier écran à formulaires (`fieldset`/`label`/`input`/`select`/`textarea`) de la migration, aucun des cinq composants de l'incrément 9 n'en comportait. Constat que les boutons natifs de cet écran n'avaient jusqu'ici strictement aucune mise en forme (ni bordure, ni fond, rendu par le seul style par défaut du navigateur), à la différence de `demarrage.component.scss`/`accueil.component.scss` (Phase 6, non concernés par cet incrément) qui avaient déjà repris manuellement une partie de la charte de la maquette.
+
+**Deux nouveaux motifs transverses ajoutés** (besoin révélé par ce premier écran à formulaires, périmètre volontairement non anticipé à l'incrément 9 conformément au commentaire d'en-tête de `_utilitaires.scss`) :
+- `.champ`/`.champ__controle` (`src/styles/_motifs.scss`) : groupe « libellé + contrôle de saisie », dans son usage le plus courant un `<label>` englobant son texte et son `<input>`/`<select>`/`<textarea>`, mais aussi (filtres de `journal-parametrage.component.html`, où un `id`/`for` explicite est nécessaire pour associer un `<select>`/`<input type="date">` à son libellé) un conteneur `.champ` avec un `<label for="...">` et son contrôle en éléments frères directs — les deux structures sont désormais explicitement documentées en commentaire (correction apportée après relecture, cf. ci-dessous).
+- `.tableau` (`src/styles/_motifs.scss`) : table HTML classique (en-tête, bordures, espacements en tokens) pour les tableaux simples de Journal des modifications et Export/Import, distincte à dessein du composant transverse `SqmTableauDenseComponent` (déjà écarté pour ces deux tableaux à l'incrément 6 de cette même phase, faute de pagination et pour une structure de cellule jugée disproportionnée, cf. rapport de cet incrément).
+- Reset global ajouté à `_reinitialisation.scss` : `fieldset { margin: 0; padding: 0; border: none; min-width: 0; }`, `legend { padding: 0; }`, `select, textarea { font: inherit; }` — neutralise le style par défaut du navigateur (bordure grise, `min-width: auto` bloquant le rétrécissement en flex/grid) pour laisser `.carte` seule porter la mise en forme visuelle du regroupement.
+
+**Composants migrés :**
+- **Coquille** (`parametrage.component.html`/`.scss`) : onglets construits sur `.bouton`/`.bouton--discret` (classes utilitaires dans le gabarit), seule la couleur de l'onglet actif reste en résidu (`.parametrage__onglet--actif`, sur le modèle exact de `.shell__lien--actif` de l'incrément 9).
+- **Seuils** (19 champs numériques répartis en 10 `fieldset`) : résidu CSS strictement nul atteint (`.scss` et `styleUrl` supprimés, comme les deux modales de l'incrément 9) — chaque `fieldset` devient une `.carte`, chaque champ un `.champ`/`.champ__controle`.
+- **Référentiels** (dépendances, marqueurs IA, motif de nommage de branches) : résidu nul également ; les boutons d'action de chaque ligne (`Modifier`/`Supprimer`) passent en `.bouton--discret`, ajout de `retour-ligne` pour éviter tout débordement horizontal à largeur étroite.
+- **Réglages applicatifs** (5 réglages, C10-01/US-034) : résidu nul.
+- **Journal des modifications** : résidu nul ; le tableau HTML simple (`journal-parametrage__tableau`) passe sur `.tableau`, enveloppé d'un conteneur `.deborde-auto` (défilement horizontal propre, jamais celui du corps de page) plutôt qu'un traitement RNF-031 complet en carte-par-ligne — ce dernier réservé au seul composant transverse `SqmTableauDenseComponent` (Synthèse des audits/Liste de travail, incréments 16/20), disproportionné pour ce tableau à cinq colonnes déjà jugé trop simple pour ce même composant à l'incrément 6.
+- **Purge des audits** : résidu nul ; le `fieldset` « Mode » (deux boutons radio natifs, non stylés par cet incrément, RG charte n'exigeant aucune mise en forme dédiée) passe en `.carte` implicite via `d-flex`/`ecart-*`.
+- **Export/Import** : résidu nul ; tableau différentiel sur `.tableau` + `.deborde-auto`, même raisonnement que le Journal.
+
+**Vérifications rejouées par le Codeur :** `npx tsc --noEmit -p tsconfig.spec.json` sans erreur, `npx eslint` sans avertissement, `npx prettier --write` (reformatage des 9 fichiers modifiés, aucun changement de fond), `npx jest --silent` sur l'écran (9 suites, 117 tests verts, inchangé), `npx jest --silent` sur la suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement de budget (feuille de style globale : 13,06 Kio, contre 12,21 Kio à l'incrément précédent).
+
+**Vérification visuelle.** Chromium headless (déjà installé à l'incrément 9) rejouant des fragments de gabarit fidèles avec le CSS global compilé (`styles.css`) aux cinq paliers RNF-030, complété par une extraction directe des règles CSS de composant depuis le bundle `main-*.js` (les styles de composant Angular, encapsulés, ne figurent pas dans `styles.css` global) pour confirmer la présence et le contenu exact des résidus `.parametrage__onglet--actif`, `.champ__controle`, etc. Confirme visuellement : mise en page en carte de chaque bloc de formulaire, absence de débordement horizontal à 375px (le tableau du Journal défile proprement dans son propre conteneur sans faire déborder la page), lisibilité conservée à tous les paliers testés (1400/992/768/576/375px).
+
+**Réserve non levée par cet incrément : vérification sous Tauri packagé.** Le critère de sortie explicite de cet incrément (« validation de bout en bout de l'approche, y compris sous Tauri packagé ») n'a pas pu être rempli dans cet environnement de développement : aucun runtime Tauri (ni WebView2/WebKitGTK, ni affichage graphique) n'y est disponible pour packager et exécuter l'application réelle. Seule la vérification par Chromium headless décrite ci-dessus a pu être menée, qui ne couvre ni la CSP réelle appliquée par le binaire packagé (`style-src 'self'; font-src 'self'`, inchangée par construction — aucune ressource externe n'est chargée par cet incrément, seules des polices système et un CSS local sont utilisés, cf. incrément 9), ni le rendu du moteur WebView natif de l'OS cible. Signalé honnêtement plutôt que présumé conforme : à couvrir explicitement lors de la Phase 12 (recette et durcissement), ou par un humain disposant d'un poste de développement complet avant la prochaine mise à disposition d'une version.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+- **Ajout de deux motifs transverses (`.champ`/`.champ__controle`, `.tableau`) plutôt que des styles propres à chaque sous-composant** : cohérent avec la logique déjà actée à l'incrément 9 (« périmètre étendu au fil des incréments suivants à mesure que chaque écran migré révèle un nouveau besoin, plutôt que construit intégralement par anticipation »).
+- **Tableaux simples de Journal/Export-Import enveloppés d'un simple défilement horizontal (`.deborde-auto`) plutôt qu'un traitement RNF-031 complet en carte-par-ligne** : RNF-031 ne mandate explicitement ce traitement que pour le composant transverse Tableau dense (cf. plan de développement, incréments 16/20) ; ces deux tableaux ont par ailleurs déjà été jugés trop simples pour justifier la réutilisation de ce même composant (incrément 6 de cette phase). Décision arbitraire à valider par un humain : un traitement RNF-031 complet pourrait être ajouté à un incrément ultérieur si jugé nécessaire après usage réel.
+- **`role="status"` ajouté aux messages de succès de Purge, Export/Import et Journal** (`purge-parametrage.component.html`, `export-import-parametrage.component.html`, `journal-parametrage.component.html`), par cohérence avec celui déjà présent sur le message de succès de Seuils : incohérence préexistante (non introduite par cet incrément), relevée lors de la relecture isolée (cf. ci-dessous) et corrigée par cohérence plutôt que laissée en l'état, le domaine (accessibilité) étant un point de vigilance renforcée.
+
+### Doutes et ambiguïtés rencontrés
+
+- Le "sixième sous-onglet" mentionné par le plan de développement (« six sous-onglets : Seuils et référentiels, Réglages applicatifs, Journal des modifications, Purge des audits, Export/import », cinq noms cités pour six) a été résolu par lecture directe du code : trois composants distincts (Seuils, Référentiels, Réglages applicatifs) sont rendus ensemble sous le seul bouton de navigation « Seuils et référentiels », ce qui porte bien le total à six sous-composants réels pour quatre boutons de navigation visibles. Interprétation retenue sans ambiguïté restante, mais signalée ici pour traçabilité.
+- Vérification sous Tauri packagé non réalisable dans cet environnement (cf. paragraphe dédié ci-dessus) : point ouvert, non résolu par cet incrément, à traiter par un humain.
+
+### Relecteur
+
+Relecture conduite dans un contexte isolé de celui du Codeur (sous-agent dédié sans connaissance de la session productrice), portant sur l'intégralité des fichiers modifiés listés par le compte-rendu (`_reinitialisation.scss`, `_motifs.scss`, `_tokens.scss`/`_utilitaires.scss`/`_points-de-rupture.scss` en référence, les sept fichiers de la coquille et des six sous-composants Paramétrage, `.spec.ts` associés), avec vérification directe de chaque affirmation par lecture du code plutôt que sur la seule foi du texte (`.claude/rules/01-usage-ia-et-conventions.md#diligence`) : comparaison exhaustive des `var(--sqm-*)` utilisés contre `_tokens.scss` (aucun token manquant ni inventé), comparaison des classes utilitaires/motifs utilisées contre `_utilitaires.scss`/`_motifs.scss` (aucune classe orpheline ni mal orthographiée), confirmation par recherche directe (`find`, `grep`) de la suppression effective des six fichiers `.scss` et de l'absence de tout `styleUrl` résiduel dans les six `.ts` correspondants, lecture des `.spec.ts` de l'écran (aucun ne cible une classe BEM par `querySelector`/`By.css`, seuls `table` et `[role="alert"]` sont interrogés — confirmé, aucun risque de rupture de sélecteur de test), comparaison textuelle des libellés affichés avec la maquette de référence et `docs/02_documentation/` (aucune altération de contenu détectée), et rejeu indépendant de `tsc --noEmit`, `eslint`, `prettier --check` et `jest` sur le périmètre (résultats concordants avec ceux du Codeur).
+
+Deux réserves mineures relevées, aucune bloquante : (1) le motif `.champ`, décrit en commentaire comme un `<label>` englobant systématiquement son contrôle, était en réalité appliqué à un `<div>` englobant un `<label for="...">` et son contrôle en éléments frères pour les trois filtres du Journal des modifications — fonctionnellement correct (association `for`/`id` valide, même mise en page), mais non documenté comme variante valide ; corrigé par le Codeur après relecture (commentaire de `_motifs.scss` étendu aux deux structures). (2) `role="status"` présent sur le message de succès de Seuils mais absent des messages équivalents de Journal, Purge et Export/Import — incohérence préexistante à cet incrément (non introduite par la migration CSS elle-même), relevée car touchant un point de vigilance renforcée (accessibilité) ; corrigée par cohérence par le Codeur après relecture plutôt que laissée en l'état.
+
+Aucune valeur brute non justifiée, aucun token invalide, aucune classe utilitaire sans effet, aucun `styleUrl` résiduel : avis global du Relecteur « acquis sous réserve », les deux réserves relevées ayant été corrigées immédiatement après relecture. Incrément considéré comme acquis, sous la seule réserve encore ouverte (non levable dans cet environnement) de la vérification sous Tauri packagé, explicitement reportée à la Phase 12 ou à un humain disposant d'un poste de développement complet.
+
+## Étape 10 (incrément 11) — Rattrapage & bugs : C10-06, écran Démarrage
+
+### Codeur
+
+Onzième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran Démarrage (`SqmDemarrageComponent`, sélection/création/chargement du fichier de données, US-001/US-002), seul écran routé **hors Shell** (`app.routes.ts` : route racine `demarrage`, distincte des routes enfants du Shell) — à la différence de tous les écrans migrés jusqu'ici (Paramétrage, et les cinq composants transverses de l'incrément 9), il ne bénéficie donc pas du padding déjà apporté par `.shell__ecran` et doit centrer/espacer lui-même son propre contenu de page.
+
+**Constat préalable.** Contrairement aux six sous-composants de Paramétrage (dépourvus de toute mise en forme), cet écran avait déjà repris manuellement, dès sa construction en Phase 6, une bonne partie de la charte visuelle de la maquette de référence (cartes, boutons, champs) mais en valeurs `oklch`/`px` propres au composant, plusieurs correspondant numériquement de façon exacte aux tokens introduits à l'incrément 9 (ex. `oklch(89% 0.006 250)` = `--sqm-neutre-300`, `oklch(55% 0.16 258)` = `--sqm-marque`) — cohérent avec le commentaire d'en-tête de `_tokens.scss` indiquant que ces tokens reprennent fidèlement les teintes déjà utilisées par les composants préexistants.
+
+**Migration.** Les deux boutons de chaque carte (`Choisir l'emplacement…`/`Créer le fichier`, `Choisir un fichier…`/`Charger le fichier`) correspondaient exactement au motif `.bouton`/`.bouton--principal` partagé (mêmes bordure/fond/rayon/police) : reconstruits sur ces classes plutôt que conservés en styles propres. Les deux `<label>` de mot de passe correspondaient au motif `.champ`/`.champ__controle` introduit à l'incrément précédent. Les deux cartes elles-mêmes correspondaient au motif `.carte`. Résidu conservé, justifié en commentaire d'en-tête : positionnement de page (`max-width: 920px; margin: 60px auto`, dimension spécifique à cet écran hors Shell, sans équivalent générique), variante de mise en avant de la seconde carte (`--sqm-marque`/`--sqm-marque-fond-douce`), `word-break: break-all` du chemin de fichier (comportement non générique), et `align-self: flex-start` des boutons au sein d'un conteneur en colonne flex (les champs doivent s'étirer sur toute la largeur, pas les boutons — comportement de la maquette non exprimable par une classe utilitaire à une seule propriété).
+
+**Responsive (RNF-030).** Les deux cartes, côte à côte par défaut (`d-flex ecart-4`, chacune `flex-1`), se replient en une colonne sous le palier 768px (`@include pr.jusqua(pr.$sqm-pr-768) { flex-direction: column; }`), pour rester lisibles aux paliers étroits.
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write` (aucun changement de fond), `npx jest --silent` sur l'écran (1 suite, tests inclus dans les 9 suites/117 tests de l'incrément 10 rejoués ensemble) et sur la suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement. Vérification visuelle par Chromium headless aux cinq paliers RNF-030 (cf. incrément 10) : bascule en une colonne sous 768px confirmée par extraction directe de la media query compilée dans `main-*.js` (`@media(max-width:767.98px){.demarrage__cartes{flex-direction:column}`).
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+- **`margin: 60px auto` conservé en valeur littérale** plutôt qu'arrondi à l'échelle de tokens la plus proche (`--sqm-espace-12`, 48px) : écart jugé trop visible (12px) pour un centrage vertical de page hors Shell sans équivalent dans le reste de la charte, à la différence des espacements internes (résolus en tokens sans écart perceptible).
+- **Palier de bascule à 768px** pour les deux cartes (plutôt que 992px comme le Shell, ou 576px comme le Tableau dense) : chaque carte contenant un formulaire complet (deux champs de mot de passe), 768px a été jugé le point où deux cartes côte à côte deviendraient trop étroites pour rester lisibles, décision arbitraire à défaut de valeur chiffrée dans la documentation source.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau au-delà de ceux déjà actés à l'incrément 9 (résidu CSS zéro, vérification Tauri packagé). Le commentaire d'en-tête historique de `demarrage.component.ts` (Phase 6) signalait déjà que cet écran est distinct de l'écran Accueil post-ouverture — confirmé sans ambiguïté par la lecture de `app.routes.ts` (route racine `demarrage`, hors Shell), cohérent avec le statut de cet écran comme résolution de la tension documentaire mentionnée en tête de la Phase 10 du plan.
+
+### Relecteur
+
+Relecture conduite dans le même contexte isolé et selon la même méthode que l'incrément 10 (cf. ci-dessus), portant sur `demarrage.component.html`/`.scss` et `demarrage.component.spec.ts`. Confirmé : aucune valeur brute non justifiée hors les deux dimensions de page documentées en commentaire (`max-width`, `margin`) ; les `var(--sqm-marque)`/`--sqm-marque-fond-douce` de la variante « mise en avant » existent bien dans `_tokens.scss` ; le point de rupture utilise `$sqm-pr-768` de `_points-de-rupture.scss` (aucune valeur en dur) ; `demarrage.component.spec.ts` ne cible aucune classe CSS par sélecteur (vérifié, aucun risque de rupture de test) ; libellés de la maquette de référence conservés à l'identique. Aucun écart relevé. Avis global : acquis.
+
+## Étape 10 (incrément 12) — Rattrapage & bugs : C10-06, écran Accueil
+
+### Codeur
+
+Douzième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran Accueil (`SqmAccueilComponent`, US-005, résumé depuis la dernière session), routé sous le Shell (bénéficie donc déjà du padding de `.shell__ecran`, à la différence de Démarrage).
+
+**Migration.** Les quatre cartes statistiques (`accueil__carte`) et les deux sections de liste (`accueil__section`) correspondaient exactement au motif `.carte` (mêmes bordure `--sqm-neutre-300`/rayon `--sqm-rayon-xl`, valeurs numériquement identiques à la maquette). La liste (`accueil__liste`) passe sur l'utilitaire `.sans-liste`, chaque ligne (`accueil__ligne`) sur `.bordure-bas` (teinte `--sqm-neutre-250`, elle aussi exactement identique à la maquette). Résidu conservé, justifié en commentaire d'en-tête : grille statistique à 4 colonnes propre à cet écran (repliée à 2 puis 1 colonnes, RNF-030, cf. ci-dessous), variante d'alerte de la carte « Membres inconnus » (RG-009, couleurs `--sqm-alerte-*` — numériquement identiques à la maquette, confirmant l'analyse déjà faite à l'incrément 9 selon laquelle ces teintes magenta n'étaient pas encore raccordées aux tokens sur cet écran), suppression de la bordure de la dernière ligne de chaque liste (`:last-child`, non exprimable par la seule classe utilitaire partagée `.bordure-bas`), et couleur/dimension du point d'alerte (`accueil__pastille`).
+
+**Décision arbitraire notable : couleur du point d'alerte.** Aucun token de `_tokens.scss` ne correspond exactement à la teinte rouge vive `oklch(58% 0.2 25)` de la maquette pour ce point décoratif (distincte de `--sqm-rouge-texte`, calibrée pour du texte). Plutôt que d'inventer un nouveau token pour ce seul usage (ce qu'avait fait l'incrément 9 pour `--sqm-orange-bordure`, par symétrie avec un token voisin déjà existant, ce qui n'est pas le cas ici), le Codeur a choisi de réutiliser `--sqm-rouge-texte` : écart de fidélité chromatique mineur, sans risque de contraste (la couleur reste dans la même famille sémantique rouge), signalé explicitement pour arbitrage humain plutôt que présumé acquis.
+
+**Responsive (RNF-030).** La grille statistique (`display: grid; grid-template-columns: repeat(4, 1fr)`) se replie à 2 colonnes sous 992px puis à 1 colonne sous 576px (`@include pr.jusqua(pr.$sqm-pr-992)`/`@include pr.jusqua(pr.$sqm-pr-576)`), pour rester lisible aux paliers étroits sans perte de contenu.
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write` (aucun changement de fond), `npx jest --silent` (1 suite, tests inclus dans les 9 suites/117 tests de l'incrément 10 rejoués ensemble) et sur la suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement (feuille de style globale finale de ces trois incréments : 13,06 Kio). Vérification visuelle par Chromium headless aux cinq paliers RNF-030, complétée par extraction directe des media queries compilées dans `main-*.js` pour confirmer la bascule de la grille à 992px/576px.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+- **Réutilisation de `--sqm-rouge-texte` pour le point d'alerte** plutôt qu'un nouveau token dédié : cf. paragraphe dédié ci-dessus, décision à valider par un humain.
+- **Arrondis mineurs de tailles/marges de la maquette à l'échelle de tokens la plus proche** (ex. 11,5px → `--sqm-texte-2xs` 11px ; 6px de marge de libellé de carte → `--sqm-espace-1` 4px) : même logique déjà actée à l'incrément 9, écarts de l'ordre du pixel sans impact perceptible.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau au-delà de la couleur du point d'alerte déjà signalée ci-dessus. Le commentaire d'en-tête historique d'`accueil.component.ts` (Phase 6) signale un périmètre volontairement restreint (seule cause d'alerte détectable à ce jour : membre inconnu) et une tension documentaire sur la nature de l'écran Accueil, déjà reprise en tête de la Phase 10 du plan de développement : non affectée par cet incrément, qui ne modifie aucune logique.
+
+### Relecteur
+
+Relecture conduite dans le même contexte isolé et selon la même méthode que les incréments 10 et 11 (cf. ci-dessus), portant sur `accueil.component.html`/`.scss` et `accueil.component.spec.ts`. Confirmé : aucune valeur brute non justifiée hors les dimensions de page et le point d'alerte documentés en commentaire ; tous les `var(--sqm-alerte-*)`/`--sqm-rouge-texte` utilisés existent bien dans `_tokens.scss` ; les deux points de rupture utilisent `$sqm-pr-992`/`$sqm-pr-576` de `_points-de-rupture.scss` (aucune valeur en dur) ; `accueil.component.spec.ts` ne cible que `[role="alert"]` par sélecteur (aucune classe BEM, aucun risque de rupture de test) ; libellés conservés à l'identique. Écart de fidélité chromatique du point d'alerte (`--sqm-rouge-texte` au lieu d'une teinte dédiée) confirmé mineur, sans risque de contraste, déjà signalé comme décision arbitraire par le Codeur plutôt que découvert en relecture. Aucun écart bloquant. Avis global : acquis, sous réserve de la validation humaine de la décision arbitraire relative au point d'alerte.
+
+## Étape 10 (incrément 13) — Rattrapage & bugs : C10-06, écran Credentials
+
+### Codeur
+
+Treizième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran de Gestion des credentials (`SqmCredentialsComponent`, US-003, US-004, US-031), routé sous le Shell.
+
+**Migration.** Le tableau des instances (`credentials__table`) passe sur le motif `.tableau` introduit à l'incrément 10 (Journal des modifications/Export-Import), enveloppé du même conteneur `.deborde-auto` (défilement horizontal propre, pas de traitement RNF-031 complet en carte-par-ligne, même raisonnement qu'aux incréments précédents : ce tableau reste un tableau simple, distinct du composant transverse `SqmTableauDenseComponent`). Le champ de saisie du credential (cellule de tableau, sans libellé visible — seul un `aria-label` explicite l'identifie) reçoit `.champ__controle` sans le wrapper `.champ` (pas de texte de libellé à mettre en colonne). Les trois statuts de verdict (en cours/succès/échec) sont distingués par les utilitaires de couleur sémantique déjà existants (`texte-discret`/`texte-vert`/`texte-orange` pour la portée excessive/`texte-rouge`), sur le même principe que les badges de statut déjà migrés aux incréments précédents. Résidu CSS strictement nul atteint (`.scss` et `styleUrl` supprimés).
+
+**`role="status"` ajouté au message de succès** (`credentials.component.html`), par cohérence avec la correction déjà appliquée aux messages de succès de Purge/Export-Import/Journal à l'incrément 10.
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write` (reformatage seul), `npx jest --silent` sur l'écran et sur la suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement. Vérification visuelle par Chromium headless (1400/576/375px) : tableau lisible aux trois paliers testés, défilement horizontal contenu dans son propre conteneur à 375px (pas de débordement de page), couleurs de verdict conformes.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+Aucune décision arbitraire nouvelle propre à cet incrément : réutilisation stricte des motifs/utilitaires déjà établis, aucun résidu CSS ajouté.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau au-delà de ceux déjà actés aux incréments précédents.
+
+### Relecteur
+
+Relecture conduite dans un contexte isolé de celui du Codeur, portant sur `credentials.component.html`/`.ts` et `credentials.component.spec.ts`, conjointement avec l'incrément 14 (cf. rapport ci-dessous, méthode commune). Confirmé : résidu CSS strictement nul réel (`.scss` supprimé, aucun `styleUrl` résiduel) ; toutes les classes utilitaires/motifs utilisées existent avec le comportement attendu ; `credentials.component.spec.ts` ne cible aucune classe CSS par sélecteur ; contenu textuel inchangé ; `role="alert"`/`aria-label` conservés. Aucun écart. Avis global : acquis.
+
+## Étape 10 (incrément 14) — Rattrapage & bugs : C10-06, écran Administration
+
+### Codeur
+
+Quatorzième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran Administration dans son intégralité — la coquille à trois onglets (`SqmAdministrationComponent` : Groupes/Projets/Sources), le sous-écran Groupes lui-même à trois sous-onglets (`SqmGroupesAdminComponent` : Groupes/Membres connus/Annotations, C10-04) et ses deux sous-composants (`SqmMembresConnusAdminComponent`, `SqmAnnotationsGroupeAdminComponent`), ainsi que Projets (`SqmProjetsAdminComponent`) et Sources (`SqmSourcesAdminComponent`) — soit six composants au total, tous suivant le même patron CRUD liste/formulaire déjà rencontré à l'incrément 10 (Référentiels).
+
+**Migration.** Réutilisation stricte des motifs/utilitaires déjà établis (`.carte`, `.bouton`/`.bouton--principal`/`.bouton--discret`, `.champ`/`.champ__controle`, `sans-liste`, `bordure-bas`, `retour-ligne`) sans qu'aucun nouveau motif transverse n'ait été nécessaire, ces six composants ne présentant pas de forme structurelle nouvelle par rapport aux écrans déjà migrés. Les deux coquilles à onglets (`administration.component.html`, `groupes-admin.component.html`) reprennent exactement le résidu `.parametrage__onglet--actif` de l'incrément 10 (couleur de l'onglet actif). La mise en évidence d'une règle de membre connu en conflit (RG-008, `membres-connus-admin.component.scss`) est conservée en résidu (`outline: 1px solid var(--sqm-orange-bordure)`, non exprimable par une classe utilitaire à une seule propriété), de même que le badge de conflit désormais recoloré en `texte-orange`/`poids-gras` (classes utilitaires) plutôt que la couleur `#b06000` en dur d'origine.
+
+**Nouvelle classe utilitaire ajoutée : `.italique`** (`src/styles/_utilitaires.scss`, `font-style: italic`), pour remplacer le seul `font-style: italic` propre à `projets-admin.component.scss` (mention de la politique IA d'un projet) : périmètre étendu par petites touches au fil des écrans migrés, conformément à la convention déjà actée à l'incrément 9.
+
+**Quatre des six composants atteignent le résidu CSS strictement nul** (`.scss` et `styleUrl` supprimés) : Projets, Sources, Annotations de groupe, et Credentials (incrément 13). Les deux coquilles à onglets (Administration, Groupes) et Membres connus conservent chacune un résidu minimal justifié (couleur d'onglet actif ; mise en évidence du conflit de règles).
+
+**Correction opportuniste (hors périmètre strict de la migration CSS, relevée en préparant cet incrément) :** le commentaire d'en-tête d'`administration.component.ts` affirmait encore que le sous-onglet Annotations de groupe « reste différé à la Phase 8 (US-020) et n'apparaît pas ici », alors qu'il est construit et actif depuis l'incrément 8 de cette même Phase 10 (C10-04). Corrigé par cohérence documentaire, sans changement de comportement.
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write` (reformatage seul), `npx jest --silent` sur les sept suites de Credentials/Administration (72 tests verts) et sur la suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement (feuille de style globale : 13,09 Kio). Vérification visuelle par Chromium headless (1400/576/375px) sur l'écran Administration (onglets, sous-onglets, liste de groupes, formulaire imbriqué avec sa `fieldset` d'instances) : mise en page cohérente et repliement propre à 375px.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+- **Aucun nouveau motif transverse** au-delà de la classe utilitaire `.italique` : les six composants de cet incrément suivent tous des formes déjà couvertes par les motifs existants, contrairement à l'incrément 10 qui avait révélé le besoin de `.champ`/`.tableau`.
+- **`role="status"` non ajouté** aux messages d'erreur/succès des composants d'Administration au-delà de ceux déjà présents : à la différence de Paramétrage/Credentials, la plupart des opérations CRUD de ces écrans referment silencieusement leur formulaire en cas de succès plutôt que d'afficher un message de confirmation persistant (aucun message de succès de ce type n'existe dans ces gabarits) ; seuls les messages d'erreur (`role="alert"`, déjà présents avant migration) sont concernés, aucune incohérence de ce type n'a donc été relevée ici.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau au-delà de ceux déjà actés aux incréments précédents.
+
+### Relecteur
+
+Relecture conduite dans un contexte isolé de celui du Codeur (sous-agent dédié sans connaissance de la session productrice), portant sur l'intégralité des fichiers modifiés des incréments 13 et 14 conjointement (`_utilitaires.scss`, `_motifs.scss`/`_tokens.scss` en référence, les sept composants Credentials/Administration et leurs `.spec.ts`), avec vérification directe de chaque affirmation par lecture du code : recherche systématique de valeurs brutes (`grep` ciblé sur hex/oklch/px) sans résultat hors fichiers de tokens, comparaison des `var(--sqm-*)` utilisés contre `_tokens.scss`, confirmation de la suppression effective des quatre `.scss` et de l'absence de tout `styleUrl` résiduel, lecture des sept `.spec.ts` (aucun sélecteur CSS de test, tous ciblent l'API TypeScript du composant), vérification de la nouvelle classe `.italique` (bien placée, une seule propriété, correctement utilisée), et rejeu indépendant de `tsc --noEmit`, `eslint`, `prettier --check` et `jest` (résultats concordants).
+
+Deux réserves documentaires relevées, aucune technique : (1) le plan de développement indiquait encore ces deux incréments « À faire » au moment de la relecture — corrigé par le Codeur immédiatement après (mise à jour de `plan_13_developpement.md`) ; (2) aucune section de rapport n'existait encore pour ces deux incréments au moment de la relecture — la présente section constitue cette mise à jour. Une anomalie documentaire préexistante (non introduite par cet incrément) a également été relevée : le commentaire d'en-tête d'`administration.component.ts` affirmait à tort que le sous-onglet Annotations restait différé ; corrigé par le Codeur par cohérence.
+
+Aucune valeur brute non justifiée, aucun token invalide, aucune classe utilitaire sans effet, aucune régression fonctionnelle ou d'accessibilité : avis global du Relecteur « acquis sous réserve », les réserves (exclusivement documentaires) ayant été levées immédiatement après relecture. Incréments 13 et 14 considérés comme acquis.
+
+## Étape 10 (incrément 15) — Rattrapage & bugs : C10-06, écran Audits
+
+### Codeur
+
+Quinzième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran Audits, constitué de trois composants indépendants routés séparément — Constitution de campagne (`SqmConstitutionCampagneComponent`), Tableau de bord d'exécution (`SqmTableauDeBordComponent`) et Brouillon (`SqmBrouillonComponent`).
+
+**Deux nouveaux motifs transverses ajoutés** (besoin révélé par ces trois écrans, premiers depuis l'incrément 10 à combiner cartes d'alerte colorées — blocage rouge, anomalie orange — avec le motif `.carte` partagé) : aucun nouveau motif de fond n'a été nécessaire (`.carte` combiné aux utilitaires `fond-rouge`/`fond-orange` suffit pour la couleur de fond), seule la couleur de bordure de chacune de ces cartes reste en résidu local à chaque composant (`.carte` ne porte par défaut qu'une bordure neutre) — ex. `.constitution-campagne__bandeau-blocage { border-color: var(--sqm-rouge-bordure); }`, `.brouillon__anomalie { border-color: var(--sqm-orange-bordure); }`.
+
+**Migration :**
+- **Constitution de campagne** : bandeau de blocage (rouge, `role="alert"`), raccourcis de sélection, arborescence groupes/projets à cases à cocher, récapitulatif (`.carte`), bouton de lancement (`.bouton--principal`). Résidu conservé : bordure du bandeau, indentation de la liste imbriquée des projets (`padding-left`, non générique), séparateur généré (`::after`) entre les credentials manquants.
+- **Tableau de bord d'exécution** : en-tête (compteur, temps restant, barre de progression), tableau des projets en cours (`.tableau`, enveloppé de `.deborde-auto`). Résidu conservé : dimensions/couleur de la barre de progression, couleur de la ligne active, et les cinq variantes du badge de statut d'exécution (`StatutExecutionProjet` : `enAttente`/`enCours`/`termine`/`echoue`/`ignore`) — gardées en résidu à tokens uniques plutôt que converties en classes utilitaires conditionnelles, par cohérence avec le patron déjà retenu pour `SqmBadgeComponent` à l'incrément 9 (mise en page en utilitaires, variantes de couleur en résidu SCSS).
+- **Brouillon** : actions globales, liste des projets en carte (`.carte`), rapport d'anomalies techniques (carte orange). Résidu conservé : bordure de la carte d'anomalie, séparateur généré entre les projets concernés (même motif que Constitution de campagne, dupliqué localement plutôt que partagé — deux occurrences seulement, abstraction jugée prématurée).
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write` (reformatage seul), `npx jest --silent` sur les trois composants (3 suites, 55 tests verts), suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement. Vérification visuelle par Chromium headless (1400/375px, fragments de gabarit fidèles avec le CSS global compilé) : cartes d'alerte/anomalie, tableau de progression et barre de remplissage lisibles aux deux paliers testés, tableau des projets en cours défilant proprement dans son propre conteneur à 375px.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+- **Cinq variantes du badge de statut d'exécution gardées en résidu SCSS** (plutôt que traduites en classes utilitaires conditionnelles `[class.fond-vert]`/etc.) : plus concis, cohérent avec le patron déjà retenu pour `SqmBadgeComponent` (incrément 9), où seule la mise en page bascule en utilitaires et les variantes de couleur restent un résidu à tokens uniques.
+- **Séparateur généré entre éléments d'une liste en ligne** (`::after { content: ',' }`, credentials manquants/projets concernés d'une anomalie) dupliqué localement dans les deux composants concernés plutôt que factorisé : seulement deux occurrences, dans deux composants distincts avec des noms de classe BEM différents — abstraction jugée prématurée (cf. règle du projet contre l'abstraction prématurée).
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau au-delà de ceux déjà actés aux incréments précédents.
+
+### Relecteur
+
+Relecture conduite dans un contexte isolé de celui du Codeur, conjointement avec les incréments 16 à 20 (méthode commune décrite en fin de section de l'incrément 20 ci-dessous). Confirmé pour cet incrément : aucune valeur brute non justifiée dans les trois composants ; les cinq modificateurs du badge de statut d'exécution (`_ngcontent` compilé) correspondent exactement, casse comprise, au type `StatutExecutionProjet` et à la classe interpolée dans le gabarit ; aucun `styleUrl` résiduel incorrect ; aucun test cassé. Une réserve mineure relevée et corrigée par le Codeur immédiatement après relecture : le champ de saisie libre « Motif de rejet » de `brouillon.component.html` (préexistant à cet incrément) ne portait aucun nom accessible (ni `<label>`, ni `aria-label`, ni `id`/`for`), à la différence des champs de recherche introduits par ce même incrément sur les autres écrans — `aria-label` ajouté par cohérence. Avis global : acquis.
+
+## Étape 10 (incrément 16) — Rattrapage & bugs : C10-06, écran Synthèse des audits
+
+### Codeur
+
+Seizième incrément de la Phase 10 (US-037, RNF-030, RNF-031) : migre en résidu CSS zéro l'écran Synthèse des audits (`SqmSyntheseAuditsComponent`), déjà consommateur des composants transverses `SqmTableauDenseComponent` (RNF-031, migré à l'incrément 9) et `SqmBandeauAlerteComponent` (RG-009, migré à l'incrément 9) : aucune modification requise sur ces deux composants, déjà conformes.
+
+**Nouveau motif transverse ajouté : `.bouton--marque`** (`src/styles/_motifs.scss`) — bordure et texte couleur de marque, action informative sur fond neutre : besoin révélé par le bouton « Exporter en PNG » de cet écran, recopié à l'identique (bordure/couleur `#1a56db` en dur) dans quatre écrans distincts de cette phase (Synthèse des audits, Synthèse graphique, Fiche projet, Comparaison entre deux audits — cf. incréments 17 à 19 ci-dessous). Ajouté ici, au premier de ces quatre écrans traité par ordre du plan.
+
+**Migration.** Barre de filtres (deux `<select>`, un champ de recherche, un compteur, `<app-selecteur-vue>`, le bouton d'export) sur les motifs/utilitaires déjà établis (`.champ__controle`, `.bouton--marque`) ; le compteur utilise la nouvelle utilitaire `.exterieur-gauche-auto` (`margin-left: auto`, cf. incrément suivant) pour se positionner en fin de barre avant le sélecteur de vue et le bouton d'export. Résidu conservé : largeur fixe du champ de recherche (220px, dimension spécifique à cet écran).
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write`, `npx jest --silent` (1 suite, tests inclus dans le rejeu groupé des incréments 15-20 ci-dessous), suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+Aucune au-delà de l'ajout du motif `.bouton--marque`, déjà justifié ci-dessus par sa réutilisation immédiate sur quatre écrans.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau.
+
+### Relecteur
+
+Cf. section « Relecteur » de l'incrément 20 ci-dessous (relecture conjointe des incréments 15 à 20). Confirmé pour cet incrément : `.bouton--marque` et `.exterieur-gauche-auto` correctement définis et utilisés, aucune valeur brute non justifiée, aucun écart. Avis global : acquis.
+
+## Étape 10 (incrément 17) — Rattrapage & bugs : C10-06, écran Synthèse graphique
+
+### Codeur
+
+Dix-septième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran Synthèse graphique (`SqmSyntheseGraphiqueComponent`), consommateur du composant transverse `SqmGraphiqueEvolutionComponent` (non concerné par cette migration : hors périmètre des vingt écrans du plan, cf. doute signalé ci-dessous).
+
+**Migration.** Même barre de filtres que Synthèse des audits (deux `<select>`, `<app-selecteur-vue>`, bouton d'export sur `.bouton--marque exterieur-gauche-auto`), plus un `<fieldset>` « Projets » (liste de cases à cocher, actions Tout sélectionner/désélectionner) migré sur `.carte`/`.bouton--discret`. **Résidu CSS strictement nul atteint** (`.scss` et `styleUrl` supprimés) : aucune dimension ni couleur propre à cet écran ne subsistait après application des motifs/utilitaires déjà établis.
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write`, `npx jest --silent`, suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+Aucune propre à cet incrément.
+
+### Doutes et ambiguïtés rencontrés
+
+**Composants transverses non couverts par les vingt écrans du plan.** Cet écran (comme Fiche projet, Liste de travail et Synthèse des audits) consomme d'autres composants partagés jamais explicitement nommés par le plan comme cible de migration au-delà des cinq composants de l'incrément 9 (`Shell`, `Badge`, `Bandeau d'alerte`, les deux modales, `Tableau dense`) : `SqmSelecteurVueComponent`, `SqmGraphiqueEvolutionComponent`, `SqmExplicationJugementComponent`, `SqmRechercheTransversaleComponent`, `SqmVerrouillageComponent`. Conformément au périmètre strict des incréments 15 à 20 (migration des sept écrans listés par le plan, pas de leurs composants enfants non nommés), ces composants n'ont pas été touchés par cette phase : ils conservent leur feuille de style antérieure, non auditée ici. Signalé explicitement plutôt que silencieusement étendu ou silencieusement ignoré : à qualifier comme incrément complémentaire si jugé nécessaire par un humain, le résidu CSS de l'application n'étant donc pas strictement nul à l'échelle globale une fois les vingt écrans clos, seulement à l'échelle des écrans eux-mêmes et des cinq composants transverses de l'incrément 9.
+
+### Relecteur
+
+Cf. section « Relecteur » de l'incrément 20 ci-dessous. Confirmé pour cet incrément : résidu CSS strictement nul réel, aucun `styleUrl` résiduel, aucun écart. Avis global : acquis.
+
+## Étape 10 (incrément 18) — Rattrapage & bugs : C10-06, écran Fiche projet
+
+### Codeur
+
+Dix-huitième incrément de la Phase 10 (US-037, RNF-030), le plus volumineux des vingt (214 lignes de SCSS avant migration) : migre en résidu CSS zéro l'écran Fiche projet (`SqmFicheProjetComponent`), déjà consommateur de `SqmBadgeComponent` (incrément 9) et `SqmExplicationJugementComponent` (non migré, cf. doute de l'incrément 17).
+
+**Migration.** En-tête (fil d'ariane, badges IA/SONAR_KO/membre inconnu), métadonnées en grille, anomalie technique (carte rouge si dernière campagne en échec), corps à deux colonnes (indicateurs Sonar/dépendances/MR ouvertes à gauche, membres/marqueurs IA/annotations/journal à droite), actions de bas de page (comparaison, export) : tous migrés sur les motifs/utilitaires déjà établis, y compris le nouveau `.bouton--marque` (actions de bas de page) et le motif `.tableau` (table des dépendances).
+
+**Résidu conservé, justifié en commentaire d'en-tête, sur le modèle de `SqmBadgeComponent` (incrément 9) — mise en page en utilitaires, variantes de couleur en résidu SCSS à tokens uniques :**
+- deux grilles CSS intrinsèques (`__metadonnees`, `__corps`, `repeat(auto-fit, minmax(...))`), non exprimables par les utilitaires d'affichage à une seule propriété ;
+- grisage complet du bloc Sonar en SONAR_KO (`__bloc-sonar--grise`, composite opacité + `grayscale(1)`) ;
+- trois variantes de couleur : métadonnée en échec (`__metadonnee--echec`), ligne de membre inconnu (`__ligne--inconnu`), gravité de l'alerte membre inconnu (`__gravite--elevee`/`--moderee`, RG-010/R10-14) — reprises des tokens sémantiques rouge/orange déjà existants, alignement délibéré plutôt qu'invention de nouveaux tokens pour ces teintes légèrement différentes de la maquette (décision arbitraire déjà pratiquée à l'identique à l'incrément 12 pour le point d'alerte de l'écran Accueil).
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write`, `npx jest --silent` (1 suite, 20 tests verts), suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement. Vérification visuelle par Chromium headless (1400px, fragments de gabarit fidèles) complétée par extraction directe des règles de composant compilées dans `main-*.js` pour confirmer les résidus de couleur (badge, gravité, métadonnée en échec, ligne inconnue) : tous corrects et construits uniquement à partir de tokens.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+- **Réutilisation des tokens rouge/orange existants pour les variantes `__gravite`/`__metadonnee--echec`/`__ligne--inconnu`** plutôt qu'invention de nouveaux tokens : même logique que l'incrément 12 (point d'alerte de l'écran Accueil), écarts de teinte mineurs sans risque de contraste.
+- **Arrondis de grilles CSS intrinsèques** (`gap` 0,6rem/1,5rem arrondis aux tokens d'espacement les plus proches) : même convention que les incréments précédents.
+
+### Doutes et ambiguïtés rencontrés
+
+`SqmExplicationJugementComponent`, consommé par cet écran, reste hors périmètre de cette migration (cf. doute déjà signalé à l'incrément 17).
+
+### Relecteur
+
+Cf. section « Relecteur » de l'incrément 20 ci-dessous. Confirmé pour cet incrément, en particulier le point de vigilance n° 9 de la mission de relecture (résidus `__metadonnees`/`__corps`/`__bloc-sonar--grise`/`__metadonnee--echec`/`__ligne--inconnu`/`__gravite--elevee`/`--moderee`, tous construits uniquement à partir de `var(--sqm-*)` existants) : conforme, aucun écart. Avis global : acquis.
+
+## Étape 10 (incrément 19) — Rattrapage & bugs : C10-06, écran Comparaison entre deux audits
+
+### Codeur
+
+Dix-neuvième incrément de la Phase 10 (US-037, RNF-030) : migre en résidu CSS zéro l'écran Comparaison entre deux audits (`SqmComparaisonAuditsComponent`, US-018), déjà consommateur de `SqmBadgeComponent` (incrément 9).
+
+**Migration.** Panneau de sélection de deux dates (`fond-douce`/`rayon-lg`, sans le motif `.carte` — l'original n'a jamais porté de bordure, contrairement aux autres cartes de l'application, préservé tel quel plutôt qu'harmonisé arbitrairement), raccourcis de sélection et bouton d'export sur `.bouton--marque`, quatre volets de tableaux comparatifs (indicateurs, dépendances, membres/contributeurs, marqueurs IA) sur le motif `.tableau` enveloppé de `.deborde-auto`, message de repli de sélection (R10-15) sur `fond-orange`/`texte-orange`. **Résidu CSS strictement nul atteint** (`.scss` et `styleUrl` supprimés) : c'est, avec Synthèse graphique, l'un des deux écrans de cette série des vingt à atteindre ce résultat, en plus des quatre déjà atteints aux incréments 10-14 (Seuils, Référentiels, Journal, Purge, Export-Import, Annotations de groupe, Projets, Sources, Credentials).
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write`, `npx jest --silent` (1 suite, 25 tests verts), suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+**Panneau de sélection sans bordure** (`fond-douce`/`rayon-lg` seuls, pas de `.carte`) : préserve fidèlement le rendu d'origine (fond gris clair uni, sans bordure), plutôt qu'une harmonisation systématique vers `.carte` qui aurait changé la couleur de fond (blanc au lieu de gris) et ajouté une bordure absente de la maquette pour ce panneau précis.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau.
+
+### Relecteur
+
+Cf. section « Relecteur » de l'incrément 20 ci-dessous. Confirmé pour cet incrément : résidu CSS strictement nul réel, aucun `styleUrl` résiduel, labels `for`/`id` des deux sélecteurs de date corrects, aucun écart. Avis global : acquis.
+
+## Étape 10 (incrément 20) — Rattrapage & bugs : C10-06, écran Liste de travail
+
+### Codeur
+
+Vingtième et dernier incrément de la Phase 10 consacré à C10-06 (US-037, RNF-030, RNF-031) : migre en résidu CSS zéro l'écran Liste de travail (`SqmListeTravailComponent`), déjà consommateur du composant transverse `SqmTableauDenseComponent` (RNF-031, migré à l'incrément 9, aucune modification requise).
+
+**Migration.** Barre de filtres (sélecteur de groupe, recherche, compteur sur `.exterieur-gauche-auto`, `<app-selecteur-vue>`), état vide (`fond-marque`/`rayon-lg`), panneau de traitement de l'alerte sélectionnée (`.carte`, formulaire de commentaire sur `.champ`/`.champ__controle`, actions sur `.bouton`/`.bouton--principal`). Résidu conservé : largeur fixe du champ de recherche (260px), seule dimension propre à cet écran.
+
+**Vérifications rejouées :** `npx tsc --noEmit -p tsconfig.spec.json`, `npx eslint`, `npx prettier --write`, `npx jest --silent` (1 suite, 16 tests verts), suite complète (80 suites, 1004 tests verts, inchangé), `npm run build` sans nouvel avertissement (feuille de style globale finale des vingt écrans : 13,28 Kio, contre 12,21 Kio à l'issue du seul socle de l'incrément 9).
+
+**Vérification visuelle groupée (incréments 15 à 20).** Chromium headless (déjà installé à l'incrément 9) a rejoué des fragments de gabarit fidèles pour les huit composants de ces six incréments, avec le CSS global compilé (`styles.css`) à trois paliers (1400/576/375px), complété par extraction directe des règles de composant depuis le bundle `main-*.js` (les styles de composant Angular, encapsulés, ne figurent pas dans `styles.css` global) pour confirmer les résidus de couleur (badge de statut d'exécution, gravité/métadonnée/ligne inconnue de Fiche projet, bandeaux de blocage/anomalie). Confirme visuellement : cartes et tableaux lisibles aux trois paliers testés, boutons `.bouton--marque` correctement rendus (bordure/texte bleu marque), tableaux défilant proprement dans leur propre conteneur à 375px sans déborder la page.
+
+### Décisions arbitraires prises en l'absence de précision documentaire
+
+Aucune propre à cet incrément.
+
+### Doutes et ambiguïtés rencontrés
+
+Aucun doute nouveau au-delà de ceux déjà actés aux incréments précédents (composants transverses non couverts, cf. incrément 17).
+
+### Relecteur
+
+Relecture conduite dans un contexte isolé de celui du Codeur (sous-agent dédié sans connaissance de la session productrice), portant sur l'intégralité des fichiers modifiés des incréments 15 à 20 conjointement (`_motifs.scss`/`_utilitaires.scss`/`_tokens.scss`, les huit composants d'écran et leurs `.spec.ts`), avec vérification directe de chaque affirmation par lecture du code plutôt que sur la seule foi du texte (`.claude/rules/01-usage-ia-et-conventions.md#diligence`) : recherche automatisée de toute valeur hex/px brute dans les six `.scss` restants (seules occurrences trouvées justifiées en commentaire — grilles intrinsèques, largeurs de champs de recherche) ; extraction et vérification croisée de la totalité des classes utilisées dans les huit gabarits contre `_motifs.scss`/`_utilitaires.scss` (aucune classe orpheline ni mal orthographiée) ; confirmation de l'absence de tout `styleUrl` résiduel pour Synthèse graphique et Comparaison entre deux audits ; vérification ligne à ligne des cinq modificateurs du badge de statut d'exécution contre le type `StatutExecutionProjet` (`etat-session.service.ts`) et contre le switch exhaustif de `libelleStatut` (couvert par test) ; lecture des huit `.spec.ts` (aucun sélecteur CSS de test cassé, les rares `querySelector`/`By.css` relevés visent des classes toujours présentes) ; et rejeu indépendant de `tsc --noEmit`, `eslint`, `prettier --check` et `jest` (165 tests verts sur les huit suites, résultats concordants avec ceux du Codeur).
+
+Une réserve mineure relevée, non bloquante : le champ « Motif de rejet » de `brouillon.component.html` (incrément 15), préexistant à cette phase, ne portait aucun nom accessible — corrigé par le Codeur immédiatement après relecture (`aria-label` ajouté). Aucune autre anomalie : aucune valeur brute non justifiée, aucun token `var(--sqm-*)` inexistant, aucune classe utilitaire sans effet, aucun attribut Angular perdu lors de la réécriture des gabarits, aucune régression de contenu ni d'accessibilité.
+
+Avis global du Relecteur, pour l'ensemble des incréments 15 à 20 : « acquis sous réserve », la seule réserve (accessibilité du champ Motif de rejet) ayant été levée immédiatement après relecture. Les vingt écrans/composants prévus par C10-06 (US-037, RNF-030, RNF-031) sont ainsi tous migrés en résidu CSS zéro, sous la seule réserve encore ouverte à l'échelle de la phase entière : la vérification sous Tauri packagé, non réalisable dans cet environnement de développement (cf. rapport de l'incrément 10), reportée à la Phase 12, et le périmètre des composants transverses non nommés par le plan au-delà des cinq de l'incrément 9 (`SqmSelecteurVueComponent`, `SqmGraphiqueEvolutionComponent`, `SqmExplicationJugementComponent`, `SqmRechercheTransversaleComponent`, `SqmVerrouillageComponent`), signalé comme piste d'un éventuel complément futur plutôt que traité silencieusement dans le périmètre de cette phase.

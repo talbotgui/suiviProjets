@@ -1,12 +1,13 @@
-.administration {
-  &__onglets {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
+// Résidu propre à ce composant (Phase 10, incrément 14) : couleur de l'onglet actif, non exprimable par les classes
+// utilitaires génériques (cf. src/styles/_utilitaires.scss), sur le modèle exact de
+// `.parametrage__onglet--actif` (src/app/ecrans/parametrage/parametrage.component.scss, Phase 10 incrément 10) et de
+// `.shell__lien--actif` (src/app/composants/shell/shell.component.scss, Phase 10 incrément 9).
+.administration__onglet--actif {
+  background-color: var(--sqm-marque-fond);
+  color: var(--sqm-marque-texte);
+  font-weight: var(--sqm-poids-demi-gras);
 
-  &__onglet--actif {
-    font-weight: bold;
-    text-decoration: underline;
+  &:hover {
+    background-color: var(--sqm-marque-fond);
   }
 }

@@ -1,8 +1,8 @@
-<section class="liste-travail">
-  <div class="liste-travail__filtres">
+<section class="liste-travail d-flex direction-colonne ecart-4">
+  <div class="liste-travail__filtres d-flex retour-ligne aligne-centre ecart-3">
     <select
       #selectGroupe
-      class="liste-travail__select"
+      class="liste-travail__select champ__controle"
       aria-label="Filtrer par groupe"
       (change)="onChangerGroupe(selectGroupe.value)"
     >
@@ -15,14 +15,14 @@
     <input
       #champRecherche
       type="text"
-      class="liste-travail__recherche"
+      class="liste-travail__recherche champ__controle"
       placeholder="Rechercher un projet ou une alerte…"
       aria-label="Rechercher une alerte"
       [value]="texteRecherche()"
       (input)="onChangerRecherche(champRecherche.value)"
     />
 
-    <span class="liste-travail__compteur">
+    <span class="liste-travail__compteur exterieur-gauche-auto texte-xs texte-discret">
       {{ alertesFiltrees().length }} alerte{{ alertesFiltrees().length > 1 ? 's' : '' }}
     </span>
 
@@ -35,7 +35,7 @@
   </div>
 
   @if (nombreVuesIgnorees() > 0) {
-    <p class="liste-travail__avertissement" role="status">
+    <p class="liste-travail__avertissement texte-orange texte-xs" role="status">
       {{ nombreVuesIgnorees() }} vue{{ nombreVuesIgnorees() > 1 ? 's' : '' }} enregistrée{{
         nombreVuesIgnorees() > 1 ? 's' : ''
       }}
@@ -44,7 +44,9 @@
   }
 
   @if (aucuneAlerte()) {
-    <p class="liste-travail__vide">Aucune alerte active : tout est traité.</p>
+    <p class="liste-travail__vide interieur-4 rayon-lg fond-marque texte-md texte-fort">
+      Aucune alerte active : tout est traité.
+    </p>
   } @else {
     <app-tableau-dense
       [colonnes]="colonnes()"
@@ -55,31 +57,43 @@
   }
 
   @if (alerteSelectionnee(); as alerte) {
-    <section class="liste-travail__panneau" aria-label="Traitement de l'alerte sélectionnée">
-      <header class="liste-travail__panneau-entete">
-        <h2>{{ alerte.libelle }}</h2>
-        <button type="button" (click)="fermerPanneau()">Fermer</button>
+    <section
+      class="liste-travail__panneau carte interieur-4 d-flex direction-colonne ecart-3"
+      aria-label="Traitement de l'alerte sélectionnée"
+    >
+      <header class="liste-travail__panneau-entete d-flex aligne-centre justifie-espace">
+        <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">{{ alerte.libelle }}</h2>
+        <button type="button" class="bouton bouton--discret" (click)="fermerPanneau()">
+          Fermer
+        </button>
       </header>
 
-      <p>{{ alerte.nomProjet }} ({{ alerte.nomGroupe }}) — {{ libelleStatut(alerte) }}</p>
+      <p class="exterieur-bas-0 exterieur-haut-0">
+        {{ alerte.nomProjet }} ({{ alerte.nomGroupe }}) — {{ libelleStatut(alerte) }}
+      </p>
 
-      <label class="liste-travail__commentaire">
+      <label class="liste-travail__commentaire champ">
         Commentaire
-        <textarea [(ngModel)]="commentaire" rows="2"></textarea>
+        <textarea class="champ__controle" [(ngModel)]="commentaire" rows="2"></textarea>
       </label>
 
       @if (messageErreur) {
-        <p class="liste-travail__erreur" role="alert">{{ messageErreur }}</p>
+        <p class="liste-travail__erreur texte-rouge texte-sm" role="alert">{{ messageErreur }}</p>
       }
 
-      <div class="liste-travail__panneau-actions">
-        <button type="button" [disabled]="enCours" (click)="ouvrirFicheProjet()">
+      <div class="liste-travail__panneau-actions d-flex retour-ligne ecart-2">
+        <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirFicheProjet()">
           Ouvrir la fiche projet
         </button>
-        <button type="button" [disabled]="enCours" (click)="demanderMarquerVu()">
+        <button type="button" class="bouton" [disabled]="enCours" (click)="demanderMarquerVu()">
           Marquer vue
         </button>
-        <button type="button" [disabled]="enCours" (click)="demanderTraiter()">
+        <button
+          type="button"
+          class="bouton bouton--principal"
+          [disabled]="enCours"
+          (click)="demanderTraiter()"
+        >
           Marquer traitée
         </button>
       </div>

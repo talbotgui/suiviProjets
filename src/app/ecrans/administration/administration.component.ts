@@ -6,7 +6,9 @@
 // matrice écrans/US pour cet écran). Le sous-onglet « Membres connus » (sous Groupes, US-022, US-023) est porté
 // par `SqmGroupesAdminComponent` ; le contrôle « Politique IA » (sous Projets, US-024) est porté par
 // `SqmProjetsAdminComponent`. Le sous-onglet « Annotations de groupe », également prévu par l'arborescence de
-// navigation, reste différé à la Phase 8 (US-020) et n'apparaît pas ici.
+// navigation, est construit depuis la Phase 10, incrément 8 (C10-04, US-019 mis à jour) : porté par
+// `SqmAnnotationsGroupeAdminComponent`, lui-même troisième sous-onglet de `SqmGroupesAdminComponent` (aux côtés de
+// Groupes et Membres connus), et non par cet écran directement.
 import { Component } from '@angular/core';
 import { SqmGroupesAdminComponent } from './groupes/groupes-admin.component';
 import { SqmProjetsAdminComponent } from './projets/projets-admin.component';

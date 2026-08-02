@@ -41,7 +41,6 @@ import type {
   selector: 'app-journal-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
   templateUrl: './journal-parametrage.component.html',
-  styleUrl: './journal-parametrage.component.scss',
 })
 export class SqmJournalParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =

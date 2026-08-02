@@ -38,7 +38,6 @@ const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
   selector: 'app-sources-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent],
   templateUrl: './sources-admin.component.html',
-  styleUrl: './sources-admin.component.scss',
 })
 export class SqmSourcesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =

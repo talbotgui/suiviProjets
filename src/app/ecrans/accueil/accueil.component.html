@@ -1,20 +1,39 @@
 <div class="accueil">
   <div class="accueil__statistiques">
-    <div class="accueil__carte">
-      <div class="accueil__carte-libelle">Groupes / Projets</div>
-      <div class="accueil__carte-valeur">{{ nombreGroupes() }} / {{ nombreProjets() }}</div>
+    <div class="accueil__carte carte interieur-x-4 interieur-y-3">
+      <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
+        Groupes / Projets
+      </div>
+      <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
+        {{ nombreGroupes() }} / {{ nombreProjets() }}
+      </div>
     </div>
-    <div class="accueil__carte">
-      <div class="accueil__carte-libelle">Dernière campagne</div>
-      <div class="accueil__carte-valeur">{{ derniereCampagneLabel() }}</div>
+    <div class="accueil__carte carte interieur-x-4 interieur-y-3">
+      <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
+        Dernière campagne
+      </div>
+      <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
+        {{ derniereCampagneLabel() }}
+      </div>
     </div>
-    <div class="accueil__carte" [class.accueil__carte--alerte]="membreInconnuDetecte()">
-      <div class="accueil__carte-libelle">Membres inconnus</div>
-      <div class="accueil__carte-valeur">{{ nombreProjetsAvecMembreInconnu() }}</div>
+    <div
+      class="accueil__carte carte interieur-x-4 interieur-y-3"
+      [class.accueil__carte--alerte]="membreInconnuDetecte()"
+    >
+      <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
+        Membres inconnus
+      </div>
+      <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
+        {{ nombreProjetsAvecMembreInconnu() }}
+      </div>
     </div>
-    <div class="accueil__carte">
-      <div class="accueil__carte-libelle">Alertes actives</div>
-      <div class="accueil__carte-valeur">{{ alertesActives().length }}</div>
+    <div class="accueil__carte carte interieur-x-4 interieur-y-3">
+      <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
+        Alertes actives
+      </div>
+      <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
+        {{ alertesActives().length }}
+      </div>
     </div>
   </div>
 
@@ -22,18 +41,26 @@
     <app-bandeau-alerte [message]="messageMembreInconnu()" />
   }
 
-  <section class="accueil__section">
-    <h2 class="accueil__section-titre">Alertes principales</h2>
+  <section class="accueil__section carte interieur-x-5 interieur-y-4 exterieur-bas-4">
+    <h2
+      class="accueil__section-titre texte-2xs poids-gras majuscules espace-lettres texte-discret exterieur-bas-3 exterieur-haut-0"
+    >
+      Alertes principales
+    </h2>
     @if (alertesPrincipales().length === 0) {
-      <p class="accueil__vide">Aucune alerte active.</p>
+      <p class="accueil__vide texte-sm texte-secondaire exterieur-bas-0 exterieur-haut-0">
+        Aucune alerte active.
+      </p>
     } @else {
-      <ul class="accueil__liste">
+      <ul class="accueil__liste sans-liste">
         @for (alerte of alertesPrincipales(); track alerte.cleAlerte) {
-          <li class="accueil__ligne">
+          <li
+            class="accueil__ligne d-flex aligne-centre ecart-3 interieur-y-3 texte-sm bordure-bas"
+          >
             <span class="accueil__pastille" aria-hidden="true"></span>
-            <span class="accueil__ligne-libelle">{{ alerte.libelle }}</span>
+            <span class="accueil__ligne-libelle flex-1">{{ alerte.libelle }}</span>
             @if (alerte.traitementAnterieur; as traitement) {
-              <span class="accueil__mention-traitement">
+              <span class="accueil__mention-traitement texte-2xs texte-discret">
                 traité précédemment le {{ traitement.horodatage | date: 'dd/MM/yyyy' }}
                 @if (traitement.commentaire) {
                   — {{ traitement.commentaire }}
@@ -46,16 +73,26 @@
     }
   </section>
 
-  <section class="accueil__section">
-    <h2 class="accueil__section-titre">Projets non audités depuis longtemps</h2>
+  <section class="accueil__section carte interieur-x-5 interieur-y-4 exterieur-bas-4">
+    <h2
+      class="accueil__section-titre texte-2xs poids-gras majuscules espace-lettres texte-discret exterieur-bas-3 exterieur-haut-0"
+    >
+      Projets non audités depuis longtemps
+    </h2>
     @if (projetsNonAuditesDepuisLongtemps().length === 0) {
-      <p class="accueil__vide">Tous les projets ont été audités récemment.</p>
+      <p class="accueil__vide texte-sm texte-secondaire exterieur-bas-0 exterieur-haut-0">
+        Tous les projets ont été audités récemment.
+      </p>
     } @else {
-      <ul class="accueil__liste">
+      <ul class="accueil__liste sans-liste">
         @for (projet of projetsNonAuditesDepuisLongtemps(); track projet.projetId) {
-          <li class="accueil__ligne">
-            <span class="accueil__ligne-libelle">{{ projet.nomProjet }}</span>
-            <span class="accueil__ligne-groupe">{{ projet.nomGroupe }}</span>
+          <li
+            class="accueil__ligne d-flex aligne-centre ecart-3 interieur-y-3 texte-sm bordure-bas"
+          >
+            <span class="accueil__ligne-libelle flex-1">{{ projet.nomProjet }}</span>
+            <span class="accueil__ligne-groupe texte-2xs texte-discret">{{
+              projet.nomGroupe
+            }}</span>
           </li>
         }
       </ul>

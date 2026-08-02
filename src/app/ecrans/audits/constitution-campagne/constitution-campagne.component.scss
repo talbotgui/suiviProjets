@@ -1,61 +1,25 @@
-.constitution-campagne {
-  &__entete {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+// Résidu propre à ce composant (Phase 10, incrément 15) : couleur de bordure du bandeau de blocage (le motif
+// `.carte` combiné à l'utilitaire `fond-rouge` du gabarit ne porte pas de bordure rouge par défaut), indentation de
+// la liste imbriquée des projets et séparateur généré entre les credentials manquants — aucun n'est exprimable par
+// une classe utilitaire à une seule propriété. Le reste (disposition, espacement, couleurs de texte) est porté par
+// les classes utilitaires/motifs appliqués directement dans le gabarit (cf.
+// constitution-campagne.component.html), remplaçant l'ancienne feuille de style entièrement propre à ce composant.
+.constitution-campagne__bandeau-blocage {
+  border-color: var(--sqm-rouge-bordure);
+}
+
+.constitution-campagne__projets {
+  padding-left: var(--sqm-espace-6);
+}
+
+.constitution-campagne__credential-manquant {
+  margin-right: var(--sqm-espace-2);
+
+  &::after {
+    content: ',';
   }
 
-  &__bandeau-blocage {
-    color: #b00020;
-    font-weight: bold;
-  }
-
-  &__raccourcis {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin: 1rem 0;
-  }
-
-  &__groupes {
-    list-style: none;
-    padding: 0;
-  }
-
-  &__groupe {
-    margin-bottom: 0.75rem;
-  }
-
-  &__groupe-entete {
-    font-weight: bold;
-  }
-
-  &__projets {
-    list-style: none;
-    padding-left: 1.5rem;
-  }
-
-  &__recapitulatif {
-    margin: 1rem 0;
-  }
-
-  &__credentials-manquants {
-    color: #b06000;
-  }
-
-  &__credential-manquant {
-    margin-right: 0.5rem;
-
-    &::after {
-      content: ',';
-    }
-
-    &:last-child::after {
-      content: '';
-    }
-  }
-
-  &__vide {
-    color: #666;
+  &:last-child::after {
+    content: '';
   }
 }

@@ -1,9 +1,10 @@
 <section class="administration">
-  <h1>Administration</h1>
+  <h1 class="texte-2xl poids-gras exterieur-bas-5 exterieur-haut-0">Administration</h1>
 
-  <nav class="administration__onglets">
+  <nav class="administration__onglets d-flex retour-ligne ecart-2 exterieur-bas-5">
     <button
       type="button"
+      class="administration__onglet bouton bouton--discret"
       [class.administration__onglet--actif]="ongletActif === 'groupes'"
       (click)="selectionnerOnglet('groupes')"
     >
@@ -11,6 +12,7 @@
     </button>
     <button
       type="button"
+      class="administration__onglet bouton bouton--discret"
       [class.administration__onglet--actif]="ongletActif === 'projets'"
       (click)="selectionnerOnglet('projets')"
     >
@@ -18,6 +20,7 @@
     </button>
     <button
       type="button"
+      class="administration__onglet bouton bouton--discret"
       [class.administration__onglet--actif]="ongletActif === 'sources'"
       (click)="selectionnerOnglet('sources')"
     >

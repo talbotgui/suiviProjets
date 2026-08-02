@@ -1,32 +1,5 @@
-.membres-connus-admin {
-  &__entete {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  &__ligne {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-
-    &--conflit {
-      outline: 1px solid #b06000;
-    }
-  }
-
-  &__badge-conflit {
-    color: #b06000;
-    font-weight: bold;
-  }
-
-  &__erreur {
-    color: #b00020;
-  }
-
-  &__actions-formulaire {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-  }
+// Résidu propre à ce composant (Phase 10, incrément 14) : mise en évidence d'une ligne en conflit de règles
+// (RG-008), non exprimable par les classes utilitaires génériques (une seule propriété CSS chacune).
+.membres-connus-admin__ligne--conflit {
+  outline: 1px solid var(--sqm-orange-bordure);
 }

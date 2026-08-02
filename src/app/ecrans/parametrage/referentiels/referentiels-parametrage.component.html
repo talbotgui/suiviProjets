@@ -1,28 +1,45 @@
 <section class="referentiels-parametrage">
-  <h2>Référentiels</h2>
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Référentiels</h2>
 
   @if (messageErreur) {
-    <p class="referentiels-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+    <p class="referentiels-parametrage__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
   }
 
-  <section class="referentiels-parametrage__bloc">
-    <header class="referentiels-parametrage__entete">
-      <h3>Référentiel des dépendances</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirCreationDependance()">
+  <section class="referentiels-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Référentiel des dépendances
+      </h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirCreationDependance()"
+      >
         Ajouter une règle
       </button>
     </header>
 
-    <ul class="referentiels-parametrage__liste">
+    <ul class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2">
       @for (regle of reglesDependances(); track regle.id) {
-        <li class="referentiels-parametrage__ligne">
+        <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
           <span>{{ regle.motif }}</span>
-          <span>{{ regle.versions.length }} borne(s) de version</span>
-          <button type="button" [disabled]="enCours" (click)="ouvrirEditionDependance(regle.id)">
+          <span class="texte-discret texte-sm"
+            >{{ regle.versions.length }} borne(s) de version</span
+          >
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours"
+            (click)="ouvrirEditionDependance(regle.id)"
+          >
             Modifier
           </button>
           <button
             type="button"
+            class="bouton bouton--discret"
             [disabled]="enCours"
             (click)="demanderSuppressionDependance(regle.id)"
           >
@@ -30,7 +47,7 @@
           </button>
         </li>
       } @empty {
-        <li class="referentiels-parametrage__vide">
+        <li class="referentiels-parametrage__vide texte-discret">
           Aucune règle de dépendances n'est encore définie.
         </li>
       }
@@ -38,22 +55,39 @@
 
     @if (formulaireDependanceVisible) {
       <form
-        class="referentiels-parametrage__formulaire"
+        class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrementDependance()"
       >
-        <h4>{{ dependanceEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}</h4>
-        <label>
-          Motif (glob, ex. <code>org.springframework:*</code>)
-          <input type="text" name="motifDependance" [(ngModel)]="motifDependance" required />
+        <h4 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+          {{ dependanceEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}
+        </h4>
+        <label class="champ">
+          Motif (glob, ex. <code class="police-mono">org.springframework:*</code>)
+          <input
+            type="text"
+            class="champ__controle"
+            name="motifDependance"
+            [(ngModel)]="motifDependance"
+            required
+          />
         </label>
-        <label>
-          Bornes de version (une par ligne, format <code>motifVersion=statut</code>)
-          <textarea name="versionsDependanceTexte" rows="4" [(ngModel)]="versionsDependanceTexte">
-          </textarea>
+        <label class="champ">
+          Bornes de version (une par ligne, format
+          <code class="police-mono">motifVersion=statut</code>)
+          <textarea
+            class="champ__controle"
+            name="versionsDependanceTexte"
+            rows="4"
+            [(ngModel)]="versionsDependanceTexte"
+          ></textarea>
         </label>
-        <div class="referentiels-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerFormulaireDependance()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
+          <button type="button" class="bouton" (click)="fermerFormulaireDependance()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }
@@ -83,24 +117,39 @@
     }
   </section>
 
-  <section class="referentiels-parametrage__bloc">
-    <header class="referentiels-parametrage__entete">
-      <h3>Référentiel des marqueurs IA</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirCreationMarqueurIa()">
+  <section class="referentiels-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Référentiel des marqueurs IA
+      </h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirCreationMarqueurIa()"
+      >
         Ajouter une règle
       </button>
     </header>
 
-    <ul class="referentiels-parametrage__liste">
+    <ul class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2">
       @for (regle of reglesMarqueursIA(); track regle.id) {
-        <li class="referentiels-parametrage__ligne">
+        <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
           <span>{{ regle.motif }}</span>
-          <span>{{ regle.outil }}</span>
-          <button type="button" [disabled]="enCours" (click)="ouvrirEditionMarqueurIa(regle.id)">
+          <span class="texte-discret texte-sm">{{ regle.outil }}</span>
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours"
+            (click)="ouvrirEditionMarqueurIa(regle.id)"
+          >
             Modifier
           </button>
           <button
             type="button"
+            class="bouton bouton--discret"
             [disabled]="enCours"
             (click)="demanderSuppressionMarqueurIa(regle.id)"
           >
@@ -108,7 +157,7 @@
           </button>
         </li>
       } @empty {
-        <li class="referentiels-parametrage__vide">
+        <li class="referentiels-parametrage__vide texte-discret">
           Aucune règle de marqueur IA n'est encore définie.
         </li>
       }
@@ -116,45 +165,67 @@
 
     @if (formulaireMarqueurIaVisible) {
       <form
-        class="referentiels-parametrage__formulaire"
+        class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrementMarqueurIa()"
       >
-        <h4>{{ marqueurIaEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}</h4>
-        <label>
+        <h4 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+          {{ marqueurIaEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}
+        </h4>
+        <label class="champ">
           Motif
-          <input type="text" name="motifMarqueurIa" [(ngModel)]="motifMarqueurIa" required />
+          <input
+            type="text"
+            class="champ__controle"
+            name="motifMarqueurIa"
+            [(ngModel)]="motifMarqueurIa"
+            required
+          />
         </label>
-        <label>
+        <label class="champ">
           Type de correspondance
-          <select name="typeCorrespondanceMarqueurIa" [(ngModel)]="typeCorrespondanceMarqueurIa">
+          <select
+            class="champ__controle"
+            name="typeCorrespondanceMarqueurIa"
+            [(ngModel)]="typeCorrespondanceMarqueurIa"
+          >
             @for (type of typesCorrespondance; track type) {
               <option [ngValue]="type">{{ type }}</option>
             }
           </select>
         </label>
-        <label>
+        <label class="champ">
           Portée
-          <select name="porteeMarqueurIa" [(ngModel)]="porteeMarqueurIa">
+          <select class="champ__controle" name="porteeMarqueurIa" [(ngModel)]="porteeMarqueurIa">
             @for (portee of portees; track portee) {
               <option [ngValue]="portee">{{ portee }}</option>
             }
           </select>
         </label>
-        <label>
+        <label class="champ">
           Nature
-          <select name="natureMarqueurIa" [(ngModel)]="natureMarqueurIa">
+          <select class="champ__controle" name="natureMarqueurIa" [(ngModel)]="natureMarqueurIa">
             @for (nature of natures; track nature) {
               <option [ngValue]="nature">{{ nature }}</option>
             }
           </select>
         </label>
-        <label>
+        <label class="champ">
           Outil
-          <input type="text" name="outilMarqueurIa" [(ngModel)]="outilMarqueurIa" required />
+          <input
+            type="text"
+            class="champ__controle"
+            name="outilMarqueurIa"
+            [(ngModel)]="outilMarqueurIa"
+            required
+          />
         </label>
-        <div class="referentiels-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerFormulaireMarqueurIa()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
+          <button type="button" class="bouton" (click)="fermerFormulaireMarqueurIa()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }
@@ -184,35 +255,49 @@
     }
   </section>
 
-  <section class="referentiels-parametrage__bloc">
-    <header class="referentiels-parametrage__entete">
-      <h3>Motif de nommage des branches (RG-030)</h3>
-      <button type="button" [disabled]="enCours" (click)="ouvrirEditionMotifNommage()">
+  <section class="referentiels-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Motif de nommage des branches (RG-030)
+      </h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirEditionMotifNommage()"
+      >
         Modifier
       </button>
     </header>
 
     <p>
-      <code>{{ motifNommageBranchesActuel() }}</code>
+      <code class="police-mono">{{ motifNommageBranchesActuel() }}</code>
     </p>
 
     @if (formulaireMotifNommageVisible) {
       <form
-        class="referentiels-parametrage__formulaire"
+        class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrementMotifNommage()"
       >
-        <label>
+        <label class="champ">
           Expression régulière
           <input
             type="text"
+            class="champ__controle"
             name="motifNommageBranchesFormulaire"
             [(ngModel)]="motifNommageBranchesFormulaire"
             required
           />
         </label>
-        <div class="referentiels-parametrage__actions-formulaire">
-          <button type="button" (click)="fermerFormulaireMotifNommage()">Annuler</button>
-          <button type="submit" [disabled]="enCours">Enregistrer</button>
+        <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
+          <button type="button" class="bouton" (click)="fermerFormulaireMotifNommage()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+            Enregistrer
+          </button>
         </div>
       </form>
     }

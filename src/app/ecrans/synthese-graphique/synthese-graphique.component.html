@@ -1,8 +1,8 @@
-<div class="synthese-graphique" #conteneurExport>
-  <div class="synthese-graphique__filtres">
+<div class="synthese-graphique d-flex direction-colonne ecart-4" #conteneurExport>
+  <div class="synthese-graphique__filtres d-flex retour-ligne aligne-centre ecart-3">
     <select
       #selectGroupe
-      class="synthese-graphique__select"
+      class="synthese-graphique__select champ__controle"
       aria-label="Filtrer par groupe"
       (change)="onChangerGroupe(selectGroupe.value)"
     >
@@ -14,7 +14,7 @@
 
     <select
       #selectIndicateur
-      class="synthese-graphique__select"
+      class="synthese-graphique__select champ__controle"
       aria-label="Filtrer par type d'indicateur"
       (change)="onChangerIndicateur(selectIndicateur.value)"
     >
@@ -32,13 +32,17 @@
       (suppressionDemandee)="supprimerVue($event)"
     />
 
-    <button type="button" class="synthese-graphique__export" (click)="exporterPng()">
+    <button
+      type="button"
+      class="synthese-graphique__export bouton bouton--marque exterieur-gauche-auto"
+      (click)="exporterPng()"
+    >
       Exporter en PNG
     </button>
   </div>
 
   @if (nombreVuesIgnorees() > 0) {
-    <p class="synthese-graphique__avertissement" role="status">
+    <p class="synthese-graphique__avertissement texte-orange texte-xs" role="status">
       {{ nombreVuesIgnorees() }} vue{{ nombreVuesIgnorees() > 1 ? 's' : '' }} enregistrée{{
         nombreVuesIgnorees() > 1 ? 's' : ''
       }}
@@ -47,18 +51,22 @@
   }
 
   @if (messageErreur; as erreur) {
-    <p class="synthese-graphique__erreur" role="alert">{{ erreur }}</p>
+    <p class="synthese-graphique__erreur texte-rouge texte-sm" role="alert">{{ erreur }}</p>
   }
 
-  <fieldset class="synthese-graphique__projets">
-    <legend>Projets</legend>
-    <div class="synthese-graphique__projets-actions">
-      <button type="button" (click)="toutSelectionner()">Tout sélectionner</button>
-      <button type="button" (click)="toutDeselectionner()">Tout désélectionner</button>
+  <fieldset class="synthese-graphique__projets carte interieur-4">
+    <legend class="d-block poids-gras texte-sm exterieur-bas-2">Projets</legend>
+    <div class="synthese-graphique__projets-actions d-flex ecart-2 exterieur-bas-2">
+      <button type="button" class="bouton bouton--discret" (click)="toutSelectionner()">
+        Tout sélectionner
+      </button>
+      <button type="button" class="bouton bouton--discret" (click)="toutDeselectionner()">
+        Tout désélectionner
+      </button>
     </div>
-    <div class="synthese-graphique__projets-liste">
+    <div class="synthese-graphique__projets-liste d-flex retour-ligne ecart-3">
       @for (projet of projetsDisponibles(); track projet.id) {
-        <label class="synthese-graphique__projet">
+        <label class="synthese-graphique__projet d-inline-flex aligne-centre ecart-2 texte-sm">
           <input
             type="checkbox"
             [checked]="projetRetenu(projet.id)"
@@ -68,7 +76,9 @@
         </label>
       }
       @if (projetsDisponibles().length === 0) {
-        <p class="synthese-graphique__aucun-projet">Aucun projet disponible pour ce groupe.</p>
+        <p class="synthese-graphique__aucun-projet texte-sm texte-discret">
+          Aucun projet disponible pour ce groupe.
+        </p>
       }
     </div>
   </fieldset>

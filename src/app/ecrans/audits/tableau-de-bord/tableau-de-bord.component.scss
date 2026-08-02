@@ -1,70 +1,48 @@
-.tableau-de-bord {
-  &__vide {
-    color: #666;
+// Résidu propre à ce composant (Phase 10, incrément 15) : dimensions et couleur de la barre de progression,
+// couleur de mise en évidence de la ligne active et couleurs des cinq variantes du badge de statut d'exécution
+// (`StatutExecutionProjet`, non couvertes par les quatre couleurs sémantiques de `SqmBadgeComponent` — un statut
+// neutre « en attente »/« ignoré » supplémentaire ne s'y ramène pas), non exprimables par les classes utilitaires
+// génériques. Le reste (disposition, espacement, typographie) est porté par les classes utilitaires/motifs
+// appliqués directement dans le gabarit (cf. tableau-de-bord.component.html), remplaçant l'ancienne feuille de
+// style entièrement propre à ce composant.
+.tableau-de-bord__barre-progression {
+  width: 100%;
+  height: var(--sqm-espace-3);
+  background: var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-md);
+  overflow: hidden;
+}
+
+.tableau-de-bord__barre-progression-remplissage {
+  height: 100%;
+  background: var(--sqm-vert-texte);
+}
+
+.tableau-de-bord__ligne--active {
+  background: var(--sqm-marque-fond-douce);
+}
+
+// Modificateurs en camelCase (plutôt que le kebab-case BEM habituel de ce dépôt) : générés par interpolation
+// directe des valeurs de l'union TypeScript StatutExecutionProjet dans le template, sans transformation.
+.tableau-de-bord__badge {
+  &--termine {
+    background-color: var(--sqm-vert-fond);
+    color: var(--sqm-vert-texte);
   }
 
-  &__termine {
-    color: #1b5e20;
-    font-weight: 600;
+  &--echoue {
+    background-color: var(--sqm-rouge-fond);
+    color: var(--sqm-rouge-texte);
   }
 
-  &__entete {
-    margin-bottom: 1rem;
+  &--enCours {
+    background-color: var(--sqm-marque-fond);
+    color: var(--sqm-marque-texte);
   }
 
-  &__barre-progression {
-    width: 100%;
-    height: 0.75rem;
-    background: #e0e0e0;
-    border-radius: 0.375rem;
-    overflow: hidden;
-    margin: 0.5rem 0;
-  }
-
-  &__barre-progression-remplissage {
-    height: 100%;
-    background: #2e7d32;
-  }
-
-  &__tableau {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  &__ligne--active {
-    background: #e3f2fd;
-  }
-
-  // Modificateurs en camelCase (plutôt que le kebab-case BEM habituel de ce dépôt) : générés par interpolation
-  // directe des valeurs de l'union TypeScript StatutExecutionProjet dans le template, sans transformation.
-  &__badge {
-    padding: 0.125rem 0.5rem;
-    border-radius: 1rem;
-    font-size: 0.85rem;
-
-    &--termine {
-      background: #c8e6c9;
-      color: #1b5e20;
-    }
-
-    &--echoue {
-      background: #ffcdd2;
-      color: #b00020;
-    }
-
-    &--enCours {
-      background: #bbdefb;
-      color: #0d47a1;
-    }
-
-    &--enAttente {
-      background: #eeeeee;
-      color: #616161;
-    }
-
-    &--ignore {
-      background: #eeeeee;
-      color: #616161;
-    }
+  &--enAttente,
+  &--ignore {
+    background-color: var(--sqm-neutre-150);
+    color: var(--sqm-neutre-800);
   }
 }

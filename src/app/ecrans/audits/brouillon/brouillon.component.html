@@ -1,27 +1,30 @@
 <section class="brouillon">
-  <header class="brouillon__entete">
-    <h2>Brouillon de campagne</h2>
+  <header class="brouillon__entete d-flex aligne-centre justifie-espace exterieur-bas-4">
+    <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Brouillon de campagne</h2>
   </header>
 
   @if (messageErreur !== null) {
-    <p class="brouillon__erreur" role="alert">{{ messageErreur }}</p>
+    <p class="brouillon__erreur texte-rouge poids-gras" role="alert">{{ messageErreur }}</p>
   }
 
   @if (!brouillonPresent()) {
-    <p class="brouillon__vide">
+    <p class="brouillon__vide texte-tenue">
       Aucun brouillon en attente : vous pouvez constituer une nouvelle campagne.
     </p>
   } @else {
-    <div class="brouillon__actions-globales">
-      <label>
+    <div
+      class="brouillon__actions-globales d-flex retour-ligne aligne-centre ecart-4 exterieur-y-4"
+    >
+      <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input type="checkbox" [checked]="estToutSelectionne()" (change)="basculerTout()" />
         Tout sélectionner
       </label>
-      <button type="button" [disabled]="enCours" (click)="demanderIntegrerTout()">
+      <button type="button" class="bouton" [disabled]="enCours" (click)="demanderIntegrerTout()">
         Intégrer tout
       </button>
       <button
         type="button"
+        class="bouton"
         [disabled]="enCours || selectionProjetIds.size === 0"
         (click)="demanderIntegrerSelection()"
       >
@@ -29,12 +32,15 @@
       </button>
       <input
         type="text"
+        class="champ__controle"
         placeholder="Motif de rejet (optionnel)"
+        aria-label="Motif de rejet (optionnel)"
         [(ngModel)]="motifRejet"
         [disabled]="enCours"
       />
       <button
         type="button"
+        class="bouton bouton--danger"
         [disabled]="enCours || selectionProjetIds.size === 0"
         (click)="demanderRejeterSelection()"
       >
@@ -42,10 +48,10 @@
       </button>
     </div>
 
-    <ul class="brouillon__projets">
+    <ul class="brouillon__projets sans-liste">
       @for (entree of entrees(); track entree.projetId) {
-        <li class="brouillon__projet">
-          <label class="brouillon__projet-entete">
+        <li class="brouillon__projet carte interieur-4 exterieur-bas-3">
+          <label class="brouillon__projet-entete poids-gras d-flex aligne-centre ecart-2">
             <input
               type="checkbox"
               [checked]="estSelectionne(entree.projetId)"
@@ -55,9 +61,9 @@
           </label>
 
           @if (aberrations(entree).length > 0) {
-            <ul class="brouillon__aberrations">
+            <ul class="brouillon__aberrations sans-liste exterieur-y-2">
               @for (aberration of aberrations(entree); track aberration.indicateur) {
-                <li class="brouillon__aberration" role="alert">
+                <li class="brouillon__aberration texte-rouge poids-gras" role="alert">
                   Valeur aberrante — {{ aberration.indicateur }} : {{ aberration.ancienneValeur }} →
                   {{ aberration.nouvelleValeur }}
                 </li>
@@ -66,7 +72,7 @@
           }
 
           @if (ecarts(entree).length > 0) {
-            <ul class="brouillon__ecarts">
+            <ul class="brouillon__ecarts sans-liste exterieur-y-2 texte-secondaire">
               @for (ecart of ecarts(entree); track ecart.indicateur + ecart.libelle) {
                 <li class="brouillon__ecart">
                   {{ ecart.libelle }} : {{ ecart.ancienneValeur }} → {{ ecart.nouvelleValeur }}
@@ -75,9 +81,10 @@
             </ul>
           }
 
-          <div class="brouillon__projet-actions">
+          <div class="brouillon__projet-actions d-flex ecart-2 exterieur-haut-2">
             <button
               type="button"
+              class="bouton bouton--discret"
               [disabled]="enCours"
               (click)="demanderIntegrerUnique(entree.projetId)"
             >
@@ -85,6 +92,7 @@
             </button>
             <button
               type="button"
+              class="bouton bouton--discret"
               [disabled]="enCours"
               (click)="demanderRejeterUnique(entree.projetId)"
             >
@@ -93,7 +101,9 @@
           </div>
         </li>
       } @empty {
-        <li class="brouillon__vide">Toutes les entrées de ce brouillon ont déjà été traitées.</li>
+        <li class="brouillon__vide texte-tenue">
+          Toutes les entrées de ce brouillon ont déjà été traitées.
+        </li>
       }
     </ul>
 
@@ -105,24 +115,30 @@
       />
     }
 
-    <section class="brouillon__rapport-anomalies">
-      <h3>Rapport d'anomalies techniques</h3>
+    <section class="brouillon__rapport-anomalies exterieur-haut-5">
+      <h3 class="texte-md poids-gras exterieur-bas-3 exterieur-haut-0">
+        Rapport d'anomalies techniques
+      </h3>
       @if (anomalies().length === 0) {
-        <p class="brouillon__vide">Aucune anomalie technique pour cette campagne.</p>
+        <p class="brouillon__vide texte-tenue">Aucune anomalie technique pour cette campagne.</p>
       } @else {
-        <ul class="brouillon__anomalies">
+        <ul class="brouillon__anomalies sans-liste d-flex direction-colonne ecart-2">
           @for (groupe of anomalies(); track groupe.categorie + (groupe.instanceId ?? '')) {
-            <li class="brouillon__anomalie">
-              <p class="brouillon__anomalie-entete">
+            <li class="brouillon__anomalie carte fond-orange interieur-4">
+              <p class="brouillon__anomalie-entete exterieur-bas-1 exterieur-haut-0">
                 <strong>{{ groupe.libelleCategorie }}</strong>
                 — {{ groupe.instanceNom }} ({{ groupe.projets.length }} projet(s))
               </p>
-              <p class="brouillon__anomalie-action">{{ groupe.actionSuggeree }}</p>
+              <p
+                class="brouillon__anomalie-action texte-secondaire texte-sm exterieur-bas-1 exterieur-haut-0"
+              >
+                {{ groupe.actionSuggeree }}
+              </p>
               <details class="brouillon__anomalie-message">
                 <summary>Message technique</summary>
                 <p>{{ groupe.message }}</p>
               </details>
-              <p class="brouillon__anomalie-projets">
+              <p class="brouillon__anomalie-projets exterieur-haut-1 exterieur-bas-0">
                 Projets concernés :
                 @for (projet of groupe.projets; track projet.projetId) {
                   <span class="brouillon__anomalie-projet">{{ projet.projetNom }}</span>

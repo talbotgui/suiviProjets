@@ -195,7 +195,6 @@ export type RaccourciComparaisonAudits = 'dernierPrecedent' | 'unMois' | 'troisM
   selector: 'app-comparaison-audits',
   imports: [RouterLink, SqmBadgeComponent],
   templateUrl: './comparaison-audits.component.html',
-  styleUrl: './comparaison-audits.component.scss',
 })
 export class SqmComparaisonAuditsComponent {
   private readonly donneesApplication: DonneesApplicationService =

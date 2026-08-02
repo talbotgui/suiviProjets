@@ -1,5 +1,11 @@
-// Tokens visuels repris de la maquette de référence (docs/01_besoin/Suivi Qualimetrie.dc.html, section « Écran
-// Accueil »), sur le modèle déjà retenu par shell.component.scss.
+// Résidu propre à ce composant (Phase 10, incrément 12) : grille statistique à 4 colonnes (repliée à 2 puis 1 sous
+// 992px/576px, RNF-030), variante d'alerte de la carte « Membres inconnus » (RG-009) et couleur/dimension du point
+// d'alerte de chaque ligne. Le reste (bordures, couleurs neutres, typographie, disposition en carte) est porté par
+// les classes utilitaires et motifs partagés (`.carte`, `.bordure-bas`, `.sans-liste`, etc.) appliqués directement
+// dans le gabarit (cf. accueil.component.html), remplaçant l'ancienne feuille de style entièrement propre à ce
+// composant (valeurs reprises manuellement de la maquette, cf. commentaire d'en-tête historique de ce fichier).
+@use 'points-de-rupture' as pr;
+
 .accueil {
   max-width: 920px;
   margin: 0 auto;
@@ -8,99 +14,45 @@
 .accueil__statistiques {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
+  gap: var(--sqm-espace-3);
+  margin-bottom: var(--sqm-espace-5);
 
-.accueil__carte {
-  background: white;
-  border: 1px solid oklch(89% 0.006 250);
-  border-radius: 10px;
-  padding: 14px 16px;
+  @include pr.jusqua(pr.$sqm-pr-992) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-  &--alerte {
-    background: oklch(93% 0.06 340);
-    border-color: oklch(78% 0.14 340);
-
-    .accueil__carte-libelle {
-      color: oklch(38% 0.18 340);
-      font-weight: 600;
-    }
-
-    .accueil__carte-valeur {
-      color: oklch(38% 0.2 340);
-    }
+  @include pr.jusqua(pr.$sqm-pr-576) {
+    grid-template-columns: 1fr;
   }
 }
 
-.accueil__carte-libelle {
-  font-size: 11.5px;
-  color: oklch(50% 0.012 250);
-  margin-bottom: 6px;
-}
+.accueil__carte--alerte {
+  background: var(--sqm-alerte-fond);
+  border-color: var(--sqm-alerte-bordure);
 
-.accueil__carte-valeur {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 20px;
-  font-weight: 600;
-}
+  .accueil__carte-libelle {
+    color: var(--sqm-alerte-texte);
+    font-weight: var(--sqm-poids-demi-gras);
+  }
 
-.accueil__section {
-  background: white;
-  border: 1px solid oklch(89% 0.006 250);
-  border-radius: 10px;
-  padding: 14px 18px;
-  margin-bottom: 16px;
-}
-
-.accueil__section-titre {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: oklch(50% 0.012 250);
-  margin: 0 0 10px;
-}
-
-.accueil__vide {
-  font-size: 13px;
-  color: oklch(48% 0.012 250);
-  margin: 0;
-}
-
-.accueil__liste {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.accueil__ligne {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px solid oklch(92% 0.005 250);
-  font-size: 13px;
-
-  &:last-child {
-    border-bottom: none;
+  .accueil__carte-valeur {
+    color: var(--sqm-alerte-texte-fort);
   }
 }
 
+// `.bordure-bas` (utilitaire partagé) retirée sur la dernière ligne de chaque liste : comportement propre à ce
+// gabarit, non exprimable par la seule classe utilitaire.
+.accueil__ligne:last-child {
+  border-bottom: none;
+}
+
+// Point d'alerte : aucun token de `src/styles/_tokens.scss` ne correspond exactement à la teinte rouge vive de la
+// maquette de référence (distincte de `--sqm-rouge-texte`, calibrée pour du texte) ; alignement délibéré sur
+// `--sqm-rouge-texte` plutôt qu'invention d'un nouveau token pour ce seul point décoratif (décision arbitraire à
+// valider par un humain, cf. rapport de développement de cet incrément).
 .accueil__pastille {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: oklch(58% 0.2 25);
-  flex: none;
-}
-
-.accueil__ligne-libelle {
-  flex: 1;
-}
-
-.accueil__ligne-groupe,
-.accueil__mention-traitement {
-  font-size: 11.5px;
-  color: oklch(50% 0.012 250);
+  background: var(--sqm-rouge-texte);
 }

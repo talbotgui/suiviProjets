@@ -36,7 +36,6 @@ type ActionPurgeEnAttente = 'densite' | 'age' | null;
   selector: 'app-purge-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
   templateUrl: './purge-parametrage.component.html',
-  styleUrl: './purge-parametrage.component.scss',
 })
 export class SqmPurgeParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =

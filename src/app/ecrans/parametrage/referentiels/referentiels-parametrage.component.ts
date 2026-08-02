@@ -70,7 +70,6 @@ interface SuppressionEnAttente {
   selector: 'app-referentiels-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
   templateUrl: './referentiels-parametrage.component.html',
-  styleUrl: './referentiels-parametrage.component.scss',
 })
 export class SqmReferentielsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =

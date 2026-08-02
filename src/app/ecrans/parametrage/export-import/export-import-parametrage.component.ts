@@ -40,7 +40,6 @@ const NOM_FICHIER_EXPORT_PAR_DEFAUT = 'configuration-qualimetrie.json';
   selector: 'app-export-import-parametrage',
   imports: [SqmConfirmationMotDePasseComponent],
   templateUrl: './export-import-parametrage.component.html',
-  styleUrl: './export-import-parametrage.component.scss',
 })
 export class SqmExportImportParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =

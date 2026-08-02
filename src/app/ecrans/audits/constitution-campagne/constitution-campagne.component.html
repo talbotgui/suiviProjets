@@ -1,17 +1,24 @@
 <section class="constitution-campagne">
-  <header class="constitution-campagne__entete">
-    <h2>Constitution de campagne</h2>
+  <header
+    class="constitution-campagne__entete d-flex aligne-centre justifie-espace exterieur-bas-4"
+  >
+    <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Constitution de campagne</h2>
   </header>
 
   @if (brouillonEnAttente()) {
-    <p class="constitution-campagne__bandeau-blocage" role="alert">
+    <p
+      class="constitution-campagne__bandeau-blocage carte fond-rouge texte-rouge poids-gras interieur-4"
+      role="alert"
+    >
       Un brouillon de la dernière campagne reste à traiter (intégré ou rejeté) avant de pouvoir en
       lancer une nouvelle.
       <a routerLink="/audits/brouillon">Traiter le brouillon</a>
     </p>
   } @else {
-    <div class="constitution-campagne__raccourcis">
-      <label class="constitution-campagne__tout">
+    <div
+      class="constitution-campagne__raccourcis d-flex retour-ligne aligne-centre ecart-4 exterieur-y-4"
+    >
+      <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input
           type="checkbox"
           [checked]="estToutSelectionne()"
@@ -20,18 +27,20 @@
         />
         Tout sélectionner
       </label>
-      <button type="button" (click)="appliquerRaccourciEchecs()">
+      <button type="button" class="bouton bouton--discret" (click)="appliquerRaccourciEchecs()">
         Rejouer les échecs de la dernière campagne
       </button>
-      <button type="button" (click)="appliquerRaccourciNonAudites()">
+      <button type="button" class="bouton bouton--discret" (click)="appliquerRaccourciNonAudites()">
         Projets non audités depuis longtemps
       </button>
     </div>
 
-    <ul class="constitution-campagne__groupes">
+    <ul class="constitution-campagne__groupes sans-liste">
       @for (groupe of groupes(); track groupe.id) {
-        <li class="constitution-campagne__groupe">
-          <label class="constitution-campagne__groupe-entete">
+        <li class="constitution-campagne__groupe exterieur-bas-3">
+          <label
+            class="constitution-campagne__groupe-entete poids-gras d-flex aligne-centre ecart-2"
+          >
             <input
               type="checkbox"
               [checked]="estGroupeIntegralementSelectionne(groupe)"
@@ -40,10 +49,10 @@
             />
             {{ groupe.nom }}
           </label>
-          <ul class="constitution-campagne__projets">
+          <ul class="constitution-campagne__projets sans-liste">
             @for (projet of groupe.projets; track projet.id) {
               <li class="constitution-campagne__projet">
-                <label>
+                <label class="d-flex aligne-centre ecart-2">
                   <input
                     type="checkbox"
                     [checked]="estProjetSelectionne(projet.id)"
@@ -53,23 +62,25 @@
                 </label>
               </li>
             } @empty {
-              <li class="constitution-campagne__vide">Aucun projet dans ce groupe.</li>
+              <li class="constitution-campagne__vide texte-tenue">Aucun projet dans ce groupe.</li>
             }
           </ul>
         </li>
       } @empty {
-        <li class="constitution-campagne__vide">Aucun groupe n'est encore défini.</li>
+        <li class="constitution-campagne__vide texte-tenue">Aucun groupe n'est encore défini.</li>
       }
     </ul>
 
-    <section class="constitution-campagne__recapitulatif">
-      <h3>Récapitulatif</h3>
-      <p>
+    <section class="constitution-campagne__recapitulatif carte interieur-4 exterieur-y-4">
+      <h3 class="texte-sm poids-gras exterieur-bas-2 exterieur-haut-0">Récapitulatif</h3>
+      <p class="exterieur-bas-0 exterieur-haut-0">
         {{ recapitulatif().nombreProjets }} projet(s),
         {{ recapitulatif().nombreInstances }} instance(s).
       </p>
       @if (recapitulatif().credentialsManquants.length > 0) {
-        <p class="constitution-campagne__credentials-manquants">
+        <p
+          class="constitution-campagne__credentials-manquants texte-orange texte-sm exterieur-haut-2 exterieur-bas-0"
+        >
           Credentials manquants pour :
           @for (instanceId of recapitulatif().credentialsManquants; track instanceId) {
             <span class="constitution-campagne__credential-manquant">{{
@@ -80,7 +91,12 @@
       }
     </section>
 
-    <button type="button" [disabled]="selectionProjetIds.size === 0" (click)="demanderLancement()">
+    <button
+      type="button"
+      class="bouton bouton--principal"
+      [disabled]="selectionProjetIds.size === 0"
+      (click)="demanderLancement()"
+    >
       Lancer la campagne
     </button>
 

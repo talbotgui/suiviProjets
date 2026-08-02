@@ -1,36 +1,38 @@
-<div class="demarrage">
-  <div class="demarrage__cartes">
-    <div class="demarrage__carte">
-      <div class="demarrage__carte-icone" aria-hidden="true">＋</div>
-      <div class="demarrage__carte-titre">Créer un nouveau fichier</div>
-      <p class="demarrage__carte-description">
+<div class="demarrage interieur-x-6">
+  <div class="demarrage__cartes d-flex ecart-4">
+    <div class="demarrage__carte carte flex-1 d-flex direction-colonne interieur-5">
+      <div class="texte-2xl exterieur-bas-2" aria-hidden="true">＋</div>
+      <div class="poids-demi-gras texte-base exterieur-bas-1">Créer un nouveau fichier</div>
+      <p class="texte-xs texte-secondaire exterieur-bas-4 exterieur-haut-0">
         Démarre un fichier de données vierge, protégé par un mot de passe que vous définissez.
       </p>
 
-      <button
-        type="button"
-        class="demarrage__bouton-secondaire"
-        (click)="choisirEmplacementCreation()"
-      >
+      <button type="button" class="bouton" (click)="choisirEmplacementCreation()">
         Choisir l'emplacement…
       </button>
       @if (cheminCreation) {
-        <p class="demarrage__chemin">{{ cheminCreation }}</p>
+        <p
+          class="demarrage__chemin police-mono texte-2xs texte-secondaire exterieur-haut-2 exterieur-bas-0"
+        >
+          {{ cheminCreation }}
+        </p>
       }
 
-      <label class="demarrage__champ">
-        <span>Mot de passe</span>
+      <label class="champ exterieur-haut-3">
+        Mot de passe
         <input
           type="password"
+          class="champ__controle"
           name="motDePasseCreation"
           autocomplete="new-password"
           [(ngModel)]="motDePasseCreation"
         />
       </label>
-      <label class="demarrage__champ">
-        <span>Confirmation du mot de passe</span>
+      <label class="champ exterieur-haut-3">
+        Confirmation du mot de passe
         <input
           type="password"
+          class="champ__controle"
           name="confirmationMotDePasseCreation"
           autocomplete="new-password"
           [(ngModel)]="confirmationMotDePasseCreation"
@@ -38,12 +40,17 @@
       </label>
 
       @if (messageErreurCreation) {
-        <p class="demarrage__erreur" role="alert">{{ messageErreurCreation }}</p>
+        <p
+          class="demarrage__erreur texte-rouge texte-xs exterieur-haut-2 exterieur-bas-0"
+          role="alert"
+        >
+          {{ messageErreurCreation }}
+        </p>
       }
 
       <button
         type="button"
-        class="demarrage__bouton-principal"
+        class="bouton bouton--principal exterieur-haut-4"
         [disabled]="creationEnCours"
         (click)="creerFichier()"
       >
@@ -51,26 +58,31 @@
       </button>
     </div>
 
-    <div class="demarrage__carte demarrage__carte--mise-en-avant">
-      <div class="demarrage__carte-icone" aria-hidden="true">⤒</div>
-      <div class="demarrage__carte-titre">Charger un fichier existant</div>
-      <p class="demarrage__carte-description">Reprend le suivi là où vous l'avez laissé.</p>
+    <div
+      class="demarrage__carte demarrage__carte--mise-en-avant carte flex-1 d-flex direction-colonne interieur-5"
+    >
+      <div class="texte-2xl exterieur-bas-2" aria-hidden="true">⤒</div>
+      <div class="poids-demi-gras texte-base exterieur-bas-1">Charger un fichier existant</div>
+      <p class="texte-xs texte-secondaire exterieur-bas-4 exterieur-haut-0">
+        Reprend le suivi là où vous l'avez laissé.
+      </p>
 
-      <button
-        type="button"
-        class="demarrage__bouton-secondaire"
-        (click)="choisirFichierChargement()"
-      >
+      <button type="button" class="bouton" (click)="choisirFichierChargement()">
         Choisir un fichier…
       </button>
       @if (cheminChargement) {
-        <p class="demarrage__chemin">{{ cheminChargement }}</p>
+        <p
+          class="demarrage__chemin police-mono texte-2xs texte-secondaire exterieur-haut-2 exterieur-bas-0"
+        >
+          {{ cheminChargement }}
+        </p>
       }
 
-      <label class="demarrage__champ">
-        <span>Mot de passe</span>
+      <label class="champ exterieur-haut-3">
+        Mot de passe
         <input
           type="password"
+          class="champ__controle"
           name="motDePasseChargement"
           autocomplete="current-password"
           [(ngModel)]="motDePasseChargement"
@@ -78,12 +90,17 @@
       </label>
 
       @if (messageErreurChargement) {
-        <p class="demarrage__erreur" role="alert">{{ messageErreurChargement }}</p>
+        <p
+          class="demarrage__erreur texte-rouge texte-xs exterieur-haut-2 exterieur-bas-0"
+          role="alert"
+        >
+          {{ messageErreurChargement }}
+        </p>
       }
 
       <button
         type="button"
-        class="demarrage__bouton-principal"
+        class="bouton bouton--principal exterieur-haut-4"
         [disabled]="chargementEnCours"
         (click)="chargerFichier()"
       >

@@ -3,33 +3,39 @@
 @if (etat(); as etatValue) {
   @switch (etatValue.type) {
     @case ('aucunFichier') {
-      <p class="fiche-projet__etat-vide">Aucun fichier n'est actuellement chargé.</p>
+      <p class="fiche-projet__etat-vide interieur-4 texte-tenue">
+        Aucun fichier n'est actuellement chargé.
+      </p>
     }
     @case ('projetIntrouvable') {
-      <p class="fiche-projet__etat-vide">
+      <p class="fiche-projet__etat-vide interieur-4 texte-tenue">
         Projet introuvable (identifiant inconnu ou projet supprimé depuis).
         <a routerLink="/synthese-audits">Retour à la Synthèse des audits</a>
       </p>
     }
     @case ('trouve') {
-      <div class="fiche-projet" #conteneurExport>
+      <div class="fiche-projet d-flex direction-colonne ecart-4" #conteneurExport>
         @let donnees = etatValue.donnees;
 
         <!-- En-tête : fil d'ariane, badges IA/SONAR_KO/membre inconnu (RG-009, RG-013, RG-016). -->
-        <header class="fiche-projet__entete">
-          <p class="fiche-projet__fil-ariane">
+        <header class="fiche-projet__entete d-flex direction-colonne ecart-1">
+          <p class="fiche-projet__fil-ariane texte-xs texte-tenue exterieur-bas-0 exterieur-haut-0">
             {{ donnees.nomGroupe }} &gt; {{ donnees.nomProjet }}
           </p>
-          <p class="fiche-projet__description">
+          <p class="fiche-projet__description texte-md exterieur-bas-0 exterieur-haut-0">
             {{ donnees.description }}
-            <span class="fiche-projet__ref-auditee"
+            <span class="fiche-projet__ref-auditee texte-sm texte-tenue"
               >— ref auditée : {{ donnees.refAuditeeLabel }}</span
             >
           </p>
-          <div class="fiche-projet__badges">
+          <div class="fiche-projet__badges d-flex aligne-centre ecart-2 retour-ligne">
             <app-badge [couleur]="donnees.statutIa.couleur" [libelle]="donnees.statutIa.label" />
             @if (donnees.statutIa.reserve; as reserve) {
-              <p class="fiche-projet__reserve-ia">{{ reserve }}</p>
+              <p
+                class="fiche-projet__reserve-ia texte-xs italique texte-orange exterieur-bas-0 exterieur-haut-0"
+              >
+                {{ reserve }}
+              </p>
             }
             @if (!donnees.pasDeSonar && donnees.sonarKo) {
               <app-badge couleur="rouge" libelle="SONAR_KO" />
@@ -42,42 +48,75 @@
 
         <!-- Métadonnées : âge chez nous, dernier audit, dernière campagne (mise en évidence si échec), taille/classe. -->
         <section class="fiche-projet__metadonnees">
-          <div class="fiche-projet__metadonnee">
-            <span class="fiche-projet__metadonnee-libelle">Âge chez nous</span>
-            <span class="fiche-projet__metadonnee-valeur">{{ donnees.ageChezNousLabel }}</span>
-          </div>
-          <div class="fiche-projet__metadonnee">
-            <span class="fiche-projet__metadonnee-libelle">Dernier audit</span>
-            <span class="fiche-projet__metadonnee-valeur">{{ donnees.dernierAuditLabel }}</span>
+          <div
+            class="fiche-projet__metadonnee d-flex direction-colonne interieur-x-3 interieur-y-2 rayon-lg"
+          >
+            <span class="fiche-projet__metadonnee-libelle texte-2xs majuscules texte-tenue"
+              >Âge chez nous</span
+            >
+            <span class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras">{{
+              donnees.ageChezNousLabel
+            }}</span>
           </div>
           <div
-            class="fiche-projet__metadonnee"
+            class="fiche-projet__metadonnee d-flex direction-colonne interieur-x-3 interieur-y-2 rayon-lg"
+          >
+            <span class="fiche-projet__metadonnee-libelle texte-2xs majuscules texte-tenue"
+              >Dernier audit</span
+            >
+            <span class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras">{{
+              donnees.dernierAuditLabel
+            }}</span>
+          </div>
+          <div
+            class="fiche-projet__metadonnee d-flex direction-colonne interieur-x-3 interieur-y-2 rayon-lg"
             [class.fiche-projet__metadonnee--echec]="donnees.campagneEnEchec"
           >
-            <span class="fiche-projet__metadonnee-libelle">Dernière campagne</span>
-            <span class="fiche-projet__metadonnee-valeur">{{ donnees.derniereCampagneLabel }}</span>
+            <span class="fiche-projet__metadonnee-libelle texte-2xs majuscules texte-tenue"
+              >Dernière campagne</span
+            >
+            <span class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras">{{
+              donnees.derniereCampagneLabel
+            }}</span>
           </div>
-          <div class="fiche-projet__metadonnee">
-            <span class="fiche-projet__metadonnee-libelle">Taille</span>
-            <span class="fiche-projet__metadonnee-valeur">{{ donnees.tailleLabel }}</span>
+          <div
+            class="fiche-projet__metadonnee d-flex direction-colonne interieur-x-3 interieur-y-2 rayon-lg"
+          >
+            <span class="fiche-projet__metadonnee-libelle texte-2xs majuscules texte-tenue"
+              >Taille</span
+            >
+            <span class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras">{{
+              donnees.tailleLabel
+            }}</span>
           </div>
         </section>
 
         <!-- Anomalie technique (état particulier : dernière campagne en échec, indicateurs de la campagne
              précédente conservés ci-dessous, jamais un écran vide). -->
         @if (donnees.anomalieTechnique; as anomalie) {
-          <section class="fiche-projet__anomalie" role="alert">
-            <p class="fiche-projet__anomalie-titre">
+          <section
+            class="fiche-projet__anomalie carte fond-rouge rayon-lg interieur-x-4 interieur-y-3"
+            role="alert"
+          >
+            <p
+              class="fiche-projet__anomalie-titre poids-demi-gras exterieur-bas-0 exterieur-haut-0"
+            >
               La campagne du {{ anomalie.dateCampagneLabel }} a échoué pour ce projet.
             </p>
-            <p class="fiche-projet__anomalie-note">
+            <p
+              class="fiche-projet__anomalie-note texte-sm texte-tenue exterieur-bas-0 exterieur-haut-0"
+            >
               Les indicateurs affichés ci-dessous restent ceux du dernier audit intégré avec succès
               ({{ donnees.dernierAuditLabel }}).
             </p>
             @if (anomalie.anomalies.length === 0) {
-              <p>Échec technique sans détail exploitable disponible pour ce projet.</p>
+              <p class="exterieur-bas-0">
+                Échec technique sans détail exploitable disponible pour ce projet.
+              </p>
             } @else {
-              <ul class="fiche-projet__anomalie-liste">
+              <ul
+                class="fiche-projet__anomalie-liste sans-liste d-flex direction-colonne ecart-2 exterieur-haut-2"
+              >
                 @for (item of anomalie.anomalies; track $index) {
                   <li>
                     <strong>{{ item.libelleCategorie }}</strong>
@@ -85,7 +124,11 @@
                       <summary>Message technique</summary>
                       <p>{{ item.message }}</p>
                     </details>
-                    <p class="fiche-projet__anomalie-action">{{ item.actionSuggeree }}</p>
+                    <p
+                      class="fiche-projet__anomalie-action texte-sm texte-marque exterieur-bas-0 exterieur-haut-0"
+                    >
+                      {{ item.actionSuggeree }}
+                    </p>
                   </li>
                 }
               </ul>
@@ -95,13 +138,13 @@
 
         <div class="fiche-projet__corps">
           <!-- Colonne gauche : indicateurs Sonar (grisés si SONAR_KO), dépendances, MR ouvertes. -->
-          <section class="fiche-projet__colonne">
-            <h2>Indicateurs Sonar</h2>
+          <section class="fiche-projet__colonne d-flex direction-colonne ecart-2">
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Indicateurs Sonar</h2>
             @if (donnees.pasDeSonar) {
               <p>Aucune source Sonar rattachée à ce projet.</p>
             } @else {
               @if (donnees.sonarKo) {
-                <p class="fiche-projet__legende-sonar-ko">
+                <p class="fiche-projet__legende-sonar-ko texte-xs italique texte-orange">
                   {{ donnees.legendeSonarKo }}
                   <app-explication-jugement
                     cle="fraicheurSonar"
@@ -110,10 +153,10 @@
                 </p>
               }
               <div
-                class="fiche-projet__bloc-sonar"
+                class="fiche-projet__bloc-sonar d-flex direction-colonne ecart-2"
                 [class.fiche-projet__bloc-sonar--grise]="donnees.sonarKo"
               >
-                <div class="fiche-projet__ligne-indicateur">
+                <div class="fiche-projet__ligne-indicateur d-flex aligne-centre ecart-2">
                   <span>Couverture</span>
                   @if (donnees.couverture; as couverture) {
                     @if (couverture.couleur; as couleur) {
@@ -126,13 +169,13 @@
                   }
                   <app-explication-jugement cle="couverture" [seuilsBruts]="donnees.seuilsBruts" />
                 </div>
-                <div class="fiche-projet__ligne-indicateur">
+                <div class="fiche-projet__ligne-indicateur d-flex aligne-centre ecart-2">
                   <span>Notes</span>
                   @for (note of donnees.notes; track $index) {
                     <app-badge [couleur]="note.couleur" [libelle]="note.lettre" />
                   }
                 </div>
-                <div class="fiche-projet__ligne-indicateur">
+                <div class="fiche-projet__ligne-indicateur d-flex aligne-centre ecart-2">
                   <span>Violations bloquantes / critiques</span>
                   @if (donnees.violationBloquant; as bloquant) {
                     @if (bloquant.couleur; as couleur) {
@@ -156,51 +199,57 @@
               </div>
             }
 
-            <h2>Dépendances</h2>
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Dépendances</h2>
             @if (!donnees.dependancesDisponibles) {
               <p>Aucune donnée de dépendances pour ce dernier audit.</p>
             } @else if (donnees.dependances.length === 0) {
               <p>Aucune dépendance déclarée par les manifestes du dépôt.</p>
             } @else {
-              <table class="fiche-projet__table">
-                <caption class="fiche-projet__table-caption">
-                  Dépendances déclarées
-                  <app-explication-jugement
-                    cle="reglesDependances"
-                    [referentielsBruts]="donnees.referentielsBruts"
-                  />
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Référence</th>
-                    <th scope="col">Version</th>
-                    <th scope="col">Manifeste</th>
-                    <th scope="col">Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (
-                    dependance of donnees.dependances;
-                    track dependance.reference + dependance.manifeste
-                  ) {
+              <div class="deborde-auto">
+                <table class="fiche-projet__table tableau">
+                  <caption
+                    class="fiche-projet__table-caption texte-gauche poids-demi-gras exterieur-bas-1"
+                  >
+                    Dépendances déclarées
+                    <app-explication-jugement
+                      cle="reglesDependances"
+                      [referentielsBruts]="donnees.referentielsBruts"
+                    />
+                  </caption>
+                  <thead>
                     <tr>
-                      <td>{{ dependance.reference }}</td>
-                      <td>{{ dependance.version }}</td>
-                      <td>{{ dependance.manifeste }}</td>
-                      <td>
-                        @if (dependance.statut.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="dependance.statut.label" />
-                        } @else {
-                          <span>{{ dependance.statut.label }}</span>
-                        }
-                      </td>
+                      <th scope="col">Référence</th>
+                      <th scope="col">Version</th>
+                      <th scope="col">Manifeste</th>
+                      <th scope="col">Statut</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (
+                      dependance of donnees.dependances;
+                      track dependance.reference + dependance.manifeste
+                    ) {
+                      <tr>
+                        <td>{{ dependance.reference }}</td>
+                        <td>{{ dependance.version }}</td>
+                        <td>{{ dependance.manifeste }}</td>
+                        <td>
+                          @if (dependance.statut.couleur; as couleur) {
+                            <app-badge [couleur]="couleur" [libelle]="dependance.statut.label" />
+                          } @else {
+                            <span>{{ dependance.statut.label }}</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
 
-            <h2>Merge requests ouvertes</h2>
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+              Merge requests ouvertes
+            </h2>
             @if (donnees.mrOuvertes.length === 0) {
               <p>Aucune demande de fusion ouverte.</p>
             } @else {
@@ -214,7 +263,7 @@
                   <app-explication-jugement cle="mrOuvertes" [seuilsBruts]="donnees.seuilsBruts" />
                 </p>
               }
-              <ul class="fiche-projet__liste">
+              <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
                 @for (mr of donnees.mrOuvertes; track mr.iid) {
                   <li>
                     !{{ mr.iid }} {{ mr.titre }} — {{ mr.ageLabel }}
@@ -228,12 +277,12 @@
           </section>
 
           <!-- Colonne droite : membres et statuts, marqueurs IA détectés, annotations et journal (lecture seule). -->
-          <section class="fiche-projet__colonne">
-            <h2>Membres et statuts</h2>
+          <section class="fiche-projet__colonne d-flex direction-colonne ecart-2">
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Membres et statuts</h2>
             @if (donnees.membres.length === 0) {
               <p>Aucun membre constaté sur ce dernier audit.</p>
             } @else {
-              <ul class="fiche-projet__liste">
+              <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
                 @for (membre of donnees.membres; track membre.username) {
                   <li [class.fiche-projet__ligne--inconnu]="membre.inconnu">
                     <span>{{ membre.nom }} ({{ membre.username }})</span>
@@ -255,7 +304,7 @@
                 }
               </ul>
               @if (donnees.membreInconnuDetecte) {
-                <p class="fiche-projet__note-qualification">
+                <p class="fiche-projet__note-qualification texte-xs texte-tenue">
                   Le lien « Qualifier ce membre » ouvre l'écran Administration (onglet Groupes) :
                   sélectionnez le groupe « {{ donnees.nomGroupe }} » puis le sous-onglet Membres
                   connus (aucun lien direct vers ce sous-onglet précis n'existe à ce jour).
@@ -263,11 +312,13 @@
               }
             }
 
-            <h2>Marqueurs IA détectés</h2>
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+              Marqueurs IA détectés
+            </h2>
             @if (donnees.marqueursIa.length === 0) {
               <p>Aucun marqueur d'outil IA détecté.</p>
             } @else {
-              <ul class="fiche-projet__liste">
+              <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
                 @for (marqueur of donnees.marqueursIa; track marqueur.chemin) {
                   <li>{{ marqueur.chemin }} ({{ marqueur.nature }}, {{ marqueur.outil }})</li>
                 }
@@ -278,11 +329,11 @@
               [referentielsBruts]="donnees.referentielsBruts"
             />
 
-            <h2>Annotations</h2>
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Annotations</h2>
             @if (donnees.annotations.length === 0) {
               <p>Aucune annotation pour ce projet.</p>
             } @else {
-              <ul class="fiche-projet__liste">
+              <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
                 @for (annotation of donnees.annotations; track annotation.id) {
                   <li>
                     {{ annotation.date }} — {{ annotation.libelle }} ({{ annotation.categorie }})
@@ -292,6 +343,7 @@
                     @if (!annotation.systeme) {
                       <button
                         type="button"
+                        class="bouton bouton--discret"
                         [disabled]="enCoursAnnotation"
                         (click)="demanderSuppressionAnnotation(annotation.id)"
                       >
@@ -320,34 +372,47 @@
             }
 
             @if (!formulaireAnnotationVisible()) {
-              <button type="button" (click)="ouvrirCreationAnnotation()">
+              <button type="button" class="bouton" (click)="ouvrirCreationAnnotation()">
                 Créer une annotation
               </button>
             } @else {
               <form
-                class="fiche-projet__formulaire-annotation"
+                class="fiche-projet__formulaire-annotation carte interieur-4 d-flex direction-colonne ecart-3"
                 (ngSubmit)="demanderCreationAnnotation()"
               >
-                <label>
+                <label class="champ">
                   Date
-                  <input type="date" name="dateAnnotation" [(ngModel)]="dateAnnotation" required />
+                  <input
+                    type="date"
+                    class="champ__controle"
+                    name="dateAnnotation"
+                    [(ngModel)]="dateAnnotation"
+                    required
+                  />
                 </label>
-                <label>
+                <label class="champ">
                   Libellé
                   <input
                     type="text"
+                    class="champ__controle"
                     name="libelleAnnotation"
                     [(ngModel)]="libelleAnnotation"
                     required
                   />
                 </label>
-                <label>
+                <label class="champ">
                   Catégorie
-                  <input type="text" name="categorieAnnotation" [(ngModel)]="categorieAnnotation" />
+                  <input
+                    type="text"
+                    class="champ__controle"
+                    name="categorieAnnotation"
+                    [(ngModel)]="categorieAnnotation"
+                  />
                 </label>
-                <label>
+                <label class="champ">
                   Description
                   <textarea
+                    class="champ__controle"
                     name="descriptionAnnotation"
                     [(ngModel)]="descriptionAnnotation"
                     rows="2"
@@ -355,12 +420,22 @@
                 </label>
 
                 @if (messageErreurAnnotation) {
-                  <p role="alert">{{ messageErreurAnnotation }}</p>
+                  <p class="texte-rouge" role="alert">{{ messageErreurAnnotation }}</p>
                 }
 
-                <div class="fiche-projet__actions-formulaire-annotation">
-                  <button type="button" (click)="fermerCreationAnnotation()">Annuler</button>
-                  <button type="submit" [disabled]="enCoursAnnotation">Enregistrer</button>
+                <div
+                  class="fiche-projet__actions-formulaire-annotation d-flex justifie-fin ecart-2"
+                >
+                  <button type="button" class="bouton" (click)="fermerCreationAnnotation()">
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    class="bouton bouton--principal"
+                    [disabled]="enCoursAnnotation"
+                  >
+                    Enregistrer
+                  </button>
                 </div>
               </form>
 
@@ -373,11 +448,11 @@
               }
             }
 
-            <h2>Journal</h2>
+            <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Journal</h2>
             @if (donnees.journal.length === 0) {
               <p>Aucune entrée de journal pour ce projet.</p>
             } @else {
-              <ul class="fiche-projet__liste">
+              <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
                 @for (entree of donnees.journal; track entree.id) {
                   <li>
                     {{ entree.horodatage }} — {{ entree.objet }} :
@@ -391,11 +466,18 @@
         </div>
 
         <!-- Actions : Comparaison entre deux audits (US-018, Phase 6 incrément 6), export PNG. -->
-        <div class="fiche-projet__actions">
-          <a class="fiche-projet__action" [routerLink]="'/comparaison-audits/' + donnees.projetId">
+        <div class="fiche-projet__actions d-flex ecart-2">
+          <a
+            class="fiche-projet__action bouton bouton--marque"
+            [routerLink]="'/comparaison-audits/' + donnees.projetId"
+          >
             Comparer à un autre audit
           </a>
-          <button type="button" class="fiche-projet__action" (click)="exporterPng()">
+          <button
+            type="button"
+            class="fiche-projet__action bouton bouton--marque"
+            (click)="exporterPng()"
+          >
             Exporter en PNG
           </button>
         </div>

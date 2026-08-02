@@ -70,7 +70,6 @@ interface InstanceAffichee {
   selector: 'app-credentials',
   imports: [FormsModule],
   templateUrl: './credentials.component.html',
-  styleUrl: './credentials.component.scss',
 })
 export class SqmCredentialsComponent {
   private readonly donneesApplication: DonneesApplicationService =

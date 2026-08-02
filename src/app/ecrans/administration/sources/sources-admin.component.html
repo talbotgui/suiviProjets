@@ -1,8 +1,12 @@
 <section class="sources-admin">
-  <div class="sources-admin__selecteurs">
-    <label>
+  <div class="sources-admin__selecteurs d-flex retour-ligne ecart-4 exterieur-bas-4">
+    <label class="champ">
       Groupe
-      <select [ngModel]="groupeSelectionneId" (ngModelChange)="selectionnerGroupe($event)">
+      <select
+        class="champ__controle"
+        [ngModel]="groupeSelectionneId"
+        (ngModelChange)="selectionnerGroupe($event)"
+      >
         @if (!groupeSelectionneId) {
           <option [ngValue]="null" disabled>Sélectionner un groupe</option>
         }
@@ -13,9 +17,13 @@
     </label>
 
     @if (groupeSelectionneId) {
-      <label>
+      <label class="champ">
         Projet
-        <select [ngModel]="projetSelectionneId" (ngModelChange)="selectionnerProjet($event)">
+        <select
+          class="champ__controle"
+          [ngModel]="projetSelectionneId"
+          (ngModelChange)="selectionnerProjet($event)"
+        >
           @if (!projetSelectionneId) {
             <option [ngValue]="null" disabled>Sélectionner un projet</option>
           }
@@ -28,26 +36,42 @@
   </div>
 
   @if (!projetSelectionneId) {
-    <p class="sources-admin__vide">Sélectionnez un groupe puis un projet pour gérer ses sources.</p>
+    <p class="sources-admin__vide texte-discret">
+      Sélectionnez un groupe puis un projet pour gérer ses sources.
+    </p>
   } @else {
-    <header class="sources-admin__entete">
-      <h2>Sources</h2>
-      <button type="button" (click)="ouvrirCreation()">Créer une source</button>
+    <header
+      class="sources-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
+    >
+      <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Sources</h2>
+      <button type="button" class="bouton" (click)="ouvrirCreation()">Créer une source</button>
     </header>
 
-    <ul class="sources-admin__liste">
+    <ul class="sources-admin__liste sans-liste d-flex direction-colonne ecart-2">
       @for (source of sources(); track source.id) {
-        <li class="sources-admin__ligne">
-          <span class="sources-admin__type">{{ source.type }}</span>
-          <span class="sources-admin__id-externe">{{ source.idExterne }}</span>
-          <span class="sources-admin__ref-auditee">
+        <li
+          class="sources-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+        >
+          <span class="sources-admin__type poids-demi-gras">{{ source.type }}</span>
+          <span class="sources-admin__id-externe texte-sm">{{ source.idExterne }}</span>
+          <span class="sources-admin__ref-auditee texte-discret texte-sm">
             {{ source.refAuditee ?? 'branche par défaut du dépôt (résolue à l’audit)' }}
           </span>
-          <button type="button" (click)="ouvrirEdition(source.id)">Modifier</button>
-          <button type="button" (click)="demanderSuppression(source.id)">Supprimer</button>
+          <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(source.id)">
+            Modifier
+          </button>
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            (click)="demanderSuppression(source.id)"
+          >
+            Supprimer
+          </button>
         </li>
       } @empty {
-        <li class="sources-admin__vide">Aucune source n'est encore définie pour ce projet.</li>
+        <li class="sources-admin__vide texte-discret">
+          Aucune source n'est encore définie pour ce projet.
+        </li>
       }
     </ul>
 
@@ -60,25 +84,35 @@
     }
 
     @if (formulaireVisible) {
-      <form class="sources-admin__formulaire" (ngSubmit)="enregistrer()">
-        <h3>{{ sourceEnEditionId ? 'Modifier la source' : 'Créer une source' }}</h3>
+      <form
+        class="sources-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
+        (ngSubmit)="enregistrer()"
+      >
+        <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+          {{ sourceEnEditionId ? 'Modifier la source' : 'Créer une source' }}
+        </h3>
 
         @if (messageErreur) {
-          <p class="sources-admin__erreur" role="alert">{{ messageErreur }}</p>
+          <p class="sources-admin__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
         }
 
-        <label>
+        <label class="champ">
           Type
-          <select [ngModel]="type" (ngModelChange)="changerType($event)" name="type">
+          <select
+            class="champ__controle"
+            [ngModel]="type"
+            (ngModelChange)="changerType($event)"
+            name="type"
+          >
             @for (typeCandidat of typesSource; track typeCandidat) {
               <option [ngValue]="typeCandidat">{{ typeCandidat }}</option>
             }
           </select>
         </label>
 
-        <label>
+        <label class="champ">
           Instance
-          <select name="instanceId" [(ngModel)]="instanceId">
+          <select class="champ__controle" name="instanceId" [(ngModel)]="instanceId">
             <option value="" disabled>Sélectionner une instance</option>
             @for (instance of instancesCompatibles(); track instance.id) {
               <option [value]="instance.id">{{ instance.nom }}</option>
@@ -86,16 +120,23 @@
           </select>
         </label>
 
-        <label>
+        <label class="champ">
           Identifiant externe
-          <input type="text" name="idExterne" [(ngModel)]="idExterne" required />
+          <input
+            type="text"
+            class="champ__controle"
+            name="idExterne"
+            [(ngModel)]="idExterne"
+            required
+          />
         </label>
 
         @if (type === typesSource[0]) {
-          <label>
+          <label class="champ">
             Ref auditée (branche, tag ou SHA)
             <input
               type="text"
+              class="champ__controle"
               name="refAuditee"
               [(ngModel)]="refAuditee"
               (ngModelChange)="rechercherBranches()"
@@ -109,16 +150,16 @@
             </datalist>
           </label>
           @if (credentialAbsent) {
-            <p class="sources-admin__avertissement">
+            <p class="sources-admin__avertissement texte-orange texte-sm">
               Aucun credential n'est mémorisé pour cette instance : saisissez-le depuis la Gestion
               des credentials pour bénéficier de l'autocomplétion des branches.
             </p>
           }
         }
 
-        <div class="sources-admin__actions-formulaire">
-          <button type="button" (click)="fermerFormulaire()">Annuler</button>
-          <button type="submit">Enregistrer</button>
+        <div class="sources-admin__actions-formulaire d-flex justifie-fin ecart-2">
+          <button type="button" class="bouton" (click)="fermerFormulaire()">Annuler</button>
+          <button type="submit" class="bouton bouton--principal">Enregistrer</button>
         </div>
       </form>
     }

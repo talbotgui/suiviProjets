@@ -71,6 +71,20 @@
   }
 }
 
+// Action informative sur fond neutre (ex. export PNG, raccourci de sélection de date) : bordure et texte couleur de
+// marque, jamais appliquée avec `.bouton--principal`/`.bouton--danger`. Besoin révélé par la Phase 10, incrément 15
+// (écrans Synthèse des audits, Synthèse graphique, Fiche projet, Comparaison entre deux audits : les quatre
+// partagent ce même bouton « Exporter en PNG »/raccourci, jusqu'ici recopié à l'identique dans chacun de leurs
+// `*.component.scss`).
+.bouton--marque {
+  border-color: var(--sqm-marque);
+  color: var(--sqm-marque-texte);
+
+  &:hover {
+    background-color: var(--sqm-marque-fond-douce);
+  }
+}
+
 // Action discrète, sans bordure ni fond (ex. bouton icône de la barre supérieure du Shell).
 .bouton--discret {
   border: none;
@@ -107,4 +121,56 @@
   @include pr.jusqua(pr.$sqm-pr-576) {
     max-width: 100%;
   }
+}
+
+// ===== Champ de formulaire =====
+// Groupe « libellé + contrôle de saisie » : le plus souvent un `<label>` englobant son texte et un
+// `<input>`/`<select>`/`<textarea>` enfant, mais aussi, quand un `id`/`for` explicite est déjà nécessaire (ex. un
+// champ de filtre identifié individuellement, `journal-parametrage.component.html`), un conteneur portant `.champ`
+// avec un `<label for="...">` et son contrôle en éléments frères directs : dans les deux cas, `.champ` se contente de
+// mettre en colonne le texte de libellé et son contrôle, sans imposer l'imbrication. Besoin révélé par la Phase 10,
+// incrément 10 (écran Paramétrage, premier écran à formulaires migré), absent des cinq composants transverses de
+// l'incrément 9. Remplace les champs natifs jusqu'ici sans aucune mise en forme propre de chaque écran à formulaire.
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sqm-espace-1);
+  font-size: var(--sqm-texte-sm);
+  color: var(--sqm-neutre-900);
+}
+
+.champ__controle {
+  font: inherit;
+  font-size: var(--sqm-texte-base);
+  color: var(--sqm-neutre-1000);
+  padding: var(--sqm-espace-2) var(--sqm-espace-3);
+  border: 1px solid var(--sqm-neutre-400);
+  border-radius: var(--sqm-rayon-md);
+  background-color: var(--sqm-neutre-0);
+}
+
+// ===== Tableau simple =====
+// Table HTML classique (en-tête, bordures, espacements) pour les écrans à un tableau simple, sans le tri/filtre/
+// pagination avancés propres au composant transverse `SqmTableauDenseComponent` (ex. Journal des modifications,
+// Export/Import de configuration — cf. rapport de développement, Étape 10 incrément 6, sur le choix de ne pas
+// réutiliser le Tableau dense pour ces tableaux simples).
+.tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sqm-texte-sm);
+}
+
+.tableau th,
+.tableau td {
+  text-align: left;
+  padding: var(--sqm-espace-2) var(--sqm-espace-3);
+  border-bottom: 1px solid var(--sqm-neutre-250);
+}
+
+.tableau thead th {
+  background-color: var(--sqm-neutre-50);
+  font-size: var(--sqm-texte-2xs);
+  letter-spacing: 0.04em;
+  font-weight: var(--sqm-poids-gras);
+  color: var(--sqm-neutre-800);
 }

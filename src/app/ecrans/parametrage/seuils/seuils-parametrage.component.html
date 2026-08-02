@@ -1,169 +1,231 @@
 <section class="seuils-parametrage">
-  <h2>Seuils de couleur</h2>
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Seuils de couleur</h2>
 
   @if (!fichierCharge()) {
-    <p class="seuils-parametrage__vide">Aucun fichier n'est chargé.</p>
+    <p class="seuils-parametrage__vide texte-discret">Aucun fichier n'est chargé.</p>
   } @else {
-    <form class="seuils-parametrage__formulaire" (ngSubmit)="demanderEnregistrement()">
-      <fieldset>
-        <legend>Vitalité du dépôt</legend>
-        <label>
+    <form
+      class="seuils-parametrage__formulaire d-flex direction-colonne ecart-4"
+      (ngSubmit)="demanderEnregistrement()"
+    >
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">Vitalité du dépôt</legend>
+        <label class="champ">
           Jours sans commit avant « mourant »
-          <input type="number" name="vitaliteMourantJours" [(ngModel)]="vitaliteMourantJours" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="vitaliteMourantJours"
+            [(ngModel)]="vitaliteMourantJours"
+          />
         </label>
-        <label>
+        <label class="champ">
           Jours sans commit avant « mort »
-          <input type="number" name="vitaliteMortJours" [(ngModel)]="vitaliteMortJours" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="vitaliteMortJours"
+            [(ngModel)]="vitaliteMortJours"
+          />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Classe de taille du dépôt (octets)</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">
+          Classe de taille du dépôt (octets)
+        </legend>
+        <label class="champ">
           Borne S
-          <input type="number" name="tailleDepotBorneS" [(ngModel)]="tailleDepotBorneS" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="tailleDepotBorneS"
+            [(ngModel)]="tailleDepotBorneS"
+          />
         </label>
-        <label>
+        <label class="champ">
           Borne L
-          <input type="number" name="tailleDepotBorneL" [(ngModel)]="tailleDepotBorneL" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="tailleDepotBorneL"
+            [(ngModel)]="tailleDepotBorneL"
+          />
         </label>
-        <label>
+        <label class="champ">
           Borne XL
-          <input type="number" name="tailleDepotBorneXL" [(ngModel)]="tailleDepotBorneXL" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="tailleDepotBorneXL"
+            [(ngModel)]="tailleDepotBorneXL"
+          />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Couverture de tests (%)</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">Couverture de tests (%)</legend>
+        <label class="champ">
           Seuil rouge
-          <input type="number" name="couvertureSeuilRouge" [(ngModel)]="couvertureSeuilRouge" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="couvertureSeuilRouge"
+            [(ngModel)]="couvertureSeuilRouge"
+          />
         </label>
-        <label>
+        <label class="champ">
           Seuil orange
-          <input type="number" name="couvertureSeuilOrange" [(ngModel)]="couvertureSeuilOrange" />
+          <input
+            type="number"
+            class="champ__controle"
+            name="couvertureSeuilOrange"
+            [(ngModel)]="couvertureSeuilOrange"
+          />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Fraîcheur Sonar (RG-013)</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">
+          Fraîcheur Sonar (RG-013)
+        </legend>
+        <label class="champ">
           Tolérance en jours
           <input
             type="number"
+            class="champ__controle"
             name="fraicheurSonarToleranceJours"
             [(ngModel)]="fraicheurSonarToleranceJours"
           />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Activité sans qualité</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">Activité sans qualité</legend>
+        <label class="champ">
           Nombre minimal de commits
           <input
             type="number"
+            class="champ__controle"
             name="activiteSansQualiteMinCommits"
             [(ngModel)]="activiteSansQualiteMinCommits"
           />
         </label>
-        <label>
+        <label class="champ">
           Nombre minimal de nouvelles violations
           <input
             type="number"
+            class="champ__controle"
             name="activiteSansQualiteMinNouvellesViolations"
             [(ngModel)]="activiteSansQualiteMinNouvellesViolations"
           />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Fraîcheur d'audit</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">Fraîcheur d'audit</legend>
+        <label class="champ">
           Jours avant projet « non audité récemment »
           <input
             type="number"
+            class="champ__controle"
             name="fraicheurAuditAncienJours"
             [(ngModel)]="fraicheurAuditAncienJours"
           />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Demandes de fusion ouvertes</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">
+          Demandes de fusion ouvertes
+        </legend>
+        <label class="champ">
           Âge orange (jours)
           <input
             type="number"
+            class="champ__controle"
             name="mrOuvertesAgeOrangeJours"
             [(ngModel)]="mrOuvertesAgeOrangeJours"
           />
         </label>
-        <label>
+        <label class="champ">
           Âge rouge (jours)
           <input
             type="number"
+            class="champ__controle"
             name="mrOuvertesAgeRougeJours"
             [(ngModel)]="mrOuvertesAgeRougeJours"
           />
         </label>
-        <label>
+        <label class="champ">
           Pourcentage de conflit rouge
           <input
             type="number"
+            class="champ__controle"
             name="mrOuvertesPourcentageConflitRouge"
             [(ngModel)]="mrOuvertesPourcentageConflitRouge"
           />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Couleurs des violations bloquantes</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">
+          Couleurs des violations bloquantes
+        </legend>
+        <label class="champ">
           Seuil orange
           <input
             type="number"
+            class="champ__controle"
             name="couleursViolationsBloquantSeuilOrange"
             [(ngModel)]="couleursViolationsBloquantSeuilOrange"
           />
         </label>
-        <label>
+        <label class="champ">
           Seuil rouge
           <input
             type="number"
+            class="champ__controle"
             name="couleursViolationsBloquantSeuilRouge"
             [(ngModel)]="couleursViolationsBloquantSeuilRouge"
           />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Couleurs des violations critiques</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">
+          Couleurs des violations critiques
+        </legend>
+        <label class="champ">
           Seuil orange
           <input
             type="number"
+            class="champ__controle"
             name="couleursViolationsCritiqueSeuilOrange"
             [(ngModel)]="couleursViolationsCritiqueSeuilOrange"
           />
         </label>
-        <label>
+        <label class="champ">
           Seuil rouge
           <input
             type="number"
+            class="champ__controle"
             name="couleursViolationsCritiqueSeuilRouge"
             [(ngModel)]="couleursViolationsCritiqueSeuilRouge"
           />
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Matérialité du brouillon (RG-020)</legend>
-        <label>
+      <fieldset class="carte interieur-4 d-flex direction-colonne ecart-3">
+        <legend class="d-block poids-gras texte-sm exterieur-bas-2">
+          Matérialité du brouillon (RG-020)
+        </legend>
+        <label class="champ">
           Variation relative
           <input
             type="number"
             step="0.01"
+            class="champ__controle"
             name="materialiteBrouillonVariationRelative"
             [(ngModel)]="materialiteBrouillonVariationRelative"
           />
@@ -171,15 +233,21 @@
       </fieldset>
 
       @if (messageErreur) {
-        <p class="seuils-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+        <p class="seuils-parametrage__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
       }
       @if (messageSucces) {
-        <p class="seuils-parametrage__succes" role="status">{{ messageSucces }}</p>
+        <p class="seuils-parametrage__succes texte-vert" role="status">{{ messageSucces }}</p>
       }
 
-      <div class="seuils-parametrage__actions">
-        <span>{{ nombreDeModifications() }} seuil(s) modifié(s)</span>
-        <button type="submit" [disabled]="enCours || nombreDeModifications() === 0">
+      <div class="seuils-parametrage__actions d-flex aligne-centre ecart-4">
+        <span class="texte-sm texte-discret"
+          >{{ nombreDeModifications() }} seuil(s) modifié(s)</span
+        >
+        <button
+          type="submit"
+          class="bouton bouton--principal"
+          [disabled]="enCours || nombreDeModifications() === 0"
+        >
           Enregistrer les seuils modifiés
         </button>
       </div>

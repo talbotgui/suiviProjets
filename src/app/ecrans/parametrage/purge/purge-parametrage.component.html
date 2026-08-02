@@ -1,35 +1,45 @@
 <section class="purge-parametrage">
-  <h2>Purge des audits</h2>
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Purge des audits</h2>
 
   @if (messageErreur) {
-    <p class="purge-parametrage__erreur" role="alert">{{ messageErreur }}</p>
+    <p class="purge-parametrage__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
   }
   @if (messageSucces) {
-    <p class="purge-parametrage__succes">{{ messageSucces }}</p>
+    <p class="purge-parametrage__succes texte-vert" role="status">{{ messageSucces }}</p>
   }
 
-  <section class="purge-parametrage__bloc">
-    <h3>Purge par densité</h3>
-    <p>
+  <section class="purge-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">Purge par densité</h3>
+    <p class="texte-sm texte-discret">
       Conserve le premier et le dernier audit de chaque projet, puis un audit au minimum tous les
       sept jours parmi les audits rapprochés.
     </p>
 
-    <button type="button" [disabled]="enCours" (click)="previsualiserDensite()">
+    <button
+      type="button"
+      class="bouton exterieur-haut-2"
+      [disabled]="enCours"
+      (click)="previsualiserDensite()"
+    >
       Prévisualiser
     </button>
 
     @if (previsualisationDensite) {
       @if (previsualisationDensite.nbAuditsSupprimes === 0) {
-        <p>Aucun audit ne serait supprimé par une purge par densité.</p>
+        <p class="exterieur-haut-2">Aucun audit ne serait supprimé par une purge par densité.</p>
       } @else {
-        <p>
+        <p class="exterieur-haut-2">
           {{ previsualisationDensite.nbAuditsSupprimes }} audit(s) supprimé(s) sur
           {{ previsualisationDensite.nbProjetsConcernes }} projet(s),
           {{ formaterOctets(previsualisationDensite.octetsAvant) }} →
           {{ formaterOctets(previsualisationDensite.octetsApres) }}.
         </p>
-        <button type="button" [disabled]="enCours" (click)="demanderExecutionDensite()">
+        <button
+          type="button"
+          class="bouton bouton--danger"
+          [disabled]="enCours"
+          (click)="demanderExecutionDensite()"
+        >
           Exécuter la purge
         </button>
       }
@@ -44,16 +54,16 @@
     }
   </section>
 
-  <section class="purge-parametrage__bloc">
-    <h3>Purge par âge</h3>
-    <p>
+  <section class="purge-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">Purge par âge</h3>
+    <p class="texte-sm texte-discret">
       Au-delà de six mois, conserve le premier et le dernier audit de chaque projet, puis supprime
       ou agrège mensuellement les audits restants selon le mode choisi.
     </p>
 
-    <fieldset>
-      <legend>Mode</legend>
-      <label>
+    <fieldset class="d-flex direction-colonne ecart-1 exterieur-haut-2">
+      <legend class="d-block poids-gras texte-sm exterieur-bas-1">Mode</legend>
+      <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input
           type="radio"
           name="modeAge"
@@ -63,7 +73,7 @@
         />
         Suppression
       </label>
-      <label>
+      <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input
           type="radio"
           name="modeAge"
@@ -75,19 +85,33 @@
       </label>
     </fieldset>
 
-    <button type="button" [disabled]="enCours" (click)="previsualiserAge()">Prévisualiser</button>
+    <button
+      type="button"
+      class="bouton exterieur-haut-2"
+      [disabled]="enCours"
+      (click)="previsualiserAge()"
+    >
+      Prévisualiser
+    </button>
 
     @if (previsualisationAge) {
       @if (previsualisationAge.nbAuditsSupprimes === 0) {
-        <p>Aucun audit ne serait supprimé par une purge par âge, pour ce mode.</p>
+        <p class="exterieur-haut-2">
+          Aucun audit ne serait supprimé par une purge par âge, pour ce mode.
+        </p>
       } @else {
-        <p>
+        <p class="exterieur-haut-2">
           {{ previsualisationAge.nbAuditsSupprimes }} audit(s) supprimé(s) sur
           {{ previsualisationAge.nbProjetsConcernes }} projet(s),
           {{ formaterOctets(previsualisationAge.octetsAvant) }} →
           {{ formaterOctets(previsualisationAge.octetsApres) }}.
         </p>
-        <button type="button" [disabled]="enCours" (click)="demanderExecutionAge()">
+        <button
+          type="button"
+          class="bouton bouton--danger"
+          [disabled]="enCours"
+          (click)="demanderExecutionAge()"
+        >
           Exécuter la purge
         </button>
       }

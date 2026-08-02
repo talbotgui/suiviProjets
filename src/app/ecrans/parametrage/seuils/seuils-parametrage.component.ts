@@ -39,7 +39,6 @@ interface ChampSeuilModifie {
   selector: 'app-seuils-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
   templateUrl: './seuils-parametrage.component.html',
-  styleUrl: './seuils-parametrage.component.scss',
 })
 export class SqmSeuilsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =

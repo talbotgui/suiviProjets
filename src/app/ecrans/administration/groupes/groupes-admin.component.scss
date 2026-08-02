@@ -1,39 +1,12 @@
-.groupes-admin {
-  &__sous-onglets {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
+// Résidu propre à ce composant (Phase 10, incrément 14) : couleur du sous-onglet actif, non exprimable par les
+// classes utilitaires génériques, sur le modèle exact de `.administration__onglet--actif`
+// (src/app/ecrans/administration/administration.component.scss).
+.groupes-admin__sous-onglet--actif {
+  background-color: var(--sqm-marque-fond);
+  color: var(--sqm-marque-texte);
+  font-weight: var(--sqm-poids-demi-gras);
 
-  &__sous-onglet--actif {
-    font-weight: bold;
-  }
-
-  &__entete {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  &__ligne {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  &__instance {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  &__erreur {
-    color: #b00020;
-  }
-
-  &__actions-formulaire {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
+  &:hover {
+    background-color: var(--sqm-marque-fond);
   }
 }

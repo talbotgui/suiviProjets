@@ -24,7 +24,6 @@ import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donne
   selector: 'app-projets-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
   templateUrl: './projets-admin.component.html',
-  styleUrl: './projets-admin.component.scss',
 })
 export class SqmProjetsAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =

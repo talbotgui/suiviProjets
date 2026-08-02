@@ -107,7 +107,6 @@ const PALETTE_SERIES: readonly string[] = [
   selector: 'app-synthese-graphique',
   imports: [SqmGraphiqueEvolutionComponent, SqmSelecteurVueComponent],
   templateUrl: './synthese-graphique.component.html',
-  styleUrl: './synthese-graphique.component.scss',
 })
 export class SqmSyntheseGraphiqueComponent {
   /**

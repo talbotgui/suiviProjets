@@ -34,7 +34,6 @@ import type {
   selector: 'app-annotations-groupe-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
   templateUrl: './annotations-groupe-admin.component.html',
-  styleUrl: './annotations-groupe-admin.component.scss',
 })
 export class SqmAnnotationsGroupeAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =

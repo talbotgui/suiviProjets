@@ -1,104 +1,21 @@
-// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
-// .claude/rules/01-usage-ia-et-conventions.md.
+// Résidu propre à ce composant (Phase 10, incrément 15) : bordure de la carte d'anomalie (le motif `.carte` combiné
+// à l'utilitaire `fond-orange` du gabarit ne porte pas de bordure orange par défaut) et séparateur généré entre les
+// projets concernés d'une anomalie — aucun n'est exprimable par une classe utilitaire à une seule propriété. Le
+// reste (disposition, espacement, couleurs de texte, cartes) est porté par les classes utilitaires/motifs
+// appliqués directement dans le gabarit (cf. brouillon.component.html), remplaçant l'ancienne feuille de style
+// entièrement propre à ce composant.
+.brouillon__anomalie {
+  border-color: var(--sqm-orange-bordure);
+}
 
-.brouillon {
-  &__entete {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.brouillon__anomalie-projet {
+  margin-right: var(--sqm-espace-2);
+
+  &::after {
+    content: ',';
   }
 
-  &__erreur {
-    color: #b00020;
-    font-weight: bold;
-  }
-
-  &__vide {
-    color: #666;
-  }
-
-  &__actions-globales {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin: 1rem 0;
-  }
-
-  &__projets {
-    list-style: none;
-    padding: 0;
-  }
-
-  &__projet {
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-
-  &__projet-entete {
-    font-weight: bold;
-  }
-
-  &__aberrations {
-    list-style: none;
-    padding: 0;
-    margin: 0.5rem 0;
-  }
-
-  &__aberration {
-    color: #b00020;
-    font-weight: bold;
-  }
-
-  &__ecarts {
-    list-style: none;
-    padding: 0;
-    margin: 0.5rem 0;
-    color: #444;
-  }
-
-  &__projet-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  &__rapport-anomalies {
-    margin-top: 1.5rem;
-  }
-
-  &__anomalies {
-    list-style: none;
-    padding: 0;
-  }
-
-  &__anomalie {
-    border: 1px solid #eec;
-    background: #fffaf0;
-    border-radius: 4px;
-    padding: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-
-  &__anomalie-entete {
-    margin: 0 0 0.25rem;
-  }
-
-  &__anomalie-action {
-    color: #444;
-    margin: 0 0 0.25rem;
-  }
-
-  &__anomalie-projet {
-    margin-right: 0.5rem;
-
-    &::after {
-      content: ',';
-    }
-
-    &:last-child::after {
-      content: '';
-    }
+  &:last-child::after {
+    content: '';
   }
 }

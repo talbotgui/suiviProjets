@@ -1,7 +1,11 @@
 <section class="projets-admin">
-  <label class="projets-admin__selecteur-groupe">
+  <label class="projets-admin__selecteur-groupe champ exterieur-bas-4">
     Groupe
-    <select [ngModel]="groupeSelectionneId" (ngModelChange)="selectionnerGroupe($event)">
+    <select
+      class="champ__controle"
+      [ngModel]="groupeSelectionneId"
+      (ngModelChange)="selectionnerGroupe($event)"
+    >
       @if (!groupeSelectionneId) {
         <option [ngValue]="null" disabled>Sélectionner un groupe</option>
       }
@@ -12,40 +16,63 @@
   </label>
 
   @if (!groupeSelectionneId) {
-    <p class="projets-admin__vide">Sélectionnez un groupe pour gérer ses projets.</p>
+    <p class="projets-admin__vide texte-discret">Sélectionnez un groupe pour gérer ses projets.</p>
   } @else {
-    <header class="projets-admin__entete">
-      <h2>Projets</h2>
-      <button type="button" (click)="ouvrirCreation()">Créer un projet</button>
+    <header
+      class="projets-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
+    >
+      <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Projets</h2>
+      <button type="button" class="bouton" (click)="ouvrirCreation()">Créer un projet</button>
     </header>
 
-    <ul class="projets-admin__liste">
+    <ul class="projets-admin__liste sans-liste d-flex direction-colonne ecart-2">
       @for (projet of projets(); track projet.id) {
-        <li class="projets-admin__ligne">
-          <span class="projets-admin__nom">{{ projet.nom }}</span>
-          <span class="projets-admin__description">{{ projet.description }}</span>
-          <span class="projets-admin__nombre-sources">{{ projet.sources.length }} source(s)</span>
-          <span class="projets-admin__politique-ia">
+        <li
+          class="projets-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+        >
+          <span class="projets-admin__nom poids-demi-gras">{{ projet.nom }}</span>
+          <span class="projets-admin__description texte-discret texte-sm">{{
+            projet.description
+          }}</span>
+          <span class="projets-admin__nombre-sources texte-discret texte-sm"
+            >{{ projet.sources.length }} source(s)</span
+          >
+          <span class="projets-admin__politique-ia texte-discret texte-sm italique">
             {{ projet.iaAutorisee ? 'IA autorisée' : 'IA interdite' }}
           </span>
           <button
             type="button"
+            class="bouton bouton--discret"
             [disabled]="politiqueIAEnCours"
             (click)="demanderBasculePolitiqueIA(projet.id)"
           >
             {{ projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
           </button>
-          <button type="button" (click)="ouvrirEdition(projet.id)">Modifier</button>
-          <button type="button" (click)="dupliquer(projet.id)">Dupliquer</button>
-          <button type="button" (click)="demanderSuppression(projet.id)">Supprimer</button>
+          <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(projet.id)">
+            Modifier
+          </button>
+          <button type="button" class="bouton bouton--discret" (click)="dupliquer(projet.id)">
+            Dupliquer
+          </button>
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            (click)="demanderSuppression(projet.id)"
+          >
+            Supprimer
+          </button>
         </li>
       } @empty {
-        <li class="projets-admin__vide">Aucun projet n'est encore défini pour ce groupe.</li>
+        <li class="projets-admin__vide texte-discret">
+          Aucun projet n'est encore défini pour ce groupe.
+        </li>
       }
     </ul>
 
     @if (messageErreurPolitiqueIA) {
-      <p class="projets-admin__erreur" role="alert">{{ messageErreurPolitiqueIA }}</p>
+      <p class="projets-admin__erreur texte-rouge exterieur-haut-3" role="alert">
+        {{ messageErreurPolitiqueIA }}
+      </p>
     }
 
     @if (projetPolitiqueIAEnAttenteId) {
@@ -65,26 +92,31 @@
     }
 
     @if (formulaireVisible) {
-      <form class="projets-admin__formulaire" (ngSubmit)="enregistrer()">
-        <h3>{{ projetEnEditionId ? 'Modifier le projet' : 'Créer un projet' }}</h3>
+      <form
+        class="projets-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
+        (ngSubmit)="enregistrer()"
+      >
+        <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+          {{ projetEnEditionId ? 'Modifier le projet' : 'Créer un projet' }}
+        </h3>
 
         @if (messageErreur) {
-          <p class="projets-admin__erreur" role="alert">{{ messageErreur }}</p>
+          <p class="projets-admin__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
         }
 
-        <label>
+        <label class="champ">
           Nom
-          <input type="text" name="nom" [(ngModel)]="nom" required />
+          <input type="text" class="champ__controle" name="nom" [(ngModel)]="nom" required />
         </label>
 
-        <label>
+        <label class="champ">
           Description
-          <textarea name="description" [(ngModel)]="description"></textarea>
+          <textarea class="champ__controle" name="description" [(ngModel)]="description"></textarea>
         </label>
 
-        <div class="projets-admin__actions-formulaire">
-          <button type="button" (click)="fermerFormulaire()">Annuler</button>
-          <button type="submit">Enregistrer</button>
+        <div class="projets-admin__actions-formulaire d-flex justifie-fin ecart-2">
+          <button type="button" class="bouton" (click)="fermerFormulaire()">Annuler</button>
+          <button type="submit" class="bouton bouton--principal">Enregistrer</button>
         </div>
       </form>
     }

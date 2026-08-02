@@ -1,17 +1,19 @@
 <section class="tableau-de-bord">
   @if (progression(); as progressionActuelle) {
-    <header class="tableau-de-bord__entete">
-      <h2>Campagne en cours</h2>
-      <p class="tableau-de-bord__compteur">
+    <header class="tableau-de-bord__entete exterieur-bas-4">
+      <h2 class="texte-lg poids-gras exterieur-bas-2 exterieur-haut-0">Campagne en cours</h2>
+      <p class="tableau-de-bord__compteur texte-sm texte-discret exterieur-bas-1 exterieur-haut-0">
         {{ nombreProjetsTraites() }} / {{ progressionActuelle.perimetre.length }} projets terminés
       </p>
       @if (tempsRestantEstimeMs(); as tempsRestant) {
-        <p class="tableau-de-bord__temps-restant">
+        <p
+          class="tableau-de-bord__temps-restant texte-sm texte-discret exterieur-bas-2 exterieur-haut-0"
+        >
           Temps restant estimé : {{ formaterDuree(tempsRestant) }}
         </p>
       }
       <div
-        class="tableau-de-bord__barre-progression"
+        class="tableau-de-bord__barre-progression exterieur-y-2"
         role="progressbar"
         [attr.aria-valuenow]="pourcentage()"
       >
@@ -21,48 +23,56 @@
         ></div>
       </div>
       @if (campagneEnCours()) {
-        <button type="button" (click)="annuler()">Annuler la campagne</button>
+        <button type="button" class="bouton bouton--danger" (click)="annuler()">
+          Annuler la campagne
+        </button>
       } @else {
-        <p class="tableau-de-bord__termine">Campagne terminée.</p>
+        <p
+          class="tableau-de-bord__termine texte-vert poids-demi-gras exterieur-bas-0 exterieur-haut-0"
+        >
+          Campagne terminée.
+        </p>
       }
     </header>
 
-    <table class="tableau-de-bord__tableau">
-      <thead>
-        <tr>
-          <th>Projet</th>
-          <th>État</th>
-          <th>Connecteur/détail</th>
-          <th>Durée</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (projetId of progressionActuelle.perimetre; track projetId) {
-          @if (progressionActuelle.projets[projetId]; as progressionProjet) {
-            <tr [class.tableau-de-bord__ligne--active]="progressionProjet.statut === 'enCours'">
-              <td>{{ nomProjet(projetId) }}</td>
-              <td>
-                <span
-                  class="tableau-de-bord__badge tableau-de-bord__badge--{{
-                    progressionProjet.statut
-                  }}"
-                >
-                  {{ libelleStatut(progressionProjet.statut) }}
-                </span>
-              </td>
-              <td>{{ detailColonne(progressionProjet) }}</td>
-              <td>
-                @if (progressionProjet.dureeMs; as duree) {
-                  {{ formaterDuree(duree) }}
-                }
-              </td>
-            </tr>
+    <div class="deborde-auto">
+      <table class="tableau-de-bord__tableau tableau">
+        <thead>
+          <tr>
+            <th>Projet</th>
+            <th>État</th>
+            <th>Connecteur/détail</th>
+            <th>Durée</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (projetId of progressionActuelle.perimetre; track projetId) {
+            @if (progressionActuelle.projets[projetId]; as progressionProjet) {
+              <tr [class.tableau-de-bord__ligne--active]="progressionProjet.statut === 'enCours'">
+                <td>{{ nomProjet(projetId) }}</td>
+                <td>
+                  <span
+                    class="tableau-de-bord__badge interieur-x-3 interieur-y-1 rayon-pilule texte-xs tableau-de-bord__badge--{{
+                      progressionProjet.statut
+                    }}"
+                  >
+                    {{ libelleStatut(progressionProjet.statut) }}
+                  </span>
+                </td>
+                <td>{{ detailColonne(progressionProjet) }}</td>
+                <td>
+                  @if (progressionProjet.dureeMs; as duree) {
+                    {{ formaterDuree(duree) }}
+                  }
+                </td>
+              </tr>
+            }
           }
-        }
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
   } @else {
-    <p class="tableau-de-bord__vide">
+    <p class="tableau-de-bord__vide texte-tenue">
       Aucune campagne en cours.
       <a routerLink="/audits/constitution-campagne">Constituer une campagne</a>
     </p>

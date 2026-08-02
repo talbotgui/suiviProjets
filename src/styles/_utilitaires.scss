@@ -168,6 +168,13 @@
 .exterieur-haut-auto {
   margin-top: auto;
 }
+// Pousse cet élément et tous ceux qui le suivent dans un même conteneur flex vers la fin de l'axe principal (ex.
+// compteur de résultats juste avant un bouton d'action, en fin de barre de filtres) : besoin révélé par la Phase 10,
+// incrément 15 (Synthèse des audits, Synthèse graphique, Liste de travail), distinct de `.exterieur-x-auto`
+// (centrage par marge des deux côtés).
+.exterieur-gauche-auto {
+  margin-left: auto;
+}
 
 // ===== Dimensions =====
 .largeur-pleine {
@@ -227,6 +234,9 @@
 }
 .majuscules {
   text-transform: uppercase;
+}
+.italique {
+  font-style: italic;
 }
 .espace-lettres {
   letter-spacing: 0.05em;

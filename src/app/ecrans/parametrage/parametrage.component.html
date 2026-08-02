@@ -1,9 +1,10 @@
 <section class="parametrage">
-  <h1>Paramétrage</h1>
+  <h1 class="texte-2xl poids-gras exterieur-bas-5 exterieur-haut-0">Paramétrage</h1>
 
-  <nav class="parametrage__onglets">
+  <nav class="parametrage__onglets d-flex retour-ligne ecart-2 exterieur-bas-5">
     <button
       type="button"
+      class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'seuilsReferentiels'"
       (click)="selectionnerOnglet('seuilsReferentiels')"
     >
@@ -11,6 +12,7 @@
     </button>
     <button
       type="button"
+      class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'journal'"
       (click)="selectionnerOnglet('journal')"
     >
@@ -18,6 +20,7 @@
     </button>
     <button
       type="button"
+      class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'purge'"
       (click)="selectionnerOnglet('purge')"
     >
@@ -25,6 +28,7 @@
     </button>
     <button
       type="button"
+      class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'exportImport'"
       (click)="selectionnerOnglet('exportImport')"
     >
@@ -34,9 +38,11 @@
 
   @switch (ongletActif) {
     @case ('seuilsReferentiels') {
-      <app-seuils-parametrage />
-      <app-referentiels-parametrage />
-      <app-reglages-applicatifs-parametrage />
+      <div class="d-flex direction-colonne ecart-6">
+        <app-seuils-parametrage />
+        <app-referentiels-parametrage />
+        <app-reglages-applicatifs-parametrage />
+      </div>
     }
     @case ('journal') {
       <app-journal-parametrage />

@@ -53,3 +53,24 @@ a {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+// Réinitialisation des styles de groupement de formulaire par défaut du navigateur (bordure/marge/`min-width: auto`
+// de `fieldset`, empêchant sinon un rétrécissement en layout flex/grid) : périmètre révélé par la Phase 10,
+// incrément 10 (écran Paramétrage, premier écran à formulaires migré), absent des cinq composants transverses de
+// l'incrément 9. La mise en forme visuelle du regroupement (bordure, fond, rayon) reste du ressort du motif `.carte`
+// appliqué directement par chaque gabarit, plutôt que d'un style de `fieldset` par défaut.
+fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+select,
+textarea {
+  font: inherit;
+}

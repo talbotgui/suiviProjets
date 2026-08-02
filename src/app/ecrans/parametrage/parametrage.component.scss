@@ -1,12 +1,14 @@
-.parametrage {
-  &__onglets {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-  }
+// Résidu propre à ce composant (Phase 10, incrément 10) : couleur de l'onglet actif, non exprimable par les classes
+// utilitaires génériques (cf. src/styles/_utilitaires.scss). Mise en page (disposition, espacement) et bouton
+// inactif portés par les classes utilitaires/motif `.bouton`/`.bouton--discret` appliquées directement dans le
+// gabarit (cf. parametrage.component.html), sur le modèle de `.shell__lien--actif`
+// (src/app/composants/shell/shell.component.scss).
+.parametrage__onglet--actif {
+  background-color: var(--sqm-marque-fond);
+  color: var(--sqm-marque-texte);
+  font-weight: var(--sqm-poids-demi-gras);
 
-  &__onglet--actif {
-    font-weight: bold;
-    text-decoration: underline;
+  &:hover {
+    background-color: var(--sqm-marque-fond);
   }
 }

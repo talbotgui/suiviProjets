@@ -31,7 +31,6 @@ type ReglageEnAttente =
   selector: 'app-reglages-applicatifs-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
   templateUrl: './reglages-applicatifs-parametrage.component.html',
-  styleUrl: './reglages-applicatifs-parametrage.component.scss',
 })
 export class SqmReglagesApplicatifsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =

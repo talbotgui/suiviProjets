@@ -1,103 +1,36 @@
-// Tokens visuels repris de la maquette de référence (docs/01_besoin/Suivi Qualimetrie.dc.html, section « Écran
-// Accueil », cartes « Créer un nouveau fichier »/« Charger un fichier existant »), sur le modèle déjà retenu par
-// accueil.component.scss.
+// Résidu propre à ce composant (Phase 10, incrément 11) : positionnement de page (l'écran Démarrage est hors Shell,
+// cf. app.routes.ts — seul écran de ce type avec l'ancien contenu de cette feuille de style à centrer lui-même,
+// sans le padding déjà apporté par `.shell__ecran` pour tous les écrans routés sous le Shell), disposition en deux
+// cartes égales (repliée en une colonne sous 768px, RNF-030) et variante de mise en avant de la seconde carte. Le
+// reste (bordures, couleurs, typographie, boutons, champs) est porté par les classes utilitaires et motifs partagés
+// (`.carte`, `.bouton`, `.champ`) appliqués directement dans le gabarit (cf. demarrage.component.html), remplaçant
+// l'ancienne feuille de style entièrement propre à ce composant (valeurs reprises manuellement de la maquette,
+// cf. commentaire d'en-tête historique de ce fichier).
+@use 'points-de-rupture' as pr;
+
 .demarrage {
   max-width: 920px;
   margin: 60px auto;
-  padding: 0 24px;
 }
 
 .demarrage__cartes {
-  display: flex;
-  gap: 16px;
-}
-
-.demarrage__carte {
-  flex: 1;
-  border: 1px solid oklch(89% 0.006 250);
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-
-  &--mise-en-avant {
-    border-color: oklch(55% 0.16 258);
-    background: oklch(97% 0.015 258);
+  @include pr.jusqua(pr.$sqm-pr-768) {
+    flex-direction: column;
   }
 }
 
-.demarrage__carte-icone {
-  font-size: 20px;
-  margin-bottom: 8px;
-}
-
-.demarrage__carte-titre {
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.demarrage__carte-description {
-  font-size: 12.5px;
-  color: oklch(48% 0.012 250);
-  line-height: 1.5;
-  margin: 0 0 16px;
-}
-
-.demarrage__bouton-secondaire {
+// Les boutons d'un conteneur en colonne flex s'étirent par défaut sur toute la largeur (`align-items: stretch`),
+// recherché ici pour les champs mais pas pour les boutons (dimensionnés à leur contenu dans la maquette de
+// référence).
+.demarrage__carte .bouton {
   align-self: flex-start;
-  background: white;
-  border: 1px solid oklch(80% 0.01 250);
-  border-radius: 6px;
-  padding: 7px 12px;
-  font-size: 12.5px;
-  cursor: pointer;
+}
+
+.demarrage__carte--mise-en-avant {
+  border-color: var(--sqm-marque);
+  background: var(--sqm-marque-fond-douce);
 }
 
 .demarrage__chemin {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11.5px;
-  color: oklch(45% 0.012 250);
   word-break: break-all;
-  margin: 8px 0 0;
-}
-
-.demarrage__champ {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12.5px;
-  margin-top: 12px;
-
-  input {
-    border: 1px solid oklch(80% 0.01 250);
-    border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 13px;
-  }
-}
-
-.demarrage__erreur {
-  color: oklch(50% 0.19 25);
-  font-size: 12px;
-  margin: 10px 0 0;
-}
-
-.demarrage__bouton-principal {
-  align-self: flex-start;
-  margin-top: 16px;
-  background: oklch(55% 0.16 258);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 9px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
 }
