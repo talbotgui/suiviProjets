@@ -1,6 +1,9 @@
 <div class="demarrage interieur-x-6">
   <div class="demarrage__cartes d-flex ecart-4">
-    <div class="demarrage__carte carte flex-1 d-flex direction-colonne interieur-5">
+    <form
+      class="demarrage__carte carte flex-1 d-flex direction-colonne interieur-5"
+      (ngSubmit)="creerFichier()"
+    >
       <div class="texte-2xl exterieur-bas-2" aria-hidden="true">＋</div>
       <div class="poids-demi-gras texte-base exterieur-bas-1">Créer un nouveau fichier</div>
       <p class="texte-xs texte-secondaire exterieur-bas-4 exterieur-haut-0">
@@ -10,11 +13,11 @@
       <button type="button" class="bouton" (click)="choisirEmplacementCreation()">
         Choisir l'emplacement…
       </button>
-      @if (cheminCreation) {
+      @if (cheminCreation()) {
         <p
           class="demarrage__chemin police-mono texte-2xs texte-secondaire exterieur-haut-2 exterieur-bas-0"
         >
-          {{ cheminCreation }}
+          {{ cheminCreation() }}
         </p>
       }
 
@@ -25,7 +28,8 @@
           class="champ__controle"
           name="motDePasseCreation"
           autocomplete="new-password"
-          [(ngModel)]="motDePasseCreation"
+          [ngModel]="motDePasseCreation()"
+          (ngModelChange)="motDePasseCreation.set($event)"
         />
       </label>
       <label class="champ exterieur-haut-3">
@@ -35,31 +39,32 @@
           class="champ__controle"
           name="confirmationMotDePasseCreation"
           autocomplete="new-password"
-          [(ngModel)]="confirmationMotDePasseCreation"
+          [ngModel]="confirmationMotDePasseCreation()"
+          (ngModelChange)="confirmationMotDePasseCreation.set($event)"
         />
       </label>
 
-      @if (messageErreurCreation) {
+      @if (messageErreurCreation()) {
         <p
           class="demarrage__erreur texte-rouge texte-xs exterieur-haut-2 exterieur-bas-0"
           role="alert"
         >
-          {{ messageErreurCreation }}
+          {{ messageErreurCreation() }}
         </p>
       }
 
       <button
-        type="button"
+        type="submit"
         class="bouton bouton--principal exterieur-haut-4"
-        [disabled]="creationEnCours"
-        (click)="creerFichier()"
+        [disabled]="creationEnCours()"
       >
         Créer le fichier
       </button>
-    </div>
+    </form>
 
-    <div
+    <form
       class="demarrage__carte demarrage__carte--mise-en-avant carte flex-1 d-flex direction-colonne interieur-5"
+      (ngSubmit)="chargerFichier()"
     >
       <div class="texte-2xl exterieur-bas-2" aria-hidden="true">⤒</div>
       <div class="poids-demi-gras texte-base exterieur-bas-1">Charger un fichier existant</div>
@@ -70,11 +75,11 @@
       <button type="button" class="bouton" (click)="choisirFichierChargement()">
         Choisir un fichier…
       </button>
-      @if (cheminChargement) {
+      @if (cheminChargement()) {
         <p
           class="demarrage__chemin police-mono texte-2xs texte-secondaire exterieur-haut-2 exterieur-bas-0"
         >
-          {{ cheminChargement }}
+          {{ cheminChargement() }}
         </p>
       }
 
@@ -85,27 +90,27 @@
           class="champ__controle"
           name="motDePasseChargement"
           autocomplete="current-password"
-          [(ngModel)]="motDePasseChargement"
+          [ngModel]="motDePasseChargement()"
+          (ngModelChange)="motDePasseChargement.set($event)"
         />
       </label>
 
-      @if (messageErreurChargement) {
+      @if (messageErreurChargement()) {
         <p
           class="demarrage__erreur texte-rouge texte-xs exterieur-haut-2 exterieur-bas-0"
           role="alert"
         >
-          {{ messageErreurChargement }}
+          {{ messageErreurChargement() }}
         </p>
       }
 
       <button
-        type="button"
+        type="submit"
         class="bouton bouton--principal exterieur-haut-4"
-        [disabled]="chargementEnCours"
-        (click)="chargerFichier()"
+        [disabled]="chargementEnCours()"
       >
         Charger le fichier
       </button>
-    </div>
+    </form>
   </div>
 </div>

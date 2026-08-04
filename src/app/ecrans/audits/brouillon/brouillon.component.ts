@@ -32,6 +32,7 @@ import type { EcartMateriel } from '../../../services/avecetat/campagne/differen
 import { DifferentielResultatUtils } from '../../../services/avecetat/campagne/differentiel-resultat.utils';
 import type { AnomalieRegroupee } from '../../../services/avecetat/campagne/rapport-anomalies.utils';
 import { RapportAnomaliesUtils } from '../../../services/avecetat/campagne/rapport-anomalies.utils';
+import { PerimetreCampagneUtils } from '../../../services/avecetat/campagne/perimetre-campagne.utils';
 
 /**
  * Valeur par défaut du seuil de matérialité (`parametres.seuils.materialiteBrouillon.variationRelative`), reprise
@@ -179,17 +180,18 @@ export class SqmBrouillonComponent {
   }
 
   /**
-   * Rapport d'anomalies techniques de la campagne à l'origine du brouillon courant (US-013, RG-021), regroupées
-   * par cause commune.
-   * @returns Les groupes d'anomalies, tableau vide si aucun brouillon ou aucune anomalie.
+   * Rapport d'anomalies techniques de la dernière campagne exécutée (US-013, RG-021), regroupées par cause
+   * commune. Basé sur la dernière campagne de `racine.campagnes` plutôt que sur le brouillon courant, pour rester
+   * consultable même après une campagne en échec total (RG-018), qui ne crée aucun brouillon depuis que
+   * `enregistrer_brouillon` (cœur natif) laisse `donnees.brouillon` à `null` dans ce cas.
+   * @returns Les groupes d'anomalies, tableau vide si aucune campagne ou aucune anomalie.
    */
   public anomalies(): readonly AnomalieRegroupee[] {
     const racine = this.donneesApplication.racine();
-    const brouillon = racine?.brouillon;
-    if (racine === null || racine === undefined || brouillon === null || brouillon === undefined) {
+    if (racine === null || racine === undefined) {
       return [];
     }
-    const campagne = racine.campagnes.find((candidate) => candidate.id === brouillon.campagneId);
+    const campagne = PerimetreCampagneUtils.trouverDerniereCampagne(racine.campagnes);
     if (campagne === undefined) {
       return [];
     }

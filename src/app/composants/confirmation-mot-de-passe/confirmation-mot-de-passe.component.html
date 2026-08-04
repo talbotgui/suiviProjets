@@ -3,10 +3,11 @@
      malgré `role="alertdialog"`/`aria-modal="true"` déjà posés. Corrigé à l'occasion de cette migration (Phase 10,
      incrément 9). -->
 <div class="superposition">
-  <div
+  <form
     class="confirmation-mot-de-passe superposition__panneau carte d-flex direction-colonne ecart-4"
     role="alertdialog"
     aria-modal="true"
+    (ngSubmit)="confirmer()"
   >
     <p class="confirmation-mot-de-passe__message exterieur-0 texte-base">{{ message() }}</p>
     <label
@@ -26,9 +27,7 @@
          aucun `autofocus` ici, l'ordre de tabulation naturel place le focus initial sur le champ de saisie. -->
     <div class="confirmation-mot-de-passe__actions d-flex justifie-fin ecart-2">
       <button type="button" class="bouton" (click)="annuler()">Annuler</button>
-      <button type="button" class="bouton bouton--principal" (click)="confirmer()">
-        Confirmer
-      </button>
+      <button type="submit" class="bouton bouton--principal">Confirmer</button>
     </div>
-  </div>
+  </form>
 </div>

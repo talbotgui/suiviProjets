@@ -171,7 +171,7 @@ describe('SqmDemarrageComponent', () => {
 
       await fixture.componentInstance.creerFichier();
 
-      expect(fixture.componentInstance.messageErreurCreation).toBe(
+      expect(fixture.componentInstance.messageErreurCreation()).toBe(
         'Choisissez un emplacement pour le nouveau fichier.',
       );
       expect(invokeSimule).not.toHaveBeenCalled();
@@ -181,12 +181,12 @@ describe('SqmDemarrageComponent', () => {
       const fixture = creerFixture();
       saveSimule.mockResolvedValue('/tmp/nouveau.sqm');
       await fixture.componentInstance.choisirEmplacementCreation();
-      fixture.componentInstance.motDePasseCreation = 'secret';
-      fixture.componentInstance.confirmationMotDePasseCreation = 'autre';
+      fixture.componentInstance.motDePasseCreation.set('secret');
+      fixture.componentInstance.confirmationMotDePasseCreation.set('autre');
 
       await fixture.componentInstance.creerFichier();
 
-      expect(fixture.componentInstance.messageErreurCreation).toBe(
+      expect(fixture.componentInstance.messageErreurCreation()).toBe(
         'La confirmation ne correspond pas au mot de passe saisi.',
       );
       expect(invokeSimule).not.toHaveBeenCalled();
@@ -198,8 +198,8 @@ describe('SqmDemarrageComponent', () => {
       saveSimule.mockResolvedValue('/tmp/nouveau.sqm');
       invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
       await fixture.componentInstance.choisirEmplacementCreation();
-      fixture.componentInstance.motDePasseCreation = 'secret';
-      fixture.componentInstance.confirmationMotDePasseCreation = 'secret';
+      fixture.componentInstance.motDePasseCreation.set('secret');
+      fixture.componentInstance.confirmationMotDePasseCreation.set('secret');
 
       await fixture.componentInstance.creerFichier();
       await fixture.whenStable();
@@ -216,12 +216,12 @@ describe('SqmDemarrageComponent', () => {
       saveSimule.mockResolvedValue('/tmp/nouveau.sqm');
       invokeSimule.mockRejectedValue({ type: 'fichierVerrouille' });
       await fixture.componentInstance.choisirEmplacementCreation();
-      fixture.componentInstance.motDePasseCreation = 'secret';
-      fixture.componentInstance.confirmationMotDePasseCreation = 'secret';
+      fixture.componentInstance.motDePasseCreation.set('secret');
+      fixture.componentInstance.confirmationMotDePasseCreation.set('secret');
 
       await fixture.componentInstance.creerFichier();
 
-      expect(fixture.componentInstance.messageErreurCreation).toBe(
+      expect(fixture.componentInstance.messageErreurCreation()).toBe(
         'Le fichier est verrouillé par un autre processus.',
       );
     });
@@ -233,7 +233,7 @@ describe('SqmDemarrageComponent', () => {
 
       await fixture.componentInstance.chargerFichier();
 
-      expect(fixture.componentInstance.messageErreurChargement).toBe(
+      expect(fixture.componentInstance.messageErreurChargement()).toBe(
         'Choisissez un fichier à charger.',
       );
       expect(invokeSimule).not.toHaveBeenCalled();
@@ -245,7 +245,7 @@ describe('SqmDemarrageComponent', () => {
       openSimule.mockResolvedValue('/tmp/existant.sqm');
       invokeSimule.mockResolvedValue(DonneesDeTest.racineSansAlerte());
       await fixture.componentInstance.choisirFichierChargement();
-      fixture.componentInstance.motDePasseChargement = 'secret';
+      fixture.componentInstance.motDePasseChargement.set('secret');
 
       await fixture.componentInstance.chargerFichier();
       await fixture.whenStable();
@@ -263,7 +263,7 @@ describe('SqmDemarrageComponent', () => {
       openSimule.mockResolvedValue('/tmp/existant.sqm');
       invokeSimule.mockResolvedValue(DonneesDeTest.racineAvecMembreInconnu());
       await fixture.componentInstance.choisirFichierChargement();
-      fixture.componentInstance.motDePasseChargement = 'secret';
+      fixture.componentInstance.motDePasseChargement.set('secret');
 
       await fixture.componentInstance.chargerFichier();
       await fixture.whenStable();
@@ -276,11 +276,11 @@ describe('SqmDemarrageComponent', () => {
       openSimule.mockResolvedValue('/tmp/existant.sqm');
       invokeSimule.mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
       await fixture.componentInstance.choisirFichierChargement();
-      fixture.componentInstance.motDePasseChargement = 'mauvais-mot-de-passe';
+      fixture.componentInstance.motDePasseChargement.set('mauvais-mot-de-passe');
 
       await fixture.componentInstance.chargerFichier();
 
-      expect(fixture.componentInstance.messageErreurChargement).toBe(
+      expect(fixture.componentInstance.messageErreurChargement()).toBe(
         'Mot de passe incorrect ou fichier altéré.',
       );
       const donneesApplication = TestBed.inject(DonneesApplicationService);
@@ -293,7 +293,7 @@ describe('SqmDemarrageComponent', () => {
 
       await fixture.componentInstance.choisirFichierChargement();
 
-      expect(fixture.componentInstance.cheminChargement).toBeNull();
+      expect(fixture.componentInstance.cheminChargement()).toBeNull();
     });
   });
 });

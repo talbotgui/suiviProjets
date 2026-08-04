@@ -114,40 +114,40 @@
         (annulee)="annulerAction()"
       />
     }
-
-    <section class="brouillon__rapport-anomalies exterieur-haut-5">
-      <h3 class="texte-md poids-gras exterieur-bas-3 exterieur-haut-0">
-        Rapport d'anomalies techniques
-      </h3>
-      @if (anomalies().length === 0) {
-        <p class="brouillon__vide texte-tenue">Aucune anomalie technique pour cette campagne.</p>
-      } @else {
-        <ul class="brouillon__anomalies sans-liste d-flex direction-colonne ecart-2">
-          @for (groupe of anomalies(); track groupe.categorie + (groupe.instanceId ?? '')) {
-            <li class="brouillon__anomalie carte fond-orange interieur-4">
-              <p class="brouillon__anomalie-entete exterieur-bas-1 exterieur-haut-0">
-                <strong>{{ groupe.libelleCategorie }}</strong>
-                — {{ groupe.instanceNom }} ({{ groupe.projets.length }} projet(s))
-              </p>
-              <p
-                class="brouillon__anomalie-action texte-secondaire texte-sm exterieur-bas-1 exterieur-haut-0"
-              >
-                {{ groupe.actionSuggeree }}
-              </p>
-              <details class="brouillon__anomalie-message">
-                <summary>Message technique</summary>
-                <p>{{ groupe.message }}</p>
-              </details>
-              <p class="brouillon__anomalie-projets exterieur-haut-1 exterieur-bas-0">
-                Projets concernés :
-                @for (projet of groupe.projets; track projet.projetId) {
-                  <span class="brouillon__anomalie-projet">{{ projet.projetNom }}</span>
-                }
-              </p>
-            </li>
-          }
-        </ul>
-      }
-    </section>
   }
+
+  <section class="brouillon__rapport-anomalies exterieur-haut-5">
+    <h3 class="texte-md poids-gras exterieur-bas-3 exterieur-haut-0">
+      Rapport d'anomalies techniques
+    </h3>
+    @if (anomalies().length === 0) {
+      <p class="brouillon__vide texte-tenue">Aucune anomalie technique pour cette campagne.</p>
+    } @else {
+      <ul class="brouillon__anomalies sans-liste d-flex direction-colonne ecart-2">
+        @for (groupe of anomalies(); track groupe.categorie + (groupe.instanceId ?? '')) {
+          <li class="brouillon__anomalie carte fond-orange interieur-4">
+            <p class="brouillon__anomalie-entete exterieur-bas-1 exterieur-haut-0">
+              <strong>{{ groupe.libelleCategorie }}</strong>
+              — {{ groupe.instanceNom }} ({{ groupe.projets.length }} projet(s))
+            </p>
+            <p
+              class="brouillon__anomalie-action texte-secondaire texte-sm exterieur-bas-1 exterieur-haut-0"
+            >
+              {{ groupe.actionSuggeree }}
+            </p>
+            <details class="brouillon__anomalie-message">
+              <summary>Message technique</summary>
+              <p>{{ groupe.message }}</p>
+            </details>
+            <p class="brouillon__anomalie-projets exterieur-haut-1 exterieur-bas-0">
+              Projets concernés :
+              @for (projet of groupe.projets; track projet.projetId) {
+                <span class="brouillon__anomalie-projet">{{ projet.projetNom }}</span>
+              }
+            </p>
+          </li>
+        }
+      </ul>
+    }
+  </section>
 </section>

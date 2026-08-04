@@ -62,11 +62,12 @@ export class PerimetreCampagneUtils {
   }
 
   /**
-   * Trouve la campagne de date la plus récente.
+   * Trouve la campagne de date la plus récente, y compris une campagne en échec total (sans brouillon associé
+   * depuis que `enregistrer_brouillon` n'en crée plus dans ce cas, cf. `SqmBrouillonComponent.anomalies`).
    * @param campagnes - Traces d'exécution des campagnes déjà réalisées.
    * @returns La dernière campagne, `undefined` si `campagnes` est vide.
    */
-  private static trouverDerniereCampagne(campagnes: readonly Campagne[]): Campagne | undefined {
+  public static trouverDerniereCampagne(campagnes: readonly Campagne[]): Campagne | undefined {
     return campagnes.reduce<Campagne | undefined>((derniere, campagne) => {
       if (
         derniere === undefined ||

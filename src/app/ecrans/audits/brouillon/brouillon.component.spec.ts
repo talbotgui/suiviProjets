@@ -149,6 +149,17 @@ class DonneesDeTest {
       vuesEnregistrees: [],
     };
   }
+
+  /**
+   * Variante de {@link racineAvecBrouillonEnAttente} sans brouillon, pour couvrir le cas d'une campagne en échec
+   * total (RG-018) : `enregistrer_brouillon` (cœur natif) ne crée alors aucun brouillon, `resultatsParProjet`
+   * n'ayant aucune entrée exploitable, mais la campagne et ses anomalies restent tracées.
+   * @returns La racine de test construite, sans brouillon.
+   */
+  public static racineAvecCampagneEnEchecTotalSansBrouillon(): DonneesRacine {
+    const racine = DonneesDeTest.racineAvecBrouillonEnAttente();
+    return { ...racine, brouillon: null };
+  }
 }
 
 describe('SqmBrouillonComponent', () => {
@@ -347,5 +358,37 @@ describe('SqmBrouillonComponent', () => {
     await composant.confirmerAction('mot-de-passe');
 
     expect(invokeSimule).not.toHaveBeenCalled();
+  });
+});
+
+describe('SqmBrouillonComponent — campagne en échec total sans brouillon', () => {
+  let composant: SqmBrouillonComponent;
+
+  beforeEach(async () => {
+    invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
+    await TestBed.configureTestingModule({
+      imports: [SqmBrouillonComponent],
+      providers: [{ provide: Router, useValue: { navigateByUrl: jest.fn() } }],
+    }).compileComponents();
+    const donneesApplication = TestBed.inject(DonneesApplicationService);
+    donneesApplication.chargerRacine(DonneesDeTest.racineAvecCampagneEnEchecTotalSansBrouillon());
+    TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    composant = TestBed.createComponent(SqmBrouillonComponent).componentInstance;
+  });
+
+  it("ne doit signaler aucun brouillon en attente, sans empêcher le rapport d'anomalies de rester consultable", () => {
+    expect(composant.brouillonPresent()).toBe(false);
+    expect(composant.entrees()).toEqual([]);
+
+    const groupes = composant.anomalies();
+
+    expect(groupes).toHaveLength(1);
+    expect(groupes[0]).toEqual(
+      expect.objectContaining({
+        categorie: 'droitsInsuffisants',
+        instanceId: 'instance-gitlab',
+      }),
+    );
   });
 });

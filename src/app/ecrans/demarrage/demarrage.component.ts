@@ -20,7 +20,8 @@
 // déjà posé par `SqmAccueilComponent.causesMembreInconnu`/`SqmListeTravailComponent` (« dupliqué localement plutôt
 // que généralisé », commentaire d'en-tête de `liste-travail.component.ts`) : ce composant n'a besoin que d'un
 // booléen, pas de la liste enrichie construite par ces deux écrans.
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
@@ -56,50 +57,61 @@ export class SqmDemarrageComponent {
   private readonly router: Router = inject(Router);
 
   /**
-   * Chemin choisi pour le nouveau fichier, `null` tant qu'aucun emplacement n'a été choisi.
+   * Chemin choisi pour le nouveau fichier, `null` tant qu'aucun emplacement n'a été choisi. Porté par un signal
+   * (plutôt qu'une simple propriété) car mis à jour depuis la continuation asynchrone d'un appel à la boîte de
+   * dialogue native, hors de toute planification automatique de détection de changement dans une application
+   * zoneless (aucune dépendance `zone.js`, cf. `app.config.ts`) : seule une écriture de signal est garantie de
+   * déclencher un nouveau rendu à ce moment-là, à la différence d'une propriété mutée après un `await` (bug
+   * constaté : le chemin ne s'affichait qu'après une interaction ultérieure sans rapport, ex. saisie du mot de
+   * passe).
    */
-  public cheminCreation: string | null = null;
+  public readonly cheminCreation: WritableSignal<string | null> = signal<string | null>(null);
 
   /**
    * Mot de passe saisi pour le nouveau fichier.
    */
-  public motDePasseCreation = '';
+  public readonly motDePasseCreation: WritableSignal<string> = signal('');
 
   /**
    * Confirmation du mot de passe saisi pour le nouveau fichier (parcours documenté : « Saisit et confirme le mot
    * de passe du futur fichier »).
    */
-  public confirmationMotDePasseCreation = '';
+  public readonly confirmationMotDePasseCreation: WritableSignal<string> = signal('');
 
   /**
    * Message d'erreur du formulaire de création, `null` si aucune erreur.
    */
-  public messageErreurCreation: string | null = null;
+  public readonly messageErreurCreation: WritableSignal<string | null> = signal<string | null>(
+    null,
+  );
 
   /**
    * Indique qu'une création est en cours, pour désactiver le bouton de soumission le temps de l'appel natif.
    */
-  public creationEnCours = false;
+  public readonly creationEnCours: WritableSignal<boolean> = signal(false);
 
   /**
-   * Chemin du fichier choisi pour le chargement, `null` tant qu'aucun fichier n'a été choisi.
+   * Chemin du fichier choisi pour le chargement, `null` tant qu'aucun fichier n'a été choisi. Signal pour le même
+   * motif que {@link cheminCreation}.
    */
-  public cheminChargement: string | null = null;
+  public readonly cheminChargement: WritableSignal<string | null> = signal<string | null>(null);
 
   /**
    * Mot de passe saisi pour le chargement du fichier choisi.
    */
-  public motDePasseChargement = '';
+  public readonly motDePasseChargement: WritableSignal<string> = signal('');
 
   /**
    * Message d'erreur du formulaire de chargement, `null` si aucune erreur.
    */
-  public messageErreurChargement: string | null = null;
+  public readonly messageErreurChargement: WritableSignal<string | null> = signal<string | null>(
+    null,
+  );
 
   /**
    * Indique qu'un chargement est en cours, pour désactiver le bouton de soumission le temps de l'appel natif.
    */
-  public chargementEnCours = false;
+  public readonly chargementEnCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Ouvre la boîte de dialogue native de sélection d'emplacement pour le nouveau fichier (US-001).
@@ -110,8 +122,8 @@ export class SqmDemarrageComponent {
       defaultPath: NOM_FICHIER_PAR_DEFAUT,
     });
     if (chemin !== null) {
-      this.cheminCreation = chemin;
-      this.messageErreurCreation = null;
+      this.cheminCreation.set(chemin);
+      this.messageErreurCreation.set(null);
     }
   }
 
@@ -120,32 +132,34 @@ export class SqmDemarrageComponent {
    * en cas de succès (parcours documenté : « ouvre le shell applicatif sur Administration »).
    */
   public async creerFichier(): Promise<void> {
-    this.messageErreurCreation = null;
-    if (this.cheminCreation === null) {
-      this.messageErreurCreation = 'Choisissez un emplacement pour le nouveau fichier.';
+    this.messageErreurCreation.set(null);
+    const cheminCreation = this.cheminCreation();
+    if (cheminCreation === null) {
+      this.messageErreurCreation.set('Choisissez un emplacement pour le nouveau fichier.');
       return;
     }
-    if (this.motDePasseCreation.length === 0) {
-      this.messageErreurCreation = 'Le mot de passe est obligatoire.';
+    const motDePasseCreation = this.motDePasseCreation();
+    if (motDePasseCreation.length === 0) {
+      this.messageErreurCreation.set('Le mot de passe est obligatoire.');
       return;
     }
-    if (this.motDePasseCreation !== this.confirmationMotDePasseCreation) {
-      this.messageErreurCreation = 'La confirmation ne correspond pas au mot de passe saisi.';
+    if (motDePasseCreation !== this.confirmationMotDePasseCreation()) {
+      this.messageErreurCreation.set('La confirmation ne correspond pas au mot de passe saisi.');
       return;
     }
-    this.creationEnCours = true;
+    this.creationEnCours.set(true);
     try {
       const resultat = await this.donneesApplication.creerFichier(
-        this.cheminCreation,
-        this.motDePasseCreation,
+        cheminCreation,
+        motDePasseCreation,
       );
       if (resultat.type === 'succes') {
         void this.router.navigateByUrl('/administration');
         return;
       }
-      this.messageErreurCreation = this.libelleAnomalie(resultat.anomalie.type);
+      this.messageErreurCreation.set(this.libelleAnomalie(resultat.anomalie.type));
     } finally {
-      this.creationEnCours = false;
+      this.creationEnCours.set(false);
     }
   }
 
@@ -158,8 +172,8 @@ export class SqmDemarrageComponent {
       filters: FILTRE_FICHIER_DONNEES,
     });
     if (typeof chemin === 'string') {
-      this.cheminChargement = chemin;
-      this.messageErreurChargement = null;
+      this.cheminChargement.set(chemin);
+      this.messageErreurChargement.set(null);
     }
   }
 
@@ -169,28 +183,30 @@ export class SqmDemarrageComponent {
    * (`08_arborescenceNavigation.md`, cf. commentaire d'en-tête de ce fichier).
    */
   public async chargerFichier(): Promise<void> {
-    this.messageErreurChargement = null;
-    if (this.cheminChargement === null) {
-      this.messageErreurChargement = 'Choisissez un fichier à charger.';
+    this.messageErreurChargement.set(null);
+    const cheminChargement = this.cheminChargement();
+    if (cheminChargement === null) {
+      this.messageErreurChargement.set('Choisissez un fichier à charger.');
       return;
     }
-    if (this.motDePasseChargement.length === 0) {
-      this.messageErreurChargement = 'Le mot de passe est obligatoire.';
+    const motDePasseChargement = this.motDePasseChargement();
+    if (motDePasseChargement.length === 0) {
+      this.messageErreurChargement.set('Le mot de passe est obligatoire.');
       return;
     }
-    this.chargementEnCours = true;
+    this.chargementEnCours.set(true);
     try {
       const resultat = await this.donneesApplication.chargerFichier(
-        this.cheminChargement,
-        this.motDePasseChargement,
+        cheminChargement,
+        motDePasseChargement,
       );
       if (resultat.type === 'succes') {
         void this.router.navigateByUrl(this.cibleApresChargement());
         return;
       }
-      this.messageErreurChargement = this.libelleAnomalie(resultat.anomalie.type);
+      this.messageErreurChargement.set(this.libelleAnomalie(resultat.anomalie.type));
     } finally {
-      this.chargementEnCours = false;
+      this.chargementEnCours.set(false);
     }
   }
 

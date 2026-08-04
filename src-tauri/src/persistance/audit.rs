@@ -52,6 +52,11 @@ pub(crate) enum ErreurAudit {
 /// indépendamment de la valeur soumise par l'appelant : cette fonction est le seul point d'entrée qui crée un
 /// brouillon, sa cohérence interne ne doit jamais dépendre d'une valeur externe non maîtrisée.
 ///
+/// Si `resultats_par_projet` est vide (campagne en échec total), aucun brouillon n'est créé : `donnees.brouillon`
+/// reste inchangé, pour que le verrou RG-019 ne bloque pas le lancement d'une nouvelle campagne derrière un
+/// brouillon sans aucune entrée à traiter. La campagne elle-même (avec ses verdicts d'échec) est toujours
+/// consignée dans `donnees.campagnes`.
+///
 /// # Erreurs
 ///
 /// [`ErreurAudit::BrouillonDejaExistant`] si `donnees.brouillon` est déjà renseigné (RG-019, revalidée ici
@@ -81,7 +86,7 @@ pub(crate) fn enregistrer_brouillon(
     // brouillon, aucune valeur externe non maîtrisée ne doit pouvoir y introduire un rejet ou une aberration déjà
     // « résolus » avant même la première résolution par l'utilisateur (constat de relecture, cf. rapport de
     // développement de cette phase).
-    let resultats_par_projet = resultats_par_projet
+    let resultats_par_projet: Vec<ResultatBrouillonProjet> = resultats_par_projet
         .into_iter()
         .map(|resultat| ResultatBrouillonProjet {
             statut: StatutResultatBrouillon::EnAttente,
@@ -91,11 +96,17 @@ pub(crate) fn enregistrer_brouillon(
         })
         .collect();
 
-    donnees.brouillon = Some(Brouillon {
-        campagne_id,
-        cree_le: horodatage,
-        resultats_par_projet,
-    });
+    // Une campagne en échec total (aucun projet n'a produit de résultat exploitable, RG-018) ne porte aucune
+    // entrée à traiter : ne pas créer de brouillon dans ce cas, pour ne pas bloquer indéfiniment le lancement
+    // d'une nouvelle campagne derrière un brouillon vide qu'aucune action de l'écran Brouillon ne permet de
+    // distinguer d'un brouillon réellement traité (RG-019, constat de relecture).
+    if !resultats_par_projet.is_empty() {
+        donnees.brouillon = Some(Brouillon {
+            campagne_id,
+            cree_le: horodatage,
+            resultats_par_projet,
+        });
+    }
 
     Ok(())
 }
@@ -332,6 +343,40 @@ mod tests {
         assert_eq!(
             brouillon.resultats_par_projet[0].statut,
             StatutResultatBrouillon::EnAttente
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn enregistrer_brouillon_ne_cree_pas_de_brouillon_pour_une_campagne_en_echec_total()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut racine = racine_avec_un_projet("projet-1");
+
+        let resultat = enregistrer_brouillon(
+            &mut racine,
+            "campagne-1".to_string(),
+            "2026-07-23".to_string(),
+            vec!["projet-1".to_string()],
+            vec![Verdict {
+                projet_id: "projet-1".to_string(),
+                statut: StatutVerdict::Echec,
+                duree_ms: None,
+                anomalies: Some(vec![serde_json::json!("instance injoignable")]),
+                motif_rejet: None,
+            }],
+            vec![],
+            "2026-07-23T08:30:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Ok(()));
+        assert_eq!(
+            racine.campagnes.len(),
+            1,
+            "la campagne doit rester tracée malgré l'échec total"
+        );
+        assert!(
+            racine.brouillon.is_none(),
+            "aucun brouillon ne doit bloquer le lancement d'une nouvelle campagne"
         );
         Ok(())
     }
