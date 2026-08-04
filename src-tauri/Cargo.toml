@@ -20,13 +20,13 @@ name = "suivi_qualimetrie_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3" }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3" }
+tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 # Sélection de fichier exclusivement via les API natives de l'OS (jamais une saisie libre de chemin), requis par
 # l'écran de Démarrage (US-001, US-002, cf. docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties).
