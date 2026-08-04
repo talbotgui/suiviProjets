@@ -87,7 +87,10 @@ pub(crate) fn charger_fichier(
 
 /// Sauvegarde le fichier de données (RG-001 à RG-003) : sauvegarde de sécurité horodatée de l'ancien contenu si un
 /// fichier existe déjà, rotation au-delà du nombre paramétré, puis écriture atomique du nouveau contenu avec un
-/// sel et un IV fraîchement régénérés (RNF-012).
+/// sel et un IV fraîchement régénérés (RNF-012). Point de convergence unique de toute écriture du fichier de
+/// données : `commande_origine` (nom de la commande de la Façade à l'origine de cet appel, ex. `"qualifierMembre"`)
+/// est consigné au journal technique local en cas de succès (R11-01b, cf. `crate::journalisation`), jamais son
+/// contenu ni le mot de passe.
 ///
 /// # Erreurs
 ///
@@ -96,8 +99,11 @@ pub(crate) fn sauvegarder_fichier(
     chemin: &Path,
     donnees: &DonneesRacine,
     mot_de_passe: &str,
+    commande_origine: &str,
 ) -> Result<[u8; TAILLE_CLE], ErreurPersistance> {
-    ecrire_fichier_chiffre(chemin, donnees, mot_de_passe)
+    let cle = ecrire_fichier_chiffre(chemin, donnees, mot_de_passe)?;
+    crate::journalisation::consigner_ecriture_fichier(commande_origine);
+    Ok(cle)
 }
 
 /// Dérive la clé correspondant au mot de passe fourni à partir du sel actuellement inscrit dans l'enveloppe sur
@@ -369,7 +375,7 @@ mod tests {
             projets: vec![],
         });
 
-        sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct")?;
+        sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct", "test")?;
 
         let (relue, _cle) = charger_fichier(&chemin, "mot-de-passe-correct")?;
 
@@ -443,7 +449,7 @@ mod tests {
             "Test",
         )?;
         racine.version_schema = VERSION_SCHEMA_COURANTE + 1;
-        sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct")?;
+        sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct", "test")?;
 
         let resultat = charger_fichier(&chemin, "mot-de-passe-correct");
 
@@ -568,7 +574,7 @@ mod tests {
             "le verrou de test doit être acquis pour que le scénario soit valide"
         );
 
-        let resultat = sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct");
+        let resultat = sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct", "test");
 
         FileExt::unlock(&fichier_verrouilleur)?;
         assert!(matches!(
@@ -592,7 +598,7 @@ mod tests {
 
         // Trois sauvegardes successives : seules les deux dernières doivent subsister.
         for _ in 0..3 {
-            sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct")?;
+            sauvegarder_fichier(&chemin, &racine, "mot-de-passe-correct", "test")?;
         }
 
         let prefixe = prefixe_sauvegarde(&chemin);

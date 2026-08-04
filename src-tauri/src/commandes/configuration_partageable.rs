@@ -93,7 +93,12 @@ pub(crate) fn importer_configuration(
         horodatage,
     )?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "importerConfiguration",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)

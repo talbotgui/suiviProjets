@@ -61,7 +61,12 @@ pub(crate) fn creer_annotation(
         horodatage,
     )?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "creerAnnotation",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)
@@ -97,7 +102,12 @@ pub(crate) fn supprimer_annotation(
         horodatage,
     )?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "supprimerAnnotation",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)
@@ -128,7 +138,12 @@ pub(crate) fn qualifier_alerte(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     alertes::qualifier_alerte(&mut donnees, cle_alerte, statut, commentaire, horodatage);
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "qualifierAlerte",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)

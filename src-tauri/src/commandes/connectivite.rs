@@ -31,6 +31,11 @@ pub(crate) async fn tester_connectivite(
     credential: String,
     etat: State<'_, EtatSession>,
 ) -> Result<VerdictConnectivite, ErreurConnecteur> {
+    crate::journalisation::consigner_appel_connecteur(
+        "testerConnectivite",
+        &instance.nom,
+        "test de connectivité",
+    );
     let client = etat.client_http();
     let client = &client;
     match instance.type_instance {
@@ -86,6 +91,11 @@ pub(crate) async fn interroger_branches(
             .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
                 message: "Aucun credential en mémoire pour cette instance".to_string(),
             })?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerBranches",
+        &instance.nom,
+        &id_externe,
+    );
     let client = etat.client_http();
     match instance.type_instance {
         TypeInstance::Gitlab => {
@@ -127,6 +137,11 @@ pub(crate) async fn lister_sources_disponibles(
             .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
                 message: "Aucun credential en mémoire pour cette instance".to_string(),
             })?;
+    crate::journalisation::consigner_appel_connecteur(
+        "listerSourcesDisponibles",
+        &instance.nom,
+        "toutes les sources accessibles",
+    );
     let client = etat.client_http();
     match instance.type_instance {
         TypeInstance::Gitlab => {

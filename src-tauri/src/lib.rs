@@ -29,18 +29,23 @@
 //! fichier, sur le même gabarit que `qualifierMembre`/`definirPolitiqueIA`. Évolution du 2026-08-02 (US-008,
 //! RG-036) : s'y ajoute `listerSourcesDisponibles`, qui liste les dépôts GitLab ou projets Sonar accessibles avec
 //! le credential courant d'une Instance, pour l'autocomplétion de l'identifiant externe d'une source (remplace la
-//! saisie libre), sur le même gabarit que `interrogerBranches`.
+//! saisie libre), sur le même gabarit que `interrogerBranches`. Phase 11 (R11-01) : le greffon de journalisation
+//! technique (`mod journalisation`) est désormais actif en développement comme en production (retrait de la
+//! restriction `cfg!(debug_assertions)`), écrit dans un dossier `logs/` à côté de l'exécutable avec rotation
+//! quotidienne et rétention de 30 jours ; les commandes appelant GitLab/Sonar et le point de convergence
+//! `persistance::moteur::sauvegarder_fichier` y consignent chacun de leurs appels.
 
 mod commandes;
 mod connecteurs;
+mod journalisation;
 mod modele;
 mod persistance;
 
 use commandes::etat_session::EtatSession;
 
-/// Démarre l'application Tauri : construit la fenêtre principale, installe le plugin de journalisation en mode
-/// développement, enregistre l'état de session et les commandes de la Façade, puis lance la boucle d'événements
-/// native.
+/// Démarre l'application Tauri : construit la fenêtre principale, installe le greffon de journalisation technique
+/// (développement comme production depuis R11-01, cf. `crate::journalisation`), enregistre l'état de session et
+/// les commandes de la Façade, puis lance la boucle d'événements native.
 ///
 /// Toute erreur fatale au démarrage est explicitement journalisée sur la sortie d'erreur avant l'arrêt du
 /// processus, plutôt que de recourir à `.unwrap()`/`.expect()` (interdits par les normes de développement du
@@ -105,13 +110,30 @@ pub fn run() {
             commandes::configuration_partageable::importer_configuration,
         ])
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+            let cible_fichier = journalisation::dossier_logs().map(|dossier| {
+                journalisation::purger_journaux_anciens(&dossier);
+                tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
+                    path: dossier,
+                    file_name: Some(journalisation::nom_fichier_journal_du_jour()),
+                })
+            });
+            let mut constructeur_log = tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .max_file_size(journalisation::TAILLE_MAX_FICHIER_JOURNAL_OCTETS)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .clear_targets()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ));
+            match cible_fichier {
+                Some(cible) => constructeur_log = constructeur_log.target(cible),
+                // Dossier de l'exécutable non résolu (cas dégradé, non observé en pratique) : la journalisation se
+                // limite alors à la sortie standard plutôt que d'empêcher le démarrage de l'application.
+                None => eprintln!(
+                    "Impossible de déterminer le dossier de journalisation à côté de l'exécutable : journalisation fichier désactivée pour cette session."
+                ),
             }
+            app.handle().plugin(constructeur_log.build())?;
             Ok(())
         })
         .run(tauri::generate_context!());

@@ -42,7 +42,8 @@ pub(crate) fn definir_seuil(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_seuil(&mut donnees, &cle, valeur, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session =
+        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirSeuil")?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -70,7 +71,12 @@ pub(crate) fn definir_referentiel(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_referentiel(&mut donnees, &type_referentiel, entree, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "definirReferentiel",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -96,7 +102,12 @@ pub(crate) fn supprimer_regle_dependance(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::supprimer_regle_dependance(&mut donnees, &id, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "supprimerRegleDependance",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -121,7 +132,12 @@ pub(crate) fn supprimer_regle_marqueur_ia(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::supprimer_regle_marqueur_ia(&mut donnees, &id, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "supprimerRegleMarqueurIA",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -153,7 +169,12 @@ pub(crate) fn definir_verrouillage(
         horodatage,
     )?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "definirVerrouillage",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -179,7 +200,12 @@ pub(crate) fn definir_concurrence_audit(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_concurrence_audit(&mut donnees, concurrence, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "definirConcurrenceAudit",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -208,7 +234,8 @@ pub(crate) fn definir_proxy(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_proxy(&mut donnees, url, chemin_bundle_ca, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session =
+        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirProxy")?;
     etat.definir(PathBuf::from(chemin), cle_session);
     etat.definir_proxy(donnees.parametres.proxy.clone());
 
@@ -235,7 +262,12 @@ pub(crate) fn definir_nombre_sauvegardes_securite(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_nombre_sauvegardes_securite(&mut donnees, nombre, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "definirNombreSauvegardesSecurite",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -261,7 +293,12 @@ pub(crate) fn definir_seuil_avertissement_taille(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     parametrage::definir_seuil_avertissement_taille(&mut donnees, seuil_octets, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "definirSeuilAvertissementTaille",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)

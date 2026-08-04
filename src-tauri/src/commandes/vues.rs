@@ -57,7 +57,8 @@ pub(crate) fn definir_vue(
         filtres,
     )?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle =
+        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirVue")?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)
@@ -81,7 +82,8 @@ pub(crate) fn supprimer_vue(
     let mut donnees = donnees;
     vues::supprimer_vue(&mut donnees, &id)?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle =
+        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "supprimerVue")?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)

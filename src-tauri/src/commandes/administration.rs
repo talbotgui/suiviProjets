@@ -97,7 +97,12 @@ pub(crate) fn qualifier_membre(
         horodatage,
     )?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "qualifierMembre",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(ReponseQualificationMembre {
@@ -142,7 +147,12 @@ pub(crate) fn definir_politique_ia(
     )?;
 
     if a_change {
-        let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirPolitiqueIA",
+        )?;
         etat.definir(PathBuf::from(chemin), cle);
     }
 
@@ -182,7 +192,12 @@ pub(crate) fn supprimer_membre_connu(
         horodatage,
     )?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "supprimerMembreConnu",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)

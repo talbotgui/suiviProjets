@@ -84,6 +84,11 @@ pub(crate) async fn interroger_vitalite(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabVitalite, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerVitalite",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_vitalite(
@@ -117,6 +122,11 @@ pub(crate) async fn interroger_taille_depot(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabTailleDepot, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerTailleDepot",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_taille_depot(
@@ -150,6 +160,11 @@ pub(crate) async fn interroger_contributeurs(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabContributeurs, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerContributeurs",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_contributeurs(
@@ -182,6 +197,11 @@ pub(crate) async fn interroger_merge_requests(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMergeRequests, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerMergeRequests",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_merge_requests(
@@ -214,6 +234,11 @@ pub(crate) async fn interroger_membres(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMembres, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerMembres",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_membres(
@@ -249,6 +274,11 @@ pub(crate) async fn interroger_branches_completes(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabBranches, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerBranchesCompletes",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_branches_completes(
@@ -283,6 +313,11 @@ pub(crate) async fn interroger_dependances(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabDependances, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerDependances",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_dependances(
@@ -321,6 +356,11 @@ pub(crate) async fn interroger_marqueurs_ia(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMarqueursIa, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerMarqueursIa",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_marqueurs_ia(
@@ -354,6 +394,11 @@ pub(crate) async fn interroger_violations(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarViolations, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerViolations",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_violations(
@@ -385,6 +430,11 @@ pub(crate) async fn interroger_dette(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarDette, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerDette",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_dette(
@@ -415,6 +465,11 @@ pub(crate) async fn interroger_couverture(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarCouverture, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerCouverture",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_couverture(
@@ -445,6 +500,11 @@ pub(crate) async fn interroger_notes(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarNotes, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerNotes",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_notes(
@@ -475,6 +535,11 @@ pub(crate) async fn interroger_ncloc(
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarNcloc, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerNcloc",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_ncloc(
@@ -510,6 +575,11 @@ pub(crate) async fn interroger_derniere_analyse(
     etat: State<'_, EtatSession>,
 ) -> Result<Option<String>, ErreurConnecteur> {
     let credential = credential_instance(&instance, &etat)?;
+    crate::journalisation::consigner_appel_connecteur(
+        "interrogerDerniereAnalyse",
+        &instance.nom,
+        &id_externe,
+    );
     match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_derniere_analyse(
@@ -569,7 +639,12 @@ pub(crate) fn enregistrer_brouillon(
         horodatage,
     )?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "enregistrerBrouillon",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)
@@ -599,7 +674,12 @@ pub(crate) fn integrer_brouillon(
     let mut donnees = donnees;
     audit::integrer_brouillon(&mut donnees, selection.as_deref())?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "integrerBrouillon",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)
@@ -628,7 +708,12 @@ pub(crate) fn rejeter_brouillon(
     let mut donnees = donnees;
     audit::rejeter_brouillon(&mut donnees, selection.as_deref(), motif)?;
 
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "rejeterBrouillon",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
 
     Ok(donnees)

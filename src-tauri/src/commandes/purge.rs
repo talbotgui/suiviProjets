@@ -41,7 +41,12 @@ pub(crate) fn executer_purge_densite(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     purge::executer_purge_densite(&mut donnees, horodatage);
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "executerPurgeDensite",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -72,7 +77,12 @@ pub(crate) fn executer_purge_journal(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     purge::executer_purge_journal(&mut donnees, aujourdhui, horodatage);
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "executerPurgeJournal",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)
@@ -113,7 +123,12 @@ pub(crate) fn executer_purge_age(
     let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     purge::executer_purge_age(&mut donnees, aujourdhui, &mode, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle_session = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "executerPurgeAge",
+    )?;
     etat.definir(PathBuf::from(chemin), cle_session);
 
     Ok(donnees)

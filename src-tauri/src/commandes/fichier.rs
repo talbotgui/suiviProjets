@@ -299,7 +299,12 @@ pub(crate) fn sauvegarder_fichier(
     etat: State<'_, EtatSession>,
 ) -> Result<(), ErreurFacade> {
     verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let cle = moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe)?;
+    let cle = moteur::sauvegarder_fichier(
+        Path::new(&chemin),
+        &donnees,
+        &mot_de_passe,
+        "sauvegarderFichier",
+    )?;
     etat.definir(PathBuf::from(chemin), cle);
     Ok(())
 }
