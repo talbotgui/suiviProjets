@@ -17,6 +17,7 @@
 // lui-même : ce service en est la seule frontière pour ces deux commandes.
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
+import { IndicateurChargementUtils } from './indicateur-chargement.utils';
 
 /**
  * Paramètres transmis à la commande native `creerAnnotation` (US-019), génériques sur le type concret de la racine
@@ -98,7 +99,7 @@ export class FacadeAlertesService {
   public async creerAnnotation<TDonnees, TReponse>(
     parametres: ParametresCreationAnnotation<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('creer_annotation', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('creer_annotation', { ...parametres }));
   }
 
   /**
@@ -110,7 +111,7 @@ export class FacadeAlertesService {
   public async supprimerAnnotation<TDonnees, TReponse>(
     parametres: ParametresSuppressionAnnotation<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('supprimer_annotation', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('supprimer_annotation', { ...parametres }));
   }
 
   /**
@@ -121,6 +122,6 @@ export class FacadeAlertesService {
   public async qualifierAlerte<TDonnees, TReponse>(
     parametres: ParametresQualificationAlerte<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('qualifier_alerte', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('qualifier_alerte', { ...parametres }));
   }
 }

@@ -7,6 +7,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmBrouillonComponent } from './brouillon.component';
@@ -188,16 +189,18 @@ describe('SqmBrouillonComponent', () => {
   });
 
   it("ne doit afficher aucun message si aucun échec d'enregistrement du brouillon n'est en attente", () => {
-    expect(composant.messageErreur).toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([]);
   });
 
   it("doit afficher, dès sa construction, l'échec d'enregistrement du brouillon retenu par le Store, puis l'acquitter (R10-06)", () => {
     const etatSession = TestBed.inject(EtatSessionService);
     etatSession.signalerEchecEnregistrementBrouillon({ type: 'motDePasseOuFichierInvalide' });
 
-    const nouveauComposant = TestBed.createComponent(SqmBrouillonComponent).componentInstance;
+    TestBed.createComponent(SqmBrouillonComponent);
 
-    expect(nouveauComposant.messageErreur).toBe('Mot de passe incorrect.');
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
+    ]);
     expect(etatSession.echecEnregistrementBrouillon()).toBeNull();
   });
 
@@ -298,7 +301,9 @@ describe('SqmBrouillonComponent', () => {
       composant.demanderIntegrerTout();
       await composant.confirmerAction('mot-de-passe');
 
-      expect(composant.messageErreur).toBe(message);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'erreur', message }),
+      ]);
     },
   );
 
@@ -318,7 +323,7 @@ describe('SqmBrouillonComponent', () => {
       expect.objectContaining({ selection: undefined, motDePasse: 'mot-de-passe-correct' }),
     );
     expect(composant.actionEnAttente).toBeNull();
-    expect(composant.messageErreur).toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([]);
     expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/constitution-campagne');
   });
 
@@ -348,7 +353,9 @@ describe('SqmBrouillonComponent', () => {
     composant.demanderIntegrerTout();
     await composant.confirmerAction('mauvais-mot-de-passe');
 
-    expect(composant.messageErreur).toBe('Mot de passe incorrect.');
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
+    ]);
     expect(composant.actionEnAttente).toBeNull();
     expect(routerMock.navigateByUrl).not.toHaveBeenCalled();
     expect(composant.brouillonPresent()).toBe(true);

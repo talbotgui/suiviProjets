@@ -12,6 +12,7 @@ import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirma
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import type { DonneesProjet } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donnees';
 
 /**
@@ -28,6 +29,7 @@ import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donne
 export class SqmProjetsAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -69,11 +71,6 @@ export class SqmProjetsAdminComponent {
    * (RG-002), `null` si aucune bascule n'est en cours.
    */
   public projetPolitiqueIAEnAttenteId: string | null = null;
-
-  /**
-   * Message d'erreur de la dernière tentative de bascule de politique IA, `null` si aucune erreur en cours.
-   */
-  public messageErreurPolitiqueIA: string | null = null;
 
   /**
    * Indique qu'une bascule de politique IA est en cours, pour désactiver les actions concurrentes.
@@ -206,7 +203,6 @@ export class SqmProjetsAdminComponent {
    * @param projetId - Identifiant du projet concerné.
    */
   public demanderBasculePolitiqueIA(projetId: string): void {
-    this.messageErreurPolitiqueIA = null;
     this.projetPolitiqueIAEnAttenteId = projetId;
   }
 
@@ -245,10 +241,11 @@ export class SqmProjetsAdminComponent {
     this.projetPolitiqueIAEnAttenteId = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreurPolitiqueIA =
+      this.notification.erreur(
         resultat.anomalie.type === 'motDePasseOuFichierInvalide'
           ? 'Mot de passe incorrect.'
-          : 'Une erreur inattendue est survenue lors de la bascule de la politique IA.';
+          : 'Une erreur inattendue est survenue lors de la bascule de la politique IA.',
+      );
     }
   }
 }

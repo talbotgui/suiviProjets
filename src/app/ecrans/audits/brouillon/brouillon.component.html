@@ -3,10 +3,6 @@
     <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Brouillon de campagne</h2>
   </header>
 
-  @if (messageErreur !== null) {
-    <p class="brouillon__erreur texte-rouge poids-gras" role="alert">{{ messageErreur }}</p>
-  }
-
   @if (!brouillonPresent()) {
     <p class="brouillon__vide texte-tenue">
       Aucun brouillon en attente : vous pouvez constituer une nouvelle campagne.

@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import {
   StatutMembre,
   StatutTraitementAlerte,
@@ -155,6 +156,7 @@ class DonneesDeTest {
 
 describe('SqmListeTravailComponent', () => {
   let donneesApplication: DonneesApplicationService;
+  let notification: NotificationService;
 
   beforeEach(async () => {
     jest.mocked(invoke).mockReset();
@@ -162,6 +164,7 @@ describe('SqmListeTravailComponent', () => {
       imports: [SqmListeTravailComponent],
     }).compileComponents();
     donneesApplication = TestBed.inject(DonneesApplicationService);
+    notification = TestBed.inject(NotificationService);
   });
 
   it("affiche le message d'état vide lorsqu'aucune alerte n'est active", () => {
@@ -317,7 +320,9 @@ describe('SqmListeTravailComponent', () => {
     composant.demanderMarquerVu();
     await composant.confirmerQualification('mot-de-passe');
 
-    expect(composant.messageErreur).not.toBeNull();
+    expect(notification.liste()).toEqual([
+      expect.objectContaining({ type: 'erreur' }),
+    ]);
     expect(composant.alerteSelectionnee()).toBeDefined();
   });
 
@@ -381,7 +386,7 @@ describe('SqmListeTravailComponent', () => {
           motDePasse: 'mot-de-passe',
         }),
       );
-      expect(composant.messageErreur).toBeNull();
+      expect(notification.liste()).toEqual([]);
       expect(donneesApplication.racine()).toBe(racineMiseAJour);
     });
 
@@ -401,7 +406,7 @@ describe('SqmListeTravailComponent', () => {
         motDePasse: 'mot-de-passe',
       });
 
-      expect(composant.messageErreur).not.toBeNull();
+      expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
     });
 
     it('supprime une vue et met à jour la racine (US-028)', async () => {
@@ -421,7 +426,7 @@ describe('SqmListeTravailComponent', () => {
         'supprimer_vue',
         expect.objectContaining({ id: 'v1', motDePasse: 'mot-de-passe' }),
       );
-      expect(composant.messageErreur).toBeNull();
+      expect(notification.liste()).toEqual([]);
       expect(donneesApplication.racine()).toBe(racineMiseAJour);
     });
 
@@ -436,7 +441,7 @@ describe('SqmListeTravailComponent', () => {
 
       await composant.supprimerVue({ id: 'id-inconnu', motDePasse: 'mot-de-passe' });
 
-      expect(composant.messageErreur).not.toBeNull();
+      expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
     });
 
     it('applique automatiquement la vue par défaut de cet écran à l’ouverture', () => {

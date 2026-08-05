@@ -1,0 +1,18 @@
+// Résidu propre à ce composant (Phase 11, R11-03) : positionnement en pile fixe, sur le même modèle que
+// `.shell__erreur-sauvegarde`/`.shell__avertissement-taille` (shell.component.scss), dont ce composant reprend
+// désormais la responsabilité (migration progressive documentée par le rapport de développement de cet
+// incrément).
+.notification {
+  bottom: var(--sqm-espace-5);
+  right: var(--sqm-espace-5);
+  z-index: 200;
+  max-width: 360px;
+}
+
+.notification__item--succes {
+  border-color: var(--sqm-vert-texte);
+}
+
+.notification__item--erreur {
+  border-color: var(--sqm-rouge-bordure);
+}

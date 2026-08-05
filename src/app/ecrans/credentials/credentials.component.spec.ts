@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../services/avecetat/etat/types-donnees';
 import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
 import { SqmCredentialsComponent } from './credentials.component';
@@ -170,7 +171,10 @@ describe('SqmCredentialsComponent', () => {
     });
     expect(etatSession.credentials()).toEqual({ i1: 'nouveau-jeton', i2: 'deja-enregistre' });
     expect(composant.valeurSaisie('i1')).toBe('nouveau-jeton');
-    expect(composant.messageSucces).toContain('enregistrés');
+    const notifications = TestBed.inject(NotificationService).liste();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].type).toBe('succes');
+    expect(notifications[0].message).toContain('enregistrés');
   });
 
   it("n'invoque pas la commande native si aucun credential n'est saisi", async () => {
@@ -188,7 +192,10 @@ describe('SqmCredentialsComponent', () => {
 
     await composant.enregistrer();
 
-    expect(composant.messageErreur).toContain("n'a été enregistré");
+    const notifications = TestBed.inject(NotificationService).liste();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].type).toBe('erreur');
+    expect(notifications[0].message).toContain("n'a été enregistré");
   });
 
   it('teste la connectivité et affiche un verdict de succès avec la latence mesurée', async () => {
@@ -261,5 +268,165 @@ describe('SqmCredentialsComponent', () => {
     await composant.toutTester();
 
     expect(invokeSimule).not.toHaveBeenCalled();
+  });
+
+  describe('collage JSON de credentials (US-003, R11-10)', () => {
+    it('pré-remplit les credentials des instances reconnues sans les enregistrer', () => {
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+      composant.onCollage('{"i1": "glpat-xxxx", "i2": "sqp_yyyy"}');
+
+      expect(composant.valeurSaisie('i1')).toBe('glpat-xxxx');
+      expect(composant.valeurSaisie('i2')).toBe('sqp_yyyy');
+      expect(composant.messageErreurCollage).toBeNull();
+      expect(composant.identifiantsNonReconnus).toEqual([]);
+      expect(composant.contenuColle).toBe('');
+      expect(invokeSimule).not.toHaveBeenCalled();
+    });
+
+    it('signale explicitement les identifiants non reconnus, sans bloquer les autres', () => {
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+      composant.onCollage('{"i1": "glpat-xxxx", "instance-inconnue": "zzzz"}');
+
+      expect(composant.valeurSaisie('i1')).toBe('glpat-xxxx');
+      expect(composant.identifiantsNonReconnus).toEqual(['instance-inconnue']);
+    });
+
+    it('affiche un message explicite si le contenu collé est un JSON invalide, sans vider le champ', () => {
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+      composant.onCollage('{ ceci n’est pas du JSON');
+
+      expect(composant.messageErreurCollage).not.toBeNull();
+      expect(composant.identifiantsNonReconnus).toEqual([]);
+      expect(composant.contenuColle).toBe('{ ceci n’est pas du JSON');
+    });
+
+    it('efface les messages précédents quand le contenu collé est vidé', () => {
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+      composant.onCollage('{ invalide');
+      expect(composant.messageErreurCollage).not.toBeNull();
+
+      composant.onCollage('');
+
+      expect(composant.messageErreurCollage).toBeNull();
+      expect(composant.contenuColle).toBe('');
+    });
+  });
+
+  describe('copie des credentials en JSON (opération inverse du collage)', () => {
+    let ecrireDansPressePapiers: jest.Mock<Promise<void>, [string]>;
+
+    beforeEach(() => {
+      ecrireDansPressePapiers = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: ecrireDansPressePapiers },
+        configurable: true,
+      });
+    });
+
+    it('désactive la copie tant qu’aucun credential n’est enregistré en mémoire', () => {
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+      expect(composant.aucunCredentialEnMemoire()).toBe(true);
+    });
+
+    it('copie les credentials enregistrés au format JSON et démarre le compte à rebours de 10 secondes', async () => {
+      TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+      expect(composant.aucunCredentialEnMemoire()).toBe(false);
+
+      await composant.copierCredentialsJson();
+
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(JSON.stringify({ i1: 'glpat-xxxx' }, null, 2));
+      expect(composant.secondesRestantesCopie()).toBe(10);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([]);
+    });
+
+    it('décrémente le compte à rebours chaque seconde puis efface le presse-papiers après 10 secondes', async () => {
+      jest.useFakeTimers();
+      try {
+        TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
+        const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+        await composant.copierCredentialsJson();
+        expect(composant.secondesRestantesCopie()).toBe(10);
+
+        jest.advanceTimersByTime(1_000);
+        expect(composant.secondesRestantesCopie()).toBe(9);
+
+        jest.advanceTimersByTime(8_000);
+        expect(composant.secondesRestantesCopie()).toBe(1);
+
+        jest.advanceTimersByTime(1_000);
+        await Promise.resolve();
+
+        expect(composant.secondesRestantesCopie()).toBeNull();
+        expect(ecrireDansPressePapiers).toHaveBeenLastCalledWith('');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('réarme le compte à rebours à 10 secondes si une nouvelle copie est déclenchée en cours de route', async () => {
+      jest.useFakeTimers();
+      try {
+        TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
+        const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+        await composant.copierCredentialsJson();
+        jest.advanceTimersByTime(4_000);
+        expect(composant.secondesRestantesCopie()).toBe(6);
+
+        await composant.copierCredentialsJson();
+        expect(composant.secondesRestantesCopie()).toBe(10);
+
+        jest.advanceTimersByTime(6_000);
+        expect(composant.secondesRestantesCopie()).toBe(4);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('efface immédiatement le presse-papiers si l’écran est quitté avant la fin du compte à rebours', async () => {
+      jest.useFakeTimers();
+      try {
+        TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
+        const fixture = TestBed.createComponent(SqmCredentialsComponent);
+        await fixture.componentInstance.copierCredentialsJson();
+        jest.advanceTimersByTime(3_000);
+        ecrireDansPressePapiers.mockClear();
+
+        fixture.destroy();
+        await Promise.resolve();
+
+        expect(ecrireDansPressePapiers).toHaveBeenCalledWith('');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('n’exporte jamais une saisie en cours non encore enregistrée', async () => {
+      TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+      composant.definirSaisie('i2', 'sqp_en-cours-de-saisie');
+
+      await composant.copierCredentialsJson();
+
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(JSON.stringify({ i1: 'glpat-xxxx' }, null, 2));
+    });
+
+    it('affiche un message explicite si la copie dans le presse-papiers échoue', async () => {
+      ecrireDansPressePapiers.mockRejectedValue(new Error('Permission refusée'));
+      TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
+      const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
+
+      await composant.copierCredentialsJson();
+
+      const notifications = TestBed.inject(NotificationService).liste();
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0].type).toBe('erreur');
+    });
   });
 });

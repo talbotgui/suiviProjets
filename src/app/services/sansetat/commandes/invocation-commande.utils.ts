@@ -13,10 +13,17 @@
 // du brouillon d'une campagne, après constat qu'une campagne lancée en `ng serve` échouait silencieusement à
 // l'étape `enregistrer_brouillon`, seule commande alors non bouchonnée du parcours de campagne). Les Façades
 // restantes (paramétrage, alertes, vues) continuent d'appeler `invoke` directement.
+//
+// Point de passage unique également retenu pour l'indicateur de chargement transverse (Phase 11, R11-04, cf.
+// `IndicateurChargementUtils.envelopper`) : couvre ainsi automatiquement les Façades déjà câblées ici (bouchon
+// compris, pour un comportement identique en `ng serve`) ; les Façades restantes, qui appellent encore `invoke`
+// directement, enveloppent chacun de leurs appels individuellement avec ce même point d'enveloppe (cf. leurs
+// fichiers respectifs).
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { BouchonAdministrationUtils } from './bouchon/bouchon-administration.utils';
 import { BouchonCommandesUtils } from './bouchon/bouchon-commandes.utils';
 import { BouchonFichierUtils } from './bouchon/bouchon-fichier.utils';
+import { IndicateurChargementUtils } from './indicateur-chargement.utils';
 
 /**
  * Point de passage unique entre `FacadeCommandesService`/`FacadeFichierService`/`FacadeAdministrationService` et
@@ -36,15 +43,17 @@ export class InvocationCommandeUtils {
     commande: string,
     parametres?: Readonly<Record<string, unknown>>,
   ): Promise<TReponse> {
-    if (isTauri()) {
-      return invoke<TReponse>(commande, parametres);
-    }
-    if (BouchonFichierUtils.COMMANDES.has(commande)) {
-      return BouchonFichierUtils.invoquer<TReponse>(commande);
-    }
-    if (BouchonAdministrationUtils.COMMANDES.has(commande)) {
-      return BouchonAdministrationUtils.invoquer<TReponse>(commande, parametres ?? {});
-    }
-    return BouchonCommandesUtils.invoquer<TReponse>(commande, parametres ?? {});
+    return IndicateurChargementUtils.envelopper(async () => {
+      if (isTauri()) {
+        return invoke<TReponse>(commande, parametres);
+      }
+      if (BouchonFichierUtils.COMMANDES.has(commande)) {
+        return BouchonFichierUtils.invoquer<TReponse>(commande);
+      }
+      if (BouchonAdministrationUtils.COMMANDES.has(commande)) {
+        return BouchonAdministrationUtils.invoquer<TReponse>(commande, parametres ?? {});
+      }
+      return BouchonCommandesUtils.invoquer<TReponse>(commande, parametres ?? {});
+    });
   }
 }

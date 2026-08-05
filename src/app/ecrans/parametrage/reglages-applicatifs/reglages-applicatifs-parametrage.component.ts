@@ -14,6 +14,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { ErreurAdministration } from '../../../services/avecetat/etat/types-donnees';
 
 /**
@@ -35,6 +36,7 @@ type ReglageEnAttente =
 export class SqmReglagesApplicatifsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Message d'erreur de validation ou de rejet par le cœur natif, `null` si aucune erreur en cours.
@@ -103,7 +105,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.reglageEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.verrouillageEditVisible = false;
@@ -157,7 +159,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.reglageEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.concurrenceEditVisible = false;
@@ -212,7 +214,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.reglageEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.proxyEditVisible = false;
@@ -267,7 +269,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.reglageEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.nombreSauvegardesEditVisible = false;
@@ -332,7 +334,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.reglageEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.seuilAvertissementEditVisible = false;

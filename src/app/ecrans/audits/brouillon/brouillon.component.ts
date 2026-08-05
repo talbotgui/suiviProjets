@@ -22,6 +22,7 @@ import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   ErreurAdministration,
   Groupe,
@@ -65,6 +66,7 @@ export class SqmBrouillonComponent {
     inject(DonneesApplicationService);
   private readonly etatSession: EtatSessionService = inject(EtatSessionService);
   private readonly router: Router = inject(Router);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Identifiants des projets actuellement sélectionnés pour une action groupée.
@@ -87,11 +89,6 @@ export class SqmBrouillonComponent {
   public enCours = false;
 
   /**
-   * Message d'erreur à afficher après l'échec d'une mutation, `null` sinon.
-   */
-  public messageErreur: string | null = null;
-
-  /**
    * À la construction, reprend un éventuel échec d'enregistrement du brouillon survenu après la navigation
    * immédiate de Constitution de campagne vers le Tableau de bord d'exécution (R10-06) : ce Store ne connaît la
    * fin réelle de la campagne, y compris de sa sauvegarde finale, qu'après cette navigation, cet écran étant le
@@ -100,7 +97,7 @@ export class SqmBrouillonComponent {
   public constructor() {
     const echec = this.etatSession.echecEnregistrementBrouillon();
     if (echec !== null) {
-      this.messageErreur = this.libelleAnomalie(echec);
+      this.notification.erreur(this.libelleAnomalie(echec));
       this.etatSession.acquitterEchecEnregistrementBrouillon();
     }
   }
@@ -255,7 +252,6 @@ export class SqmBrouillonComponent {
    * mot de passe du fichier (RG-002).
    */
   public demanderIntegrerTout(): void {
-    this.messageErreur = null;
     this.actionEnAttente = { type: 'integrer', selection: undefined };
   }
 
@@ -263,7 +259,6 @@ export class SqmBrouillonComponent {
    * Demande l'intégration de la sélection courante (F09 : « intègre projet par projet »).
    */
   public demanderIntegrerSelection(): void {
-    this.messageErreur = null;
     this.actionEnAttente = { type: 'integrer', selection: Array.from(this.selectionProjetIds) };
   }
 
@@ -272,7 +267,6 @@ export class SqmBrouillonComponent {
    * @param projetId - Identifiant du projet à intégrer.
    */
   public demanderIntegrerUnique(projetId: string): void {
-    this.messageErreur = null;
     this.actionEnAttente = { type: 'integrer', selection: [projetId] };
   }
 
@@ -280,7 +274,6 @@ export class SqmBrouillonComponent {
    * Demande le rejet de la sélection courante (F09 : « rejette », motif optionnel).
    */
   public demanderRejeterSelection(): void {
-    this.messageErreur = null;
     this.actionEnAttente = { type: 'rejeter', selection: Array.from(this.selectionProjetIds) };
   }
 
@@ -289,7 +282,6 @@ export class SqmBrouillonComponent {
    * @param projetId - Identifiant du projet à rejeter.
    */
   public demanderRejeterUnique(projetId: string): void {
-    this.messageErreur = null;
     this.actionEnAttente = { type: 'rejeter', selection: [projetId] };
   }
 
@@ -323,7 +315,7 @@ export class SqmBrouillonComponent {
     this.actionEnAttente = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
 

@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import {
   StatutMembre,
   TypeCritereMembre,
@@ -584,7 +585,9 @@ describe('SqmFicheProjetComponent', () => {
     composant.demanderCreationAnnotation();
     await composant.confirmerCreationAnnotation('mot-de-passe');
 
-    expect(composant.messageErreurAnnotation).not.toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur' }),
+    ]);
     expect(composant.formulaireAnnotationVisible()).toBe(true);
   });
 
@@ -626,6 +629,8 @@ describe('SqmFicheProjetComponent', () => {
     composant.confirmerSuppressionAnnotation();
     await composant.confirmerSuppressionAnnotationMotDePasse('mot-de-passe');
 
-    expect(composant.messageErreurAnnotation).not.toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur' }),
+    ]);
   });
 });

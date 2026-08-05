@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmJournalParametrageComponent } from './journal-parametrage.component';
@@ -399,7 +400,9 @@ describe('SqmJournalParametrageComponent', () => {
       );
       expect(composant.previsualisationPurge).toBeNull();
       expect(composant.purgeEnAttenteMotDePasse).toBe(false);
-      expect(composant.messageSuccesPurge).not.toBeNull();
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'succes' }),
+      ]);
     });
 
     it('convertit un rejet typé « sessionVerrouillee » en message explicite à la purge', async () => {
@@ -414,9 +417,12 @@ describe('SqmJournalParametrageComponent', () => {
       composant.demanderExecutionPurge();
       await composant.confirmerExecutionPurge('mot-de-passe');
 
-      expect(composant.messageErreurPurge).toBe(
-        'La session est verrouillée : déverrouillez-la avant de purger.',
-      );
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({
+          type: 'erreur',
+          message: 'La session est verrouillée : déverrouillez-la avant de purger.',
+        }),
+      ]);
     });
   });
 });

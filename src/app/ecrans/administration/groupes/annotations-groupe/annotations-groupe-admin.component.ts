@@ -20,6 +20,7 @@ import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confi
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
 import type { DonneesAnnotation } from '../../../../services/avecetat/etat/donnees-application.service';
 import { DonneesApplicationService } from '../../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../../services/avecetat/etat/notification.service';
 import type {
   Annotation,
   ErreurAdministration,
@@ -38,6 +39,7 @@ import type {
 export class SqmAnnotationsGroupeAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -177,7 +179,7 @@ export class SqmAnnotationsGroupeAdminComponent {
     this.actionEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.formulaireVisible = false;
@@ -228,7 +230,7 @@ export class SqmAnnotationsGroupeAdminComponent {
     this.annotationASupprimerId = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
     }
   }
 

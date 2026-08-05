@@ -12,6 +12,7 @@ import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confi
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
 import type { DonneesMembreConnu } from '../../../../services/avecetat/etat/donnees-application.service';
 import { DonneesApplicationService } from '../../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../../services/avecetat/etat/notification.service';
 import type {
   ErreurAdministration,
   Groupe,
@@ -40,6 +41,7 @@ const ORIGINE_ADMINISTRATION = 'Administration';
 export class SqmMembresConnusAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Types de critère proposés au formulaire.
@@ -251,7 +253,7 @@ export class SqmMembresConnusAdminComponent {
         this.formulaireVisible = false;
         break;
       case 'echec':
-        this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+        this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
         break;
     }
   }
@@ -301,7 +303,7 @@ export class SqmMembresConnusAdminComponent {
     this.membreASupprimerId = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
     }
   }
 

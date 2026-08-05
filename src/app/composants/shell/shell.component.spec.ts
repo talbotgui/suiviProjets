@@ -233,7 +233,7 @@ describe('SqmShellComponent', () => {
     expect(element.querySelector('[role="dialog"]')).toBeNull();
 
     const bouton = element.querySelector<HTMLButtonElement>(
-      'button[aria-label="Recherche transversale"]',
+      'button[title="Recherche transversale (Ctrl+K)"]',
     );
     bouton?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
@@ -291,7 +291,7 @@ describe('SqmShellComponent', () => {
       const element = DomTestUtils.obtenirElementNatif(fixture);
 
       element
-        .querySelector<HTMLButtonElement>('button[aria-label="Verrouillage manuel"]')
+        .querySelector<HTMLButtonElement>('button[title="Verrouillage manuel"]')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       await fixture.whenStable();
       fixture.detectChanges();
@@ -355,7 +355,7 @@ describe('SqmShellComponent', () => {
       const element = DomTestUtils.obtenirElementNatif(fixture);
 
       element
-        .querySelector<HTMLButtonElement>('button[aria-label="Sauvegarder"]')
+        .querySelector<HTMLButtonElement>('button[title="Sauvegarder"]')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       fixture.detectChanges();
       expect(element.querySelector('app-confirmation-mot-de-passe')).not.toBeNull();
@@ -379,7 +379,7 @@ describe('SqmShellComponent', () => {
       const element = DomTestUtils.obtenirElementNatif(fixture);
 
       element
-        .querySelector<HTMLButtonElement>('button[aria-label="Sauvegarder"]')
+        .querySelector<HTMLButtonElement>('button[title="Sauvegarder"]')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       fixture.detectChanges();
 

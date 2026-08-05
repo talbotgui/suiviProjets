@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmSeuilsParametrageComponent } from './seuils-parametrage.component';
 
@@ -110,7 +111,9 @@ describe('SqmSeuilsParametrageComponent', () => {
     composant.demanderEnregistrement();
     await composant.confirmerEnregistrement('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(messageAttendu);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur', message: messageAttendu }),
+    ]);
   });
 
   it('initialise le formulaire depuis les seuils chargés', () => {
@@ -159,7 +162,9 @@ describe('SqmSeuilsParametrageComponent', () => {
       'definir_seuil',
       expect.objectContaining({ cle: 'couverture.seuilRouge', valeur: 45 }),
     );
-    expect(composant.messageSucces).not.toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes' }),
+    ]);
     expect(composant.nombreDeModifications()).toBe(0);
     expect(composant.actionEnAttenteMotDePasse).toBe(false);
   });
@@ -175,8 +180,11 @@ describe('SqmSeuilsParametrageComponent', () => {
     await composant.confirmerEnregistrement('mot-de-passe');
 
     expect(invokeSimule).toHaveBeenCalledTimes(1);
-    expect(composant.messageErreur).toBe(
-      "Ce seuil n'est pas reconnu par le fichier de données ouvert.",
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: "Ce seuil n'est pas reconnu par le fichier de données ouvert.",
+      }),
+    ]);
   });
 });

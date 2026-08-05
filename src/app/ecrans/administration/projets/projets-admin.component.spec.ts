@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmProjetsAdminComponent } from './projets-admin.component';
 
@@ -266,7 +267,9 @@ describe('SqmProjetsAdminComponent', () => {
       composant.demanderBasculePolitiqueIA(projetId);
       await composant.confirmerBasculePolitiqueIA('mauvais-mot-de-passe');
 
-      expect(composant.messageErreurPolitiqueIA).toBe('Mot de passe incorrect.');
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
+      ]);
       expect(composant.projets()[0].iaAutorisee).toBe(false);
     });
   });

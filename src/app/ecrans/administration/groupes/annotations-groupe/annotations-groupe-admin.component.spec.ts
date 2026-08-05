@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../../services/avecetat/etat/notification.service';
 import type { Annotation, DonneesRacine } from '../../../../services/avecetat/etat/types-donnees';
 import { SqmAnnotationsGroupeAdminComponent } from './annotations-groupe-admin.component';
 
@@ -192,6 +193,11 @@ describe('SqmAnnotationsGroupeAdminComponent', () => {
     composant.confirmerSuppression();
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
-    expect(composant.messageErreur).toBe('Cette annotation système ne peut pas être supprimée.');
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Cette annotation système ne peut pas être supprimée.',
+      }),
+    ]);
   });
 });

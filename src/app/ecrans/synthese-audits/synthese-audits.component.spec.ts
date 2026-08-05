@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/types-donnees';
 import type {
   Audit,
@@ -812,7 +813,7 @@ describe('SqmSyntheseAuditsComponent', () => {
           motDePasse: 'mot-de-passe',
         }),
       );
-      expect(composant.messageErreur).toBeNull();
+      expect(TestBed.inject(NotificationService).liste()).toEqual([]);
       expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
     });
 
@@ -829,7 +830,9 @@ describe('SqmSyntheseAuditsComponent', () => {
         motDePasse: 'mot-de-passe',
       });
 
-      expect(composant.messageErreur).not.toBeNull();
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'erreur' }),
+      ]);
     });
 
     it('supprime une vue et met à jour la racine (US-028)', async () => {
@@ -846,7 +849,7 @@ describe('SqmSyntheseAuditsComponent', () => {
         'supprimer_vue',
         expect.objectContaining({ id: 'v1', motDePasse: 'mot-de-passe' }),
       );
-      expect(composant.messageErreur).toBeNull();
+      expect(TestBed.inject(NotificationService).liste()).toEqual([]);
       expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
     });
 
@@ -858,7 +861,9 @@ describe('SqmSyntheseAuditsComponent', () => {
 
       await composant.supprimerVue({ id: 'id-inconnu', motDePasse: 'mot-de-passe' });
 
-      expect(composant.messageErreur).not.toBeNull();
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'erreur' }),
+      ]);
     });
 
     it('applique automatiquement la vue par défaut de cet écran à l’ouverture', () => {

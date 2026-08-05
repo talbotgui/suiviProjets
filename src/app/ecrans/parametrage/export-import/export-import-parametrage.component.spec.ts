@@ -6,6 +6,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmExportImportParametrageComponent } from './export-import-parametrage.component';
@@ -100,7 +101,9 @@ describe('SqmExportImportParametrageComponent', () => {
       chemin: '/tmp/configuration.json',
       donnees: DonneesDeTest.racineVide(),
     });
-    expect(composant.messageSucces).toContain('exportée');
+    const derniere = TestBed.inject(NotificationService).liste().at(-1);
+    expect(derniere?.type).toBe('succes');
+    expect(derniere?.message).toContain('exportée');
   });
 
   it("n'exporte rien si l'utilisateur annule la boîte de dialogue", async () => {
@@ -123,8 +126,12 @@ describe('SqmExportImportParametrageComponent', () => {
 
     await composant.exporter();
 
-    expect(composant.messageErreur).toBe("Une erreur inattendue est survenue lors de l'opération.");
-    expect(composant.messageSucces).toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: "Une erreur inattendue est survenue lors de l'opération.",
+      }),
+    ]);
   });
 
   it('prévisualise un import et accepte par défaut toutes les lignes non identiques', async () => {
@@ -208,8 +215,11 @@ describe('SqmExportImportParametrageComponent', () => {
 
     await composant.choisirEtPrevisualiser();
 
-    expect(composant.messageErreur).toBe(
-      'Ce fichier de configuration a été produit par une version plus récente de cette application.',
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Ce fichier de configuration a été produit par une version plus récente de cette application.',
+      }),
     );
     expect(composant.differentiel).toBeNull();
   });
@@ -302,7 +312,9 @@ describe('SqmExportImportParametrageComponent', () => {
     });
     expect(composant.differentiel).toBeNull();
     expect(composant.importEnAttenteMotDePasse).toBe(false);
-    expect(composant.messageSucces).toContain('appliquée');
+    const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
+    expect(derniereNotification?.type).toBe('succes');
+    expect(derniereNotification?.message).toContain('appliquée');
   });
 
   it("affiche un message explicite quand l'import échoue, sans effacer la prévisualisation", async () => {
@@ -320,8 +332,11 @@ describe('SqmExportImportParametrageComponent', () => {
     invokeSimule.mockRejectedValueOnce({ type: 'ligneDifferentielInconnue' });
     await composant.confirmerImport('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Le contenu du fichier a changé depuis la prévisualisation : recommencez.',
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Le contenu du fichier a changé depuis la prévisualisation : recommencez.',
+      }),
     );
     expect(composant.importEnAttenteMotDePasse).toBe(false);
     expect(composant.differentiel).not.toBeNull();
@@ -342,8 +357,11 @@ describe('SqmExportImportParametrageComponent', () => {
     invokeSimule.mockRejectedValueOnce({ type: 'motDePasseSessionDivergent' });
     await composant.confirmerImport('mauvais-mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
+      }),
     );
   });
 

@@ -101,6 +101,21 @@
       <span aria-hidden="true">≡</span>
       <span class="shell__lien-libelle">Paramétrage</span>
     </a>
+
+    <!-- Mention d'attribution (R11-05) : poussée en bas de la sidebar par exterieur-haut-auto (margin-top: auto),
+         alignée à droite. Réduite à sa seule icône au palier replié en rail d'icônes sous 992px (RNF-030), le
+         libellé restant présent dans le DOM pour les technologies d'assistance (même mécanisme que
+         .shell__lien-libelle des entrées de navigation ci-dessus). -->
+    <a
+      class="shell__attribution d-flex aligne-centre justifie-fin ecart-2 interieur-x-3 interieur-y-2 texte-discret texte-xs sans-decoration exterieur-haut-auto"
+      href="https://github.com/talbotgui/suiviProjets"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Application créée par talbotgui — dépôt GitHub"
+    >
+      <span class="shell__lien-libelle">Créée par talbotgui</span>
+      <span aria-hidden="true">↗</span>
+    </a>
   </nav>
 
   <div class="shell__zone d-flex direction-colonne largeur-mini-nulle deborde-masque flex-1">
@@ -116,37 +131,37 @@
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Recherche transversale (Ctrl+K)"
-          aria-label="Recherche transversale"
           (click)="ouvrirRecherche()"
         >
-          ⌕
+          <span aria-hidden="true">⌕</span>
+          <span>Recherche</span>
         </button>
         <button
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Gestion des credentials"
-          aria-label="Gestion des credentials"
           (click)="ouvrirCredentials()"
         >
-          🔑
+          <span aria-hidden="true">🔑</span>
+          <span>Credentials</span>
         </button>
         <button
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Sauvegarder"
-          aria-label="Sauvegarder"
           (click)="ouvrirSauvegarde()"
         >
-          💾
+          <span aria-hidden="true">💾</span>
+          <span>Sauvegarder</span>
         </button>
         <button
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Verrouillage manuel"
-          aria-label="Verrouillage manuel"
           (click)="verrouillerManuellement()"
         >
-          🔒
+          <span aria-hidden="true">🔒</span>
+          <span>Verrouiller</span>
         </button>
       </div>
     </header>
@@ -167,15 +182,6 @@
       (annulee)="annulerSauvegarde()"
     />
   }
-  @if (messageErreurSauvegarde) {
-    <p
-      class="shell__erreur-sauvegarde fixe carte texte-rouge fond-rouge interieur-x-4 interieur-y-3 texte-sm"
-      role="alert"
-    >
-      {{ messageErreurSauvegarde }}
-    </p>
-  }
-
   @if (avertissementTailleActif()) {
     <div
       class="shell__avertissement-taille fixe carte texte-orange fond-orange interieur-x-4 interieur-y-3 texte-sm"
@@ -197,4 +203,7 @@
   @if (verrouillageActif()) {
     <app-verrouillage />
   }
+
+  <app-indicateur-chargement />
+  <app-notification />
 </div>

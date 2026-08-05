@@ -47,6 +47,7 @@ import type {
   ColonneTableauDense,
 } from '../../composants/tableau-dense/tableau-dense.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Groupe, TraitementAlerte } from '../../services/avecetat/etat/types-donnees';
 import { StatutTraitementAlerte } from '../../services/avecetat/etat/types-donnees';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
@@ -145,6 +146,7 @@ export class SqmListeTravailComponent {
     inject(DonneesApplicationService);
 
   private readonly router: Router = inject(Router);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne
@@ -200,11 +202,6 @@ export class SqmListeTravailComponent {
    * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
    */
   public enCours = false;
-
-  /**
-   * Message d'erreur de la dernière qualification tentée, `null` si aucune erreur en cours.
-   */
-  public messageErreur: string | null = null;
 
   /**
    * Ensemble complet des alertes actives, membres inconnus toujours en tête (RG-009, US-020), non filtré.
@@ -341,7 +338,7 @@ export class SqmListeTravailComponent {
       demande.motDePasse,
     );
     if (resultat.type === 'echec') {
-      this.messageErreur = "Une erreur inattendue est survenue lors de l'enregistrement de la vue.";
+      this.notification.erreur("Une erreur inattendue est survenue lors de l'enregistrement de la vue.");
     }
   }
 
@@ -353,7 +350,7 @@ export class SqmListeTravailComponent {
   public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
     const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
     if (resultat.type === 'echec') {
-      this.messageErreur = 'Une erreur inattendue est survenue lors de la suppression de la vue.';
+      this.notification.erreur('Une erreur inattendue est survenue lors de la suppression de la vue.');
     }
   }
 
@@ -428,7 +425,6 @@ export class SqmListeTravailComponent {
   public activerLigne(ligne: LigneAlerteTravail): void {
     this.alerteSelectionneeCle.set(ligne.cleAlerte);
     this.commentaire = '';
-    this.messageErreur = null;
   }
 
   /**
@@ -495,7 +491,7 @@ export class SqmListeTravailComponent {
     this.actionEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = 'Une erreur inattendue est survenue lors de la qualification.';
+      this.notification.erreur('Une erreur inattendue est survenue lors de la qualification.');
       return;
     }
     this.alerteSelectionneeCle.set(null);

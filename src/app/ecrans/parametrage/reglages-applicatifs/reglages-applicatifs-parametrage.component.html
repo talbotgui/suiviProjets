@@ -151,7 +151,11 @@
             class="champ__controle"
             name="urlProxyFormulaire"
             [(ngModel)]="urlProxyFormulaire"
+            aria-describedby="reglages-applicatifs-url-proxy-aide"
           />
+          <span id="reglages-applicatifs-url-proxy-aide" class="champ__aide"
+            >Ex. http://proxy.exemple.local:3128</span
+          >
         </label>
         <label class="champ">
           Chemin du fascicule de certificats d'autorité supplémentaire
@@ -160,7 +164,11 @@
             class="champ__controle"
             name="cheminBundleCaFormulaire"
             [(ngModel)]="cheminBundleCaFormulaire"
+            aria-describedby="reglages-applicatifs-bundle-ca-aide"
           />
+          <span id="reglages-applicatifs-bundle-ca-aide" class="champ__aide"
+            >Ex. /etc/ssl/certs/ca-entreprise.pem</span
+          >
         </label>
         <div
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"

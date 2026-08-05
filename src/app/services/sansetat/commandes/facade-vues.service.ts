@@ -16,6 +16,7 @@
 // jamais invoquer `invoke` lui-même : ce service en est la seule frontière pour ces deux commandes.
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
+import { IndicateurChargementUtils } from './indicateur-chargement.utils';
 
 /**
  * Paramètres transmis à la commande native `definirVue` (US-028), génériques sur le type concret de la racine
@@ -72,7 +73,7 @@ export class FacadeVuesService {
   public async definirVue<TDonnees, TReponse>(
     parametres: ParametresDefinitionVue<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('definir_vue', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_vue', { ...parametres }));
   }
 
   /**
@@ -83,6 +84,6 @@ export class FacadeVuesService {
   public async supprimerVue<TDonnees, TReponse>(
     parametres: ParametresSuppressionVue<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('supprimer_vue', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('supprimer_vue', { ...parametres }));
   }
 }

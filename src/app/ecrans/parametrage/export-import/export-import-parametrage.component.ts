@@ -17,6 +17,7 @@
 import { Component, inject } from '@angular/core';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   CategorieLigneDifferentiel,
   DifferentielImportConfiguration,
@@ -44,18 +45,7 @@ const NOM_FICHIER_EXPORT_PAR_DEFAUT = 'configuration-qualimetrie.json';
 export class SqmExportImportParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
-
-  /**
-   * Message d'erreur de la dernière opération (export, prévisualisation ou import), `null` si aucune erreur en
-   * cours.
-   */
-  public messageErreur: string | null = null;
-
-  /**
-   * Message de confirmation de succès de la dernière opération, discret et non bloquant (charte d'ergonomie),
-   * `null` si aucune opération récente.
-   */
-  public messageSucces: string | null = null;
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
@@ -90,8 +80,6 @@ export class SqmExportImportParametrageComponent {
    * courante (US-029, RG-028). Aucun mot de passe requis : n'écrit jamais le fichier de données lui-même.
    */
   public async exporter(): Promise<void> {
-    this.messageErreur = null;
-    this.messageSucces = null;
     const chemin = await SelecteurFichierUtils.choisirEmplacementCreation({
       filters: FILTRE_FICHIER_CONFIGURATION,
       defaultPath: NOM_FICHIER_EXPORT_PAR_DEFAUT,
@@ -103,10 +91,10 @@ export class SqmExportImportParametrageComponent {
     const resultat = await this.donneesApplication.exporterConfiguration(chemin);
     this.enCours = false;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.messageSucces = 'La configuration a été exportée.';
+    this.notification.succes('La configuration a été exportée.');
   }
 
   /**
@@ -116,8 +104,6 @@ export class SqmExportImportParametrageComponent {
    * no-op), l'utilisateur pouvant ensuite désélectionner ligne à ligne avant confirmation (RG-029).
    */
   public async choisirEtPrevisualiser(): Promise<void> {
-    this.messageErreur = null;
-    this.messageSucces = null;
     const chemin = await SelecteurFichierUtils.choisirFichierChargement({
       multiple: false,
       filters: FILTRE_FICHIER_CONFIGURATION,
@@ -129,7 +115,7 @@ export class SqmExportImportParametrageComponent {
     const resultat = await this.donneesApplication.previsualiserImportConfiguration(chemin);
     this.enCours = false;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       this.differentiel = null;
       this.cheminConfigurationCourant = null;
       return;
@@ -197,7 +183,6 @@ export class SqmExportImportParametrageComponent {
     if (this.differentiel === null || this.lignesAcceptees.size === 0) {
       return;
     }
-    this.messageErreur = null;
     this.importEnAttenteMotDePasse = true;
   }
 
@@ -235,13 +220,13 @@ export class SqmExportImportParametrageComponent {
     this.enCours = false;
     this.importEnAttenteMotDePasse = false;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.differentiel = null;
     this.cheminConfigurationCourant = null;
     this.lignesAcceptees = new Set();
-    this.messageSucces = 'La configuration importée a été appliquée.';
+    this.notification.succes('La configuration importée a été appliquée.');
   }
 
   /**

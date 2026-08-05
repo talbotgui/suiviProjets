@@ -149,6 +149,19 @@
   background-color: var(--sqm-neutre-0);
 }
 
+// Libellé d'aide sous un contrôle de saisie (Phase 11, R11-08) : distinct d'une reformulation du libellé du champ,
+// propose systématiquement un exemple de valeur valide (ex. « ex. https://gitlab.exemple.fr »), jamais un substitut
+// du `placeholder` natif (qui disparaît à la saisie et ne doit donc jamais porter seul cette information). Élément
+// frère direct de `.champ__controle` au sein d'un même `.champ` (flex colonne) : aucune déclaration de mise en page
+// propre ici, seulement la distinction typographique du texte de libellé porté par `.champ` lui-même. Rollout
+// socle-puis-écran-par-écran (cf. rapport de développement de cet incrément) : appliqué à un premier sous-ensemble
+// représentatif de champs, généralisé au fil des incréments suivants plutôt qu'en un seul remaniement.
+.champ__aide {
+  font-size: var(--sqm-texte-xs);
+  font-weight: var(--sqm-poids-normal);
+  color: var(--sqm-neutre-800);
+}
+
 // ===== Tableau simple =====
 // Table HTML classique (en-tête, bordures, espacements) pour les écrans à un tableau simple, sans le tri/filtre/
 // pagination avancés propres au composant transverse `SqmTableauDenseComponent` (ex. Journal des modifications,

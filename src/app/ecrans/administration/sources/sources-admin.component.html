@@ -141,8 +141,12 @@
             name="idExterne"
             [(ngModel)]="idExterne"
             list="sources-admin-id-externe"
+            aria-describedby="sources-admin-id-externe-aide"
             required
           />
+          <span id="sources-admin-id-externe-aide" class="champ__aide"
+            >Ex. groupe/sous-groupe/projet (GitLab) ou clé de projet (Sonar).</span
+          >
           <datalist id="sources-admin-id-externe">
             @for (source of sourcesDisponibles; track source.idExterne) {
               <option [value]="source.idExterne">{{ source.libelle }}</option>

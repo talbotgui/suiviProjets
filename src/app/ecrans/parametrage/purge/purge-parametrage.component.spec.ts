@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmPurgeParametrageComponent } from './purge-parametrage.component';
 
@@ -139,7 +140,9 @@ describe('SqmPurgeParametrageComponent', () => {
     );
     expect(composant.previsualisationDensite).toBeNull();
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
-    expect(composant.messageSucces).toContain('purge par densité');
+    const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
+    expect(derniereNotification?.type).toBe('succes');
+    expect(derniereNotification?.message).toContain('purge par densité');
   });
 
   it('prévisualise une purge par âge pour le mode sélectionné et réinitialise au changement de mode', async () => {
@@ -171,7 +174,9 @@ describe('SqmPurgeParametrageComponent', () => {
 
     await composant.previsualiserDensite();
 
-    expect(composant.messageErreur).toBe('Mot de passe incorrect.');
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
+    );
     expect(composant.previsualisationDensite).toBeNull();
   });
 
@@ -189,7 +194,12 @@ describe('SqmPurgeParametrageComponent', () => {
 
     await composant.previsualiserAge();
 
-    expect(composant.messageErreur).toBe("Une erreur inattendue est survenue lors de l'opération.");
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'erreur',
+        message: "Une erreur inattendue est survenue lors de l'opération.",
+      }),
+    );
     expect(composant.previsualisationAge).toBeNull();
   });
 
@@ -207,8 +217,11 @@ describe('SqmPurgeParametrageComponent', () => {
     invokeSimule.mockRejectedValueOnce({ type: 'fichierVerrouille' });
     await composant.confirmerExecutionDensite('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Le fichier de données est verrouillé par un autre processus.',
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Le fichier de données est verrouillé par un autre processus.',
+      }),
     );
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
   });
@@ -227,8 +240,11 @@ describe('SqmPurgeParametrageComponent', () => {
     invokeSimule.mockRejectedValueOnce({ type: 'sessionVerrouillee' });
     await composant.confirmerExecutionDensite('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'La session est verrouillée : déverrouillez-la avant de sauvegarder.',
+    expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'La session est verrouillée : déverrouillez-la avant de sauvegarder.',
+      }),
     );
   });
 
@@ -252,7 +268,9 @@ describe('SqmPurgeParametrageComponent', () => {
     );
     expect(composant.previsualisationAge).toBeNull();
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
-    expect(composant.messageSucces).toContain('purge par âge');
+    const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
+    expect(derniereNotification?.type).toBe('succes');
+    expect(derniereNotification?.message).toContain('purge par âge');
   });
 
   it('annule la ressaisie du mot de passe en cours', async () => {

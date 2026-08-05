@@ -32,6 +32,7 @@ import type {
   TypeCorrespondanceMarqueur,
 } from '../../../services/sansetat/commandes/types-facade';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   EntreeReglesDependances,
   EntreeReglesMarqueursIA,
@@ -74,6 +75,7 @@ interface SuppressionEnAttente {
 export class SqmReferentielsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Types de correspondance proposés au formulaire d'une règle de marqueur IA.
@@ -219,7 +221,7 @@ export class SqmReferentielsParametrageComponent {
     this.actionEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.formulaireDependanceVisible = false;
@@ -319,7 +321,7 @@ export class SqmReferentielsParametrageComponent {
     this.actionEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.formulaireMarqueurIaVisible = false;
@@ -390,7 +392,7 @@ export class SqmReferentielsParametrageComponent {
     this.actionEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.formulaireMotifNommageVisible = false;
@@ -462,7 +464,7 @@ export class SqmReferentielsParametrageComponent {
     this.actionEnAttenteMotDePasse = null;
 
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       this.suppressionEnAttente = null;
       return;
     }

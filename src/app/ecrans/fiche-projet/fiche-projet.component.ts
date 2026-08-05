@@ -25,6 +25,7 @@ import { RapportAnomaliesUtils } from '../../services/avecetat/campagne/rapport-
 import type { AnomalieResolue } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { ResultatCroiseFraicheurSonar } from '../../services/avecetat/campagne/connecteur-croise.utils';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { StatutMembre } from '../../services/avecetat/etat/types-donnees';
 import type {
   Annotation,
@@ -288,6 +289,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
 export class SqmFicheProjetComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Identifiant du projet affiché, lié au segment de route `fiche-projet/:projetId` (`withComponentInputBinding()`,
@@ -405,7 +407,7 @@ export class SqmFicheProjetComponent {
     this.enCoursAnnotation = false;
 
     if (resultat.type === 'echec') {
-      this.messageErreurAnnotation = 'Une erreur inattendue est survenue lors de la création.';
+      this.notification.erreur('Une erreur inattendue est survenue lors de la création.');
       return;
     }
     this.formulaireAnnotationVisible.set(false);
@@ -476,7 +478,7 @@ export class SqmFicheProjetComponent {
     this.annotationASupprimerId.set(null);
 
     if (resultat.type === 'echec') {
-      this.messageErreurAnnotation = 'Une erreur inattendue est survenue lors de la suppression.';
+      this.notification.erreur('Une erreur inattendue est survenue lors de la suppression.');
     }
   }
 

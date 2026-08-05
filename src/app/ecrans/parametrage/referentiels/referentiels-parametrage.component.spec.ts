@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmReferentielsParametrageComponent } from './referentiels-parametrage.component';
 
@@ -192,7 +193,9 @@ describe('SqmReferentielsParametrageComponent', () => {
     composant.demanderEnregistrementMotifNommage();
     await composant.confirmerEnregistrementMotifNommage('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(messageAttendu);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur', message: messageAttendu }),
+    ]);
   });
 
   it('bloque la création avec un motif vide', () => {
@@ -323,9 +326,12 @@ describe('SqmReferentielsParametrageComponent', () => {
     composant.demanderEnregistrementDependance();
     await composant.confirmerEnregistrementDependance('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      "Cette entrée n'est pas valide : vérifiez les champs obligatoires.",
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: "Cette entrée n'est pas valide : vérifiez les champs obligatoires.",
+      }),
+    ]);
   });
 
   it('demande puis annule la suppression d’une règle de dépendances sans appeler la commande native (US-033, RG-035)', () => {
@@ -387,9 +393,12 @@ describe('SqmReferentielsParametrageComponent', () => {
     composant.confirmerSuppression();
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).",
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).",
+      }),
+    ]);
     expect(composant.suppressionEnAttente).toBeNull();
   });
 });

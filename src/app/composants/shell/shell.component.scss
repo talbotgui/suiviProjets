@@ -57,19 +57,11 @@
   padding: var(--sqm-espace-6) var(--sqm-espace-8) var(--sqm-espace-8);
 }
 
-.shell__erreur-sauvegarde,
 .shell__avertissement-taille {
   bottom: var(--sqm-espace-5);
   right: var(--sqm-espace-5);
   z-index: 150;
   max-width: 320px;
-}
-
-.shell__erreur-sauvegarde {
-  border-color: var(--sqm-rouge-bordure);
-}
-
-.shell__avertissement-taille {
   border-color: var(--sqm-orange-bordure);
 }
 
@@ -98,7 +90,8 @@
     border: 0;
   }
 
-  .shell__lien {
+  .shell__lien,
+  .shell__attribution {
     justify-content: center;
   }
 }

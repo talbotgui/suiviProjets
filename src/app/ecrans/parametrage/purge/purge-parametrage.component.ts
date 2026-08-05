@@ -17,6 +17,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   ErreurAdministration,
   ModePurgeAge,
@@ -40,6 +41,7 @@ type ActionPurgeEnAttente = 'densite' | 'age' | null;
 export class SqmPurgeParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Résumé de la dernière prévisualisation de purge par densité, `null` si aucune n'a encore été demandée ou si la
@@ -58,17 +60,6 @@ export class SqmPurgeParametrageComponent {
   public modeAge: ModePurgeAge = 'suppression';
 
   /**
-   * Message d'erreur de la dernière opération (prévisualisation ou exécution), `null` si aucune erreur en cours.
-   */
-  public messageErreur: string | null = null;
-
-  /**
-   * Message de confirmation de succès de la dernière purge exécutée, discret et non bloquant (charte
-   * d'ergonomie), `null` si aucune purge récente.
-   */
-  public messageSucces: string | null = null;
-
-  /**
    * Action de purge en attente de ressaisie du mot de passe (RG-002).
    */
   public actionEnAttenteMotDePasse: ActionPurgeEnAttente = null;
@@ -82,13 +73,11 @@ export class SqmPurgeParametrageComponent {
    * Prévisualise une purge par densité (RG-024).
    */
   public async previsualiserDensite(): Promise<void> {
-    this.messageErreur = null;
-    this.messageSucces = null;
     this.enCours = true;
     const resultat = await this.donneesApplication.previsualiserPurgeDensite();
     this.enCours = false;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.previsualisationDensite = resultat.previsualisation;
@@ -102,7 +91,6 @@ export class SqmPurgeParametrageComponent {
     if (!this.previsualisationDensite || this.previsualisationDensite.nbAuditsSupprimes === 0) {
       return;
     }
-    this.messageErreur = null;
     this.actionEnAttenteMotDePasse = 'densite';
   }
 
@@ -116,24 +104,22 @@ export class SqmPurgeParametrageComponent {
     this.enCours = false;
     this.actionEnAttenteMotDePasse = null;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.previsualisationDensite = null;
-    this.messageSucces = 'La purge par densité a été effectuée.';
+    this.notification.succes('La purge par densité a été effectuée.');
   }
 
   /**
    * Prévisualise une purge par âge pour le mode actuellement sélectionné (RG-025).
    */
   public async previsualiserAge(): Promise<void> {
-    this.messageErreur = null;
-    this.messageSucces = null;
     this.enCours = true;
     const resultat = await this.donneesApplication.previsualiserPurgeAge(this.modeAge);
     this.enCours = false;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.previsualisationAge = resultat.previsualisation;
@@ -147,7 +133,6 @@ export class SqmPurgeParametrageComponent {
     if (!this.previsualisationAge || this.previsualisationAge.nbAuditsSupprimes === 0) {
       return;
     }
-    this.messageErreur = null;
     this.actionEnAttenteMotDePasse = 'age';
   }
 
@@ -162,11 +147,11 @@ export class SqmPurgeParametrageComponent {
     this.enCours = false;
     this.actionEnAttenteMotDePasse = null;
     if (resultat.type === 'echec') {
-      this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
     this.previsualisationAge = null;
-    this.messageSucces = 'La purge par âge a été effectuée.';
+    this.notification.succes('La purge par âge a été effectuée.');
   }
 
   /**

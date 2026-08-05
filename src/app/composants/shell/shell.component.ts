@@ -52,10 +52,13 @@ import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../confirmation-mot-de-passe/confirmation-mot-de-passe.component';
+import { SqmIndicateurChargementComponent } from '../indicateur-chargement/indicateur-chargement.component';
+import { SqmNotificationComponent } from '../notification/notification.component';
 import { SqmRechercheTransversaleComponent } from '../recherche-transversale/recherche-transversale.component';
 import { SqmVerrouillageComponent } from '../verrouillage/verrouillage.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatFichier, EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 
 /**
@@ -77,6 +80,8 @@ const DELAI_INACTIVITE_MINUTES_PAR_DEFAUT = 15;
     RouterLinkActive,
     RouterOutlet,
     SqmConfirmationMotDePasseComponent,
+    SqmIndicateurChargementComponent,
+    SqmNotificationComponent,
     SqmRechercheTransversaleComponent,
     SqmVerrouillageComponent,
   ],
@@ -88,6 +93,7 @@ export class SqmShellComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly etatSession: EtatSessionService = inject(EtatSessionService);
+  private readonly notification: NotificationService = inject(NotificationService);
   private minuteurInactivite: ReturnType<typeof setTimeout> | undefined;
 
   /**
@@ -99,11 +105,6 @@ export class SqmShellComponent {
    * Indique si le panneau de confirmation du mot de passe de sauvegarde est actuellement affiché.
    */
   public readonly sauvegardeOuverte: WritableSignal<boolean> = signal(false);
-
-  /**
-   * Message d'erreur de la dernière sauvegarde tentée, `null` si aucune erreur.
-   */
-  public messageErreurSauvegarde: string | null = null;
 
   /**
    * Indique si l'avertissement de taille du fichier de données est actuellement affiché (US-035, RG-032, Phase 10
@@ -189,7 +190,6 @@ export class SqmShellComponent {
    * Ouvre le panneau de confirmation du mot de passe avant sauvegarde (bouton 💾 de la barre supérieure, RG-002).
    */
   public ouvrirSauvegarde(): void {
-    this.messageErreurSauvegarde = null;
     this.sauvegardeOuverte.set(true);
   }
 
@@ -208,12 +208,11 @@ export class SqmShellComponent {
   public async confirmerSauvegarde(motDePasse: string): Promise<void> {
     const resultat = await this.donneesApplication.sauvegarderFichier(motDePasse);
     if (resultat.type === 'succes') {
-      this.messageErreurSauvegarde = null;
       this.sauvegardeOuverte.set(false);
       this.avertissementTailleActif.set(this.tailleEstimeeDepasseLeSeuil());
       return;
     }
-    this.messageErreurSauvegarde = 'La sauvegarde a échoué. Réessayez.';
+    this.notification.erreur('La sauvegarde a échoué. Réessayez.');
   }
 
   /**

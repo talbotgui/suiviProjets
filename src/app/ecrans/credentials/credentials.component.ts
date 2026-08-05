@@ -19,15 +19,17 @@
 // « — », jamais masquées (F24). Décision de périmètre de cet incrément (à valider par un humain) : le bouton
 // « tout tester » n'est construit qu'ici, pas encore repris en préambule de la constitution de campagne (second
 // emplacement littéralement cité par F24), laissé à un incrément ultérieur.
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { ErreurConnecteurUtils } from '../../services/sansetat/commandes/erreur-connecteur.utils';
 import { FacadeCommandesService } from '../../services/sansetat/commandes/facade-commandes.service';
 import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
 import type { Instance } from '../../services/sansetat/commandes/types-facade';
+import { ValidationCredentialsUtils } from '../../services/sansetat/commandes/validation-credentials.utils';
 
 /**
  * Valeur par défaut de la concurrence du test global (RG-017), reprise de la même convention que
@@ -36,6 +38,13 @@ import type { Instance } from '../../services/sansetat/commandes/types-facade';
  * que son extraction en dépendance partagée, cf. règle du projet contre l'abstraction prématurée.
  */
 const CONCURRENCE_PAR_DEFAUT = 4;
+
+/**
+ * Durée, en secondes, pendant laquelle le JSON copié par {@link SqmCredentialsComponent.copierCredentialsJson}
+ * reste disponible dans le presse-papiers avant effacement automatique (mesure de sécurité demandée explicitement
+ * par l'utilisateur, pas une valeur arbitraire du Codeur).
+ */
+const DUREE_EXPIRATION_PRESSE_PAPIERS_SECONDES = 10;
 
 /** Statut d'affichage du verdict d'une instance, `nonTeste` avant tout appel de {@link tester}. */
 type StatutVerdictAffiche = 'enCours' | 'succes' | 'echec';
@@ -76,6 +85,23 @@ export class SqmCredentialsComponent {
     inject(DonneesApplicationService);
   private readonly etatSession: EtatSessionService = inject(EtatSessionService);
   private readonly facadeCommandes: FacadeCommandesService = inject(FacadeCommandesService);
+  private readonly notification: NotificationService = inject(NotificationService);
+  private minuteurExpirationPressePapiers: ReturnType<typeof setInterval> | undefined;
+
+  /**
+   * Construit l'écran : désarme le minuteur d'expiration du presse-papiers à la destruction du composant, en
+   * effaçant immédiatement le presse-papiers si un compte à rebours était encore en cours (jamais laissé courir
+   * sans plus aucun affichage), sur le modèle déjà retenu par `SqmShellComponent` pour son propre minuteur
+   * d'inactivité.
+   */
+  public constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.minuteurExpirationPressePapiers !== undefined) {
+        this.arreterExpirationPressePapiers();
+        void this.viderPressePapiers();
+      }
+    });
+  }
 
   /**
    * Toutes les instances déclarées, tous groupes confondus, complétées du nom de leur groupe de rattachement.
@@ -101,20 +127,39 @@ export class SqmCredentialsComponent {
   private readonly verdicts: WritableSignal<Readonly<Record<string, VerdictAffiche>>> = signal({});
 
   /**
-   * Message d'erreur de la dernière opération, `null` si aucune erreur en cours.
-   */
-  public messageErreur: string | null = null;
-
-  /**
-   * Message de confirmation de succès de la dernière opération, discret et non bloquant (charte d'ergonomie),
-   * `null` si aucune opération récente.
-   */
-  public messageSucces: string | null = null;
-
-  /**
    * Indique qu'un enregistrement des credentials saisis est en cours.
    */
   public enregistrementEnCours = false;
+
+  /**
+   * Contenu actuellement saisi dans la zone de collage JSON (US-003, R11-10) : vidé après un traitement réussi
+   * (JSON valide, même si certains identifiants ne sont pas reconnus, cf. {@link identifiantsNonReconnus} qui reste
+   * affiché), conservé tel quel en cas d'erreur de validation pour permettre sa correction sur place.
+   */
+  public contenuColle = '';
+
+  /**
+   * Message d'erreur de validation du contenu collé (forme JSON invalide, hors schéma), `null` si aucune erreur en
+   * cours ; signalé au plus près du champ concerné, conformément à
+   * `docs/02_documentation/10_charteErgonomie.md#messages-utilisateurs` (erreur de saisie, non une anomalie
+   * technique d'action déjà tentée).
+   */
+  public messageErreurCollage: string | null = null;
+
+  /**
+   * Identifiants du JSON collé ne correspondant à aucune instance du fichier ouvert, jamais silencieusement
+   * ignorés (R11-10) : signalés à part, sans empêcher le pré-remplissage des identifiants reconnus.
+   */
+  public identifiantsNonReconnus: readonly string[] = [];
+
+  /**
+   * Nombre de secondes restant avant l'effacement automatique du presse-papiers après
+   * {@link copierCredentialsJson}, `null` si aucun compte à rebours n'est en cours. Porté par un signal, pas une
+   * propriété simple, car actualisé depuis un `setInterval` : l'application étant zoneless, seule l'écriture d'un
+   * signal (ou un évènement DOM) déclenche un nouveau rendu depuis une continuation externe à la détection de
+   * changement (même motif déjà corrigé pour `demarrage.component.ts`, R11-07).
+   */
+  public readonly secondesRestantesCopie: WritableSignal<number | null> = signal(null);
 
   /**
    * Indique qu'un test de connectivité global (US-031) est en cours.
@@ -145,8 +190,6 @@ export class SqmCredentialsComponent {
    * avec ceux déjà enregistrés (US-003, RG-004) : jamais persistés sur disque.
    */
   public async enregistrer(): Promise<void> {
-    this.messageErreur = null;
-    this.messageSucces = null;
     const saisies = Object.entries(this.saisieInterne()).filter(([, valeur]) => valeur.length > 0);
     if (saisies.length === 0) {
       return;
@@ -160,12 +203,131 @@ export class SqmCredentialsComponent {
       await this.facadeCommandes.definirCredentials(fusion);
       this.etatSession.definirCredentials(fusion);
       this.saisieInterne.set({});
-      this.messageSucces = 'Les credentials ont été enregistrés pour cette session.';
+      this.notification.succes('Les credentials ont été enregistrés pour cette session.');
     } catch {
-      this.messageErreur =
-        "Un ou plusieurs credentials saisis sont vides : aucun n'a été enregistré.";
+      this.notification.erreur(
+        "Un ou plusieurs credentials saisis sont vides : aucun n'a été enregistré.",
+      );
     } finally {
       this.enregistrementEnCours = false;
+    }
+  }
+
+  /**
+   * Valide le contenu JSON collé (US-003, R11-10) et, si valide, pré-remplit en mémoire de session (via
+   * {@link definirSaisie}, jamais un enregistrement direct) les credentials dont l'identifiant d'instance est
+   * reconnu dans le fichier ouvert ; signale explicitement tout identifiant non reconnu, jamais silencieusement
+   * ignoré. Déclenché à toute modification du contenu (dont le collage), pas seulement l'évènement `paste`, pour
+   * couvrir aussi une saisie ou une correction manuelle du texte collé. {@link contenuColle} est vidé dès que le
+   * contenu a été validé et lu avec succès (décision arbitraire à valider par un humain), pour signaler clairement
+   * la prise en compte du collage et permettre d'en enchaîner un second sans effacer manuellement le premier.
+   * @param contenu - Contenu actuellement présent dans la zone de collage.
+   */
+  public onCollage(contenu: string): void {
+    this.messageErreurCollage = null;
+    this.identifiantsNonReconnus = [];
+    if (contenu.trim().length === 0) {
+      this.contenuColle = '';
+      return;
+    }
+
+    const resultat = ValidationCredentialsUtils.validerJsonCredentials(contenu);
+    if (resultat.type === 'invalide') {
+      this.contenuColle = contenu;
+      this.messageErreurCollage = resultat.message;
+      return;
+    }
+
+    const idsConnus = new Set(this.instances().map((item) => item.instance.id));
+    const nonReconnus: string[] = [];
+    for (const [identifiant, jeton] of Object.entries(resultat.credentials)) {
+      if (idsConnus.has(identifiant)) {
+        this.definirSaisie(identifiant, jeton);
+      } else {
+        nonReconnus.push(identifiant);
+      }
+    }
+    this.identifiantsNonReconnus = nonReconnus;
+    this.contenuColle = '';
+  }
+
+  /**
+   * Indique si aucun credential n'est actuellement enregistré en mémoire de session, pour désactiver
+   * {@link copierCredentialsJson}.
+   * @returns `true` si aucun credential n'est enregistré.
+   */
+  public aucunCredentialEnMemoire(): boolean {
+    const credentials = this.etatSession.credentials();
+    return credentials === null || Object.keys(credentials).length === 0;
+  }
+
+  /**
+   * Copie dans le presse-papiers, au format JSON, les credentials actuellement enregistrés en mémoire de session
+   * (opération inverse de {@link onCollage}), pour faciliter leur report vers une autre session ou leur sauvegarde
+   * personnelle par l'utilisateur (jamais écrits sur disque par l'application elle-même, RG-004). N'inclut jamais
+   * une saisie non encore enregistrée (`saisieInterne`) : seuls des credentials déjà confirmés par « Enregistrer »
+   * sont exportés, jamais un brouillon de saisie potentiellement incomplet ou fautif. Utilise directement l'API Web
+   * standard `navigator.clipboard` plutôt que le greffon Tauri dédié (décision arbitraire à valider par un humain,
+   * aucune autre fonctionnalité de l'application ne nécessitant jusqu'ici d'accès au presse-papiers) : la copie
+   * est déclenchée par un geste utilisateur explicite (clic), condition suffisante pour cette API dans les
+   * environnements webview ciblés, sans configuration Tauri supplémentaire. Par mesure de sécurité, le
+   * presse-papiers est effacé automatiquement {@link DUREE_EXPIRATION_PRESSE_PAPIERS_SECONDES} secondes après la
+   * copie (cf. {@link demarrerExpirationPressePapiers}), pour limiter la fenêtre d'exposition d'un credential en
+   * clair dans le presse-papiers système.
+   */
+  public async copierCredentialsJson(): Promise<void> {
+    const credentials = this.etatSession.credentials();
+    if (credentials === null || Object.keys(credentials).length === 0) {
+      return;
+    }
+    const json = JSON.stringify(credentials, null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      this.demarrerExpirationPressePapiers();
+    } catch {
+      this.notification.erreur('La copie dans le presse-papiers a échoué.');
+    }
+  }
+
+  /**
+   * Arme (ou réarme, si un compte à rebours était déjà en cours) le minuteur d'effacement automatique du
+   * presse-papiers, en repoussant toute échéance déjà programmée.
+   */
+  private demarrerExpirationPressePapiers(): void {
+    this.arreterExpirationPressePapiers();
+    this.secondesRestantesCopie.set(DUREE_EXPIRATION_PRESSE_PAPIERS_SECONDES);
+    this.minuteurExpirationPressePapiers = setInterval(() => {
+      const restant = this.secondesRestantesCopie();
+      if (restant === null || restant <= 1) {
+        this.arreterExpirationPressePapiers();
+        void this.viderPressePapiers();
+        return;
+      }
+      this.secondesRestantesCopie.set(restant - 1);
+    }, 1_000);
+  }
+
+  /**
+   * Désarme le minuteur d'effacement automatique du presse-papiers et masque le compte à rebours, sans effacer le
+   * presse-papiers lui-même (à la charge de l'appelant, cf. {@link viderPressePapiers}).
+   */
+  private arreterExpirationPressePapiers(): void {
+    clearInterval(this.minuteurExpirationPressePapiers);
+    this.minuteurExpirationPressePapiers = undefined;
+    this.secondesRestantesCopie.set(null);
+  }
+
+  /**
+   * Efface le contenu du presse-papiers à l'expiration du compte à rebours (échec ignoré délibérément : rien de
+   * plus à faire côté application si le système refuse l'écriture, ex. focus perdu par la fenêtre applicative,
+   * l'utilisateur reste de toute façon informé par la disparition du compte à rebours que la donnée est considérée
+   * comme expirée).
+   */
+  private async viderPressePapiers(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText('');
+    } catch {
+      // Effacement au mieux : aucune action supplémentaire possible ni nécessaire côté application.
     }
   }
 

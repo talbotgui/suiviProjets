@@ -24,6 +24,7 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   EntreeJournal,
   ErreurAdministration,
@@ -45,23 +46,13 @@ import type {
 export class SqmJournalParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Résumé de la dernière prévisualisation de purge du journal, `null` si aucune n'a encore été demandée ou si la
    * racine a changé depuis (purge exécutée, ou par un autre onglet, US-036).
    */
   public previsualisationPurge: PrevisualisationPurgeJournal | null = null;
-
-  /**
-   * Message d'erreur de la dernière opération de purge (prévisualisation ou exécution), `null` si aucune erreur en
-   * cours.
-   */
-  public messageErreurPurge: string | null = null;
-
-  /**
-   * Message de confirmation de succès de la dernière purge exécutée, `null` si aucune purge récente.
-   */
-  public messageSuccesPurge: string | null = null;
 
   /**
    * Indique si la ressaisie du mot de passe est actuellement affichée pour l'exécution de la purge (RG-002).
@@ -77,13 +68,11 @@ export class SqmJournalParametrageComponent {
    * Prévisualise une purge du journal des modifications lui-même, limite fixe de deux ans (US-036, RG-034).
    */
   public async previsualiserPurge(): Promise<void> {
-    this.messageErreurPurge = null;
-    this.messageSuccesPurge = null;
     this.purgeEnCours = true;
     const resultat = await this.donneesApplication.previsualiserPurgeJournal();
     this.purgeEnCours = false;
     if (resultat.type === 'echec') {
-      this.messageErreurPurge = this.libelleAnomaliePurge(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomaliePurge(resultat.anomalie));
       return;
     }
     this.previsualisationPurge = resultat.previsualisation;
@@ -97,7 +86,6 @@ export class SqmJournalParametrageComponent {
     if (!this.previsualisationPurge || this.previsualisationPurge.nbEntreesSupprimees === 0) {
       return;
     }
-    this.messageErreurPurge = null;
     this.purgeEnAttenteMotDePasse = true;
   }
 
@@ -118,11 +106,11 @@ export class SqmJournalParametrageComponent {
     this.purgeEnCours = false;
     this.purgeEnAttenteMotDePasse = false;
     if (resultat.type === 'echec') {
-      this.messageErreurPurge = this.libelleAnomaliePurge(resultat.anomalie);
+      this.notification.erreur(this.libelleAnomaliePurge(resultat.anomalie));
       return;
     }
     this.previsualisationPurge = null;
-    this.messageSuccesPurge = 'La purge du journal des modifications a été effectuée.';
+    this.notification.succes('La purge du journal des modifications a été effectuée.');
   }
 
   /**

@@ -232,13 +232,6 @@
         </label>
       </fieldset>
 
-      @if (messageErreur) {
-        <p class="seuils-parametrage__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
-      }
-      @if (messageSucces) {
-        <p class="seuils-parametrage__succes texte-vert" role="status">{{ messageSucces }}</p>
-      }
-
       <div class="seuils-parametrage__actions d-flex aligne-centre ecart-4">
         <span class="texte-sm texte-discret"
           >{{ nombreDeModifications() }} seuil(s) modifié(s)</span

@@ -71,10 +71,6 @@
     </p>
   }
 
-  @if (messageErreur; as erreur) {
-    <p class="synthese-audits__erreur texte-rouge texte-sm" role="alert">{{ erreur }}</p>
-  }
-
   @if (membreInconnuDetecteGlobalement()) {
     <app-bandeau-alerte [message]="messageMembreInconnu()" />
   }

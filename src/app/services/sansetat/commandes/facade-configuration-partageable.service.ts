@@ -19,6 +19,7 @@
 // du disque (export/import), peu représentative une fois simulée.
 import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
+import { IndicateurChargementUtils } from './indicateur-chargement.utils';
 
 /**
  * Paramètres transmis à la commande native `exporterConfiguration` (US-029), générique sur le type concret de la
@@ -77,7 +78,7 @@ export class FacadeConfigurationPartageableService {
   public async exporterConfiguration<TDonnees>(
     parametres: ParametresExportConfiguration<TDonnees>,
   ): Promise<void> {
-    await invoke<void>('exporter_configuration', { ...parametres });
+    await IndicateurChargementUtils.envelopper(() => invoke<void>('exporter_configuration', { ...parametres }));
   }
 
   /**
@@ -89,7 +90,7 @@ export class FacadeConfigurationPartageableService {
   public async previsualiserImportConfiguration<TDonnees, TReponse>(
     parametres: ParametresPrevisualisationImportConfiguration<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('previsualiser_import_configuration', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('previsualiser_import_configuration', { ...parametres }));
   }
 
   /**
@@ -101,6 +102,6 @@ export class FacadeConfigurationPartageableService {
   public async importerConfiguration<TDonnees, TReponse>(
     parametres: ParametresImportConfiguration<TDonnees>,
   ): Promise<TReponse> {
-    return invoke<TReponse>('importer_configuration', { ...parametres });
+    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('importer_configuration', { ...parametres }));
   }
 }

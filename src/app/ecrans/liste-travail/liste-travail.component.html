@@ -77,10 +77,6 @@
         <textarea class="champ__controle" [(ngModel)]="commentaire" rows="2"></textarea>
       </label>
 
-      @if (messageErreur) {
-        <p class="liste-travail__erreur texte-rouge texte-sm" role="alert">{{ messageErreur }}</p>
-      }
-
       <div class="liste-travail__panneau-actions d-flex retour-ligne ecart-2">
         <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirFicheProjet()">
           Ouvrir la fiche projet

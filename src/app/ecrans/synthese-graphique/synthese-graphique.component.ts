@@ -31,6 +31,7 @@ import type {
   VueSelectionnable,
 } from '../../composants/selecteur-vue/selecteur-vue.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { ChangementSeuilUtils } from '../../services/sansetat/jugement/changement-seuil.utils';
 import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
@@ -142,6 +143,7 @@ export class SqmSyntheseGraphiqueComponent {
 
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne l'appliquer
@@ -171,11 +173,6 @@ export class SqmSyntheseGraphiqueComponent {
    * `SqmSyntheseAuditsComponent`).
    */
   private readonly conteneurExport = viewChild<ElementRef<HTMLElement>>('conteneurExport');
-
-  /**
-   * Message d'erreur de la dernière mutation de vue enregistrée tentée (US-028), `null` si aucune erreur en cours.
-   */
-  public messageErreur: string | null = null;
 
   /**
    * Identifiant du groupe sélectionné dans le filtre, `null` = tous les groupes.
@@ -458,7 +455,7 @@ export class SqmSyntheseGraphiqueComponent {
       demande.motDePasse,
     );
     if (resultat.type === 'echec') {
-      this.messageErreur = "Une erreur inattendue est survenue lors de l'enregistrement de la vue.";
+      this.notification.erreur("Une erreur inattendue est survenue lors de l'enregistrement de la vue.");
     }
   }
 
@@ -469,7 +466,7 @@ export class SqmSyntheseGraphiqueComponent {
   public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
     const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
     if (resultat.type === 'echec') {
-      this.messageErreur = 'Une erreur inattendue est survenue lors de la suppression de la vue.';
+      this.notification.erreur('Une erreur inattendue est survenue lors de la suppression de la vue.');
     }
   }
 

@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../../services/avecetat/etat/notification.service';
 import type {
   DonneesRacine,
   MembreConnu,
@@ -234,9 +235,12 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     await composant.confirmerEnregistrement('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Ce username est déjà utilisé par une autre règle de ce groupe.',
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Ce username est déjà utilisé par une autre règle de ce groupe.',
+      }),
+    ]);
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
   });
 
@@ -249,9 +253,13 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     await composant.confirmerEnregistrement('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Cette règle entre en conflit avec une autre règle de ce groupe portant le même critère et un statut différent.',
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message:
+          'Cette règle entre en conflit avec une autre règle de ce groupe portant le même critère et un statut différent.',
+      }),
+    ]);
     expect(composant.actionEnAttenteMotDePasse).toBeNull();
   });
 
@@ -339,9 +347,12 @@ describe('SqmMembresConnusAdminComponent', () => {
     composant.confirmerSuppression();
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Cette règle est introuvable : elle a peut-être déjà été supprimée.',
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Cette règle est introuvable : elle a peut-être déjà été supprimée.',
+      }),
+    ]);
   });
 
   it('affiche un message explicite quand le mot de passe saisi diverge de la session (R10-01)', async () => {
@@ -359,8 +370,11 @@ describe('SqmMembresConnusAdminComponent', () => {
     composant.confirmerSuppression();
     await composant.confirmerSuppressionMotDePasse('mauvais-mot-de-passe');
 
-    expect(composant.messageErreur).toBe(
-      'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
-    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'erreur',
+        message: 'Le mot de passe saisi ne correspond pas à celui de la session en cours.',
+      }),
+    ]);
   });
 });

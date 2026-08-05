@@ -14,6 +14,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   ErreurAdministration,
   SeuilsJugement,
@@ -43,6 +44,7 @@ interface ChampSeuilModifie {
 export class SqmSeuilsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Instantané des seuils chargés lors de la dernière (ré)initialisation du formulaire, utilisé pour détecter les
@@ -69,17 +71,6 @@ export class SqmSeuilsParametrageComponent {
   public couleursViolationsCritiqueSeuilOrange = 0;
   public couleursViolationsCritiqueSeuilRouge = 0;
   public materialiteBrouillonVariationRelative = 0;
-
-  /**
-   * Message d'erreur de validation ou de rejet par le cœur natif, `null` si aucune erreur en cours.
-   */
-  public messageErreur: string | null = null;
-
-  /**
-   * Message de confirmation de succès, discret et non bloquant (charte d'ergonomie), `null` si aucun enregistrement
-   * récent.
-   */
-  public messageSucces: string | null = null;
 
   /**
    * Indique si la ressaisie du mot de passe du fichier est actuellement affichée (RG-002).
@@ -265,11 +256,9 @@ export class SqmSeuilsParametrageComponent {
    * Ouvre la ressaisie du mot de passe si au moins un seuil a été modifié (RG-002).
    */
   public demanderEnregistrement(): void {
-    this.messageSucces = null;
     if (this.champsModifies().length === 0) {
       return;
     }
-    this.messageErreur = null;
     this.actionEnAttenteMotDePasse = true;
   }
 
@@ -298,14 +287,14 @@ export class SqmSeuilsParametrageComponent {
       if (resultat.type === 'echec') {
         this.enCours = false;
         this.actionEnAttenteMotDePasse = false;
-        this.messageErreur = this.libelleAnomalie(resultat.anomalie);
+        this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
         this.reinitialiserDepuisRacine();
         return;
       }
     }
     this.enCours = false;
     this.actionEnAttenteMotDePasse = false;
-    this.messageSucces = 'Les seuils modifiés ont été enregistrés.';
+    this.notification.succes('Les seuils modifiés ont été enregistrés.');
     this.reinitialiserDepuisRacine();
   }
 

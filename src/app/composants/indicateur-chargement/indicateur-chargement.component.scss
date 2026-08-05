@@ -1,0 +1,28 @@
+// Résidu propre à ce composant (Phase 11, R11-04) : barre de progression indéterminée, positionnée en haut de
+// l'écran, au-dessus de tous les autres éléments du Shell (z-index le plus élevé de l'application, un traitement en
+// cours devant toujours rester visible).
+.indicateur-chargement {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 300;
+  overflow: hidden;
+  background-color: var(--sqm-marque-fond);
+}
+
+.indicateur-chargement__barre {
+  height: 100%;
+  width: 40%;
+  background-color: var(--sqm-marque);
+  animation: sqm-indicateur-chargement-defilement 1.1s ease-in-out infinite;
+}
+
+@keyframes sqm-indicateur-chargement-defilement {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}

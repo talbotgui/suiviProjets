@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmReglagesApplicatifsParametrageComponent } from './reglages-applicatifs-parametrage.component';
 
@@ -196,6 +197,8 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
     composant.demanderEnregistrementConcurrence();
     await composant.confirmerEnregistrementConcurrence('mot-de-passe');
 
-    expect(composant.messageErreur).toBe('Ce réglage n’est pas valide.');
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'erreur', message: 'Ce réglage n’est pas valide.' }),
+    ]);
   });
 });
