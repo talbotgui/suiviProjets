@@ -2,69 +2,29 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Onglet Sources de l'écran Administration (US-008, Phase 3) : sélection d'un groupe puis d'un projet, ensuite
-// liste, création, modification et suppression de ses sources, avec autocomplétion des branches pour la ref
-// auditée d'une source GitLab (`FacadeCommandesService.interrogerBranches`, débouncée). L'absence de ref auditée
-// est affichée explicitement comme « branche par défaut du dépôt », sans tenter de résoudre la valeur effective
-// (nécessite un audit réel, hors périmètre de cette phase, cf. `docs/02_documentation/12_modeleDonnees.md#invariants-et-règles-de-cohérence`).
-//
-// Évolution du 2026-08-02 (US-008, RG-036) : l'identifiant externe n'est plus saisi en texte libre mais choisi
-// dans une liste avec autocomplétion (`FacadeCommandesService.listerSourcesDisponibles`), chargée en un seul appel
-// à la sélection de l'instance et mise en cache pour la durée de la session (`sourcesDisponiblesParInstance`), à
-// la différence de l'autocomplétion des branches ci-dessus (rechargée à chaque frappe débouncée).
-import { Component, DestroyRef, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+// liste et suppression de ses sources. La saisie (création/modification, cascade Type→Instance, autocomplétions)
+// est déléguée à `SqmFormulaireSourceComponent` (`composants/formulaire-source/`) depuis C11-01 (Phase 11),
+// extrait de ce composant pour être également consommé par le mini-flux guidé de `SqmProjetsAdminComponent` sans
+// dupliquer cette logique.
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subject, from, of } from 'rxjs';
-import type { Observable } from 'rxjs';
-import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
+import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
-import type { DonneesSource } from '../../../services/avecetat/etat/donnees-application.service';
 import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/types-donnees';
-import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
-import { FacadeCommandesService } from '../../../services/sansetat/commandes/facade-commandes.service';
-import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
-import type {
-  Instance,
-  ResultatInterrogationBranches,
-  SourceDisponible,
-} from '../../../services/sansetat/commandes/types-facade';
 
 /**
- * Délai de silence, en millisecondes, avant qu'une saisie dans le champ de ref auditée ne déclenche
- * l'interrogation des branches (US-008), pour éviter un appel réseau à chaque frappe.
- */
-const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
-
-/**
- * Onglet Sources de l'écran Administration : sélection d'un groupe puis d'un projet, et CRUD complet de ses
- * sources avec autocomplétion des branches (US-008).
+ * Onglet Sources de l'écran Administration : sélection d'un groupe puis d'un projet, liste et suppression de ses
+ * sources ; création/modification déléguée à `SqmFormulaireSourceComponent` (US-008).
  */
 @Component({
   selector: 'app-sources-admin',
-  imports: [FormsModule, SqmConfirmationSuppressionComponent],
+  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmFormulaireSourceComponent],
   templateUrl: './sources-admin.component.html',
 })
 export class SqmSourcesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
-  private readonly facadeCommandes: FacadeCommandesService = inject(FacadeCommandesService);
-  private readonly destroyRef: DestroyRef = inject(DestroyRef);
-  private readonly rechercheBranche$: Subject<string> = new Subject<string>();
-
-  /**
-   * Dépôts GitLab ou projets Sonar disponibles déjà chargés, indexés par `Instance.id` (US-008, RG-036) : un seul
-   * appel par instance pour la durée de la session, plutôt qu'un appel à chaque sélection de cette même instance.
-   */
-  private readonly sourcesDisponiblesParInstance = new Map<string, readonly SourceDisponible[]>();
-
-  /**
-   * Types de source proposés au formulaire (dépôt GitLab, projet Sonar).
-   */
-  public readonly typesSource: readonly TypeSource[] = [
-    TypeSource.DepotGitlab,
-    TypeSource.ProjetSonar,
-  ];
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -82,71 +42,14 @@ export class SqmSourcesAdminComponent {
   public formulaireVisible = false;
 
   /**
-   * Identifiant de la source en cours de modification, `null` en création.
+   * Source en cours de modification, `null` en création.
    */
-  public sourceEnEditionId: string | null = null;
-
-  /**
-   * Identifiant d'instance saisi dans le formulaire.
-   */
-  public instanceId = '';
-
-  /**
-   * Type de source saisi dans le formulaire.
-   */
-  public type: TypeSource = TypeSource.DepotGitlab;
-
-  /**
-   * Identifiant externe (identifiant de projet côté instance) saisi dans le formulaire.
-   */
-  public idExterne = '';
-
-  /**
-   * Ref auditée saisie dans le formulaire, chaîne vide si absente (branche par défaut du dépôt).
-   */
-  public refAuditee = '';
-
-  /**
-   * Message d'erreur de validation du formulaire, `null` si aucune erreur en cours.
-   */
-  public messageErreur: string | null = null;
-
-  /**
-   * Suggestions de branches actuellement proposées par l'autocomplétion (US-008).
-   */
-  public suggestionsBranches: readonly string[] = [];
-
-  /**
-   * Dépôts GitLab ou projets Sonar disponibles pour l'instance actuellement sélectionnée dans le formulaire,
-   * proposés en autocomplétion de l'identifiant externe (US-008, RG-036), triés par ordre alphabétique du libellé
-   * insensible à la casse (déjà garanti par `FacadeCommandesService.listerSourcesDisponibles`).
-   */
-  public sourcesDisponibles: readonly SourceDisponible[] = [];
-
-  /**
-   * Indique qu'aucun credential n'est actuellement mémorisé pour l'instance sélectionnée : ni l'autocomplétion des
-   * branches ni celle de l'identifiant externe (RG-036) ne sont disponibles, l'utilisateur doit d'abord saisir un
-   * credential (Gestion des credentials).
-   */
-  public credentialAbsent = false;
+  public sourceEnEdition: Source | null = null;
 
   /**
    * Identifiant de la source dont la suppression est en cours de confirmation, `null` si aucune n'est en cours.
    */
   public sourceASupprimerId: string | null = null;
-
-  public constructor() {
-    this.rechercheBranche$
-      .pipe(
-        debounceTime(DELAI_DEBOUNCE_RECHERCHE_MS),
-        distinctUntilChanged(),
-        switchMap((terme) => this.interrogerBranchesPourInstance(terme)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((resultat) => {
-        this.appliquerResultatBranches(resultat);
-      });
-  }
 
   /**
    * Groupes disponibles pour la sélection.
@@ -192,33 +95,10 @@ export class SqmSourcesAdminComponent {
   }
 
   /**
-   * Instances du groupe sélectionné compatibles avec le type de source actuellement saisi dans le formulaire
-   * (une source GitLab ne peut référencer qu'une instance GitLab, une source Sonar qu'une instance Sonar).
-   * @returns Le tableau des instances compatibles.
-   */
-  public instancesCompatibles(): readonly Instance[] {
-    const groupe = this.groupes().find((candidat) => candidat.id === this.groupeSelectionneId);
-    if (!groupe) {
-      return [];
-    }
-    const typeInstanceAttendu =
-      this.type === TypeSource.DepotGitlab ? TypeInstance.Gitlab : TypeInstance.Sonar;
-    return groupe.instances.filter((instance) => instance.type === typeInstanceAttendu);
-  }
-
-  /**
    * Ouvre le formulaire pour la création d'une nouvelle source au sein du projet sélectionné.
    */
   public ouvrirCreation(): void {
-    this.sourceEnEditionId = null;
-    this.instanceId = '';
-    this.type = TypeSource.DepotGitlab;
-    this.idExterne = '';
-    this.refAuditee = '';
-    this.messageErreur = null;
-    this.suggestionsBranches = [];
-    this.sourcesDisponibles = [];
-    this.credentialAbsent = false;
+    this.sourceEnEdition = null;
     this.formulaireVisible = true;
   }
 
@@ -231,96 +111,14 @@ export class SqmSourcesAdminComponent {
     if (!source) {
       return;
     }
-    this.sourceEnEditionId = source.id;
-    this.instanceId = source.instanceId;
-    this.type = source.type;
-    this.idExterne = source.idExterne;
-    this.refAuditee = source.refAuditee ?? '';
-    this.messageErreur = null;
-    this.suggestionsBranches = [];
-    this.sourcesDisponibles = [];
-    this.credentialAbsent = false;
+    this.sourceEnEdition = source;
     this.formulaireVisible = true;
-    void this.chargerSourcesDisponibles(source.instanceId);
   }
 
   /**
    * Referme le formulaire sans enregistrer.
    */
   public fermerFormulaire(): void {
-    this.formulaireVisible = false;
-  }
-
-  /**
-   * Change le type de source saisi dans le formulaire, en réinitialisant l'instance sélectionnée (une instance
-   * compatible avec l'ancien type peut ne plus l'être avec le nouveau).
-   * @param nouveauType - Type de source désormais sélectionné.
-   */
-  public changerType(nouveauType: TypeSource): void {
-    this.type = nouveauType;
-    this.instanceId = '';
-    this.suggestionsBranches = [];
-    this.sourcesDisponibles = [];
-  }
-
-  /**
-   * Sélectionne l'instance du formulaire de source et déclenche le chargement (mis en cache) de la liste des
-   * dépôts/projets disponibles pour l'autocomplétion de l'identifiant externe (US-008, RG-036).
-   * @param instanceId - Identifiant de l'instance désormais sélectionnée dans le formulaire.
-   */
-  public selectionnerInstance(instanceId: string): void {
-    this.instanceId = instanceId;
-    void this.chargerSourcesDisponibles(instanceId);
-  }
-
-  /**
-   * Déclenche (de façon débouncée) l'autocomplétion des branches pour le terme actuellement saisi dans le champ
-   * de ref auditée (US-008). Sans effet pour une source Sonar, qui n'a pas de branches.
-   */
-  public rechercherBranches(): void {
-    if (this.type === TypeSource.ProjetSonar) {
-      return;
-    }
-    this.rechercheBranche$.next(this.refAuditee);
-  }
-
-  /**
-   * Valide puis enregistre le formulaire (création ou modification selon le contexte).
-   */
-  public enregistrer(): void {
-    if (!this.projetSelectionneId || !this.groupeSelectionneId) {
-      return;
-    }
-    if (this.instanceId.length === 0) {
-      this.messageErreur = 'Une instance doit être sélectionnée.';
-      return;
-    }
-    if (this.idExterne.trim().length === 0) {
-      this.messageErreur = "L'identifiant externe est obligatoire.";
-      return;
-    }
-
-    const donnees: DonneesSource = {
-      instanceId: this.instanceId,
-      type: this.type,
-      idExterne: this.idExterne.trim(),
-      refAuditee: this.refAuditee.trim().length > 0 ? this.refAuditee.trim() : undefined,
-    };
-
-    if (this.sourceEnEditionId) {
-      this.donneesApplication.modifierSource(
-        this.groupeSelectionneId,
-        this.projetSelectionneId,
-        this.sourceEnEditionId,
-        donnees,
-      );
-    } else {
-      this.donneesApplication.creerSource(
-        this.groupeSelectionneId,
-        this.projetSelectionneId,
-        donnees,
-      );
-    }
     this.formulaireVisible = false;
   }
 
@@ -351,75 +149,5 @@ export class SqmSourcesAdminComponent {
    */
   public annulerSuppression(): void {
     this.sourceASupprimerId = null;
-  }
-
-  /**
-   * Charge, en un seul appel mis en cache pour la durée de la session (US-008, RG-036), la liste des dépôts
-   * GitLab ou des projets Sonar disponibles pour l'instance désignée, pour l'autocomplétion de l'identifiant
-   * externe. Sans effet si `instanceId` est vide ou déjà présente dans le cache.
-   * @param instanceId - Identifiant de l'instance dont on charge la liste des dépôts/projets disponibles.
-   */
-  private async chargerSourcesDisponibles(instanceId: string): Promise<void> {
-    if (instanceId.length === 0) {
-      this.sourcesDisponibles = [];
-      return;
-    }
-    const enCache = this.sourcesDisponiblesParInstance.get(instanceId);
-    if (enCache) {
-      this.sourcesDisponibles = enCache;
-      this.credentialAbsent = false;
-      return;
-    }
-    const instance = this.instancesCompatibles().find((candidat) => candidat.id === instanceId);
-    if (!instance) {
-      this.sourcesDisponibles = [];
-      return;
-    }
-    const resultat = await this.facadeCommandes.listerSourcesDisponibles(instance);
-    if (resultat.type === 'succes') {
-      this.sourcesDisponiblesParInstance.set(instanceId, resultat.sourcesDisponibles);
-      this.sourcesDisponibles = resultat.sourcesDisponibles;
-      this.credentialAbsent = false;
-      return;
-    }
-    this.sourcesDisponibles = [];
-    this.credentialAbsent = resultat.anomalie.type === 'credentialAbsent';
-  }
-
-  /**
-   * Interroge les branches de l'instance actuellement sélectionnée dans le formulaire pour le terme donné.
-   * @param terme - Terme de recherche saisi par l'utilisateur.
-   * @returns Un flux résolvant le résultat de l'interrogation, ou `null` si aucune instance n'est sélectionnée.
-   */
-  private interrogerBranchesPourInstance(
-    terme: string,
-  ): Observable<ResultatInterrogationBranches | null> {
-    const instance = this.instancesCompatibles().find(
-      (candidat) => candidat.id === this.instanceId,
-    );
-    if (!instance || this.idExterne.trim().length === 0) {
-      return of(null);
-    }
-    return from(
-      this.facadeCommandes.interrogerBranches(instance, this.idExterne.trim(), terme),
-    ).pipe(catchError(() => of(null)));
-  }
-
-  /**
-   * Applique le résultat d'une interrogation de branches à l'état du formulaire.
-   * @param resultat - Résultat de l'interrogation, `null` si elle n'a pas pu être lancée.
-   */
-  private appliquerResultatBranches(resultat: ResultatInterrogationBranches | null): void {
-    if (!resultat) {
-      this.suggestionsBranches = [];
-      return;
-    }
-    if (resultat.type === 'succes') {
-      this.suggestionsBranches = resultat.branches;
-      this.credentialAbsent = false;
-      return;
-    }
-    this.suggestionsBranches = [];
-    this.credentialAbsent = resultat.anomalie.type === 'credentialAbsent';
   }
 }

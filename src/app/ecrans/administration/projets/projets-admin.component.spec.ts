@@ -1,11 +1,15 @@
 // Test de l'onglet Projets de l'écran Administration (cf. projets-admin.component.ts), généré avec l'assistance
 // de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
+import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
+import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmProjetsAdminComponent } from './projets-admin.component';
 
 // `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
@@ -81,6 +85,7 @@ class DonneesDeTest {
 
 describe('SqmProjetsAdminComponent', () => {
   let donneesApplication: DonneesApplicationService;
+  let fixture: ComponentFixture<SqmProjetsAdminComponent>;
   let composant: SqmProjetsAdminComponent;
   let groupeId: string;
 
@@ -98,7 +103,8 @@ describe('SqmProjetsAdminComponent', () => {
       instances: [],
     });
     TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-    composant = TestBed.createComponent(SqmProjetsAdminComponent).componentInstance;
+    fixture = TestBed.createComponent(SqmProjetsAdminComponent);
+    composant = fixture.componentInstance;
   });
 
   it("n'affiche aucun projet tant qu'aucun groupe n'est sélectionné", () => {
@@ -271,6 +277,134 @@ describe('SqmProjetsAdminComponent', () => {
         expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
       ]);
       expect(composant.projets()[0].iaAutorisee).toBe(false);
+    });
+  });
+
+  describe('enchaînement guidé projet → sources (US-007, C11-01)', () => {
+    let groupeAvecInstanceId: string;
+
+    beforeEach(() => {
+      groupeAvecInstanceId = donneesApplication.creerGroupe({
+        nom: 'Socle Technique',
+        description: '',
+        instances: [
+          {
+            id: 'instance-gitlab',
+            type: TypeInstance.Gitlab,
+            nom: 'gitlab-prod',
+            urlBase: 'https://gitlab.test',
+          },
+        ],
+      });
+      composant.selectionnerGroupe(groupeAvecInstanceId);
+    });
+
+    it('« Créer un projet » simple ne déclenche pas le mini-flux', () => {
+      composant.ouvrirCreation();
+      composant.nom = 'API Facturation';
+
+      composant.enregistrer();
+
+      expect(composant.projetPourSourcesId).toBeNull();
+    });
+
+    it('« Créer et ajouter des sources » crée le projet puis ouvre le mini-flux pré-filtré', () => {
+      composant.ouvrirCreationAvecSources();
+      composant.nom = 'API Facturation';
+
+      composant.enregistrer();
+
+      expect(composant.formulaireVisible).toBe(false);
+      expect(composant.projets()).toHaveLength(1);
+      expect(composant.projetPourSourcesId).toBe(composant.projets()[0].id);
+    });
+
+    it('« Ajouter une autre source » enregistre la source puis réinitialise le formulaire sans fermer le mini-flux', () => {
+      composant.ouvrirCreationAvecSources();
+      composant.nom = 'API Facturation';
+      composant.enregistrer();
+      fixture.detectChanges();
+      const formulaireSource = DomTestUtils.obtenirComposantEnfant(
+        fixture,
+        SqmFormulaireSourceComponent,
+      );
+      formulaireSource.instanceId.set('instance-gitlab');
+      formulaireSource.idExterne.set('groupe/api-facturation');
+
+      composant.ajouterAutreSource();
+
+      expect(composant.projets()[0].sources).toHaveLength(1);
+      expect(composant.projetPourSourcesId).not.toBeNull();
+      expect(formulaireSource.instanceId()).toBe('');
+      expect(formulaireSource.idExterne()).toBe('');
+    });
+
+    it('« Terminer ce projet, projet suivant » enregistre la dernière source puis rouvre un formulaire Projet vierge en mode « avec sources »', () => {
+      composant.ouvrirCreationAvecSources();
+      composant.nom = 'API Facturation';
+      composant.enregistrer();
+      fixture.detectChanges();
+      const formulaireSource = DomTestUtils.obtenirComposantEnfant(
+        fixture,
+        SqmFormulaireSourceComponent,
+      );
+      formulaireSource.instanceId.set('instance-gitlab');
+      formulaireSource.idExterne.set('groupe/api-facturation');
+
+      composant.terminerProjetPasserAuSuivant();
+
+      expect(composant.projets()[0].sources).toHaveLength(1);
+      expect(composant.projetPourSourcesId).toBeNull();
+      expect(composant.formulaireVisible).toBe(true);
+      expect(composant.nom).toBe('');
+      expect(composant.creationAvecSourcesDemandee).toBe(true);
+    });
+
+    it('« Terminer ce projet, projet suivant » avec un formulaire vide ne crée aucune source superflue', () => {
+      composant.ouvrirCreationAvecSources();
+      composant.nom = 'API Facturation';
+      composant.enregistrer();
+      fixture.detectChanges();
+
+      composant.terminerProjetPasserAuSuivant();
+
+      expect(composant.projets()[0].sources).toEqual([]);
+      expect(composant.projetPourSourcesId).toBeNull();
+      expect(composant.formulaireVisible).toBe(true);
+      expect(composant.creationAvecSourcesDemandee).toBe(true);
+    });
+
+    it('« Terminer ce projet, projet suivant » reste sur le mini-flux si la saisie en cours est invalide', () => {
+      composant.ouvrirCreationAvecSources();
+      composant.nom = 'API Facturation';
+      composant.enregistrer();
+      fixture.detectChanges();
+      const formulaireSource = DomTestUtils.obtenirComposantEnfant(
+        fixture,
+        SqmFormulaireSourceComponent,
+      );
+      formulaireSource.instanceId.set('instance-gitlab');
+
+      composant.terminerProjetPasserAuSuivant();
+
+      expect(composant.projetPourSourcesId).not.toBeNull();
+      expect(formulaireSource.messageErreur).toBe("L'identifiant externe est obligatoire.");
+    });
+
+    it('enchaîne sur un second mini-flux sans reclic sur « Créer et ajouter des sources »', () => {
+      composant.ouvrirCreationAvecSources();
+      composant.nom = 'API Facturation';
+      composant.enregistrer();
+      fixture.detectChanges();
+      composant.terminerProjetPasserAuSuivant();
+
+      composant.nom = 'API Paiement';
+      composant.enregistrer();
+
+      expect(composant.projets()).toHaveLength(2);
+      expect(composant.projetPourSourcesId).toBe(
+        composant.projets().find((p) => p.nom === 'API Paiement')?.id,
+      );
     });
   });
 });

@@ -1,0 +1,108 @@
+<ng-template #champs>
+  @if (messageErreur) {
+    <p class="formulaire-source__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
+  }
+
+  <label class="champ">
+    Type
+    <select
+      class="champ__controle"
+      [ngModel]="type()"
+      (ngModelChange)="changerType($event)"
+      name="type"
+    >
+      @for (typeCandidat of typesSource; track typeCandidat) {
+        <option [ngValue]="typeCandidat">{{ typeCandidat }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="champ">
+    Instance
+    <select
+      class="champ__controle"
+      name="instanceId"
+      [ngModel]="instanceId()"
+      (ngModelChange)="selectionnerInstance($event)"
+    >
+      <option value="" disabled>Sélectionner une instance</option>
+      @for (instance of instancesCompatibles(); track instance.id) {
+        <option [value]="instance.id">{{ instance.nom }}</option>
+      }
+    </select>
+  </label>
+
+  @if (credentialAbsent()) {
+    <p class="formulaire-source__avertissement texte-orange texte-sm">
+      Aucun credential n'est mémorisé pour cette instance : saisissez-le depuis la Gestion des
+      credentials pour bénéficier de l'autocomplétion de l'identifiant externe et des branches.
+    </p>
+  }
+
+  <label class="champ">
+    Identifiant externe
+    <input
+      type="text"
+      class="champ__controle"
+      name="idExterne"
+      [ngModel]="idExterne()"
+      (ngModelChange)="idExterne.set($event)"
+      list="formulaire-source-id-externe"
+      aria-describedby="formulaire-source-id-externe-aide"
+      required
+    />
+    <span id="formulaire-source-id-externe-aide" class="champ__aide"
+      >Ex. groupe/sous-groupe/projet (GitLab) ou clé de projet (Sonar).</span
+    >
+    <datalist id="formulaire-source-id-externe">
+      @for (source of sourcesDisponibles(); track source.idExterne) {
+        <option [value]="source.idExterne">{{ source.libelle }}</option>
+      }
+    </datalist>
+  </label>
+
+  @if (type() === typesSource[0]) {
+    <label class="champ">
+      Ref auditée (branche, tag ou SHA)
+      <input
+        type="text"
+        class="champ__controle"
+        name="refAuditee"
+        [ngModel]="refAuditee()"
+        (ngModelChange)="modifierRefAuditee($event)"
+        list="formulaire-source-branches"
+        placeholder="Laisser vide pour la branche par défaut du dépôt"
+      />
+      <datalist id="formulaire-source-branches">
+        @for (branche of suggestionsBranches(); track branche) {
+          <option [value]="branche"></option>
+        }
+      </datalist>
+    </label>
+  }
+</ng-template>
+
+@if (actionsVisibles()) {
+  <form class="formulaire-source d-flex direction-colonne ecart-3" (ngSubmit)="soumettre()">
+    <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+      {{ sourceAModifier() ? 'Modifier la source' : 'Créer une source' }}
+    </h3>
+
+    <ng-container [ngTemplateOutlet]="champs" />
+
+    <div class="formulaire-source__actions d-flex justifie-fin ecart-2">
+      <button type="button" class="bouton" (click)="annuler()">Annuler</button>
+      <button type="submit" class="bouton bouton--principal">Enregistrer</button>
+    </div>
+  </form>
+} @else {
+  <!-- Pas de `<form>`/`ngSubmit` ici, à la différence de la branche ci-dessus : le composant appelant
+       (mini-flux guidé, C11-01) pilote entièrement la soumission via les méthodes publiques `soumettre`/
+       `enregistrer`, ses propres boutons `type="button"` n'étant pas des enfants du DOM de ce composant. Un
+       `<form>` interne exposerait sinon un risque de soumission implicite à la touche Entrée pour une source dont
+       le formulaire ne comporte plus qu'un seul champ texte visible (Sonar, sans champ Ref auditée), incohérent
+       avec le flux à deux boutons explicites voulu par C11-01. -->
+  <div class="formulaire-source d-flex direction-colonne ecart-3">
+    <ng-container [ngTemplateOutlet]="champs" />
+  </div>
+}

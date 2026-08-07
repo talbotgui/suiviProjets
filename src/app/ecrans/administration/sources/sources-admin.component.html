@@ -83,102 +83,18 @@
       />
     }
 
-    @if (formulaireVisible) {
-      <form
+    @if (formulaireVisible && groupeSelectionneId && projetSelectionneId) {
+      <div
         class="sources-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
-        (ngSubmit)="enregistrer()"
       >
-        <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
-          {{ sourceEnEditionId ? 'Modifier la source' : 'Créer une source' }}
-        </h3>
-
-        @if (messageErreur) {
-          <p class="sources-admin__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
-        }
-
-        <label class="champ">
-          Type
-          <select
-            class="champ__controle"
-            [ngModel]="type"
-            (ngModelChange)="changerType($event)"
-            name="type"
-          >
-            @for (typeCandidat of typesSource; track typeCandidat) {
-              <option [ngValue]="typeCandidat">{{ typeCandidat }}</option>
-            }
-          </select>
-        </label>
-
-        <label class="champ">
-          Instance
-          <select
-            class="champ__controle"
-            name="instanceId"
-            [ngModel]="instanceId"
-            (ngModelChange)="selectionnerInstance($event)"
-          >
-            <option value="" disabled>Sélectionner une instance</option>
-            @for (instance of instancesCompatibles(); track instance.id) {
-              <option [value]="instance.id">{{ instance.nom }}</option>
-            }
-          </select>
-        </label>
-
-        @if (credentialAbsent) {
-          <p class="sources-admin__avertissement texte-orange texte-sm">
-            Aucun credential n'est mémorisé pour cette instance : saisissez-le depuis la Gestion des
-            credentials pour bénéficier de l'autocomplétion de l'identifiant externe et des
-            branches.
-          </p>
-        }
-
-        <label class="champ">
-          Identifiant externe
-          <input
-            type="text"
-            class="champ__controle"
-            name="idExterne"
-            [(ngModel)]="idExterne"
-            list="sources-admin-id-externe"
-            aria-describedby="sources-admin-id-externe-aide"
-            required
-          />
-          <span id="sources-admin-id-externe-aide" class="champ__aide"
-            >Ex. groupe/sous-groupe/projet (GitLab) ou clé de projet (Sonar).</span
-          >
-          <datalist id="sources-admin-id-externe">
-            @for (source of sourcesDisponibles; track source.idExterne) {
-              <option [value]="source.idExterne">{{ source.libelle }}</option>
-            }
-          </datalist>
-        </label>
-
-        @if (type === typesSource[0]) {
-          <label class="champ">
-            Ref auditée (branche, tag ou SHA)
-            <input
-              type="text"
-              class="champ__controle"
-              name="refAuditee"
-              [(ngModel)]="refAuditee"
-              (ngModelChange)="rechercherBranches()"
-              list="sources-admin-branches"
-              placeholder="Laisser vide pour la branche par défaut du dépôt"
-            />
-            <datalist id="sources-admin-branches">
-              @for (branche of suggestionsBranches; track branche) {
-                <option [value]="branche"></option>
-              }
-            </datalist>
-          </label>
-        }
-
-        <div class="sources-admin__actions-formulaire d-flex justifie-fin ecart-2">
-          <button type="button" class="bouton" (click)="fermerFormulaire()">Annuler</button>
-          <button type="submit" class="bouton bouton--principal">Enregistrer</button>
-        </div>
-      </form>
+        <app-formulaire-source
+          [groupeId]="groupeSelectionneId"
+          [projetId]="projetSelectionneId"
+          [sourceAModifier]="sourceEnEdition"
+          (enregistree)="fermerFormulaire()"
+          (annulee)="fermerFormulaire()"
+        />
+      </div>
     }
   }
 </section>

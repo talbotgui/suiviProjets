@@ -16,9 +16,10 @@ Synthèse actionnable de [16_normesTests.md](../../docs/02_documentation/16_norm
 
 ## Tests de bout en bout
 
-- [tauri-driver](https://tauri.app/develop/tests/webdriver/) (WebDriver) sur l'application packagée réelle, jamais un outil limité à la vue web seule.
-- Toujours avec les clients HTTP des connecteurs bouchonnés, jamais contre une vraie instance (rejouabilité déterministe) ([source](../../docs/02_documentation/16_normesTests.md#tests-de-bout-en-bout)).
-- Périmètre minimal : créer un fichier de données, réaliser une campagne et intégrer les résultats, qualifier un membre inconnu, verrouiller/déverrouiller la session.
+- Décision révisée à la Phase 12 : [Playwright](https://playwright.dev/) contre `ng serve` (façade de commandes bouchonnée côté TypeScript), à la place de tauri-driver sur l'application packagée ([source](../../docs/02_documentation/16_normesTests.md#tests-de-bout-en-bout)). Compromis assumé : le pont IPC natif réel, les dialogues système et la CSP packagée ne sont plus exercés par ce test.
+- Toujours avec le bouchon TypeScript de la Façade de commandes, jamais contre une vraie instance (rejouabilité déterministe, valeurs de test toujours fixes, jamais aléatoires) ; seul l'aléa `± 10 %` déjà existant du bouchon Sonar subsiste, couvert par des assertions à bornes tolérantes plutôt que des valeurs exactes.
+- Un délai artificiel fixe sur les commandes d'interrogation GitLab/Sonar du bouchon permet d'exercer réellement l'indicateur de chargement et la progression de campagne.
+- Périmètre : parcours unique couvrant l'ensemble des écrans de l'application (Phase 12), incluant les quatre séquences minimales historiques (créer un fichier de données, réaliser une campagne et intégrer les résultats, qualifier un membre inconnu, verrouiller/déverrouiller la session).
 
 ## Tests de charge et de performance
 

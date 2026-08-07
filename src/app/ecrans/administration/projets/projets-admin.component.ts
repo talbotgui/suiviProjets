@@ -6,10 +6,18 @@
 // IA de chaque projet (RG-014 à RG-016). Tout projet créé ou dupliqué porte toujours l'interdiction par défaut
 // (RG-014) ; le contrôle Politique IA permet ensuite de l'autoriser explicitement, avec ressaisie du mot de passe
 // du fichier à chaque bascule (RG-002), la commande native invoquée sauvegardant effectivement le fichier.
-import { Component, inject } from '@angular/core';
+//
+// Depuis C11-01 (Phase 11) : enchaînement guidé projet → sources (US-007). Le bouton « Créer et ajouter des
+// sources » enregistre l'intention (`creationAvecSourcesDemandee`), la soumission normale du formulaire
+// (`enregistrer`, seul point d'écriture de `creerProjet`) ouvre alors le mini-flux Sources plutôt que de
+// simplement fermer le formulaire. Le mini-flux réutilise `SqmFormulaireSourceComponent` (`actionsVisibles` à
+// `false`), déjà extrait de l'onglet Sources pour cet usage : les boutons « Ajouter une autre source »/« Terminer
+// ce projet, projet suivant » l'invoquent via la variable de référence de gabarit `#formulaireSource`.
+import { Component, inject, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
+import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import type { DonneesProjet } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
@@ -17,19 +25,30 @@ import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donne
 
 /**
  * Onglet Projets de l'écran Administration : sélection d'un groupe puis CRUD complet de ses projets, avec
- * duplication (US-007) et contrôle de la politique IA (US-024). L'origine consignée au journal (RG-023) pour la
- * bascule de politique IA est fixée côté cœur natif (`Administration`), cette commande ne l'exposant pas en
- * paramètre à la différence de `qualifierMembre`.
+ * duplication (US-007), contrôle de la politique IA (US-024) et enchaînement guidé vers l'ajout de sources
+ * (US-007, C11-01). L'origine consignée au journal (RG-023) pour la bascule de politique IA est fixée côté cœur
+ * natif (`Administration`), cette commande ne l'exposant pas en paramètre à la différence de `qualifierMembre`.
  */
 @Component({
   selector: 'app-projets-admin',
-  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
+  imports: [
+    FormsModule,
+    SqmConfirmationSuppressionComponent,
+    SqmConfirmationMotDePasseComponent,
+    SqmFormulaireSourceComponent,
+  ],
   templateUrl: './projets-admin.component.html',
 })
 export class SqmProjetsAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+
+  /**
+   * Référence au formulaire de source du mini-flux guidé (C11-01), `undefined` tant qu'il n'est pas affiché
+   * ({@link projetPourSourcesId} à `null`).
+   */
+  private readonly formulaireSource = viewChild<SqmFormulaireSourceComponent>('formulaireSource');
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -78,6 +97,19 @@ export class SqmProjetsAdminComponent {
   public politiqueIAEnCours = false;
 
   /**
+   * Indique que la soumission en cours du formulaire de création doit, une fois le projet créé, ouvrir le
+   * mini-flux guidé d'ajout de sources (C11-01), plutôt que simplement fermer le formulaire. Consommé et remis à
+   * `false` par {@link enregistrer} dès la création effectuée.
+   */
+  public creationAvecSourcesDemandee = false;
+
+  /**
+   * Identifiant du projet pour lequel le mini-flux guidé d'ajout de sources (C11-01) est actuellement affiché,
+   * `null` si aucun mini-flux n'est en cours.
+   */
+  public projetPourSourcesId: string | null = null;
+
+  /**
    * Groupes disponibles pour la sélection.
    * @returns Le tableau des groupes de la racine courante.
    */
@@ -92,6 +124,7 @@ export class SqmProjetsAdminComponent {
   public selectionnerGroupe(groupeId: string): void {
     this.groupeSelectionneId = groupeId;
     this.formulaireVisible = false;
+    this.projetPourSourcesId = null;
   }
 
   /**
@@ -103,18 +136,31 @@ export class SqmProjetsAdminComponent {
   }
 
   /**
-   * Ouvre le formulaire pour la création d'un nouveau projet au sein du groupe sélectionné.
+   * Ouvre le formulaire pour la création d'un nouveau projet au sein du groupe sélectionné. Referme, le cas
+   * échéant, le mini-flux guidé d'ajout de sources en cours (C11-01).
    */
   public ouvrirCreation(): void {
     this.projetEnEditionId = null;
     this.nom = '';
     this.description = '';
     this.messageErreur = null;
+    this.creationAvecSourcesDemandee = false;
+    this.projetPourSourcesId = null;
     this.formulaireVisible = true;
   }
 
   /**
-   * Ouvre le formulaire pré-rempli pour la modification d'un projet existant.
+   * Ouvre le formulaire pour la création d'un nouveau projet, en enchaînant, une fois créé, sur le mini-flux
+   * guidé d'ajout de sources (US-007, C11-01).
+   */
+  public ouvrirCreationAvecSources(): void {
+    this.ouvrirCreation();
+    this.creationAvecSourcesDemandee = true;
+  }
+
+  /**
+   * Ouvre le formulaire pré-rempli pour la modification d'un projet existant. Referme, le cas échéant, le
+   * mini-flux guidé d'ajout de sources en cours (C11-01).
    * @param projetId - Identifiant du projet à modifier.
    */
   public ouvrirEdition(projetId: string): void {
@@ -126,6 +172,8 @@ export class SqmProjetsAdminComponent {
     this.nom = projet.nom;
     this.description = projet.description;
     this.messageErreur = null;
+    this.creationAvecSourcesDemandee = false;
+    this.projetPourSourcesId = null;
     this.formulaireVisible = true;
   }
 
@@ -137,7 +185,9 @@ export class SqmProjetsAdminComponent {
   }
 
   /**
-   * Valide puis enregistre le formulaire (création ou modification selon le contexte).
+   * Valide puis enregistre le formulaire (création ou modification selon le contexte). En création, si
+   * {@link ouvrirCreationAvecSources} a été utilisé pour ouvrir ce formulaire, ouvre le mini-flux guidé d'ajout de
+   * sources (US-007, C11-01) plutôt que de simplement fermer le formulaire.
    */
   public enregistrer(): void {
     if (!this.groupeSelectionneId) {
@@ -156,10 +206,58 @@ export class SqmProjetsAdminComponent {
         this.projetEnEditionId,
         donnees,
       );
-    } else {
-      this.donneesApplication.creerProjet(this.groupeSelectionneId, donnees);
+      this.formulaireVisible = false;
+      return;
     }
+
+    const projetId = this.donneesApplication.creerProjet(this.groupeSelectionneId, donnees);
     this.formulaireVisible = false;
+    if (this.creationAvecSourcesDemandee) {
+      this.creationAvecSourcesDemandee = false;
+      this.projetPourSourcesId = projetId;
+    }
+  }
+
+  /**
+   * Invoque l'enregistrement de la source en cours de saisie dans le mini-flux guidé (C11-01) : la valeur émise
+   * par la sortie `enregistree` du composant enfant déclenche {@link reinitialiserApresAjoutSource} pour permettre
+   * la saisie de la source suivante, sans fermer le mini-flux.
+   */
+  public ajouterAutreSource(): void {
+    this.formulaireSource()?.soumettre();
+  }
+
+  /**
+   * Réinitialise le formulaire du mini-flux guidé après l'ajout réussi d'une source (C11-01), pour permettre la
+   * saisie de la source suivante sans fermer le mini-flux. Invoqué par la sortie `enregistree` du composant
+   * enfant.
+   */
+  public reinitialiserApresAjoutSource(): void {
+    this.formulaireSource()?.reinitialiser();
+  }
+
+  /**
+   * Termine le mini-flux guidé (C11-01) : enregistre la dernière source en cours de saisie si elle n'est pas
+   * restée vide, puis rouvre directement le formulaire de création d'un nouveau projet en mode « avec sources »
+   * (comme si {@link ouvrirCreationAvecSources} avait été recliqué), sans repasser par la liste des projets — pour
+   * qu'un enchaînement de plusieurs dizaines de projets n'exige de recliquer « Créer et ajouter des sources »
+   * qu'une seule fois (décision arbitraire confirmée explicitement par l'utilisateur lors de la relecture de
+   * C11-01, préférée au réarmement en simple mode « Créer un projet »). Reste sur le mini-flux si une saisie en
+   * cours est invalide (message d'erreur affiché par le composant enfant).
+   */
+  public terminerProjetPasserAuSuivant(): void {
+    const formulaire = this.formulaireSource();
+    if (!formulaire) {
+      return;
+    }
+    if (!formulaire.estVide()) {
+      const id = formulaire.enregistrer();
+      if (id === null) {
+        return;
+      }
+    }
+    this.projetPourSourcesId = null;
+    this.ouvrirCreationAvecSources();
   }
 
   /**
