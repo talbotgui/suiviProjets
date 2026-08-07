@@ -9,6 +9,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
     "lint": "ng lint",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json"
   },

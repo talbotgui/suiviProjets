@@ -153,7 +153,10 @@
       </button>
     </header>
 
-    <ul class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2">
+    <ul
+      id="referentiels-parametrage-liste-marqueurs-ia"
+      class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2"
+    >
       @for (regle of reglesMarqueursIA(); track regle.id) {
         <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
           <span>{{ regle.motif }}</span>

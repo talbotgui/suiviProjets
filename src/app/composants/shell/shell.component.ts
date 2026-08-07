@@ -58,6 +58,7 @@ import { SqmRechercheTransversaleComponent } from '../recherche-transversale/rec
 import { SqmVerrouillageComponent } from '../verrouillage/verrouillage.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatFichier, EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import type { StatutExecutionProjet } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 
@@ -301,16 +302,45 @@ export class SqmShellComponent {
 
   /**
    * Calcule la cible de navigation de l'entrée « Audits » (cf. {@link ouvrirAudits}).
+   *
+   * Correction (Phase 12, constat R12-04) : `EtatSessionService.progressionCampagne` reste non `null` pour le
+   * reste de la session dès qu'une première campagne a été lancée (« la campagne en cours *ou la dernière
+   * campagne exécutée* », cf. commentaire de ce signal) — un simple test `!== null` route donc en permanence vers
+   * le Tableau de bord une fois toute campagne achevée, y compris quand un nouveau brouillon reste ensuite à
+   * traiter, sans plus jamais pouvoir rejoindre Brouillon ou Constitution de campagne depuis cette entrée. Corrigé
+   * en reprenant la même vérification que {@link SqmTableauDeBordComponent.campagneEnCours} (bug de même nature
+   * déjà corrigé à cet endroit le 2026-07-28, jamais reporté ici) : la campagne n'est considérée « en cours » que
+   * si au moins un projet de son périmètre n'a pas encore de statut terminal.
    * @returns Le chemin absolu de l'écran d'Audits pertinent.
    */
   private cibleAudits(): string {
-    if (this.etatSession.progressionCampagne() !== null) {
+    if (this.campagneReellementEnCours()) {
       return '/audits/tableau-de-bord';
     }
     if (this.donneesApplication.racine()?.brouillon != null) {
       return '/audits/brouillon';
     }
     return '/audits/constitution-campagne';
+  }
+
+  /**
+   * Indique si la dernière campagne lancée est encore réellement en cours (au moins un projet de son périmètre
+   * pas encore à un statut terminal), cf. {@link cibleAudits}.
+   * @returns `true` si une campagne est effectivement en cours d'exécution.
+   */
+  private campagneReellementEnCours(): boolean {
+    const progression = this.etatSession.progressionCampagne();
+    if (progression === null) {
+      return false;
+    }
+    const statutsTerminaux: ReadonlySet<StatutExecutionProjet> = new Set([
+      'termine',
+      'echoue',
+      'ignore',
+    ]);
+    return progression.perimetre.some(
+      (projetId) => !statutsTerminaux.has(progression.projets[projetId]?.statut ?? 'enAttente'),
+    );
   }
 
   /**

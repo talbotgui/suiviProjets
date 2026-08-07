@@ -3,6 +3,7 @@
 
   <nav class="administration__onglets d-flex retour-ligne ecart-2 exterieur-bas-5">
     <button
+      id="administration-onglet-groupes"
       type="button"
       class="administration__onglet bouton bouton--discret"
       [class.administration__onglet--actif]="ongletActif === 'groupes'"
@@ -11,6 +12,7 @@
       Groupes
     </button>
     <button
+      id="administration-onglet-projets"
       type="button"
       class="administration__onglet bouton bouton--discret"
       [class.administration__onglet--actif]="ongletActif === 'projets'"
@@ -19,6 +21,7 @@
       Projets
     </button>
     <button
+      id="administration-onglet-sources"
       type="button"
       class="administration__onglet bouton bouton--discret"
       [class.administration__onglet--actif]="ongletActif === 'sources'"

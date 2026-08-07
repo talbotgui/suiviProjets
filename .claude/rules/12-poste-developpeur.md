@@ -6,6 +6,7 @@ Synthèse actionnable de [17_posteDeveloppeur.md](../../docs/02_documentation/17
 
 - Développement complet : `npm run tauri dev` (front + cœur natif, rechargement à chaud) ; front seul : `npm start` (commandes de la Façade indisponibles) ([source](../../docs/02_documentation/17_posteDeveloppeur.md#commandes-de-démarrage-en-mode-développement)).
 - Tests : `npm test` (Jest), `cargo test` (Rust) ; tests d'intégration hors CI déclenchés manuellement une fois les variables d'environnement définies (cf. [11-normes-tests.md](./11-normes-tests.md)).
+- Test de bout en bout (Phase 12) : `npm run test:e2e` (Playwright, démarre `ng serve` automatiquement via `webServer`) ; résultats et captures d'écran dans `e2e/test-output/` (strictement local, jamais committé).
 - Build : `npm run tauri build` (build de production, packaging natif du poste courant) ; `cargo build --locked`/`cargo check --locked` pour vérifier la seule compilation Rust ([source](../../docs/02_documentation/17_posteDeveloppeur.md#commandes-de-build)). Le build multiplateforme est produit par la CI, pas en local.
 
 ## Variables d'environnement

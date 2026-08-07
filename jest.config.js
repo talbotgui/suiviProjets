@@ -79,7 +79,9 @@ for (const { dossier, seuil } of PERIMETRES_COUVERTURE) {
 module.exports = {
   preset: 'jest-preset-angular',
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
-  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/src-tauri/'],
+  // `e2e/` ajouté à la Phase 12 : Jest scanne par défaut tout `*.spec.ts` du dépôt, y compris hors `src/`, et
+  // entrerait sinon en conflit avec les globals de `@playwright/test` (`test`/`expect` distincts de ceux de Jest).
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/src-tauri/', '<rootDir>/e2e/'],
   collectCoverage: false,
   collectCoverageFrom: [
     'src/app/**/*.ts',

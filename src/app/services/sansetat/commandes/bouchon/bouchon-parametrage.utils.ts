@@ -22,9 +22,22 @@
 // interdits en dépendance depuis `services/sansetat/` (cf. commentaire d'en-tête de `donnees-racine-bouchon.ts`) :
 // traversée défensive de type `unknown`, sur le modèle déjà retenu par `BouchonAdministrationUtils`.
 
-/** Réponse brute d'une commande bouchonnée : soit la racine mise à jour, soit un résumé de purge. */
+/**
+ * Réponse brute d'une commande bouchonnée : soit la racine mise à jour, soit un résumé de purge — deux formes
+ * distinctes selon la commande (constat corrigé à l'exécution du test de bout en bout Playwright : ces deux formes
+ * ne coïncident pas, `PrevisualisationPurge` portant `nbAuditsSupprimes`/`nbProjetsConcernes`/`octetsAvant`/
+ * `octetsApres`, consommés tels quels par `SqmPurgeParametrageComponent`, quand `PrevisualisationPurgeJournal` ne
+ * porte que `nbEntreesSupprimees`, consommé par `SqmJournalParametrageComponent`).
+ */
 type ReponseBouchonParametrage =
-  Record<string, unknown> | { readonly nombreAuditsSupprimes: number };
+  | Record<string, unknown>
+  | {
+      readonly nbAuditsSupprimes: number;
+      readonly nbProjetsConcernes: number;
+      readonly octetsAvant: number;
+      readonly octetsApres: number;
+    }
+  | { readonly nbEntreesSupprimees: number };
 
 /**
  * Bouchon TS des quinze commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
@@ -96,8 +109,9 @@ export class BouchonParametrageUtils {
         );
       case 'previsualiser_purge_densite':
       case 'previsualiser_purge_age':
+        return { nbAuditsSupprimes: 0, nbProjetsConcernes: 0, octetsAvant: 0, octetsApres: 0 };
       case 'previsualiser_purge_journal':
-        return { nombreAuditsSupprimes: 0 };
+        return { nbEntreesSupprimees: 0 };
       case 'executer_purge_densite':
       case 'executer_purge_age':
       case 'executer_purge_journal':

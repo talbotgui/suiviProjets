@@ -225,6 +225,27 @@ describe('SqmShellComponent', () => {
     expect(router.url).toBe('/audits/brouillon');
   });
 
+  it('ouvre le Brouillon plutôt que le Tableau de bord une fois la dernière campagne achevée (Phase 12, R12-04)', async () => {
+    // `progressionCampagne` reste non `null` pour le reste de la session une fois une première campagne lancée
+    // (« la campagne en cours ou la dernière campagne exécutée ») : `cibleAudits` doit donc bien vérifier que la
+    // campagne est *encore* en cours (au moins un projet non terminal), pas seulement que `progressionCampagne`
+    // a déjà été renseigné une fois, sous peine de router indéfiniment vers le Tableau de bord d'une campagne déjà
+    // achevée, sans jamais pouvoir rejoindre le Brouillon qui en résulte.
+    donneesApplication.chargerRacine({
+      ...DonneesDeTest.racineVide(),
+      brouillon: DonneesDeTest.brouillonEnAttente(),
+    });
+    etatSession.demarrerProgressionCampagne(['projet-1']);
+    etatSession.mettreAJourProgressionProjet('projet-1', { statut: 'termine' });
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.ouvrirAudits();
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/audits/brouillon');
+  });
+
   it('ouvre la recherche transversale au clic sur le bouton de la barre supérieure', () => {
     const fixture = TestBed.createComponent(SqmShellComponent);
     fixture.detectChanges();

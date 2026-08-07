@@ -326,19 +326,46 @@ export const CONSTAT_SONAR_REPLI: ConstatSonarBouchon = {
 };
 
 /**
- * Constat GitLab de repli, utilisé quand une source inconnue du jeu de données ci-dessus est interrogée, sur le
- * modèle de {@link CONSTAT_SONAR_REPLI}.
+ * Constat GitLab de repli, utilisé quand une source inconnue du jeu de données ci-dessus est interrogée (ex.
+ * projet créé pendant une session de test manuel, ou par le test de bout en bout Playwright de la Phase 12).
+ *
+ * Enrichi à la Phase 12 (décision explicite de l'utilisateur : « le bouchon est enrichi pour permettre à ce test
+ * de passer ») d'un membre déjà qualifiable par anticipation (`mdurand-e2e`, domaine `entreprise-e2e.fr`) et d'un
+ * second membre volontairement laissé inconnu (`kbenali-e2e`, sans domaine reconnu) pour produire une alerte
+ * « membre inconnu » exploitable par le parcours E2E, ainsi que d'une dépendance (`org.exemple:lib-e2e`)
+ * exploitable par une règle de dépendances créée par ce même parcours. Toutes les sources créées par ce test
+ * partagent ce même constat de repli (aucune n'est présente dans {@link CONSTATS_GITLAB_BOUCHON} ci-dessus) :
+ * valeurs volontairement identiques sur les quatre projets, sans conséquence pour un parcours qui ne compare pas
+ * les projets entre eux sur ce point.
  */
 export const CONSTAT_GITLAB_REPLI: ConstatGitlabBouchon = {
   refEffective: 'main',
   shaTete: '00000000',
   dernierCommitLe: '2026-07-01',
   tailleOctets: 1000000,
-  contributeurs: [],
+  contributeurs: [
+    { email: 'mdurand@entreprise-e2e.fr', nom: 'Marie Durand E2E', nombreCommits: 12 },
+    { email: 'kbenali@externe-e2e.fr', nom: 'Karim Benali E2E', nombreCommits: 4 },
+  ],
   mrOuvertes: [],
-  membres: [],
+  membres: [
+    {
+      username: 'mdurand-e2e',
+      nom: 'Marie Durand E2E',
+      niveauAcces: 40,
+      herite: false,
+      emailPublic: 'mdurand@entreprise-e2e.fr',
+    },
+    {
+      username: 'kbenali-e2e',
+      nom: 'Karim Benali E2E',
+      niveauAcces: 40,
+      herite: false,
+      emailPublic: 'kbenali@externe-e2e.fr',
+    },
+  ],
   marqueurs: [],
-  dependances: [],
+  dependances: [{ reference: 'org.exemple:lib-e2e', version: '1.0.0', manifeste: 'pom.xml' }],
   branches: [{ nom: 'main', avecMR: false, dernierCommitLe: '2026-07-01' }],
   branchesAutocompletion: ['main'],
 };

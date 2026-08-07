@@ -1,7 +1,7 @@
 <!-- Interpolation Angular systématique (jamais d'injection HTML dynamique), conformément à
      docs/02_documentation/15_normesSecurite.md. -->
 @if (liste().length > 0) {
-  <div class="notification fixe d-flex direction-colonne ecart-2" aria-live="polite">
+  <div id="notification" class="notification fixe d-flex direction-colonne ecart-2" aria-live="polite">
     @for (notif of liste(); track notif.id) {
       <div
         class="notification__item carte d-flex aligne-centre justifie-espace ecart-3 interieur-x-4 interieur-y-3 texte-sm"
