@@ -2,7 +2,10 @@
   @if (progression(); as progressionActuelle) {
     <header class="tableau-de-bord__entete exterieur-bas-4">
       <h2 class="texte-lg poids-gras exterieur-bas-2 exterieur-haut-0">Campagne en cours</h2>
-      <p class="tableau-de-bord__compteur texte-sm texte-discret exterieur-bas-1 exterieur-haut-0">
+      <p
+        id="tableau-de-bord-compteur"
+        class="tableau-de-bord__compteur texte-sm texte-discret exterieur-bas-1 exterieur-haut-0"
+      >
         {{ nombreProjetsTraites() }} / {{ progressionActuelle.perimetre.length }} projets terminés
       </p>
       @if (tempsRestantEstimeMs(); as tempsRestant) {
@@ -13,6 +16,7 @@
         </p>
       }
       <div
+        id="tableau-de-bord-barre-progression"
         class="tableau-de-bord__barre-progression exterieur-y-2"
         role="progressbar"
         [attr.aria-valuenow]="pourcentage()"
@@ -23,11 +27,17 @@
         ></div>
       </div>
       @if (campagneEnCours()) {
-        <button type="button" class="bouton bouton--danger" (click)="annuler()">
+        <button
+          id="tableau-de-bord-bouton-annuler"
+          type="button"
+          class="bouton bouton--danger"
+          (click)="annuler()"
+        >
           Annuler la campagne
         </button>
       } @else {
         <p
+          id="tableau-de-bord-termine"
           class="tableau-de-bord__termine texte-vert poids-demi-gras exterieur-bas-0 exterieur-haut-0"
         >
           Campagne terminée.
@@ -36,7 +46,7 @@
     </header>
 
     <div class="deborde-auto">
-      <table class="tableau-de-bord__tableau tableau">
+      <table id="tableau-de-bord-tableau" class="tableau-de-bord__tableau tableau">
         <thead>
           <tr>
             <th>Projet</th>

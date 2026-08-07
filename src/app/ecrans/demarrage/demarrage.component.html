@@ -1,6 +1,7 @@
 <div class="demarrage interieur-x-6">
   <div class="demarrage__cartes d-flex ecart-4">
     <form
+      id="demarrage-formulaire-creation"
       class="demarrage__carte carte flex-1 d-flex direction-colonne interieur-5"
       (ngSubmit)="creerFichier()"
     >
@@ -10,7 +11,12 @@
         Démarre un fichier de données vierge, protégé par un mot de passe que vous définissez.
       </p>
 
-      <button type="button" class="bouton" (click)="choisirEmplacementCreation()">
+      <button
+        id="demarrage-bouton-choisir-emplacement-creation"
+        type="button"
+        class="bouton"
+        (click)="choisirEmplacementCreation()"
+      >
         Choisir l'emplacement…
       </button>
       @if (cheminCreation()) {
@@ -24,6 +30,7 @@
       <label class="champ exterieur-haut-3">
         Mot de passe
         <input
+          id="demarrage-champ-mot-de-passe-creation"
           type="password"
           class="champ__controle"
           name="motDePasseCreation"
@@ -35,6 +42,7 @@
       <label class="champ exterieur-haut-3">
         Confirmation du mot de passe
         <input
+          id="demarrage-champ-confirmation-mot-de-passe-creation"
           type="password"
           class="champ__controle"
           name="confirmationMotDePasseCreation"
@@ -46,6 +54,7 @@
 
       @if (messageErreurCreation()) {
         <p
+          id="demarrage-message-erreur-creation"
           class="demarrage__erreur texte-rouge texte-xs exterieur-haut-2 exterieur-bas-0"
           role="alert"
         >
@@ -54,6 +63,7 @@
       }
 
       <button
+        id="demarrage-bouton-creer-fichier"
         type="submit"
         class="bouton bouton--principal exterieur-haut-4"
         [disabled]="creationEnCours()"

@@ -42,7 +42,10 @@
       (input)="onChangerRecherche(champRecherche.value)"
     />
 
-    <span class="synthese-audits__compteur exterieur-gauche-auto texte-xs texte-discret">
+    <span
+      id="synthese-audits-compteur"
+      class="synthese-audits__compteur exterieur-gauche-auto texte-xs texte-discret"
+    >
       {{ compteurProjets() }} projet{{ compteurProjets() > 1 ? 's' : '' }}
     </span>
 

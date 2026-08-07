@@ -156,7 +156,10 @@
                 class="fiche-projet__bloc-sonar d-flex direction-colonne ecart-2"
                 [class.fiche-projet__bloc-sonar--grise]="donnees.sonarKo"
               >
-                <div class="fiche-projet__ligne-indicateur d-flex aligne-centre ecart-2">
+                <div
+                  id="fiche-projet-couverture"
+                  class="fiche-projet__ligne-indicateur d-flex aligne-centre ecart-2"
+                >
                   <span>Couverture</span>
                   @if (donnees.couverture; as couverture) {
                     @if (couverture.couleur; as couleur) {
@@ -468,6 +471,7 @@
         <!-- Actions : Comparaison entre deux audits (US-018, Phase 6 incrément 6), export PNG. -->
         <div class="fiche-projet__actions d-flex ecart-2">
           <a
+            id="fiche-projet-lien-comparer"
             class="fiche-projet__action bouton bouton--marque"
             [routerLink]="'/comparaison-audits/' + donnees.projetId"
           >

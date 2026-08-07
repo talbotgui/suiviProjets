@@ -14,7 +14,13 @@
   </label>
 
   <div class="selecteur-vue__actions">
-    <button type="button" (click)="ouvrirFormulaireEnregistrement()">Enregistrer sous...</button>
+    <button
+      id="selecteur-vue-bouton-enregistrer-sous"
+      type="button"
+      (click)="ouvrirFormulaireEnregistrement()"
+    >
+      Enregistrer sous...
+    </button>
     @if (vueSelectionnee(); as vue) {
       <button type="button" (click)="mettreAJourVueSelectionnee()">
         Mettre à jour « {{ vue.nom }} »
@@ -28,6 +34,7 @@
       <label>
         Nom de la vue
         <input
+          id="selecteur-vue-champ-nom"
           type="text"
           name="nomVue"
           required
@@ -46,7 +53,7 @@
       </label>
       <div class="selecteur-vue__actions">
         <button type="button" (click)="annulerFormulaireEnregistrement()">Annuler</button>
-        <button type="submit">Enregistrer</button>
+        <button id="selecteur-vue-bouton-enregistrer" type="submit">Enregistrer</button>
       </div>
     </form>
   }

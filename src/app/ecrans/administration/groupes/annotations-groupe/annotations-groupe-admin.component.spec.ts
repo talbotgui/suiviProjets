@@ -9,7 +9,7 @@ import { NotificationService } from '../../../../services/avecetat/etat/notifica
 import type { Annotation, DonneesRacine } from '../../../../services/avecetat/etat/types-donnees';
 import { SqmAnnotationsGroupeAdminComponent } from './annotations-groupe-admin.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
 

@@ -11,8 +11,16 @@
     <!-- Bouton de validation jamais pré-sélectionné par défaut (charte d'ergonomie, Modale de confirmation) :
          aucun `autofocus` ici, l'ordre de tabulation naturel place le focus initial sur « Annuler ». -->
     <div class="confirmation-suppression__actions d-flex justifie-fin ecart-2">
-      <button type="button" class="bouton" (click)="annuler()">Annuler</button>
       <button
+        id="confirmation-suppression-bouton-annuler"
+        type="button"
+        class="bouton"
+        (click)="annuler()"
+      >
+        Annuler
+      </button>
+      <button
+        id="confirmation-suppression-bouton-confirmer"
         type="button"
         class="confirmation-suppression__bouton-danger bouton bouton--danger"
         (click)="confirmer()"

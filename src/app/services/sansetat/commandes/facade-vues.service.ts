@@ -14,9 +14,14 @@
 // le commentaire d'en-tête de `facade-administration.service.ts`. `DonneesApplicationService` (Store,
 // `services/avecetat/etat/`) instancie ces paramètres de type avec ses propres types concrets à chaque appel, sans
 // jamais invoquer `invoke` lui-même : ce service en est la seule frontière pour ces deux commandes.
+//
+// Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis la Phase 12 : point de
+// passage unique permettant le bouchon TS des commandes ci-dessous hors contexte Tauri (`ng serve`), sur le modèle
+// déjà appliqué à `FacadeAdministrationService`/`FacadeParametrageService`/`FacadeAlertesService` (cf.
+// `invocation-commande.utils.ts` et `bouchon/bouchon-vues.utils.ts`) — corrige un écart constaté à cette phase : ce
+// service appelait `invoke` directement jusqu'ici, en échec systématique hors contexte Tauri.
 import { Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
-import { IndicateurChargementUtils } from './indicateur-chargement.utils';
+import { InvocationCommandeUtils } from './invocation-commande.utils';
 
 /**
  * Paramètres transmis à la commande native `definirVue` (US-028), génériques sur le type concret de la racine
@@ -73,7 +78,7 @@ export class FacadeVuesService {
   public async definirVue<TDonnees, TReponse>(
     parametres: ParametresDefinitionVue<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_vue', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_vue', { ...parametres });
   }
 
   /**
@@ -84,6 +89,6 @@ export class FacadeVuesService {
   public async supprimerVue<TDonnees, TReponse>(
     parametres: ParametresSuppressionVue<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('supprimer_vue', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_vue', { ...parametres });
   }
 }

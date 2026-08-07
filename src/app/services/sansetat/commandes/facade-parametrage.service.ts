@@ -18,9 +18,14 @@
 // d'en-tête de `facade-administration.service.ts`. `DonneesApplicationService` (Store, `services/avecetat/etat/`)
 // instancie ces paramètres de type avec ses propres types concrets à chaque appel, sans jamais invoquer `invoke`
 // lui-même : ce service en est la seule frontière pour ces commandes.
+//
+// Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis la Phase 12 : point de
+// passage unique permettant le bouchon TS des commandes ci-dessous hors contexte Tauri (`ng serve`), sur le modèle
+// déjà appliqué à `FacadeAdministrationService`/`FacadeCommandesService`/`FacadeFichierService` (cf.
+// `invocation-commande.utils.ts` et `bouchon/bouchon-parametrage.utils.ts`) — corrige un écart constaté à cette
+// phase : ce service appelait `invoke` directement jusqu'ici, en échec systématique hors contexte Tauri.
 import { Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
-import { IndicateurChargementUtils } from './indicateur-chargement.utils';
+import { InvocationCommandeUtils } from './invocation-commande.utils';
 
 /**
  * Paramètres transmis à la commande native `definirSeuil` (US-033), génériques sur le type concret de la racine
@@ -246,7 +251,7 @@ export class FacadeParametrageService {
   public async definirSeuil<TDonnees, TReponse>(
     parametres: ParametresDefinitionSeuil<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_seuil', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_seuil', { ...parametres });
   }
 
   /**
@@ -258,7 +263,7 @@ export class FacadeParametrageService {
   public async definirReferentiel<TDonnees, TReponse>(
     parametres: ParametresDefinitionReferentiel<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_referentiel', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_referentiel', { ...parametres });
   }
 
   /**
@@ -269,7 +274,9 @@ export class FacadeParametrageService {
   public async previsualiserPurgeDensite<TDonnees, TReponse>(
     parametres: ParametresPrevisualisationPurgeDensite<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('previsualiser_purge_densite', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('previsualiser_purge_densite', {
+      ...parametres,
+    });
   }
 
   /**
@@ -280,7 +287,7 @@ export class FacadeParametrageService {
   public async executerPurgeDensite<TDonnees, TReponse>(
     parametres: ParametresExecutionPurgeDensite<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('executer_purge_densite', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('executer_purge_densite', { ...parametres });
   }
 
   /**
@@ -291,7 +298,7 @@ export class FacadeParametrageService {
   public async previsualiserPurgeAge<TDonnees, TReponse>(
     parametres: ParametresPrevisualisationPurgeAge<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('previsualiser_purge_age', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('previsualiser_purge_age', { ...parametres });
   }
 
   /**
@@ -302,7 +309,7 @@ export class FacadeParametrageService {
   public async executerPurgeAge<TDonnees, TReponse>(
     parametres: ParametresExecutionPurgeAge<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('executer_purge_age', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('executer_purge_age', { ...parametres });
   }
 
   /**
@@ -314,7 +321,9 @@ export class FacadeParametrageService {
   public async supprimerRegleDependance<TDonnees, TReponse>(
     parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('supprimer_regle_dependance', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_regle_dependance', {
+      ...parametres,
+    });
   }
 
   /**
@@ -326,7 +335,9 @@ export class FacadeParametrageService {
   public async supprimerRegleMarqueurIA<TDonnees, TReponse>(
     parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('supprimer_regle_marqueur_ia', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_regle_marqueur_ia', {
+      ...parametres,
+    });
   }
 
   /**
@@ -338,7 +349,7 @@ export class FacadeParametrageService {
   public async definirVerrouillage<TDonnees, TReponse>(
     parametres: ParametresDefinitionVerrouillage<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_verrouillage', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_verrouillage', { ...parametres });
   }
 
   /**
@@ -350,7 +361,9 @@ export class FacadeParametrageService {
   public async definirConcurrenceAudit<TDonnees, TReponse>(
     parametres: ParametresDefinitionConcurrenceAudit<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_concurrence_audit', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_concurrence_audit', {
+      ...parametres,
+    });
   }
 
   /**
@@ -362,7 +375,7 @@ export class FacadeParametrageService {
   public async definirProxy<TDonnees, TReponse>(
     parametres: ParametresDefinitionProxy<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_proxy', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_proxy', { ...parametres });
   }
 
   /**
@@ -374,7 +387,9 @@ export class FacadeParametrageService {
   public async definirNombreSauvegardesSecurite<TDonnees, TReponse>(
     parametres: ParametresDefinitionNombreSauvegardesSecurite<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_nombre_sauvegardes_securite', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_nombre_sauvegardes_securite', {
+      ...parametres,
+    });
   }
 
   /**
@@ -386,7 +401,9 @@ export class FacadeParametrageService {
   public async definirSeuilAvertissementTaille<TDonnees, TReponse>(
     parametres: ParametresDefinitionSeuilAvertissementTaille<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('definir_seuil_avertissement_taille', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_seuil_avertissement_taille', {
+      ...parametres,
+    });
   }
 
   /**
@@ -398,7 +415,9 @@ export class FacadeParametrageService {
   public async previsualiserPurgeJournal<TDonnees, TReponse>(
     parametres: ParametresPrevisualisationPurgeJournal<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('previsualiser_purge_journal', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('previsualiser_purge_journal', {
+      ...parametres,
+    });
   }
 
   /**
@@ -410,6 +429,6 @@ export class FacadeParametrageService {
   public async executerPurgeJournal<TDonnees, TReponse>(
     parametres: ParametresExecutionPurgeJournal<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('executer_purge_journal', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('executer_purge_journal', { ...parametres });
   }
 }

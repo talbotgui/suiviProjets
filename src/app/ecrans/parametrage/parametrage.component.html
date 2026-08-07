@@ -3,6 +3,7 @@
 
   <nav class="parametrage__onglets d-flex retour-ligne ecart-2 exterieur-bas-5">
     <button
+      id="parametrage-onglet-seuils-referentiels"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'seuilsReferentiels'"
@@ -11,6 +12,7 @@
       Seuils et référentiels
     </button>
     <button
+      id="parametrage-onglet-journal"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'journal'"
@@ -19,6 +21,7 @@
       Journal des modifications
     </button>
     <button
+      id="parametrage-onglet-purge"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'purge'"
@@ -27,6 +30,7 @@
       Purge des audits
     </button>
     <button
+      id="parametrage-onglet-export-import"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
       [class.parametrage__onglet--actif]="ongletActif === 'exportImport'"

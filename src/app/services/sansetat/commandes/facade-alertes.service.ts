@@ -15,9 +15,14 @@
 // d'en-tête de `facade-administration.service.ts`. `DonneesApplicationService` (Store, `services/avecetat/etat/`)
 // instancie ces paramètres de type avec ses propres types concrets à chaque appel, sans jamais invoquer `invoke`
 // lui-même : ce service en est la seule frontière pour ces deux commandes.
+//
+// Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis la Phase 12 : point de
+// passage unique permettant le bouchon TS des commandes ci-dessous hors contexte Tauri (`ng serve`), sur le modèle
+// déjà appliqué à `FacadeAdministrationService`/`FacadeParametrageService` (cf. `invocation-commande.utils.ts` et
+// `bouchon/bouchon-alertes.utils.ts`) — corrige un écart constaté à cette phase : ce service appelait `invoke`
+// directement jusqu'ici, en échec systématique hors contexte Tauri.
 import { Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
-import { IndicateurChargementUtils } from './indicateur-chargement.utils';
+import { InvocationCommandeUtils } from './invocation-commande.utils';
 
 /**
  * Paramètres transmis à la commande native `creerAnnotation` (US-019), génériques sur le type concret de la racine
@@ -99,7 +104,7 @@ export class FacadeAlertesService {
   public async creerAnnotation<TDonnees, TReponse>(
     parametres: ParametresCreationAnnotation<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('creer_annotation', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('creer_annotation', { ...parametres });
   }
 
   /**
@@ -111,7 +116,7 @@ export class FacadeAlertesService {
   public async supprimerAnnotation<TDonnees, TReponse>(
     parametres: ParametresSuppressionAnnotation<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('supprimer_annotation', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_annotation', { ...parametres });
   }
 
   /**
@@ -122,6 +127,6 @@ export class FacadeAlertesService {
   public async qualifierAlerte<TDonnees, TReponse>(
     parametres: ParametresQualificationAlerte<TDonnees>,
   ): Promise<TReponse> {
-    return IndicateurChargementUtils.envelopper(() => invoke<TReponse>('qualifier_alerte', { ...parametres }));
+    return InvocationCommandeUtils.invoquer<TReponse>('qualifier_alerte', { ...parametres });
   }
 }

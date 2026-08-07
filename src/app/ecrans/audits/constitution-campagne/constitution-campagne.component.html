@@ -20,6 +20,7 @@
     >
       <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input
+          id="constitution-campagne-case-tout-selectionner"
           type="checkbox"
           [checked]="estToutSelectionne()"
           [indeterminate]="estPartiellementSelectionne()"
@@ -92,6 +93,7 @@
     </section>
 
     <button
+      id="constitution-campagne-bouton-lancer"
       type="button"
       class="bouton bouton--principal"
       [disabled]="selectionProjetIds.size === 0"

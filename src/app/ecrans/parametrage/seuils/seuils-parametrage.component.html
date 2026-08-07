@@ -22,6 +22,7 @@
         <label class="champ">
           Jours sans commit avant « mort »
           <input
+            id="seuils-parametrage-champ-vitalite-mort-jours"
             type="number"
             class="champ__controle"
             name="vitaliteMortJours"
@@ -237,6 +238,7 @@
           >{{ nombreDeModifications() }} seuil(s) modifié(s)</span
         >
         <button
+          id="seuils-parametrage-bouton-enregistrer"
           type="submit"
           class="bouton bouton--principal"
           [disabled]="enCours || nombreDeModifications() === 0"

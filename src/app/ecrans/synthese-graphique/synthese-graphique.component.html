@@ -53,7 +53,12 @@
   <fieldset class="synthese-graphique__projets carte interieur-4">
     <legend class="d-block poids-gras texte-sm exterieur-bas-2">Projets</legend>
     <div class="synthese-graphique__projets-actions d-flex ecart-2 exterieur-bas-2">
-      <button type="button" class="bouton bouton--discret" (click)="toutSelectionner()">
+      <button
+        id="synthese-graphique-bouton-tout-selectionner"
+        type="button"
+        class="bouton bouton--discret"
+        (click)="toutSelectionner()"
+      >
         Tout sélectionner
       </button>
       <button type="button" class="bouton bouton--discret" (click)="toutDeselectionner()">

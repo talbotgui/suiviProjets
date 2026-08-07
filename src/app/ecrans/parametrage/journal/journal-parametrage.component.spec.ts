@@ -9,7 +9,7 @@ import { EtatSessionService } from '../../../services/avecetat/etat/etat-session
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmJournalParametrageComponent } from './journal-parametrage.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
 

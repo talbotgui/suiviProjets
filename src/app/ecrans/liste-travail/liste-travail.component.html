@@ -63,7 +63,12 @@
     >
       <header class="liste-travail__panneau-entete d-flex aligne-centre justifie-espace">
         <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">{{ alerte.libelle }}</h2>
-        <button type="button" class="bouton bouton--discret" (click)="fermerPanneau()">
+        <button
+          id="liste-travail-bouton-fermer-panneau"
+          type="button"
+          class="bouton bouton--discret"
+          (click)="fermerPanneau()"
+        >
           Fermer
         </button>
       </header>
@@ -74,17 +79,35 @@
 
       <label class="liste-travail__commentaire champ">
         Commentaire
-        <textarea class="champ__controle" [(ngModel)]="commentaire" rows="2"></textarea>
+        <textarea
+          id="liste-travail-champ-commentaire"
+          class="champ__controle"
+          [(ngModel)]="commentaire"
+          rows="2"
+        ></textarea>
       </label>
 
       <div class="liste-travail__panneau-actions d-flex retour-ligne ecart-2">
-        <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirFicheProjet()">
+        <button
+          id="liste-travail-bouton-ouvrir-fiche-projet"
+          type="button"
+          class="bouton"
+          [disabled]="enCours"
+          (click)="ouvrirFicheProjet()"
+        >
           Ouvrir la fiche projet
         </button>
-        <button type="button" class="bouton" [disabled]="enCours" (click)="demanderMarquerVu()">
+        <button
+          id="liste-travail-bouton-marquer-vue"
+          type="button"
+          class="bouton"
+          [disabled]="enCours"
+          (click)="demanderMarquerVu()"
+        >
           Marquer vue
         </button>
         <button
+          id="liste-travail-bouton-marquer-traitee"
           type="button"
           class="bouton bouton--principal"
           [disabled]="enCours"

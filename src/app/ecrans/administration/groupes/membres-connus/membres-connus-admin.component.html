@@ -2,6 +2,7 @@
   <label class="membres-connus-admin__selecteur-groupe champ exterieur-bas-4">
     Groupe
     <select
+      id="membres-connus-admin-champ-groupe"
       class="champ__controle"
       [ngModel]="groupeSelectionneId"
       (ngModelChange)="selectionnerGroupe($event)"
@@ -24,12 +25,21 @@
       class="membres-connus-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
     >
       <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Membres connus</h2>
-      <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirCreation()">
+      <button
+        id="membres-connus-admin-bouton-creer"
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirCreation()"
+      >
         Créer une règle
       </button>
     </header>
 
-    <ul class="membres-connus-admin__liste sans-liste d-flex direction-colonne ecart-2">
+    <ul
+      id="membres-connus-admin-liste"
+      class="membres-connus-admin__liste sans-liste d-flex direction-colonne ecart-2"
+    >
       @for (regle of membresConnus(); track regle.id) {
         <li
           class="membres-connus-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
@@ -113,6 +123,7 @@
         <label class="champ">
           Critère
           <input
+            id="membres-connus-admin-champ-critere"
             type="text"
             class="champ__controle"
             name="critere"
@@ -123,7 +134,12 @@
 
         <label class="champ">
           Type de critère
-          <select class="champ__controle" name="typeCritere" [(ngModel)]="typeCritere">
+          <select
+            id="membres-connus-admin-champ-type-critere"
+            class="champ__controle"
+            name="typeCritere"
+            [(ngModel)]="typeCritere"
+          >
             @for (type of typesCritere; track type) {
               <option [ngValue]="type">{{ type }}</option>
             }
@@ -132,7 +148,12 @@
 
         <label class="champ">
           Statut
-          <select class="champ__controle" name="statut" [(ngModel)]="statut">
+          <select
+            id="membres-connus-admin-champ-statut"
+            class="champ__controle"
+            name="statut"
+            [(ngModel)]="statut"
+          >
             @for (statutPropose of statuts; track statutPropose) {
               <option [ngValue]="statutPropose">{{ statutPropose }}</option>
             }
@@ -141,17 +162,41 @@
 
         <label class="champ">
           Libellé
-          <input type="text" class="champ__controle" name="libelle" [(ngModel)]="libelle" />
+          <input
+            id="membres-connus-admin-champ-libelle"
+            type="text"
+            class="champ__controle"
+            name="libelle"
+            [(ngModel)]="libelle"
+          />
         </label>
 
         <label class="champ">
           Alias courriel
-          <input type="text" class="champ__controle" name="aliasEmail" [(ngModel)]="aliasEmail" />
+          <input
+            id="membres-connus-admin-champ-alias-email"
+            type="text"
+            class="champ__controle"
+            name="aliasEmail"
+            [(ngModel)]="aliasEmail"
+          />
         </label>
 
         <div class="membres-connus-admin__actions-formulaire d-flex justifie-fin ecart-2">
-          <button type="button" class="bouton" (click)="fermerFormulaire()">Annuler</button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button
+            id="membres-connus-admin-bouton-annuler"
+            type="button"
+            class="bouton"
+            (click)="fermerFormulaire()"
+          >
+            Annuler
+          </button>
+          <button
+            id="membres-connus-admin-bouton-enregistrer"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours"
+          >
             Enregistrer
           </button>
         </div>

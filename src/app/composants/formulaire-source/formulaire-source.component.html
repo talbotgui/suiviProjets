@@ -6,6 +6,7 @@
   <label class="champ">
     Type
     <select
+      id="formulaire-source-champ-type"
       class="champ__controle"
       [ngModel]="type()"
       (ngModelChange)="changerType($event)"
@@ -20,6 +21,7 @@
   <label class="champ">
     Instance
     <select
+      id="formulaire-source-champ-instance"
       class="champ__controle"
       name="instanceId"
       [ngModel]="instanceId()"
@@ -42,6 +44,7 @@
   <label class="champ">
     Identifiant externe
     <input
+      id="formulaire-source-champ-id-externe"
       type="text"
       class="champ__controle"
       name="idExterne"
@@ -65,6 +68,7 @@
     <label class="champ">
       Ref auditée (branche, tag ou SHA)
       <input
+        id="formulaire-source-champ-ref-auditee"
         type="text"
         class="champ__controle"
         name="refAuditee"
@@ -91,8 +95,21 @@
     <ng-container [ngTemplateOutlet]="champs" />
 
     <div class="formulaire-source__actions d-flex justifie-fin ecart-2">
-      <button type="button" class="bouton" (click)="annuler()">Annuler</button>
-      <button type="submit" class="bouton bouton--principal">Enregistrer</button>
+      <button
+        id="formulaire-source-bouton-annuler"
+        type="button"
+        class="bouton"
+        (click)="annuler()"
+      >
+        Annuler
+      </button>
+      <button
+        id="formulaire-source-bouton-enregistrer"
+        type="submit"
+        class="bouton bouton--principal"
+      >
+        Enregistrer
+      </button>
     </div>
   </form>
 } @else {

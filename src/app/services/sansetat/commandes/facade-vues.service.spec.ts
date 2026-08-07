@@ -1,18 +1,23 @@
 // Test du client typé de la Façade de commandes dédié à la Phase 9, incrément 1 (cf. facade-vues.service.ts),
 // généré avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { FacadeVuesService } from './facade-vues.service';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+// `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
+// le modèle de `facade-administration.service.spec.ts` (Phase 12 : ce service route désormais via
+// `InvocationCommandeUtils` plutôt que d'appeler `invoke` directement).
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 const invokeSimule = jest.mocked(invoke);
+const isTauriSimule = jest.mocked(isTauri);
 
 describe('FacadeVuesService', () => {
   let service: FacadeVuesService;
 
   beforeEach(() => {
     invokeSimule.mockReset();
+    isTauriSimule.mockReturnValue(true);
     TestBed.configureTestingModule({});
     service = TestBed.inject(FacadeVuesService);
   });

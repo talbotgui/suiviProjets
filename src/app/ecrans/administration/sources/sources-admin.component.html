@@ -3,6 +3,7 @@
     <label class="champ">
       Groupe
       <select
+        id="sources-admin-champ-groupe"
         class="champ__controle"
         [ngModel]="groupeSelectionneId"
         (ngModelChange)="selectionnerGroupe($event)"
@@ -20,6 +21,7 @@
       <label class="champ">
         Projet
         <select
+          id="sources-admin-champ-projet"
           class="champ__controle"
           [ngModel]="projetSelectionneId"
           (ngModelChange)="selectionnerProjet($event)"
@@ -44,10 +46,20 @@
       class="sources-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
     >
       <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Sources</h2>
-      <button type="button" class="bouton" (click)="ouvrirCreation()">Créer une source</button>
+      <button
+        id="sources-admin-bouton-creer"
+        type="button"
+        class="bouton"
+        (click)="ouvrirCreation()"
+      >
+        Créer une source
+      </button>
     </header>
 
-    <ul class="sources-admin__liste sans-liste d-flex direction-colonne ecart-2">
+    <ul
+      id="sources-admin-liste"
+      class="sources-admin__liste sans-liste d-flex direction-colonne ecart-2"
+    >
       @for (source of sources(); track source.id) {
         <li
           class="sources-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"

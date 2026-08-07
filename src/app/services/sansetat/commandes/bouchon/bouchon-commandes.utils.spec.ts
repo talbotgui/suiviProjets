@@ -8,7 +8,15 @@ const ID_EXTERNE_GITLAB_CONNU = '1234';
 const ID_EXTERNE_SONAR_CONNU = 'entreprise:api-facturation';
 
 describe('BouchonCommandesUtils', () => {
+  // Timers simulés à avancement automatique (Phase 12, sur le modèle déjà retenu pour R10-10) : le délai
+  // artificiel désormais appliqué aux commandes d'interrogation d'audit (`DELAI_INTERROGATION_AUDIT_MS`) ne doit
+  // pas ralentir la suite de tests d'un délai réel à chaque appel concerné.
+  beforeEach(() => {
+    jest.useFakeTimers({ advanceTimers: true });
+  });
+
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 

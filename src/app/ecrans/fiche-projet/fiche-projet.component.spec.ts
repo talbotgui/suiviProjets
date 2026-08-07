@@ -24,7 +24,7 @@ import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmFicheProjetComponent } from './fiche-projet.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 jest.mock('html-to-image', () => ({ toPng: jest.fn() }));
 
 /**

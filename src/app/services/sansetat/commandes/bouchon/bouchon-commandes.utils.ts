@@ -13,6 +13,16 @@
 //
 // Évolution du 2026-08-02 (US-008, RG-036) : `lister_sources_disponibles`, résolue par `instance.id` depuis
 // `SOURCES_DISPONIBLES_PAR_INSTANCE` (`donnees-bouchon.ts`), triée par libellé insensible à la casse.
+//
+// Évolution de la Phase 12 : les commandes d'interrogation GitLab/Sonar d'une campagne d'audit (constantes de
+// {@link COMMANDES_INTERROGATION_AUDIT} ci-dessous) sont désormais résolues après un délai artificiel fixe
+// ({@link DELAI_INTERROGATION_AUDIT_MS}, jamais aléatoire), plutôt qu'instantanément comme jusqu'ici — décision
+// explicite de l'utilisateur, pour se rapprocher d'un comportement réel et permettre au test de bout en bout
+// Playwright d'exercer effectivement l'indicateur de chargement transverse (`IndicateurChargementUtils`) et la
+// progression affichée par l'écran Tableau de bord d'exécution, plutôt qu'une résolution instantanée qui masquerait
+// ces comportements. `tester_connectivite`, `lister_sources_disponibles`, `interroger_branches` (autocomplétion)
+// et `interroger_derniere_analyse` restent instantanées, hors du périmètre de cette demande (pas des commandes
+// d'audit d'une campagne).
 import type {
   Branche,
   Dependance,
@@ -44,6 +54,34 @@ import {
 
 /** Amplitude de l'aléatoire appliqué aux résultats Sonar (± 10 % des valeurs continues), cf. en-tête ci-dessus. */
 const AMPLITUDE_ALEATOIRE_SONAR = 0.1;
+
+/**
+ * Délai artificiel fixe (jamais aléatoire) appliqué aux commandes d'interrogation GitLab/Sonar d'audit d'une
+ * campagne, cf. en-tête ci-dessus. Valeur choisie pour rester perceptible (indicateur de chargement, progression)
+ * sans allonger excessivement la durée totale du test de bout en bout Playwright, qui interroge un grand nombre de
+ * sources au fil de son parcours en 25 étapes ; à ajuster si l'expérience montre une durée totale impraticable.
+ */
+const DELAI_INTERROGATION_AUDIT_MS = 800;
+
+/**
+ * Commandes d'interrogation GitLab/Sonar d'une campagne d'audit auxquelles {@link DELAI_INTERROGATION_AUDIT_MS}
+ * s'applique, cf. en-tête ci-dessus.
+ */
+const COMMANDES_INTERROGATION_AUDIT: ReadonlySet<string> = new Set([
+  'interroger_vitalite',
+  'interroger_taille_depot',
+  'interroger_contributeurs',
+  'interroger_merge_requests',
+  'interroger_membres',
+  'interroger_branches_completes',
+  'interroger_dependances',
+  'interroger_marqueurs_ia',
+  'interroger_violations',
+  'interroger_dette',
+  'interroger_couverture',
+  'interroger_notes',
+  'interroger_ncloc',
+]);
 
 /**
  * Union de toutes les réponses brutes que peut produire ce bouchon, une par commande couverte. Sert uniquement à
@@ -120,14 +158,17 @@ export class BouchonCommandesUtils {
     commande: string,
     parametres: Readonly<Record<string, unknown>>,
   ): Promise<TReponse>;
-  public static invoquer(
+  public static async invoquer(
     commande: string,
     parametres: Readonly<Record<string, unknown>>,
   ): Promise<ReponseBouchon> {
+    if (COMMANDES_INTERROGATION_AUDIT.has(commande)) {
+      await new Promise((resoudre) => setTimeout(resoudre, DELAI_INTERROGATION_AUDIT_MS));
+    }
     try {
-      return Promise.resolve(BouchonCommandesUtils.resoudre(commande, parametres));
+      return BouchonCommandesUtils.resoudre(commande, parametres);
     } catch (erreur: unknown) {
-      return Promise.reject(erreur instanceof Error ? erreur : new Error(String(erreur)));
+      throw erreur instanceof Error ? erreur : new Error(String(erreur));
     }
   }
 

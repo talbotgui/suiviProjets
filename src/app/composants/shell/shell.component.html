@@ -26,6 +26,7 @@
     </div>
 
     <a
+      id="shell-lien-accueil"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/accueil"
       routerLinkActive="shell__lien--actif"
@@ -37,6 +38,7 @@
     </a>
 
     <a
+      id="shell-lien-synthese-audits"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/synthese-audits"
       routerLinkActive="shell__lien--actif"
@@ -48,6 +50,7 @@
     </a>
 
     <a
+      id="shell-lien-synthese-graphique"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/synthese-graphique"
       routerLinkActive="shell__lien--actif"
@@ -59,6 +62,7 @@
     </a>
 
     <a
+      id="shell-lien-liste-travail"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/liste-travail"
       routerLinkActive="shell__lien--actif"
@@ -70,6 +74,7 @@
     </a>
 
     <button
+      id="shell-lien-audits"
       type="button"
       class="shell__lien shell__lien--bouton d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       [class.shell__lien--actif]="auditsActif()"
@@ -81,6 +86,7 @@
     </button>
 
     <a
+      id="shell-lien-administration"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/administration"
       routerLinkActive="shell__lien--actif"
@@ -92,6 +98,7 @@
     </a>
 
     <a
+      id="shell-lien-parametrage"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
       routerLink="/parametrage"
       routerLinkActive="shell__lien--actif"
@@ -128,6 +135,7 @@
           statutSauvegarde()
         }}</span>
         <button
+          id="shell-bouton-recherche"
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Recherche transversale (Ctrl+K)"
@@ -137,6 +145,7 @@
           <span>Recherche</span>
         </button>
         <button
+          id="shell-bouton-credentials"
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Gestion des credentials"
@@ -146,6 +155,7 @@
           <span>Credentials</span>
         </button>
         <button
+          id="shell-bouton-sauvegarder"
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Sauvegarder"
@@ -155,6 +165,7 @@
           <span>Sauvegarder</span>
         </button>
         <button
+          id="shell-bouton-verrouiller"
           type="button"
           class="bouton bouton--discret rayon-md"
           title="Verrouillage manuel"

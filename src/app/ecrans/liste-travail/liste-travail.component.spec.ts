@@ -21,7 +21,7 @@ import type { MembreGitlab } from '../../services/sansetat/commandes/types-facad
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmListeTravailComponent } from './liste-travail.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction

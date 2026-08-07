@@ -15,7 +15,13 @@
         <input type="checkbox" [checked]="estToutSelectionne()" (change)="basculerTout()" />
         Tout sélectionner
       </label>
-      <button type="button" class="bouton" [disabled]="enCours" (click)="demanderIntegrerTout()">
+      <button
+        id="brouillon-bouton-integrer-tout"
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="demanderIntegrerTout()"
+      >
         Intégrer tout
       </button>
       <button
@@ -44,7 +50,7 @@
       </button>
     </div>
 
-    <ul class="brouillon__projets sans-liste">
+    <ul id="brouillon-liste-projets" class="brouillon__projets sans-liste">
       @for (entree of entrees(); track entree.projetId) {
         <li class="brouillon__projet carte interieur-4 exterieur-bas-3">
           <label class="brouillon__projet-entete poids-gras d-flex aligne-centre ecart-2">

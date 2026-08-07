@@ -2,6 +2,7 @@
   <label class="annotations-groupe-admin__selecteur-groupe champ exterieur-bas-4">
     Groupe
     <select
+      id="annotations-groupe-admin-champ-groupe"
       class="champ__controle"
       [ngModel]="groupeSelectionneId"
       (ngModelChange)="selectionnerGroupe($event)"
@@ -24,12 +25,21 @@
       class="annotations-groupe-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
     >
       <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Annotations</h2>
-      <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirCreation()">
+      <button
+        id="annotations-groupe-admin-bouton-creer"
+        type="button"
+        class="bouton"
+        [disabled]="enCours"
+        (click)="ouvrirCreation()"
+      >
         Créer une annotation
       </button>
     </header>
 
-    <ul class="annotations-groupe-admin__liste sans-liste d-flex direction-colonne ecart-2">
+    <ul
+      id="annotations-groupe-admin-liste"
+      class="annotations-groupe-admin__liste sans-liste d-flex direction-colonne ecart-2"
+    >
       @for (annotation of annotations(); track annotation.id) {
         <li
           class="annotations-groupe-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
@@ -100,12 +110,20 @@
 
         <label class="champ">
           Date
-          <input type="date" class="champ__controle" name="date" [(ngModel)]="date" required />
+          <input
+            id="annotations-groupe-admin-champ-date"
+            type="date"
+            class="champ__controle"
+            name="date"
+            [(ngModel)]="date"
+            required
+          />
         </label>
 
         <label class="champ">
           Libellé
           <input
+            id="annotations-groupe-admin-champ-libelle"
             type="text"
             class="champ__controle"
             name="libelle"
@@ -116,12 +134,19 @@
 
         <label class="champ">
           Catégorie
-          <input type="text" class="champ__controle" name="categorie" [(ngModel)]="categorie" />
+          <input
+            id="annotations-groupe-admin-champ-categorie"
+            type="text"
+            class="champ__controle"
+            name="categorie"
+            [(ngModel)]="categorie"
+          />
         </label>
 
         <label class="champ">
           Description
           <textarea
+            id="annotations-groupe-admin-champ-description"
             class="champ__controle"
             name="description"
             rows="3"
@@ -130,8 +155,20 @@
         </label>
 
         <div class="annotations-groupe-admin__actions-formulaire d-flex justifie-fin ecart-2">
-          <button type="button" class="bouton" (click)="fermerFormulaire()">Annuler</button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button
+            id="annotations-groupe-admin-bouton-annuler"
+            type="button"
+            class="bouton"
+            (click)="fermerFormulaire()"
+          >
+            Annuler
+          </button>
+          <button
+            id="annotations-groupe-admin-bouton-enregistrer"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours"
+          >
             Enregistrer
           </button>
         </div>

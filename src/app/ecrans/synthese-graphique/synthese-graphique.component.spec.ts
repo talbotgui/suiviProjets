@@ -19,7 +19,7 @@ import type {
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmSyntheseGraphiqueComponent } from './synthese-graphique.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 jest.mock('html-to-image', () => ({ toPng: jest.fn() }));
 
 /**

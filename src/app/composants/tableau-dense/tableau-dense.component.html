@@ -72,8 +72,9 @@
       }
     </thead>
     <tbody>
-      @for (ligne of lignesAffichees(); track identifiant()(ligne)) {
+      @for (ligne of lignesAffichees(); track identifiant()(ligne); let i = $index) {
         <tr
+          [id]="'tableau-dense-ligne-' + i"
           class="tableau-dense__ligne"
           [class.tableau-dense__ligne--grisee]="estLigneGrisee(ligne)"
           [class.tableau-dense__ligne--desactivee]="estLigneDesactivee(ligne)"

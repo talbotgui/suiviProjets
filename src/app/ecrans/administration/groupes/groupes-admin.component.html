@@ -1,6 +1,7 @@
 <section class="groupes-admin">
   <nav class="groupes-admin__sous-onglets d-flex retour-ligne ecart-2 exterieur-bas-4">
     <button
+      id="groupes-admin-sous-onglet-groupes"
       type="button"
       class="groupes-admin__sous-onglet bouton bouton--discret"
       [class.groupes-admin__sous-onglet--actif]="sousOngletActif === 'groupes'"
@@ -9,6 +10,7 @@
       Groupes
     </button>
     <button
+      id="groupes-admin-sous-onglet-membres-connus"
       type="button"
       class="groupes-admin__sous-onglet bouton bouton--discret"
       [class.groupes-admin__sous-onglet--actif]="sousOngletActif === 'membresConnus'"
@@ -17,6 +19,7 @@
       Membres connus
     </button>
     <button
+      id="groupes-admin-sous-onglet-annotations"
       type="button"
       class="groupes-admin__sous-onglet bouton bouton--discret"
       [class.groupes-admin__sous-onglet--actif]="sousOngletActif === 'annotations'"
@@ -32,10 +35,20 @@
         class="groupes-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
       >
         <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Groupes</h2>
-        <button type="button" class="bouton" (click)="ouvrirCreation()">Créer un groupe</button>
+        <button
+          id="groupes-admin-bouton-creer"
+          type="button"
+          class="bouton"
+          (click)="ouvrirCreation()"
+        >
+          Créer un groupe
+        </button>
       </header>
 
-      <ul class="groupes-admin__liste sans-liste d-flex direction-colonne ecart-2">
+      <ul
+        id="groupes-admin-liste"
+        class="groupes-admin__liste sans-liste d-flex direction-colonne ecart-2"
+      >
         @for (groupe of groupes(); track groupe.id) {
           <li
             class="groupes-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
@@ -86,12 +99,20 @@
 
           <label class="champ">
             Nom
-            <input type="text" class="champ__controle" name="nom" [(ngModel)]="nom" required />
+            <input
+              id="groupes-admin-champ-nom"
+              type="text"
+              class="champ__controle"
+              name="nom"
+              [(ngModel)]="nom"
+              required
+            />
           </label>
 
           <label class="champ">
             Description
             <textarea
+              id="groupes-admin-champ-description"
               class="champ__controle"
               name="description"
               [(ngModel)]="description"
@@ -104,9 +125,10 @@
             <legend class="d-block poids-gras texte-sm exterieur-bas-2">
               Instances GitLab/Sonar
             </legend>
-            @for (instance of instances; track instance.id) {
+            @for (instance of instances; track instance.id; let i = $index) {
               <div class="groupes-admin__instance d-flex retour-ligne aligne-centre ecart-2">
                 <select
+                  [id]="'groupes-admin-instance-' + i + '-champ-type'"
                   [name]="'type-' + instance.id"
                   class="champ__controle"
                   [(ngModel)]="instance.type"
@@ -117,6 +139,7 @@
                 </select>
                 <input
                   type="text"
+                  [id]="'groupes-admin-instance-' + i + '-champ-nom'"
                   [name]="'nom-' + instance.id"
                   class="champ__controle flex-1"
                   [(ngModel)]="instance.nom"
@@ -124,12 +147,14 @@
                 />
                 <input
                   type="text"
+                  [id]="'groupes-admin-instance-' + i + '-champ-url'"
                   [name]="'url-' + instance.id"
                   class="champ__controle flex-1"
                   [(ngModel)]="instance.urlBase"
                   placeholder="URL de base"
                 />
                 <button
+                  [id]="'groupes-admin-instance-' + i + '-bouton-retirer'"
                   type="button"
                   class="bouton bouton--discret"
                   (click)="supprimerInstance(instance.id)"
@@ -138,14 +163,32 @@
                 </button>
               </div>
             }
-            <button type="button" class="bouton" (click)="ajouterInstance()">
+            <button
+              id="groupes-admin-bouton-ajouter-instance"
+              type="button"
+              class="bouton"
+              (click)="ajouterInstance()"
+            >
               Ajouter une instance
             </button>
           </fieldset>
 
           <div class="groupes-admin__actions-formulaire d-flex justifie-fin ecart-2">
-            <button type="button" class="bouton" (click)="fermerFormulaire()">Annuler</button>
-            <button type="submit" class="bouton bouton--principal">Enregistrer</button>
+            <button
+              id="groupes-admin-bouton-annuler"
+              type="button"
+              class="bouton"
+              (click)="fermerFormulaire()"
+            >
+              Annuler
+            </button>
+            <button
+              id="groupes-admin-bouton-enregistrer"
+              type="submit"
+              class="bouton bouton--principal"
+            >
+              Enregistrer
+            </button>
           </div>
         </form>
       }

@@ -58,6 +58,7 @@
       <legend class="d-block poids-gras texte-sm exterieur-bas-1">Mode</legend>
       <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input
+          id="purge-parametrage-age-mode-suppression"
           type="radio"
           name="modeAge"
           [ngModel]="modeAge"
@@ -68,6 +69,7 @@
       </label>
       <label class="d-flex aligne-centre ecart-2 texte-sm">
         <input
+          id="purge-parametrage-age-mode-agregation-mensuelle"
           type="radio"
           name="modeAge"
           [ngModel]="modeAge"
@@ -79,6 +81,7 @@
     </fieldset>
 
     <button
+      id="purge-parametrage-bouton-previsualiser-age"
       type="button"
       class="bouton exterieur-haut-2"
       [disabled]="enCours"
@@ -89,7 +92,7 @@
 
     @if (previsualisationAge) {
       @if (previsualisationAge.nbAuditsSupprimes === 0) {
-        <p class="exterieur-haut-2">
+        <p id="purge-parametrage-age-resultat-vide" class="exterieur-haut-2">
           Aucun audit ne serait supprimé par une purge par âge, pour ce mode.
         </p>
       } @else {
@@ -100,6 +103,7 @@
           {{ formaterOctets(previsualisationAge.octetsApres) }}.
         </p>
         <button
+          id="purge-parametrage-bouton-executer-age"
           type="button"
           class="bouton bouton--danger"
           [disabled]="enCours"

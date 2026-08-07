@@ -13,6 +13,7 @@
         Référentiel des dépendances
       </h3>
       <button
+        id="referentiels-parametrage-bouton-ajouter-dependance"
         type="button"
         class="bouton"
         [disabled]="enCours"
@@ -22,14 +23,18 @@
       </button>
     </header>
 
-    <ul class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2">
-      @for (regle of reglesDependances(); track regle.id) {
+    <ul
+      id="referentiels-parametrage-liste-dependances"
+      class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2"
+    >
+      @for (regle of reglesDependances(); track regle.id; let i = $index) {
         <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
           <span>{{ regle.motif }}</span>
           <span class="texte-discret texte-sm"
             >{{ regle.versions.length }} borne(s) de version</span
           >
           <button
+            [id]="'referentiels-parametrage-dependance-' + i + '-bouton-modifier'"
             type="button"
             class="bouton bouton--discret"
             [disabled]="enCours"
@@ -38,6 +43,7 @@
             Modifier
           </button>
           <button
+            [id]="'referentiels-parametrage-dependance-' + i + '-bouton-supprimer'"
             type="button"
             class="bouton bouton--discret"
             [disabled]="enCours"
@@ -64,6 +70,7 @@
         <label class="champ">
           Motif (glob, ex. <code class="police-mono">org.springframework:*</code>)
           <input
+            id="referentiels-parametrage-champ-motif-dependance"
             type="text"
             class="champ__controle"
             name="motifDependance"
@@ -75,6 +82,7 @@
           Bornes de version (une par ligne, format
           <code class="police-mono">motifVersion=statut</code>)
           <textarea
+            id="referentiels-parametrage-champ-versions-dependance"
             class="champ__controle"
             name="versionsDependanceTexte"
             rows="4"
@@ -82,10 +90,20 @@
           ></textarea>
         </label>
         <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
-          <button type="button" class="bouton" (click)="fermerFormulaireDependance()">
+          <button
+            id="referentiels-parametrage-bouton-annuler-dependance"
+            type="button"
+            class="bouton"
+            (click)="fermerFormulaireDependance()"
+          >
             Annuler
           </button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button
+            id="referentiels-parametrage-bouton-enregistrer-dependance"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours"
+          >
             Enregistrer
           </button>
         </div>
@@ -125,6 +143,7 @@
         Référentiel des marqueurs IA
       </h3>
       <button
+        id="referentiels-parametrage-bouton-ajouter-marqueur-ia"
         type="button"
         class="bouton"
         [disabled]="enCours"
@@ -174,6 +193,7 @@
         <label class="champ">
           Motif
           <input
+            id="referentiels-parametrage-champ-motif-marqueur-ia"
             type="text"
             class="champ__controle"
             name="motifMarqueurIa"
@@ -184,6 +204,7 @@
         <label class="champ">
           Type de correspondance
           <select
+            id="referentiels-parametrage-champ-type-correspondance-marqueur-ia"
             class="champ__controle"
             name="typeCorrespondanceMarqueurIa"
             [(ngModel)]="typeCorrespondanceMarqueurIa"
@@ -195,7 +216,12 @@
         </label>
         <label class="champ">
           Portée
-          <select class="champ__controle" name="porteeMarqueurIa" [(ngModel)]="porteeMarqueurIa">
+          <select
+            id="referentiels-parametrage-champ-portee-marqueur-ia"
+            class="champ__controle"
+            name="porteeMarqueurIa"
+            [(ngModel)]="porteeMarqueurIa"
+          >
             @for (portee of portees; track portee) {
               <option [ngValue]="portee">{{ portee }}</option>
             }
@@ -203,7 +229,12 @@
         </label>
         <label class="champ">
           Nature
-          <select class="champ__controle" name="natureMarqueurIa" [(ngModel)]="natureMarqueurIa">
+          <select
+            id="referentiels-parametrage-champ-nature-marqueur-ia"
+            class="champ__controle"
+            name="natureMarqueurIa"
+            [(ngModel)]="natureMarqueurIa"
+          >
             @for (nature of natures; track nature) {
               <option [ngValue]="nature">{{ nature }}</option>
             }
@@ -212,6 +243,7 @@
         <label class="champ">
           Outil
           <input
+            id="referentiels-parametrage-champ-outil-marqueur-ia"
             type="text"
             class="champ__controle"
             name="outilMarqueurIa"
@@ -220,10 +252,20 @@
           />
         </label>
         <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
-          <button type="button" class="bouton" (click)="fermerFormulaireMarqueurIa()">
+          <button
+            id="referentiels-parametrage-bouton-annuler-marqueur-ia"
+            type="button"
+            class="bouton"
+            (click)="fermerFormulaireMarqueurIa()"
+          >
             Annuler
           </button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button
+            id="referentiels-parametrage-bouton-enregistrer-marqueur-ia"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours"
+          >
             Enregistrer
           </button>
         </div>

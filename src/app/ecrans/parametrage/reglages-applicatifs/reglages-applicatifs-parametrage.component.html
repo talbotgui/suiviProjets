@@ -84,6 +84,7 @@
         Concurrence d'audit par défaut
       </h3>
       <button
+        id="reglages-applicatifs-bouton-modifier-concurrence"
         type="button"
         class="bouton"
         [disabled]="enCours"
@@ -101,6 +102,7 @@
         <label class="champ">
           Nombre de projets audités simultanément
           <input
+            id="reglages-applicatifs-champ-concurrence"
             type="number"
             min="1"
             class="champ__controle"
@@ -112,8 +114,20 @@
         <div
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
         >
-          <button type="button" class="bouton" (click)="fermerEditionConcurrence()">Annuler</button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button
+            id="reglages-applicatifs-bouton-annuler-concurrence"
+            type="button"
+            class="bouton"
+            (click)="fermerEditionConcurrence()"
+          >
+            Annuler
+          </button>
+          <button
+            id="reglages-applicatifs-bouton-enregistrer-concurrence"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours"
+          >
             Enregistrer
           </button>
         </div>

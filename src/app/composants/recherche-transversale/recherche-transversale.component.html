@@ -21,6 +21,7 @@
       <div class="recherche-transversale__entete">
         <span class="recherche-transversale__icone" aria-hidden="true">⌕</span>
         <input
+          id="recherche-transversale-champ"
           #champRecherche
           type="text"
           class="recherche-transversale__champ"
@@ -153,7 +154,10 @@
           }
 
           @if (resultats().entites.nombreTotal > 0) {
-            <section class="recherche-transversale__groupe">
+            <section
+              id="recherche-transversale-resultats-entites"
+              class="recherche-transversale__groupe"
+            >
               <h3>Entités</h3>
               <ul>
                 @for (entite of resultats().entites.occurrences; track entite.id) {
