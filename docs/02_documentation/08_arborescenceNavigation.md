@@ -14,7 +14,14 @@ Accueil (avant ouverture d'un fichier)
 └── Charger un fichier de données existant → ouvre le shell applicatif sur Liste de travail (si alertes non traitées) ou Synthèse des audits (sinon)
 
 Shell applicatif (après ouverture d'un fichier — sidebar persistante + barre supérieure)
-├── Accueil (résumé depuis la dernière session)
+├── Administration
+│   ├── Groupes (dont onglet Membres connus, Annotations de groupe)
+│   ├── Projets (dont Politique IA)
+│   └── Sources (dont ref auditée)
+├── Audits
+│   ├── Constitution de campagne
+│   ├── Tableau de bord d'exécution
+│   └── Brouillon (avec rapport d'anomalies)
 ├── Synthèse des audits
 │   └── Fiche projet (accès par clic sur un projet)
 │       └── Comparaison entre deux audits
@@ -22,14 +29,7 @@ Shell applicatif (après ouverture d'un fichier — sidebar persistante + barre 
 │   └── Fiche projet (accès par clic sur une série ou un point)
 ├── Liste de travail
 │   └── Fiche projet (accès par clic sur une alerte)
-├── Audits
-│   ├── Constitution de campagne
-│   ├── Tableau de bord d'exécution
-│   └── Brouillon (avec rapport d'anomalies)
-├── Administration
-│   ├── Groupes (dont onglet Membres connus, Annotations de groupe)
-│   ├── Projets (dont Politique IA)
-│   └── Sources (dont ref auditée)
+├── Accueil (résumé depuis la dernière session)
 ├── Paramétrage
 │   ├── Seuils et référentiels (dépendances, marqueurs IA, nommage des branches)
 │   ├── Journal des modifications
@@ -44,7 +44,7 @@ Composant transversal
 
 ## Règles de navigation
 
-- La sidebar (232px, cf. [maquette de référence](../01_besoin/Suivi%20Qualimetrie.dc.html)) reste visible en permanence dans le shell applicatif et matérialise l'écran actif ; elle donne accès direct à Accueil, Synthèse des audits, Synthèse graphique, Liste de travail, Audits, Administration et Paramétrage.
+- La sidebar (232px, cf. [maquette de référence](../01_besoin/Suivi%20Qualimetrie.dc.html)) reste visible en permanence dans le shell applicatif et matérialise l'écran actif ; elle donne accès direct, dans cet ordre fixe, à Administration, Audits, Synthèse des audits, Synthèse graphique, Liste de travail, Accueil et Paramétrage. Cet ordre (révisé le 2026-08-08, [C11-03](../03_plan/plan_13_developpement.md#phase-11--journalisation-technique-et-confort-de-saisie-projets-sources)) reflète la séquence d'usage typique d'un utilisateur — constituer son périmètre (Administration) puis l'auditer (Audits) avant de consulter des résultats encore vides à la création du fichier — plutôt que l'ordre initial retenu à la Phase 6 (Accueil en tête) ; il reste unique et fixe, indépendant du contenu du fichier ouvert (piste alternative d'un ordre dynamique selon la présence d'un audit intégré écartée par arbitrage humain explicite, pour ne pas introduire de réordonnancement surprenant en cours de session).
 - Dans l'arborescence ci-dessus, les éléments indentés sous Administration et Paramétrage sont des onglets d'un même écran (une seule ligne dans la matrice écrans / user stories ci-dessous) ; le test de connectivité globale, mentionné entre parenthèses sous Gestion des credentials, est une zone de ce même écran, ni un onglet ni un écran contextuel ; les éléments indentés sous Audits (Constitution de campagne, Tableau de bord d'exécution, Brouillon) sont trois écrans distincts, chacun recensé séparément dans cette matrice.
 - La barre supérieure, commune à tous les écrans du shell, affiche le nom du fichier chargé, le statut de sauvegarde, et donne accès à la recherche transversale, à la gestion des credentials et au verrouillage manuel.
 - Les écrans contextuels (Fiche projet, Comparaison entre deux audits) ne figurent pas dans la sidebar : ils s'ouvrent par navigation contextuelle (clic sur un projet, une alerte ou un point de graphique) et portent un bouton de retour explicite vers l'écran d'origine (Synthèse des audits, Synthèse graphique ou Liste de travail).

@@ -218,7 +218,8 @@ describe('SqmExportImportParametrageComponent', () => {
     expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
       expect.objectContaining({
         type: 'erreur',
-        message: 'Ce fichier de configuration a été produit par une version plus récente de cette application.',
+        message:
+          'Ce fichier de configuration a été produit par une version plus récente de cette application.',
       }),
     );
     expect(composant.differentiel).toBeNull();

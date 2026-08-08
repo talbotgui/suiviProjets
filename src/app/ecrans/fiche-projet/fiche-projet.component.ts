@@ -802,7 +802,7 @@ export class SqmFicheProjetComponent {
       return "Indicateurs Sonar grisés : ce projet n'a jamais été analysé par Sonar, ces indicateurs ne reflètent donc aucun état réel.";
     }
     if (resultat.dernierCommitLe === undefined) {
-      return 'Indicateurs Sonar grisés : écart de fraîcheur constaté avec le dernier commit (RG-013).';
+      return 'Indicateurs Sonar grisés : écart de fraîcheur constaté avec le dernier commit.';
     }
     const ecartJours = Math.round(
       Math.abs(
@@ -1091,7 +1091,7 @@ export class SqmFicheProjetComponent {
           label: 'IA interdite · conforme sous réserve',
           couleur: 'bleu',
           reserve:
-            "Aucun marqueur d'outil IA détecté par le dernier audit, mais l'absence de preuve ne prouve pas l'absence d'usage réel (RG-016).",
+            "Aucun marqueur d'outil IA détecté par le dernier audit, mais l'absence de preuve ne prouve pas l'absence d'usage réel.",
         };
     }
   }

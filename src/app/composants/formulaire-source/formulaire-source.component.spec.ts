@@ -378,8 +378,8 @@ describe('SqmFormulaireSourceComponent', () => {
     });
   });
 
-  describe('autocomplétion de l’identifiant externe (US-008, RG-036)', () => {
-    it('rend la liste des options du datalist dans le gabarit après sélection de l’instance', async () => {
+  describe('autocomplétion de l’identifiant externe (US-008, RG-036, C11-02)', () => {
+    it('transmet les sources disponibles au champ de recherche riche après sélection de l’instance', async () => {
       const facade = TestBed.inject(FacadeCommandesService);
       jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
         type: 'succes',
@@ -400,23 +400,15 @@ describe('SqmFormulaireSourceComponent', () => {
       await Promise.resolve();
       fixture.detectChanges();
 
-      const elementNatif = DomTestUtils.obtenirElementNatif(fixture);
-      const datalist = elementNatif.querySelector<HTMLDataListElement>(
-        '#formulaire-source-id-externe',
-      );
-      expect(datalist).not.toBeNull();
-      const options = Array.from(datalist?.querySelectorAll('option') ?? []).map((option) => ({
-        value: option.value,
-        libelle: option.textContent?.trim(),
-      }));
-      expect(options).toEqual([
-        { value: '1234', libelle: 'entreprise/api-facturation' },
-        { value: '1567', libelle: 'entreprise/batch-comptable' },
+      expect(composant.optionsRecherche()).toEqual([
+        { valeur: '1234', libelle: 'entreprise/api-facturation' },
+        { valeur: '1567', libelle: 'entreprise/batch-comptable' },
       ]);
 
-      const champIdExterne =
-        elementNatif.querySelector<HTMLInputElement>('input[name="idExterne"]');
-      expect(champIdExterne?.getAttribute('list')).toBe('formulaire-source-id-externe');
+      const elementNatif = DomTestUtils.obtenirElementNatif(fixture);
+      const champRecherche = elementNatif.querySelector('app-champ-recherche-riche');
+      expect(champRecherche).not.toBeNull();
+      expect(champRecherche?.querySelector('#formulaire-source-champ-id-externe')).not.toBeNull();
     });
 
     it('charge la liste des sources disponibles à la sélection de l’instance', async () => {

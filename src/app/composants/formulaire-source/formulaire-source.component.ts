@@ -16,13 +16,24 @@
 // `(ngModelChange)` synchrones habituels mais aussi par l'`effect` de préchargement depuis {@link sourceAModifier}
 // ci-dessous, qui ne s'exécute pas dans la pile d'un évènement DOM.
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
-import type { InputSignal, OutputEmitterRef, WritableSignal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Subject, from, of } from 'rxjs';
 import type { Observable } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import type { OptionRechercheRiche } from '../champ-recherche-riche/champ-recherche-riche.component';
+import { SqmChampRechercheRicheComponent } from '../champ-recherche-riche/champ-recherche-riche.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import type { DonneesSource } from '../../services/avecetat/etat/donnees-application.service';
 import type { Source } from '../../services/avecetat/etat/types-donnees';
@@ -49,7 +60,7 @@ const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
  */
 @Component({
   selector: 'app-formulaire-source',
-  imports: [FormsModule, NgTemplateOutlet],
+  imports: [FormsModule, NgTemplateOutlet, SqmChampRechercheRicheComponent],
   templateUrl: './formulaire-source.component.html',
 })
 export class SqmFormulaireSourceComponent {
@@ -148,6 +159,18 @@ export class SqmFormulaireSourceComponent {
    * proposés en autocomplétion de l'identifiant externe (US-008, RG-036).
    */
   public readonly sourcesDisponibles: WritableSignal<readonly SourceDisponible[]> = signal([]);
+
+  /**
+   * Suggestions du champ de recherche riche de l'identifiant externe (C11-02), dérivées de
+   * {@link sourcesDisponibles} : la valeur retenue est l'identifiant externe lui-même, le libellé affiché reste
+   * celui déjà présenté par l'ancienne autocomplétion HTML native.
+   */
+  public readonly optionsRecherche: Signal<readonly OptionRechercheRiche[]> = computed(() =>
+    this.sourcesDisponibles().map((source) => ({
+      valeur: source.idExterne,
+      libelle: source.libelle,
+    })),
+  );
 
   /**
    * Indique qu'aucun credential n'est actuellement mémorisé pour l'instance sélectionnée : ni l'autocomplétion des

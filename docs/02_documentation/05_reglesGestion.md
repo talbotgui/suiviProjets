@@ -15,6 +15,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 
 | écran | description sommaire | règle(s) de gestion concernée(s) |
 |---|---|---|
+| Shell applicatif (bandeau global) | Bandeau transverse, affiché sous l'entête sur tout écran du shell, signalant un credential manquant pour une instance utilisée par le fichier ouvert | RG-037 |
 | Écran d'accueil | Point d'entrée : créer ou charger le fichier de données, résumé de l'état depuis la dernière session | RG-001, RG-002, RG-003, RG-009, RG-026 |
 | Gestion des credentials | Saisie en mémoire des credentials par instance, assistant de création de token, test de connectivité | RG-004 |
 | Administration | Gestion des groupes, projets, sources, membres connus, politique IA et annotations de groupe | RG-006, RG-007, RG-008, RG-012, RG-014, RG-015, RG-023, RG-033, RG-036 |
@@ -39,6 +40,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-003 | Avant tout écrasement du fichier de données, une sauvegarde de sécurité horodatée de l'ancien fichier est conservée, dans la limite d'un nombre paramétrable de versions | Écran d'accueil, Écran de paramétrage | À chaque sauvegarde |
 | RG-004 | Aucun credential n'est jamais persisté sur disque ; il est ressaisi à chaque session, transmis uniquement en en-tête HTTP vers l'instance concernée, et purgé à la fermeture, au verrouillage et après un délai d'inactivité | Gestion des credentials, Écran de verrouillage | Pendant toute la durée de la session |
 | RG-005 | Le verrouillage de session, qu'il soit déclenché par inactivité ou manuellement, efface la clé dérivée et l'ensemble des credentials en mémoire, côté front comme côté cœur applicatif | Écran de verrouillage | Sur déclenchement du verrouillage |
+| RG-037 | Un bandeau non bloquant, affiché sous l'entête sur tout écran du shell tant que la condition reste vraie, signale qu'au moins une instance GitLab ou Sonar référencée par une source du fichier ouvert n'a pas de credential mémorisé pour la session en cours, avec une action de raccourci vers la Gestion des credentials ; ce signal complète [RG-004](#stockage-et-confidentialité-des-données) sans le remplacer, le credential lui-même restant ressaisi à chaque session, jamais persisté (ajouté le 2026-08-08, besoin identifié en Phase 11 lors de la session de réflexion UX du 2026-08-03, absent de `Specification.md`, cf. [C11-04](../03_plan/plan_13_developpement.md#phase-11--journalisation-technique-et-confort-de-saisie-projets-sources)) | Shell applicatif (bandeau global) | Dès qu'une instance référencée par une source du fichier ouvert n'a pas de credential mémorisé pour la session en cours |
 
 ### Membres et sécurité des accès
 
@@ -75,7 +77,7 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 
 | identifiant | énoncé de la règle | écran(s) concerné(s) | conditions d'application |
 |---|---|---|---|
-| RG-036 | À la sélection d'une Instance dans le formulaire de rattachement d'une source, la liste complète des dépôts GitLab (instance de type `gitlab`) ou des projets Sonar (instance de type `sonar`) accessibles avec le credential courant est chargée en un seul appel, mis en cache pour la durée de la session par instance ; l'identifiant externe de la source est saisi par sélection avec autocomplétion dans cette liste, présentée triée par ordre alphabétique insensible à la casse, y compris avant toute saisie de l'utilisateur (ajouté le 2026-08-02, besoin identifié en Phase 10, absent de `Specification.md`) | Administration | Sélection d'une Instance dans le formulaire de rattachement d'une source |
+| RG-036 | À la sélection d'une Instance dans le formulaire de rattachement d'une source, la liste complète des dépôts GitLab (instance de type `gitlab`) ou des projets Sonar (instance de type `sonar`) accessibles avec le credential courant est chargée en un seul appel, mis en cache pour la durée de la session par instance ; l'identifiant externe de la source est saisi au moyen d'un composant de recherche riche réutilisable (et non plus un champ texte libre à autocomplétion HTML native), présentant la liste précédente triée par ordre alphabétique insensible à la casse y compris avant toute saisie de l'utilisateur, avec surlignage du texte recherché dans chaque suggestion, message explicite en l'absence de correspondance et navigation complète au clavier (ajouté le 2026-08-02, besoin identifié en Phase 10, absent de `Specification.md` ; composant de recherche généralisé le 2026-08-08, cf. [C11-02](../03_plan/plan_13_developpement.md#phase-11--journalisation-technique-et-confort-de-saisie-projets-sources)) | Administration | Sélection d'une Instance dans le formulaire de rattachement d'une source, y compris depuis le mini-flux guidé projet → sources ([C11-01](../03_plan/plan_13_developpement.md#phase-11--journalisation-technique-et-confort-de-saisie-projets-sources)) |
 
 ### Seuils, référentiels et historisation
 
@@ -141,3 +143,4 @@ Chaque règle de gestion porte un identifiant stable de la forme `RG-NNN` (numé
 | RG-034 | [US-036](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-035 | [US-033](./04_casUsage.md#cas-dusage--user-stories) |
 | RG-036 | [US-008](./04_casUsage.md#cas-dusage--user-stories) |
+| RG-037 | [US-003](./04_casUsage.md#cas-dusage--user-stories), [US-004](./04_casUsage.md#cas-dusage--user-stories) |

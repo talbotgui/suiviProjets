@@ -89,7 +89,7 @@ pub(crate) async fn interroger_vitalite(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_vitalite(
                 &instance.url_base,
@@ -105,7 +105,13 @@ pub(crate) async fn interroger_vitalite(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerVitalite",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge la taille d'un dépôt GitLab en octets (US-009, `gitlab.taille_depot`).
@@ -127,7 +133,7 @@ pub(crate) async fn interroger_taille_depot(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_taille_depot(
                 &instance.url_base,
@@ -142,7 +148,13 @@ pub(crate) async fn interroger_taille_depot(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerTailleDepot",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les contributeurs distincts sur la fenêtre glissante d'un dépôt GitLab (US-009,
@@ -165,7 +177,7 @@ pub(crate) async fn interroger_contributeurs(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_contributeurs(
                 &instance.url_base,
@@ -180,7 +192,13 @@ pub(crate) async fn interroger_contributeurs(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerContributeurs",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les demandes de fusion ouvertes d'un dépôt GitLab (US-009, `gitlab.merge_requests`).
@@ -202,7 +220,7 @@ pub(crate) async fn interroger_merge_requests(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_merge_requests(
                 &instance.url_base,
@@ -217,7 +235,13 @@ pub(crate) async fn interroger_merge_requests(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerMergeRequests",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les membres d'un dépôt GitLab (US-009, `gitlab.membres`).
@@ -239,7 +263,7 @@ pub(crate) async fn interroger_membres(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_membres(
                 &instance.url_base,
@@ -254,7 +278,13 @@ pub(crate) async fn interroger_membres(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerMembres",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge la liste complète des branches d'un dépôt GitLab pour le catalogue figé des résultats d'audit
@@ -279,7 +309,7 @@ pub(crate) async fn interroger_branches_completes(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_branches_completes(
                 &instance.url_base,
@@ -294,7 +324,13 @@ pub(crate) async fn interroger_branches_completes(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerBranchesCompletes",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les dépendances déclarées par les manifestes du dépôt GitLab (US-009, `gitlab.dependances`), tous
@@ -318,7 +354,7 @@ pub(crate) async fn interroger_dependances(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_dependances(
                 &instance.url_base,
@@ -333,7 +369,13 @@ pub(crate) async fn interroger_dependances(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerDependances",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les marqueurs d'outils IA détectés dans l'arborescence complète de la ref auditée d'un dépôt GitLab
@@ -361,7 +403,7 @@ pub(crate) async fn interroger_marqueurs_ia(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_marqueurs_ia(
                 &instance.url_base,
@@ -377,7 +419,13 @@ pub(crate) async fn interroger_marqueurs_ia(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerMarqueursIa",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les violations Sonar par sévérité (US-009, `sonar.violations`).
@@ -399,7 +447,7 @@ pub(crate) async fn interroger_violations(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_violations(
                 &instance.url_base,
@@ -414,7 +462,13 @@ pub(crate) async fn interroger_violations(
         TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerViolations",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge la dette technique Sonar (US-009, `sonar.dette`).
@@ -435,7 +489,7 @@ pub(crate) async fn interroger_dette(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_dette(
                 &instance.url_base,
@@ -449,7 +503,13 @@ pub(crate) async fn interroger_dette(
         TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerDette",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge la couverture de tests Sonar (US-009, `sonar.couverture`).
@@ -470,7 +530,7 @@ pub(crate) async fn interroger_couverture(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_couverture(
                 &instance.url_base,
@@ -484,7 +544,13 @@ pub(crate) async fn interroger_couverture(
         TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerCouverture",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge les notes Sonar des quatre axes (US-009, `sonar.notes`).
@@ -505,7 +571,7 @@ pub(crate) async fn interroger_notes(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_notes(
                 &instance.url_base,
@@ -519,7 +585,13 @@ pub(crate) async fn interroger_notes(
         TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerNotes",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge le volume de code Sonar (US-009, `sonar.ncloc`).
@@ -540,7 +612,7 @@ pub(crate) async fn interroger_ncloc(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_ncloc(
                 &instance.url_base,
@@ -554,7 +626,13 @@ pub(crate) async fn interroger_ncloc(
         TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerNcloc",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Interroge la date de la dernière analyse Sonar d'un projet (Phase 5, incrément 3), donnée intermédiaire
@@ -580,7 +658,7 @@ pub(crate) async fn interroger_derniere_analyse(
         &instance.nom,
         &id_externe,
     );
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Sonar => {
             sonar::interroger_derniere_analyse(
                 &instance.url_base,
@@ -593,7 +671,13 @@ pub(crate) async fn interroger_derniere_analyse(
         TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerDerniereAnalyse",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Enregistre les résultats d'une campagne dans la zone de brouillon, sauvegarde le fichier (US-009, US-014,

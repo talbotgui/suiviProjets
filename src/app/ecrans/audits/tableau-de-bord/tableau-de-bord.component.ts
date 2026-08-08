@@ -184,6 +184,17 @@ export class SqmTableauDeBordComponent {
   }
 
   /**
+   * Indique si l'annulation de la campagne affichée a déjà été demandée (RG-018, R12-07) : désactive le bouton
+   * « Annuler la campagne » et change son libellé dès le clic, plutôt que de laisser croire qu'il n'a aucun effet
+   * pendant que les projets déjà en cours d'audit continuent normalement jusqu'à leur terme (aucun désabonnement,
+   * résultats acquis conservés) — ce qui peut prendre plusieurs minutes selon le nombre de sources concernées.
+   * @returns `true` si l'annulation a été demandée pour la campagne actuellement affichée.
+   */
+  public annulationDemandee(): boolean {
+    return this.orchestrateurCampagne.annulationDemandee();
+  }
+
+  /**
    * Indique si la campagne affichée est encore en cours (au moins un projet du périmètre pas encore traité),
    * pour conditionner l'affichage du bouton « Annuler la campagne » (bug corrigé le 2026-07-28 : ce bouton
    * restait affiché indéfiniment après la fin d'une campagne, `EtatSessionService.progressionCampagne` n'étant

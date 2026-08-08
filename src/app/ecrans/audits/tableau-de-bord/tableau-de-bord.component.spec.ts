@@ -185,11 +185,23 @@ describe('SqmTableauDeBordComponent', () => {
 
     composant.annuler();
 
-    // L'annulation est un drapeau interne à l'Orchestrateur : ce test vérifie seulement que l'appel ne lève
-    // aucune erreur et n'affecte pas immédiatement la progression déjà acquise (aucune campagne n'étant
-    // effectivement en vol dans ce test unitaire, cf. `orchestrateur-campagne.service.spec.ts` pour le
-    // comportement d'annulation complet).
+    // La demande n'affecte pas immédiatement la progression déjà acquise (les projets déjà en cours d'audit vont
+    // à leur terme normalement, RG-018) ; aucune campagne n'étant effectivement en vol dans ce test unitaire, cf.
+    // `orchestrateur-campagne.service.spec.ts` pour le comportement d'annulation complet.
     expect(etatSession.progressionCampagne()?.projets[projetId]?.statut).toBe('enCours');
+  });
+
+  it('doit refléter la demande d’annulation dès le clic, sans attendre la fin effective de la campagne (R12-07)', () => {
+    etatSession.demarrerProgressionCampagne([projetId]);
+    etatSession.mettreAJourProgressionProjet(projetId, {
+      statut: 'enCours',
+      connecteurActif: 'gitlab',
+    });
+
+    expect(composant.annulationDemandee()).toBe(false);
+    composant.annuler();
+
+    expect(composant.annulationDemandee()).toBe(true);
   });
 
   describe('campagneEnCours (bouton « Annuler la campagne »)', () => {

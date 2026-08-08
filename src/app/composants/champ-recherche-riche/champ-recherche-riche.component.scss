@@ -1,0 +1,46 @@
+// Tokens repris de `src/styles/_tokens.scss` (résidu CSS zéro par composant, C10-06) : seule la superposition de
+// suggestions (positionnement, ombre) exige du CSS bespoke, non couverte par les classes utilitaires existantes.
+.champ-recherche-riche {
+  position: relative;
+
+  &__liste {
+    position: absolute;
+    inset-inline: 0;
+    top: 100%;
+    z-index: 20;
+    margin: var(--sqm-espace-1) 0 0;
+    padding: var(--sqm-espace-1) 0;
+    max-height: 14rem;
+    overflow-y: auto;
+    list-style: none;
+    background-color: var(--sqm-neutre-0);
+    border: 1px solid var(--sqm-neutre-300);
+    border-radius: var(--sqm-rayon-md);
+    box-shadow: 0 8px 20px oklch(22% 0.01 250 / 18%);
+  }
+
+  &__option {
+    padding: var(--sqm-espace-2) var(--sqm-espace-3);
+    font-size: var(--sqm-texte-sm);
+    color: var(--sqm-neutre-1000);
+    cursor: pointer;
+
+    &:hover,
+    &--actif {
+      background-color: var(--sqm-marque-fond-douce);
+    }
+
+    mark {
+      background-color: var(--sqm-marque-fond);
+      color: var(--sqm-marque-texte);
+      font-weight: var(--sqm-poids-demi-gras);
+      border-radius: var(--sqm-rayon-sm);
+    }
+  }
+
+  &__vide {
+    padding: var(--sqm-espace-2) var(--sqm-espace-3);
+    font-size: var(--sqm-texte-sm);
+    color: var(--sqm-neutre-800);
+  }
+}

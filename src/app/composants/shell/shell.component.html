@@ -26,16 +26,28 @@
     </div>
 
     <a
-      id="shell-lien-accueil"
+      id="shell-lien-administration"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
-      routerLink="/accueil"
+      routerLink="/administration"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
-      title="Accueil"
+      title="Administration"
     >
-      <span aria-hidden="true">⌂</span>
-      <span class="shell__lien-libelle">Accueil</span>
+      <span aria-hidden="true">⚙</span>
+      <span class="shell__lien-libelle">Administration</span>
     </a>
+
+    <button
+      id="shell-lien-audits"
+      type="button"
+      class="shell__lien shell__lien--bouton d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
+      [class.shell__lien--actif]="auditsActif()"
+      (click)="ouvrirAudits()"
+      title="Audits"
+    >
+      <span aria-hidden="true">◷</span>
+      <span class="shell__lien-libelle">Audits</span>
+    </button>
 
     <a
       id="shell-lien-synthese-audits"
@@ -73,28 +85,16 @@
       <span class="shell__lien-libelle">Liste de travail</span>
     </a>
 
-    <button
-      id="shell-lien-audits"
-      type="button"
-      class="shell__lien shell__lien--bouton d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
-      [class.shell__lien--actif]="auditsActif()"
-      (click)="ouvrirAudits()"
-      title="Audits"
-    >
-      <span aria-hidden="true">◷</span>
-      <span class="shell__lien-libelle">Audits</span>
-    </button>
-
     <a
-      id="shell-lien-administration"
+      id="shell-lien-accueil"
       class="shell__lien d-flex aligne-centre ecart-3 interieur-x-3 interieur-y-2 rayon-md texte-sm"
-      routerLink="/administration"
+      routerLink="/accueil"
       routerLinkActive="shell__lien--actif"
       [routerLinkActiveOptions]="{ exact: false }"
-      title="Administration"
+      title="Accueil"
     >
-      <span aria-hidden="true">⚙</span>
-      <span class="shell__lien-libelle">Administration</span>
+      <span aria-hidden="true">⌂</span>
+      <span class="shell__lien-libelle">Accueil</span>
     </a>
 
     <a
@@ -114,11 +114,13 @@
          libellé restant présent dans le DOM pour les technologies d'assistance (même mécanisme que
          .shell__lien-libelle des entrées de navigation ci-dessus). -->
     <a
+      id="shell-lien-attribution-github"
       class="shell__attribution d-flex aligne-centre justifie-fin ecart-2 interieur-x-3 interieur-y-2 texte-discret texte-xs sans-decoration exterieur-haut-auto"
       href="https://github.com/talbotgui/suiviProjets"
       target="_blank"
       rel="noopener noreferrer"
       title="Application créée par talbotgui — dépôt GitHub"
+      (click)="ouvrirAttributionGithub($event, 'https://github.com/talbotgui/suiviProjets')"
     >
       <span class="shell__lien-libelle">Créée par talbotgui</span>
       <span aria-hidden="true">↗</span>
@@ -176,6 +178,16 @@
         </button>
       </div>
     </header>
+
+    @if (credentialManquantActif()) {
+      <div class="interieur-x-5 interieur-y-3">
+        <app-bandeau-alerte
+          [message]="messageCredentialManquant()"
+          libelleAction="Gérer les credentials"
+          (action)="ouvrirCredentials()"
+        />
+      </div>
+    }
 
     <main class="shell__ecran deborde-auto flex-1">
       <router-outlet />

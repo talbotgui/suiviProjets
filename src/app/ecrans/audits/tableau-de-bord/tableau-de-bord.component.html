@@ -31,9 +31,10 @@
           id="tableau-de-bord-bouton-annuler"
           type="button"
           class="bouton bouton--danger"
+          [disabled]="annulationDemandee()"
           (click)="annuler()"
         >
-          Annuler la campagne
+          {{ annulationDemandee() ? 'Annulation demandée…' : 'Annuler la campagne' }}
         </button>
       } @else {
         <p

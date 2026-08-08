@@ -1,0 +1,55 @@
+<div class="champ champ-recherche-riche">
+  <label [attr.for]="id()">{{ libelle() }}</label>
+  <input
+    #champ
+    [id]="id()"
+    type="text"
+    class="champ__controle"
+    role="combobox"
+    aria-autocomplete="list"
+    aria-haspopup="listbox"
+    autocomplete="off"
+    [attr.aria-expanded]="ouverte()"
+    [attr.aria-controls]="id() + '-listbox'"
+    [attr.aria-activedescendant]="indexActif() >= 0 ? id() + '-option-' + indexActif() : null"
+    [attr.aria-describedby]="aide() ? id() + '-aide' : null"
+    [value]="valeur()"
+    [placeholder]="placeholder() ?? ''"
+    [required]="requis()"
+    (input)="gererSaisie($event)"
+    (focus)="ouvrir()"
+    (blur)="fermerDifferee()"
+    (keydown)="gererTouche($event)"
+  />
+  @if (aide()) {
+    <span [id]="id() + '-aide'" class="champ__aide">{{ aide() }}</span>
+  }
+
+  @if (ouverte()) {
+    <ul [id]="id() + '-listbox'" role="listbox" class="champ-recherche-riche__liste">
+      @for (option of optionsFiltrees(); track option.valeur; let i = $index) {
+        @let segment = segmenterLibelle(option);
+        <li
+          [id]="id() + '-option-' + i"
+          role="option"
+          [attr.aria-selected]="i === indexActif()"
+          class="champ-recherche-riche__option"
+          [class.champ-recherche-riche__option--actif]="i === indexActif()"
+          (mousedown)="selectionnerDepuisSouris($event, option)"
+        >
+          <span>{{ segment.avant }}</span
+          ><mark>{{ segment.correspondance }}</mark
+          ><span>{{ segment.apres }}</span>
+        </li>
+      } @empty {
+        <li class="champ-recherche-riche__vide" role="presentation">
+          @if (valeur().trim().length > 0) {
+            Aucun résultat pour « {{ valeur() }} ».
+          } @else {
+            Aucun résultat.
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

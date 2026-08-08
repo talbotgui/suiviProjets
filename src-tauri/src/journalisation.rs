@@ -53,6 +53,29 @@ pub(crate) fn consigner_appel_connecteur(commande: &str, instance_nom: &str, cib
     );
 }
 
+/// Consigne l'issue d'un appel sortant vers un connecteur GitLab/Sonar, en complément de
+/// [`consigner_appel_connecteur`] qui n'en trace jusqu'ici que le déclenchement (R12-06, constat de test manuel :
+/// un audit resté durablement « en cours » sans qu'aucune anomalie n'apparaisse dans le journal technique, faute de
+/// toute consignation du chemin d'échec). Ne consigne que le nom de la catégorie d'anomalie (`Debug` de
+/// `ErreurConnecteur`, jamais un credential ni le contenu d'une réponse) en cas d'échec, rien en cas de succès (déjà
+/// couvert par [`consigner_appel_connecteur`]) ; transmet `resultat` inchangé (`commande`/`instance_nom`/`cible`
+/// reprennent les mêmes valeurs que celles déjà transmises à [`consigner_appel_connecteur`] pour le même appel),
+/// afin de s'insérer sans changer la valeur de retour au point d'appel.
+pub(crate) fn consigner_resultat_connecteur<T, E: std::fmt::Debug>(
+    commande: &str,
+    instance_nom: &str,
+    cible: &str,
+    resultat: Result<T, E>,
+) -> Result<T, E> {
+    if let Err(erreur) = &resultat {
+        log::warn!(
+            target: CIBLE_ACTION_TRACEE,
+            "{commande} : échec (instance={instance_nom}, cible={cible}) : {erreur:?}"
+        );
+    }
+    resultat
+}
+
 /// Consigne une écriture du fichier de données (R11-01b), au point de convergence unique
 /// `persistance::moteur::sauvegarder_fichier` : nom de la commande de la Façade à l'origine de cette écriture,
 /// jamais le contenu du fichier ni le mot de passe.
@@ -134,6 +157,24 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.chemin);
         }
+    }
+
+    #[test]
+    fn consigner_resultat_connecteur_renvoie_le_succes_inchange() {
+        let resultat: Result<u8, &str> = Ok(42);
+        assert_eq!(
+            consigner_resultat_connecteur("commande", "instance", "cible", resultat),
+            Ok(42)
+        );
+    }
+
+    #[test]
+    fn consigner_resultat_connecteur_renvoie_lechec_inchange() {
+        let resultat: Result<u8, &str> = Err("anomalie");
+        assert_eq!(
+            consigner_resultat_connecteur("commande", "instance", "cible", resultat),
+            Err("anomalie")
+        );
     }
 
     #[test]

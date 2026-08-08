@@ -38,14 +38,20 @@ pub(crate) async fn tester_connectivite(
     );
     let client = etat.client_http();
     let client = &client;
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::tester_connectivite(&instance.url_base, &credential, client).await
         }
         TypeInstance::Sonar => {
             sonar::tester_connectivite(&instance.url_base, &credential, client).await
         }
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "testerConnectivite",
+        &instance.nom,
+        "test de connectivité",
+        resultat,
+    )
 }
 
 /// Enregistre les credentials de la session courante en mémoire côté cœur natif (US-003), en miroir du Store
@@ -97,7 +103,7 @@ pub(crate) async fn interroger_branches(
         &id_externe,
     );
     let client = etat.client_http();
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::interroger_branches(
                 &instance.url_base,
@@ -113,7 +119,13 @@ pub(crate) async fn interroger_branches(
         TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
             message: "Type de source incompatible avec cette opération".to_string(),
         }),
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "interrogerBranches",
+        &instance.nom,
+        &id_externe,
+        resultat,
+    )
 }
 
 /// Liste les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une Instance, pour
@@ -143,12 +155,18 @@ pub(crate) async fn lister_sources_disponibles(
         "toutes les sources accessibles",
     );
     let client = etat.client_http();
-    match instance.type_instance {
+    let resultat = match instance.type_instance {
         TypeInstance::Gitlab => {
             gitlab::lister_projets(&instance.url_base, &credential, &client).await
         }
         TypeInstance::Sonar => {
             sonar::rechercher_projets(&instance.url_base, &credential, &client).await
         }
-    }
+    };
+    crate::journalisation::consigner_resultat_connecteur(
+        "listerSourcesDisponibles",
+        &instance.nom,
+        "toutes les sources accessibles",
+        resultat,
+    )
 }

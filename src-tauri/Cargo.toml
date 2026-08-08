@@ -31,6 +31,10 @@ tauri-plugin-log = "2"
 # Sélection de fichier exclusivement via les API natives de l'OS (jamais une saisie libre de chemin), requis par
 # l'écran de Démarrage (US-001, US-002, cf. docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties).
 tauri-plugin-dialog = "2"
+# Ouverture d'URL externe dans le navigateur système par défaut (mention d'attribution du pied de page de la
+# sidebar, R12-05) : la webview Tauri n'ouvre jamais elle-même une navigation externe (`target="_blank"` silencieusement
+# sans effet hors de ce greffon), à la différence d'un navigateur classique (`ng serve`).
+tauri-plugin-opener = "2"
 argon2 = "0.5.3"
 aes-gcm = "0.10.3"
 pbkdf2 = "0.12.2"

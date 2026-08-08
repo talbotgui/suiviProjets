@@ -15,7 +15,15 @@
 // (`docs/02_documentation/13_conceptionDetaillee.md`, séquence « Réaliser une campagne d'audit » : « l'Orchestrateur
 // de campagne met à jour l'état de progression directement dans le Store d'état applicatif »). Ce service reste
 // donc, à la différence du Connecteur croisé (pur), porteur d'un unique état interne non partagé
-// (`annulationDemandee`, un simple drapeau de contrôle du pipeline RxJS, jamais lu par un écran).
+// (`annulationDemandee`, un drapeau de contrôle du pipeline RxJS).
+//
+// Correction (Phase 12, constat R12-07) : `annulationDemandee` était jusqu'ici un simple booléen privé, jamais lu
+// par un écran — un clic sur « Annuler la campagne » (Tableau de bord d'exécution) ne produisait donc strictement
+// aucun retour visuel tant que les projets déjà en cours d'audit n'avaient pas atteint leur terme normalement
+// (RG-018 : aucun désabonnement, résultats acquis conservés), ce qui pouvait durer plusieurs minutes selon le
+// nombre de sources et de connecteurs concernés. Devenu un signal en lecture seule exposé aux écrans
+// (`annulationDemandee`), pour que le bouton se désactive et change de libellé dès la demande, sans attendre la
+// fin effective de l'annulation.
 //
 // Périmètre acté aux incréments 4/5 (décisions actées lors de sessions de clarification préalables avec
 // l'utilisateur, cf. rapport de développement de cette phase) :
@@ -31,7 +39,8 @@
 //   - Le rapport d'anomalies détaillé (F08, RG-021 : catégorie/message/action suggérée/regroupement) reste un
 //     incrément ultérieur ; les anomalies sont collectées ici sous une forme minimale (`{ indicateur, sourceId,
 //     anomalie }`), décision arbitraire documentée dans le rapport de développement de cette phase.
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import type { Signal, WritableSignal } from '@angular/core';
 import { EMPTY, firstValueFrom, from } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import type {
@@ -103,7 +112,16 @@ export class OrchestrateurCampagneService {
     inject(DonneesApplicationService);
   private readonly etatSession: EtatSessionService = inject(EtatSessionService);
 
-  private annulationDemandee = false;
+  private readonly annulationDemandeeInterne: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Indique si l'annulation de la campagne en cours a été demandée (RG-018, R12-07) : permet à un écran (Tableau
+   * de bord d'exécution) de donner un retour visuel immédiat au clic sur « Annuler la campagne », alors même que
+   * les projets déjà en cours d'audit continuent normalement jusqu'à leur terme (aucun désabonnement, résultats
+   * acquis conservés) et que la campagne peut donc rester visuellement « en cours » un moment après la demande.
+   * Remis à `false` au lancement de chaque nouvelle campagne ({@link lancerCampagne}).
+   */
+  public readonly annulationDemandee: Signal<boolean> = this.annulationDemandeeInterne.asReadonly();
 
   /**
    * Estime le coût prévisionnel d'un périmètre de campagne et contrôle la présence en mémoire des credentials
@@ -147,7 +165,7 @@ export class OrchestrateurCampagneService {
     perimetre: readonly string[],
     motDePasse: string,
   ): Promise<ResultatMutationAdministration> {
-    this.annulationDemandee = false;
+    this.annulationDemandeeInterne.set(false);
     this.etatSession.demarrerProgressionCampagne(perimetre);
 
     const campagneId = crypto.randomUUID();
@@ -155,7 +173,7 @@ export class OrchestrateurCampagneService {
     const resultatsProjets = await firstValueFrom(
       from(perimetre).pipe(
         mergeMap((projetId) => {
-          if (this.annulationDemandee) {
+          if (this.annulationDemandeeInterne()) {
             return EMPTY;
           }
           return from(this.auditerProjet(projetId, campagneId));
@@ -196,7 +214,7 @@ export class OrchestrateurCampagneService {
    * soumis ; les projets ainsi non traités rejoignent le statut « ignoré ».
    */
   public annulerCampagne(): void {
-    this.annulationDemandee = true;
+    this.annulationDemandeeInterne.set(true);
   }
 
   /**

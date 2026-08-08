@@ -33,7 +33,10 @@
 //! technique (`mod journalisation`) est désormais actif en développement comme en production (retrait de la
 //! restriction `cfg!(debug_assertions)`), écrit dans un dossier `logs/` à côté de l'exécutable avec rotation
 //! quotidienne et rétention de 30 jours ; les commandes appelant GitLab/Sonar et le point de convergence
-//! `persistance::moteur::sauvegarder_fichier` y consignent chacun de leurs appels.
+//! `persistance::moteur::sauvegarder_fichier` y consignent chacun de leurs appels, y compris désormais leurs
+//! anomalies (`ErreurConnecteur`), pas seulement leur déclenchement (R12-06). Phase 12 (R12-05) : le greffon
+//! `tauri_plugin_opener` est ajouté pour l'ouverture de la mention d'attribution de la sidebar (lien GitHub) dans
+//! le navigateur système par défaut, la webview ne le faisant jamais d'elle-même pour une navigation externe.
 
 mod commandes;
 mod connecteurs;
@@ -55,6 +58,7 @@ pub fn run() {
     let resultat = tauri::Builder::default()
         .manage(EtatSession::nouveau())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commandes::fichier::creer_fichier,
             commandes::fichier::charger_fichier,

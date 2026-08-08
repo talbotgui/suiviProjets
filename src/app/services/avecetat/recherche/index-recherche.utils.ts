@@ -322,11 +322,14 @@ export class IndexRechercheUtils {
   /**
    * Replie les accents d'une chaîne (décomposition Unicode NFD, qui sépare chaque lettre accentuée en une lettre de
    * base suivie d'une marque diacritique combinante, puis suppression de ces seules marques), pour que la
-   * comparaison de termes de {@link rechercher} soit insensible aux accents (R10-18) en plus de la casse.
+   * comparaison de termes de {@link rechercher} soit insensible aux accents (R10-18) en plus de la casse. Visibilité
+   * publique (C11-02) : réutilisée telle quelle par `SqmChampRechercheRicheComponent`
+   * (`composants/champ-recherche-riche/`) pour le même besoin de comparaison insensible aux accents, plutôt que d'en
+   * dupliquer une seconde implémentation.
    * @param valeur - Chaîne à traiter.
    * @returns La chaîne sans accents.
    */
-  private static replierAccents(valeur: string): string {
+  public static replierAccents(valeur: string): string {
     return Array.from(valeur.normalize('NFD'))
       .filter((caractere) => {
         const codePoint = caractere.codePointAt(0) ?? 0;

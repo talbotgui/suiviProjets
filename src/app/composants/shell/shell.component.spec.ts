@@ -4,18 +4,23 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import type { Brouillon, DonneesRacine } from '../../services/avecetat/etat/types-donnees';
+import { TypeSource } from '../../services/avecetat/etat/types-donnees';
+import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmShellComponent } from './shell.component';
 
 // `isTauri` toujours vrai ici : ce test exerce le passage réel par `invoke` (cf. `InvocationCommandeUtils`), sur
 // le modèle de `facade-commandes.service.spec.ts`.
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
+jest.mock('@tauri-apps/plugin-opener', () => ({ openUrl: jest.fn() }));
 
 const invokeSimule = jest.mocked(invoke);
 const isTauriSimule = jest.mocked(isTauri);
+const openUrlSimule = jest.mocked(openUrl);
 
 /**
  * Composant factice utilisé comme cible des routes de test : seul son enregistrement importe, jamais son rendu.
@@ -87,6 +92,7 @@ describe('SqmShellComponent', () => {
 
   beforeEach(async () => {
     invokeSimule.mockReset();
+    openUrlSimule.mockReset();
     isTauriSimule.mockReturnValue(true);
     await TestBed.configureTestingModule({
       imports: [SqmShellComponent],
@@ -122,6 +128,26 @@ describe('SqmShellComponent', () => {
     );
     expect(lienListeTravail).not.toBeUndefined();
     expect(lienListeTravail?.getAttribute('href')).toBe('/liste-travail');
+  });
+
+  it('présente les sept entrées de sidebar dans l’ordre fixe retenu par C11-03', () => {
+    const fixture = TestBed.createComponent(SqmShellComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    const entrees = Array.from(
+      element.querySelectorAll<HTMLElement>('.shell__sidebar .shell__lien'),
+    ).map((candidat) => candidat.id);
+
+    expect(entrees).toEqual([
+      'shell-lien-administration',
+      'shell-lien-audits',
+      'shell-lien-synthese-audits',
+      'shell-lien-synthese-graphique',
+      'shell-lien-liste-travail',
+      'shell-lien-accueil',
+      'shell-lien-parametrage',
+    ]);
   });
 
   it('navigue vers Synthèse des audits au clic sur l’entrée de sidebar correspondante', async () => {
@@ -462,6 +488,210 @@ describe('SqmShellComponent', () => {
       fixture.componentInstance.fermerAvertissementTaille();
 
       expect(fixture.componentInstance.avertissementTailleActif()).toBe(false);
+    });
+  });
+
+  describe('bandeau global de credential manquant (RG-037, C11-04)', () => {
+    it('n’affiche pas le bandeau tant qu’aucun fichier n’est ouvert', () => {
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(fixture.componentInstance.credentialManquantActif()).toBe(false);
+      expect(element.querySelector('app-bandeau-alerte')).toBeNull();
+    });
+
+    it('affiche le bandeau quand une instance utilisée par une source du fichier ouvert n’a pas de credential', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const groupeId = donneesApplication.creerGroupe({
+        nom: 'Socle Comptable',
+        description: '',
+        instances: [
+          {
+            id: 'instance-gitlab',
+            type: TypeInstance.Gitlab,
+            nom: 'gitlab-prod',
+            urlBase: 'https://gitlab.test',
+          },
+        ],
+      });
+      const projetId = donneesApplication.creerProjet(groupeId, {
+        nom: 'API Facturation',
+        description: '',
+      });
+      donneesApplication.creerSource(groupeId, projetId, {
+        instanceId: 'instance-gitlab',
+        type: TypeSource.DepotGitlab,
+        idExterne: '1234',
+        refAuditee: undefined,
+      });
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(fixture.componentInstance.credentialManquantActif()).toBe(true);
+      expect(fixture.componentInstance.messageCredentialManquant()).toContain('gitlab-prod');
+      expect(element.querySelector('app-bandeau-alerte')).not.toBeNull();
+    });
+
+    it('n’affiche pas le bandeau une fois la session verrouillée, même si le credential reste manquant', async () => {
+      invokeSimule.mockResolvedValue(undefined);
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const groupeId = donneesApplication.creerGroupe({
+        nom: 'Socle Comptable',
+        description: '',
+        instances: [
+          {
+            id: 'instance-gitlab',
+            type: TypeInstance.Gitlab,
+            nom: 'gitlab-prod',
+            urlBase: 'https://gitlab.test',
+          },
+        ],
+      });
+      const projetId = donneesApplication.creerProjet(groupeId, {
+        nom: 'API Facturation',
+        description: '',
+      });
+      donneesApplication.creerSource(groupeId, projetId, {
+        instanceId: 'instance-gitlab',
+        type: TypeSource.DepotGitlab,
+        idExterne: '1234',
+        refAuditee: undefined,
+      });
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      expect(fixture.componentInstance.credentialManquantActif()).toBe(true);
+
+      await fixture.componentInstance.verrouillerManuellement();
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(fixture.componentInstance.credentialManquantActif()).toBe(false);
+      expect(element.querySelector('app-bandeau-alerte')).toBeNull();
+    });
+
+    it('n’affiche pas le bandeau une fois le credential mémorisé pour l’instance utilisée', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const groupeId = donneesApplication.creerGroupe({
+        nom: 'Socle Comptable',
+        description: '',
+        instances: [
+          {
+            id: 'instance-gitlab',
+            type: TypeInstance.Gitlab,
+            nom: 'gitlab-prod',
+            urlBase: 'https://gitlab.test',
+          },
+        ],
+      });
+      const projetId = donneesApplication.creerProjet(groupeId, {
+        nom: 'API Facturation',
+        description: '',
+      });
+      donneesApplication.creerSource(groupeId, projetId, {
+        instanceId: 'instance-gitlab',
+        type: TypeSource.DepotGitlab,
+        idExterne: '1234',
+        refAuditee: undefined,
+      });
+      etatSession.definirCredentials({ 'instance-gitlab': 'jeton-secret' });
+
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.credentialManquantActif()).toBe(false);
+    });
+
+    it('n’affiche pas le bandeau pour une instance non référencée par une source du fichier ouvert', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      donneesApplication.creerGroupe({
+        nom: 'Socle Comptable',
+        description: '',
+        instances: [
+          {
+            id: 'instance-gitlab',
+            type: TypeInstance.Gitlab,
+            nom: 'gitlab-prod',
+            urlBase: 'https://gitlab.test',
+          },
+        ],
+      });
+
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.credentialManquantActif()).toBe(false);
+    });
+
+    it('ouvre la Gestion des credentials via l’action du bandeau', async () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+      etatSession.ouvrirFichier('/tmp/donnees-test.sqm');
+      const groupeId = donneesApplication.creerGroupe({
+        nom: 'Socle Comptable',
+        description: '',
+        instances: [
+          {
+            id: 'instance-gitlab',
+            type: TypeInstance.Gitlab,
+            nom: 'gitlab-prod',
+            urlBase: 'https://gitlab.test',
+          },
+        ],
+      });
+      const projetId = donneesApplication.creerProjet(groupeId, {
+        nom: 'API Facturation',
+        description: '',
+      });
+      donneesApplication.creerSource(groupeId, projetId, {
+        instanceId: 'instance-gitlab',
+        type: TypeSource.DepotGitlab,
+        idExterne: '1234',
+        refAuditee: undefined,
+      });
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      element
+        .querySelector<HTMLButtonElement>('app-bandeau-alerte button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await fixture.whenStable();
+
+      expect(router.url).toBe('/credentials');
+    });
+  });
+
+  describe('mention d’attribution (lien GitHub, R12-05)', () => {
+    it('ouvre le lien dans le navigateur système via le greffon opener en contexte Tauri', () => {
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const lien = element.querySelector<HTMLAnchorElement>('#shell-lien-attribution-github');
+      const evenement = new MouseEvent('click', { bubbles: true, cancelable: true });
+
+      lien?.dispatchEvent(evenement);
+
+      expect(evenement.defaultPrevented).toBe(true);
+      expect(openUrlSimule).toHaveBeenCalledWith('https://github.com/talbotgui/suiviProjets');
+    });
+
+    it('laisse la navigation native du navigateur suivre son cours hors contexte Tauri', () => {
+      isTauriSimule.mockReturnValue(false);
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const lien = element.querySelector<HTMLAnchorElement>('#shell-lien-attribution-github');
+      const evenement = new MouseEvent('click', { bubbles: true, cancelable: true });
+
+      lien?.dispatchEvent(evenement);
+
+      expect(evenement.defaultPrevented).toBe(false);
+      expect(openUrlSimule).not.toHaveBeenCalled();
     });
   });
 });

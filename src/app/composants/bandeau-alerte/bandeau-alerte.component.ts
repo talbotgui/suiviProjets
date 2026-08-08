@@ -2,11 +2,14 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Composant transverse « Bandeau d'alerte pleine largeur » de la charte d'ergonomie (cf.
-// docs/02_documentation/10_charteErgonomie.md#composants-dinterface-réutilisables), utilisé exclusivement pour les
-// signaux prioritaires (membre inconnu, RG-009) : reste visible au-dessus du contenu qu'il concerne, y compris
-// après filtrage. Sur le modèle du gabarit `SqmExempleReferenceComponent` : n'est affiché que si le composant
-// appelant le rend visible (aucun état de visibilité interne, aucun mécanisme de fermeture définitive qui
-// permettrait de le masquer malgré RG-009).
+// docs/02_documentation/10_charteErgonomie.md#composants-dinterface-réutilisables), pour tout signal prioritaire
+// qui doit rester visible au-dessus du contenu qu'il concerne, y compris après filtrage : membre inconnu (RG-009,
+// bandeau local à un écran), et depuis C11-04 (Phase 11), credential manquant pour une instance utilisée par le
+// fichier ouvert (RG-037, bandeau global instancié par `composants/shell/`, sous l'entête, sur tout écran).
+// Généralisation actée par arbitrage humain explicite plutôt qu'un second composant dédié dupliquant ce même
+// gabarit (cf. C11-04, rapport de développement de cet incrément). Sur le modèle du gabarit
+// `SqmExempleReferenceComponent` : n'est affiché que si le composant appelant le rend visible (aucun état de
+// visibilité interne, aucun mécanisme de fermeture définitive qui permettrait de le masquer malgré ces signaux).
 import { Component, input, output } from '@angular/core';
 import type { InputSignal, OutputEmitterRef } from '@angular/core';
 

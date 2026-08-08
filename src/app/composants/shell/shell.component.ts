@@ -9,10 +9,13 @@
 //
 // Décisions arbitraires (à valider par un humain, cf. rapport de développement de cet incrément) :
 // - La sidebar reprend l'ordre exact des sept entrées énuméré par `08_arborescenceNavigation.md#règles-de-
-//   navigation` (Accueil, Synthèse des audits, Synthèse graphique, Liste de travail, Audits, Administration,
-//   Paramétrage). Toutes les entrées portent désormais une navigation active depuis la Phase 8 (`SqmListeTravailComponent`,
-//   US-020) : jusqu'à cette phase, l'entrée « Liste de travail » était rendue non interactive (`aria-disabled`, sur
-//   le modèle de la section « À VENIR » de la maquette de référence), son écran n'existant pas encore.
+//   navigation` : Administration, Audits, Synthèse des audits, Synthèse graphique, Liste de travail, Accueil,
+//   Paramétrage — ordre fixe révisé par C11-03 (Phase 11, arbitrage humain explicite du 2026-08-08), qui remplace
+//   l'ordre initial de cette Phase 6 (Accueil en tête) pour refléter la séquence d'usage typique (constituer son
+//   périmètre puis l'auditer avant de consulter des résultats). Toutes les entrées portent une navigation active
+//   depuis la Phase 8 (`SqmListeTravailComponent`, US-020) : jusqu'à cette phase, l'entrée « Liste de travail »
+//   était rendue non interactive (`aria-disabled`, sur le modèle de la section « À VENIR » de la maquette de
+//   référence), son écran n'existant pas encore.
 // - L'entrée « Audits » applique la règle de routage intelligent documentée par `08_arborescenceNavigation.md`
 //   (« ouvre par défaut Constitution de campagne ; ouvre le Tableau de bord d'exécution si une campagne est en
 //   cours ; ouvre l'écran de Brouillon si un brouillon reste à traiter ») : sa cible n'étant pas statique, elle est
@@ -48,9 +51,11 @@
 //   utilisateur (clavier ou clic, mêmes événements globaux que `gererRaccourciClavier`), sur le modèle de mise en
 //   place/nettoyage de minuteur déjà retenu par `SqmGraphiqueEvolutionComponent` (`effect()` + `DestroyRef.onDestroy`
 //   plutôt qu'une implémentation de `OnDestroy`).
-import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
-import type { WritableSignal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import type { Signal, WritableSignal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { isTauri } from '@tauri-apps/api/core';
+import { SqmBandeauAlerteComponent } from '../bandeau-alerte/bandeau-alerte.component';
 import { SqmConfirmationMotDePasseComponent } from '../confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmIndicateurChargementComponent } from '../indicateur-chargement/indicateur-chargement.component';
 import { SqmNotificationComponent } from '../notification/notification.component';
@@ -60,7 +65,9 @@ import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-
 import { EtatFichier, EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import type { StatutExecutionProjet } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
+import { OuvreurLienUtils } from '../../services/sansetat/commandes/ouvreur-lien.utils';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
+import type { Instance } from '../../services/sansetat/commandes/types-facade';
 
 /**
  * Délai d'inactivité par défaut, en minutes, avant verrouillage automatique de la session (RNF-014), utilisé tant
@@ -80,6 +87,7 @@ const DELAI_INACTIVITE_MINUTES_PAR_DEFAUT = 15;
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
+    SqmBandeauAlerteComponent,
     SqmConfirmationMotDePasseComponent,
     SqmIndicateurChargementComponent,
     SqmNotificationComponent,
@@ -120,6 +128,15 @@ export class SqmShellComponent {
    * optimiste, sans conséquence pratique compte tenu de la marge laissée par le seuil par défaut (10 Mio).
    */
   public readonly avertissementTailleActif: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Indique si le bandeau global de credential manquant (US-003, US-004, RG-037, C11-04) doit être affiché : au
+   * moins une instance GitLab/Sonar référencée par une source du fichier ouvert n'a pas de credential mémorisé pour
+   * la session en cours. Toujours `false` tant qu'aucun fichier n'est ouvert (ou pendant un verrouillage).
+   */
+  public readonly credentialManquantActif: Signal<boolean> = computed(
+    () => this.instancesUtiliseesSansCredential().length > 0,
+  );
 
   /**
    * Construit le Shell : met en place l'effet réactif qui arme ou désarme le minuteur de verrouillage automatique
@@ -181,10 +198,42 @@ export class SqmShellComponent {
   }
 
   /**
-   * Ouvre l'écran de Gestion des credentials (bouton 🔑 de la barre supérieure, US-003, US-004, US-031).
+   * Ouvre l'écran de Gestion des credentials (bouton 🔑 de la barre supérieure, US-003, US-004, US-031 ; également
+   * action du bandeau global de credential manquant, RG-037, C11-04).
    */
   public ouvrirCredentials(): void {
     void this.router.navigateByUrl('/credentials');
+  }
+
+  /**
+   * Ouvre la mention d'attribution du pied de page de la sidebar (lien vers le dépôt GitHub du projet) dans le
+   * navigateur système par défaut plutôt que dans la webview applicative (R12-05) : la navigation par défaut de
+   * l'élément `<a>` n'a aucun effet dans la webview Tauri packagée, à la différence d'un navigateur classique (`ng
+   * serve`), qui n'a donc besoin d'aucune intervention ici (`preventDefault` réservé au seul contexte Tauri).
+   * @param evenement - Événement de clic sur le lien d'attribution.
+   * @param url - URL du dépôt GitHub, reprise telle quelle de l'attribut `href` du gabarit.
+   */
+  public ouvrirAttributionGithub(evenement: MouseEvent, url: string): void {
+    if (!isTauri()) {
+      return;
+    }
+    evenement.preventDefault();
+    void OuvreurLienUtils.ouvrir(url);
+  }
+
+  /**
+   * Message du bandeau global de credential manquant (RG-037, C11-04), énumérant les instances concernées par leur
+   * nom.
+   * @returns Le message à afficher, chaîne vide si {@link credentialManquantActif} vaut `false` (le composant
+   * appelant ne rend alors pas le bandeau, cf. gabarit).
+   */
+  public messageCredentialManquant(): string {
+    const instances = this.instancesUtiliseesSansCredential();
+    if (instances.length === 0) {
+      return '';
+    }
+    const noms = instances.map((instance) => instance.nom).join(', ');
+    return `Aucun credential mémorisé pour cette session pour : ${noms}. Renseignez-le pour éviter un échec de connexion.`;
   }
 
   /**
@@ -341,6 +390,32 @@ export class SqmShellComponent {
     return progression.perimetre.some(
       (projetId) => !statutsTerminaux.has(progression.projets[projetId]?.statut ?? 'enAttente'),
     );
+  }
+
+  /**
+   * Instances GitLab/Sonar référencées par au moins une source du fichier ouvert et actuellement dépourvues de
+   * credential mémorisé pour la session en cours (RG-037, C11-04). Tableau vide tant qu'aucun fichier n'est ouvert
+   * (ou pendant un verrouillage, RG-004 : les credentials sont alors purgés eux aussi, un signal serait trompeur
+   * sous la superposition de Verrouillage).
+   * @returns Les instances concernées, dans l'ordre de définition des groupes puis des instances de chaque groupe.
+   */
+  private instancesUtiliseesSansCredential(): readonly Instance[] {
+    if (this.etatSession.etatFichier() !== EtatFichier.Ouvert) {
+      return [];
+    }
+    const credentials = this.etatSession.credentials();
+    const resultat: Instance[] = [];
+    for (const groupe of this.donneesApplication.groupes()) {
+      const instanceIdsUtilisees = new Set(
+        groupe.projets.flatMap((projet) => projet.sources.map((source) => source.instanceId)),
+      );
+      for (const instance of groupe.instances) {
+        if (instanceIdsUtilisees.has(instance.id) && !credentials?.[instance.id]) {
+          resultat.push(instance);
+        }
+      }
+    }
+    return resultat;
   }
 
   /**
