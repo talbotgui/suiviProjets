@@ -39,10 +39,10 @@ L'application ne comporte pas de système de comptes ni de rôles applicatifs in
 
 Conformément à [RNF-016](./07_exigencesNonFonctionnelles.md#sécurité), les dépendances du projet sont verrouillées par fichier de lock et auditées en continu :
 
-- `cargo audit` (Rust) et `npm audit` (Angular/npm) sont exécutés systématiquement en intégration continue (cf. [mise en place du pipeline, étape 12](./18_pic.md#mise-en-place-du-pipeline)) et recommandés en local avant tout commit introduisant une nouvelle dépendance.
-- Toute vulnérabilité de sévérité critique ou élevée détectée bloque l'intégration continue jusqu'à mise à jour de la dépendance ou justification documentée d'exception.
-- L'analyse est déclenchée à chaque commit poussé, complétée par une exécution périodique indépendante des commits (fréquence précisée à l'étape 12), afin de détecter les vulnérabilités publiées après le dernier commit touchant une dépendance restée inchangée.
-- Les exceptions (vulnérabilité connue sans correctif disponible, jugée non exploitable dans le contexte de cette application locale) sont documentées explicitement, avec justification et date de réévaluation, dans un fichier d'exceptions versionné dans le dépôt.
+- `cargo audit --json` (Rust) et `npm audit --json` (Angular/npm) sont exécutés dans le pipeline d'intégration continue (cf. [mise en place du pipeline, étape 12](./18_pic.md#mise-en-place-du-pipeline)) et recommandés en local avant tout commit introduisant une nouvelle dépendance.
+- Toute vulnérabilité de sévérité critique ou élevée détectée bloque le pipeline jusqu'à mise à jour de la dépendance ou justification documentée d'exception.
+- L'analyse ne se déclenche plus automatiquement à chaque commit (décision révisée à la [Phase 14](../03_plan/plan_13_developpement.md#phase-14--intégration-continue-empaquetage-et-publication), pour ne pas consommer inutilement de minutes d'exécution GitHub Actions) : elle est rejouée à la demande (`workflow_dispatch`) et systématiquement avant toute publication de release, ce qui couvre en pratique les vulnérabilités publiées après le dernier audit d'une dépendance restée inchangée dès lors qu'une nouvelle version est publiée.
+- Les exceptions (vulnérabilité connue sans correctif disponible, jugée non exploitable dans le contexte de cette application locale) sont documentées explicitement, avec justification et date de réévaluation, dans un fichier d'exceptions versionné unique à la racine du dépôt, `audit-exceptions.json`, commun aux deux écosystèmes (un seul format à maintenir plutôt qu'un mécanisme par outil, `cargo audit` ne portant pas nativement de justification/date) : chaque entrée y précise `ecosysteme` (`cargo`/`npm`), `id` (identifiant RUSTSEC/GHSA de l'avis), `paquet`, `gravite`, `justification` et `dateReevaluation`.
 
 ## Journalisation des événements sensibles
 

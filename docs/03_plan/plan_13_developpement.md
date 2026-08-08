@@ -251,16 +251,29 @@ Critère de sortie : un rendu visuel fin, produit à l'aide de ClaudeDesign, est
 
 Objectif : compléter le workflow GitHub Actions au-delà du socle de la phase 0 et réaliser une première publication.
 
+### Arbitrage humain explicite précédant cette phase
+
+Trois points tranchés par l'utilisateur, avant tout développement, qui révisent le comportement documenté à l'origine par [18_pic.md#mise-en-place-du-pipeline](../02_documentation/18_pic.md#mise-en-place-du-pipeline) (déclenchement automatique sur push/PR jusqu'aux tests e2e et SCA inclus) :
+
+1. **Aucune exécution systématique des Actions GitHub** : ni `validation.yml` ni `publication.yml` ne se déclenchent plus automatiquement sur push/pull request, pour ne pas consommer inutilement de minutes d'exécution sur un projet mené en solo. `validation.yml` (analyse statique, tests unitaires et couverture, e2e, SCA) devient intégralement à la demande (`workflow_dispatch`), déjà anticipé comme mode alternatif par `18_pic.md#usage-courant` avant cette révision. `publication.yml` ré-exécute cette validation en préalable bloquant à chaque build/publication (tag `vX.Y.Z` poussé ou `workflow_dispatch`), puisqu'elle ne tourne plus automatiquement à chaque commit.
+2. **Génération et publication de la couverture de code (`cargo-llvm-cov` + Jest/Istanbul) à chaque création de release**, sur GitHub Pages (piste alternative écartée : artefact de run éphémère, jugé moins pérenne), avec lien inséré dans les notes de la Release. Nécessite l'activation préalable de GitHub Pages sur le dépôt (action humaine, Settings → Pages → Source : GitHub Actions).
+3. **Build multiplateforme (matrice Windows/macOS/Linux) construit dès cet incrément**, plutôt que repoussé après un premier increment Windows seul.
+
+Réalisé en un seul incrément (décision explicite de l'utilisateur, pas de sous-découpage séparément validé à la différence des Phases 10/11). Documentation mise à jour en conséquence avant le code : `18_pic.md`, `16_normesTests.md#stratégie-de-couverture-de-code`, `15_normesSecurite.md#analyse-des-dépendances-vulnérables` (format du fichier d'exceptions unique `audit-exceptions.json`, cargo+npm), synthèses `.claude/rules/09-normes-developpement.md`/`10-normes-securite.md`/`11-normes-tests.md`.
+
+### Actions
+
 | action | référence |
 |---|---|
-| Étapes fonctionnelles du pipeline (analyse statique, tests unitaires et couverture, [tests de bout en bout Playwright](#phase-12--test-de-bout-en-bout-playwright-ng-serve), SCA) | [mise en place du pipeline, étape 12](../02_documentation/18_pic.md#mise-en-place-du-pipeline) |
-| Intégration de `cargo-llvm-cov` et de la couverture Jest (Istanbul) au pipeline (le harnais `tauri-driver`/WebDriver initialement prévu ici n'est plus nécessaire, la [Phase 12](#phase-12--test-de-bout-en-bout-playwright-ng-serve) ayant retenu Playwright contre `ng serve`) | [plan de l'étape 11](./plan_11_normesTests.md#actions-issues-de-létape-11--normes-de-tests-automatisés) |
-| Intégration `cargo audit`/`npm audit`, fichier d'exceptions | [plan de l'étape 10](./plan_10_normesSecurite.md#actions-issues-de-létape-10--normes-de-sécurité-applicative) |
-| Secret de signature, permissions `contents: write`, configuration du updater Tauri | [plan de l'étape 12](./plan_12_environnementsEtCI.md#actions-issues-de-létape-12--environnements-intégration-continue-et-mise-en-production) |
-| Build multiplateforme (dont l'archive ZIP portable Windows), déclenchement par tag ou `workflow_dispatch` | [stratégie de build, empaquetage et publication, étape 12](../02_documentation/19_environnementProduction.md#stratégie-de-build-empaquetage-et-publication) |
-| Fonction d'export du rapport de diagnostic local, gestionnaire global d'erreurs non gérées | [plan de l'étape 12](./plan_12_environnementsEtCI.md#actions-issues-de-létape-12--environnements-intégration-continue-et-mise-en-production) |
+| `validation.yml` restructuré : trigger `workflow_dispatch` uniquement (plus de `push`/`pull_request`) ; analyse statique, tests unitaires et couverture, [tests de bout en bout Playwright](#phase-12--test-de-bout-en-bout-playwright-ng-serve), SCA | [mise en place du pipeline, étape 12](../02_documentation/18_pic.md#mise-en-place-du-pipeline) |
+| Intégration de `cargo-llvm-cov` (seuil global 80 %) et de la couverture Jest (Istanbul, seuils déjà configurés par périmètre) au pipeline, reporter `html` pour les deux (le harnais `tauri-driver`/WebDriver initialement prévu ici n'est plus nécessaire, la [Phase 12](#phase-12--test-de-bout-en-bout-playwright-ng-serve) ayant retenu Playwright contre `ng serve`) | [plan de l'étape 11](./plan_11_normesTests.md#actions-issues-de-létape-11--normes-de-tests-automatisés) |
+| Intégration `cargo audit`/`npm audit` (sortie JSON), fichier d'exceptions unique `audit-exceptions.json` (cargo+npm) | [plan de l'étape 10](./plan_10_normesSecurite.md#actions-issues-de-létape-10--normes-de-sécurité-applicative) |
+| Génération du site de couverture combiné (Rust + TypeScript) et déploiement sur GitHub Pages à chaque release (`actions/upload-pages-artifact`/`actions/deploy-pages`, permissions `pages: write`/`id-token: write`), lien inséré dans les notes de la Release | Arbitrage ci-dessus |
+| `publication.yml` (renommage de `publication-windows.yml`) : matrice `ubuntu-latest`/`windows-latest`/`macos-latest`, déclenchement par tag `v*` poussé ou `workflow_dispatch`, appel du job de validation en préalable bloquant | [stratégie de build, empaquetage et publication, étape 12](../02_documentation/19_environnementProduction.md#stratégie-de-build-empaquetage-et-publication) |
+| Secret de signature, permissions `contents: write`, configuration du updater Tauri | [plan de l'étape 12](./plan_12_environnementsEtCI.md#actions-issues-de-létape-12--environnements-intégration-continue-et-mise-en-production) — différé, plugin `tauri-plugin-updater` non encore intégré (décision déjà actée dans l'en-tête de `publication-windows.yml`, non remise en cause par cet incrément) |
+| Fonction d'export du rapport de diagnostic local, gestionnaire global d'erreurs non gérées | [plan de l'étape 12](./plan_12_environnementsEtCI.md#actions-issues-de-létape-12--environnements-intégration-continue-et-mise-en-production) — hors périmètre de cet incrément (action applicative, sans lien avec le pipeline CI/couverture/release), reporté à un incrément ultérieur |
 
-Critère de sortie : une GitHub Release `v0.1.0` publiée, installable sur les trois systèmes d'exploitation cibles, mise à jour automatique fonctionnelle.
+Critère de sortie : une GitHub Release `v0.1.0` publiée, installable sur les trois systèmes d'exploitation cibles, couverture de code générée et publiée sur GitHub Pages à cette même release. Mise à jour automatique (updater Tauri) non couverte par cet incrément (cf. ligne différée ci-dessus), reportée à un incrément ultérieur de cette même phase.
 
 ## Phase 15 — Recette et durcissement avant première version utilisable
 

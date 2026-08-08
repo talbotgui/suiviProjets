@@ -3,6 +3,8 @@
 #
 # Toolchain Rust figée pour l'ensemble du dépôt (cf. docs/02_documentation/14_normesDeveloppement.md#gestion-des-dépendances) :
 # version exacte et composants requis (rustfmt, clippy) déjà installés dans cet environnement de développement.
+# llvm-tools-preview ajouté en Phase 14 (docs/03_plan/plan_13_developpement.md#phase-14--intégration-continue-empaquetage-et-publication) :
+# requis par cargo-llvm-cov pour la mesure de couverture Rust dans le pipeline.
 [toolchain]
 channel = "1.97.1"
-components = ["rustfmt", "clippy"]
+components = ["rustfmt", "clippy", "llvm-tools-preview"]

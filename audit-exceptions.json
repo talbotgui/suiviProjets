@@ -1,0 +1,4 @@
+{
+  "_lisezMoi": "Fichier d'exceptions SCA unique (cargo audit + npm audit), cf. docs/02_documentation/15_normesSecurite.md#analyse-des-dépendances-vulnérables. Chaque entrée de 'exceptions' : ecosysteme (cargo|npm), id (identifiant RUSTSEC/GHSA ou nom de paquet), paquet, gravite, justification, dateReevaluation (AAAA-MM-JJ). Vérifié par scripts/verifier-audit.js dans le pipeline (Phase 14).",
+  "exceptions": []
+}

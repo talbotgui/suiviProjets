@@ -24,7 +24,7 @@ Synthèse actionnable de [15_normesSecurite.md](../../docs/02_documentation/15_n
 
 ## Dépendances vulnérables
 
-- `cargo audit`/`npm audit` systématiques en CI ; vulnérabilité critique ou élevée = pipeline bloqué, sauf exception documentée (justification + date de réévaluation) dans un fichier versionné ([source](../../docs/02_documentation/15_normesSecurite.md#analyse-des-dépendances-vulnérables)).
+- `cargo audit`/`npm audit` en CI, rejoués à la demande et systématiquement avant toute publication de release (plus d'exécution automatique à chaque commit depuis la Phase 14) ; vulnérabilité critique ou élevée = pipeline bloqué, sauf exception documentée dans `audit-exceptions.json` (fichier unique cargo+npm à la racine du dépôt : `ecosysteme`, `id`, `paquet`, `gravite`, `justification`, `dateReevaluation` par entrée) ([source](../../docs/02_documentation/15_normesSecurite.md#analyse-des-dépendances-vulnérables)).
 
 ## Journalisation
 

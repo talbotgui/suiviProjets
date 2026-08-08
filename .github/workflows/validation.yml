@@ -1,23 +1,21 @@
-# Squelette du pipeline d'intégration continue (Phase 0 — bootstrap du poste de développement et de l'outillage),
-# généré avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
+# Pipeline de validation, complété en Phase 14 (docs/03_plan/plan_13_developpement.md#phase-14--intégration-continue-empaquetage-et-publication)
+# au-delà du squelette de la Phase 0, généré avec l'assistance de l'IA (Claude Code), conformément à
+# .claude/rules/01-usage-ia-et-conventions.md.
 #
-# Périmètre volontairement limité, à ce stade, à la récupération du code et à l'installation de l'outillage
-# (cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline et
-# docs/03_plan/plan_13_developpement.md#phase-0--bootstrap-du-poste-de-développement-et-de-loutillage) :
-# aucune étape fonctionnelle (analyse statique, tests, couverture, tests de bout en bout, analyse des dépendances
-# vulnérables, build multiplateforme, publication) n'est ajoutée ici. Ces étapes sont différées à la Phase 10
-# (cf. docs/03_plan/plan_13_developpement.md#phase-10--intégration-continue-empaquetage-et-publication).
+# Déclenchement exclusivement à la demande (workflow_dispatch) ou par appel depuis le workflow de publication
+# (workflow_call) : arbitrage humain explicite de la Phase 14, aucune exécution automatique sur push/pull request,
+# pour ne pas consommer inutilement de minutes d'exécution GitHub Actions sur un projet mené en solo (cf.
+# docs/02_documentation/18_pic.md#mise-en-place-du-pipeline). Rejouer ce workflow manuellement avant toute
+# intégration significative sur master reste à la charge du développeur.
 name: Validation
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+  workflow_dispatch: {}
+  workflow_call: {}
 
 jobs:
-  installation-outillage:
-    name: Récupération du code et installation de l'outillage
+  analyse-statique:
+    name: Analyse statique (Clippy, ESLint)
     runs-on: ubuntu-latest
     steps:
       - name: Récupération du code
@@ -46,6 +44,152 @@ jobs:
             pkg-config \
             build-essential
 
-      - name: Installation des dépendances Rust verrouillées et compilation du cœur natif
+      - name: ESLint (avertissements bloquants)
+        run: npm run lint
+
+      # Avertissements traités comme des erreurs, cf. docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code.
+      - name: Clippy (avertissements bloquants)
         working-directory: src-tauri
-        run: cargo build --locked
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  tests-et-couverture:
+    name: Tests unitaires et couverture
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml, dont llvm-tools-preview)
+        run: rustup show
+
+      - name: Installation des dépendances système Tauri (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            build-essential
+
+      - name: Installation de cargo-llvm-cov (binaire préconstruit)
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      # Seuil global 80 %, cf. docs/02_documentation/16_normesTests.md#stratégie-de-couverture-de-code (pas de
+      # découpage par module côté Rust, à la différence du Moteur de jugement TypeScript ci-dessous). Rapport HTML
+      # généré dans le même temps, réutilisé par le site de couverture publié à la release (cf. publication.yml).
+      - name: Tests unitaires Rust avec couverture (cargo-llvm-cov, seuil 80 %)
+        working-directory: src-tauri
+        run: |
+          cargo llvm-cov --locked --workspace --html \
+            --output-dir "$GITHUB_WORKSPACE/site-couverture/rust" \
+            --fail-under-lines 80
+
+      # Seuils par périmètre déjà configurés dans jest.config.js (90 % Moteur de jugement, 80 % reste de la logique
+      # applicative) ; rapport par fonctions non bloquant pour les composants graphiques, cf.
+      # docs/02_documentation/16_normesTests.md#stratégie-de-couverture-de-code.
+      - name: Tests unitaires Angular/TypeScript avec couverture (Jest/Istanbul)
+        run: npm run test:coverage
+
+      - name: Assemblage du site de couverture combiné (page de renvoi Rust/TypeScript)
+        run: |
+          mkdir -p site-couverture
+          cp -r coverage site-couverture/ts
+          cat > site-couverture/index.html <<'EOF'
+          <!doctype html>
+          <html lang="fr">
+          <head><meta charset="utf-8"><title>Couverture de code — Suivi Qualimétrie</title></head>
+          <body>
+            <h1>Rapports de couverture de code</h1>
+            <ul>
+              <li><a href="rust/html/index.html">Cœur natif (Rust, cargo-llvm-cov)</a></li>
+              <li><a href="ts/index.html">Interface (Angular/TypeScript, Jest/Istanbul)</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Archivage du site de couverture (consommé par le workflow de publication à la release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-couverture
+          path: site-couverture/
+          retention-days: 14
+
+  tests-e2e:
+    name: Tests de bout en bout (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Installation des navigateurs Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Exécution du parcours de bout en bout (npx playwright test, contre ng serve)
+        run: npx playwright test
+
+      - name: Archivage des captures d'écran en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-output
+          path: e2e/test-output/
+          retention-days: 7
+
+  sca:
+    name: Analyse des dépendances vulnérables (SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml)
+        run: rustup show
+
+      - name: Installation de cargo-audit (binaire préconstruit)
+        uses: taiki-e/install-action@cargo-audit
+
+      # Croisement avec docs/02_documentation/15_normesSecurite.md#analyse-des-dépendances-vulnérables : toute
+      # vulnérabilité critique/élevée non listée dans audit-exceptions.json (justification + date de réévaluation)
+      # fait échouer ce job, cf. scripts/verifier-audit.js. `cargo audit`/`npm audit` sortent en erreur dès qu'une
+      # vulnérabilité est trouvée : la sortie JSON est donc d'abord capturée (`|| true`) avant d'être transmise au
+      # script de vérification, seul habilité à faire échouer ce job.
+      - name: cargo audit, croisé avec le fichier d'exceptions
+        working-directory: src-tauri
+        run: |
+          cargo audit --json > /tmp/cargo-audit.json || true
+          node ../scripts/verifier-audit.js --ecosysteme cargo < /tmp/cargo-audit.json
+
+      - name: npm audit, croisé avec le fichier d'exceptions
+        run: |
+          npm audit --json > /tmp/npm-audit.json || true
+          node scripts/verifier-audit.js --ecosysteme npm < /tmp/npm-audit.json

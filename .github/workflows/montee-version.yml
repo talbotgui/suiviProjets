@@ -8,7 +8,7 @@
 # docs/02_documentation/14_normesDeveloppement.md#règles-de-revue-de-code).
 #
 # Ce workflow ne crée aucun tag ni Release : il prépare uniquement le commit de montée de version que le workflow
-# « Publication Windows » (.github/workflows/publication-windows.yml) exige déjà comme préalable committé sur
+# « Publication » (.github/workflows/publication.yml) exige déjà comme préalable committé sur
 # `master` avant de publier (cf. docs/02_documentation/19_environnementProduction.md#gestion-des-versions-et-des-mises-à-jour).
 name: Montée de version
 
@@ -131,4 +131,4 @@ jobs:
             --base master \
             --head "version/${{ inputs.version }}" \
             --title "chore(version): passage en ${{ inputs.version }}" \
-            --body "Montée de version automatique vers **${{ inputs.version }}** (package.json, package-lock.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock), déclenchée manuellement via le workflow « Montée de version ». À relire puis fusionner avant de lancer, le cas échéant, le workflow « Publication Windows » sur cette même version."
+            --body "Montée de version automatique vers **${{ inputs.version }}** (package.json, package-lock.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock), déclenchée manuellement via le workflow « Montée de version ». À relire puis fusionner avant de lancer, le cas échéant, le workflow « Publication » sur cette même version."

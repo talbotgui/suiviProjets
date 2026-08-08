@@ -89,5 +89,8 @@ module.exports = {
     '!src/app/**/*.routes.ts',
     '!src/app/**/*.config.ts',
   ],
+  // Reporter 'html' ajouté en Phase 14 (docs/03_plan/plan_13_developpement.md#phase-14--intégration-continue-empaquetage-et-publication) :
+  // le rapport HTML est publié sur GitHub Pages à chaque release, en plus des reporters par défaut de Jest.
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   coverageThreshold,
 };
