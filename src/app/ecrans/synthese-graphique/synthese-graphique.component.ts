@@ -16,7 +16,16 @@
 // dépendances obsolètes recalculé à chaque audit contre le référentiel COURANT) et les « signaux binaires »
 // mentionnés par la maquette (SONAR_KO, membre inconnu, violation IA) — point signalé comme doute pour arbitrage
 // humain.
-import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { toPng } from 'html-to-image';
 import type {
@@ -107,6 +116,7 @@ const PALETTE_SERIES: readonly string[] = [
 @Component({
   selector: 'app-synthese-graphique',
   imports: [SqmGraphiqueEvolutionComponent, SqmSelecteurVueComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './synthese-graphique.component.html',
 })
 export class SqmSyntheseGraphiqueComponent {
@@ -455,7 +465,9 @@ export class SqmSyntheseGraphiqueComponent {
       demande.motDePasse,
     );
     if (resultat.type === 'echec') {
-      this.notification.erreur("Une erreur inattendue est survenue lors de l'enregistrement de la vue.");
+      this.notification.erreur(
+        "Une erreur inattendue est survenue lors de l'enregistrement de la vue.",
+      );
     }
   }
 
@@ -466,7 +478,9 @@ export class SqmSyntheseGraphiqueComponent {
   public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
     const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
     if (resultat.type === 'echec') {
-      this.notification.erreur('Une erreur inattendue est survenue lors de la suppression de la vue.');
+      this.notification.erreur(
+        'Une erreur inattendue est survenue lors de la suppression de la vue.',
+      );
     }
   }
 

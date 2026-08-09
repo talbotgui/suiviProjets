@@ -5,7 +5,7 @@
 // (`shell.component.html`), affiché tant qu'au moins un appel de commande est en cours
 // (`IndicateurChargementUtils.actif`). Aucun état interne, source unique de vérité dans `IndicateurChargementUtils`,
 // sur le même modèle que `SqmNotificationComponent`.
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { IndicateurChargementUtils } from '../../services/sansetat/commandes/indicateur-chargement.utils';
 
@@ -15,6 +15,7 @@ import { IndicateurChargementUtils } from '../../services/sansetat/commandes/ind
 @Component({
   selector: 'app-indicateur-chargement',
   templateUrl: './indicateur-chargement.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './indicateur-chargement.component.scss',
 })
 export class SqmIndicateurChargementComponent {

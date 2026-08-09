@@ -7,7 +7,7 @@
 // `SqmConfirmationMotDePasseComponent` pour le champ de mot de passe (bouton « Annuler » sans effet ici au-delà de
 // vider le champ saisi, la superposition restant affichée tant que la session n'est pas déverrouillée ou le
 // fichier fermé : aucune action d'annulation légitime sur un écran de verrouillage).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../confirmation-mot-de-passe/confirmation-mot-de-passe.component';
@@ -22,6 +22,7 @@ import { EtatSessionService } from '../../services/avecetat/etat/etat-session.se
   selector: 'app-verrouillage',
   imports: [SqmConfirmationMotDePasseComponent],
   templateUrl: './verrouillage.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './verrouillage.component.scss',
 })
 export class SqmVerrouillageComponent {

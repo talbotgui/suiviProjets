@@ -17,7 +17,7 @@
 // incorrect) survient nécessairement après cette navigation : il n'est donc pas affiché ici, mais retenu par
 // `EtatSessionService.signalerEchecEnregistrementBrouillon` pour affichage par l'écran Brouillon dès sa prochaine
 // consultation (Phase 10, R10-06).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -36,6 +36,7 @@ import { ParametresJugementUtils } from '../../../services/sansetat/jugement/par
   selector: 'app-constitution-campagne',
   imports: [SqmConfirmationMotDePasseComponent, RouterLink],
   templateUrl: './constitution-campagne.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './constitution-campagne.component.scss',
 })
 export class SqmConstitutionCampagneComponent {

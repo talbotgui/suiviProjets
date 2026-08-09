@@ -19,7 +19,16 @@
 // (raccourcis compris) et mettre en forme le différentiel déjà calculé (libellés, couleurs), sur le modèle déjà
 // établi par `SqmFicheProjetComponent` pour la coloration des indicateurs Sonar et du statut de rattachement des
 // membres.
-import { Component, ElementRef, computed, inject, input, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
@@ -194,6 +203,7 @@ export type RaccourciComparaisonAudits = 'dernierPrecedent' | 'unMois' | 'troisM
 @Component({
   selector: 'app-comparaison-audits',
   imports: [RouterLink, SqmBadgeComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './comparaison-audits.component.html',
 })
 export class SqmComparaisonAuditsComponent {

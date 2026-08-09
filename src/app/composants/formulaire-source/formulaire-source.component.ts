@@ -25,6 +25,7 @@ import {
   input,
   output,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -61,6 +62,7 @@ const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
 @Component({
   selector: 'app-formulaire-source',
   imports: [FormsModule, NgTemplateOutlet, SqmChampRechercheRicheComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './formulaire-source.component.html',
 })
 export class SqmFormulaireSourceComponent {

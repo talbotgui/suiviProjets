@@ -6,7 +6,7 @@
 // autres CRUD de l'écran Administration (Phase 3, en mémoire uniquement), chaque mutation invoque ici directement
 // une commande native qui sauvegarde effectivement le fichier (RG-002 : le mot de passe est donc redemandé à
 // chaque enregistrement ou suppression, cf. `SqmConfirmationMotDePasseComponent`).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -36,6 +36,7 @@ const ORIGINE_ADMINISTRATION = 'Administration';
   selector: 'app-membres-connus-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
   templateUrl: './membres-connus-admin.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './membres-connus-admin.component.scss',
 })
 export class SqmMembresConnusAdminComponent {

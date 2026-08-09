@@ -10,7 +10,7 @@
 // gabarit (cf. C11-04, rapport de développement de cet incrément). Sur le modèle du gabarit
 // `SqmExempleReferenceComponent` : n'est affiché que si le composant appelant le rend visible (aucun état de
 // visibilité interne, aucun mécanisme de fermeture définitive qui permettrait de le masquer malgré ces signaux).
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, OutputEmitterRef } from '@angular/core';
 
 /**
@@ -21,6 +21,7 @@ import type { InputSignal, OutputEmitterRef } from '@angular/core';
 @Component({
   selector: 'app-bandeau-alerte',
   templateUrl: './bandeau-alerte.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './bandeau-alerte.component.scss',
 })
 export class SqmBandeauAlerteComponent {

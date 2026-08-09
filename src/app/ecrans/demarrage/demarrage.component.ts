@@ -20,7 +20,7 @@
 // déjà posé par `SqmAccueilComponent.causesMembreInconnu`/`SqmListeTravailComponent` (« dupliqué localement plutôt
 // que généralisé », commentaire d'en-tête de `liste-travail.component.ts`) : ce composant n'a besoin que d'un
 // booléen, pas de la liste enrichie construite par ces deux écrans.
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -49,6 +49,7 @@ const NOM_FICHIER_PAR_DEFAUT = 'suivi-qualimetrie.sqm';
   selector: 'app-demarrage',
   imports: [FormsModule],
   templateUrl: './demarrage.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './demarrage.component.scss',
 })
 export class SqmDemarrageComponent {

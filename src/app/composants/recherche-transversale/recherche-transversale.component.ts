@@ -24,6 +24,7 @@ import {
   output,
   signal,
   viewChild,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import type { AfterViewInit, OutputEmitterRef, WritableSignal } from '@angular/core';
 import { Router } from '@angular/router';
@@ -44,6 +45,7 @@ import type {
 @Component({
   selector: 'app-recherche-transversale',
   templateUrl: './recherche-transversale.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './recherche-transversale.component.scss',
 })
 export class SqmRechercheTransversaleComponent implements AfterViewInit {

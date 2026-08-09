@@ -43,6 +43,7 @@ import {
   input,
   signal,
   viewChild,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import type { ChartConfiguration, ChartDataset, ScatterDataPoint, TooltipItem } from 'chart.js';
@@ -130,6 +131,7 @@ const STYLE_LIGNE_VERTICALE: Readonly<
 @Component({
   selector: 'app-graphique-evolution',
   templateUrl: './graphique-evolution.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './graphique-evolution.component.scss',
 })
 export class SqmGraphiqueEvolutionComponent {

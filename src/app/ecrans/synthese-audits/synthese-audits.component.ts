@@ -20,7 +20,16 @@
 // combinaison de filtres de cet écran (groupe, indicateur, recherche texte) ni aucun tri interne du tableau dense
 // ne peut donc faire disparaître le signal, qui reste au moins signalé globalement (RG-009) même si la ligne
 // concernée est filtrée hors du tableau visible.
-import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { Router } from '@angular/router';
 import { toPng } from 'html-to-image';
@@ -210,6 +219,7 @@ interface SeuilsResolus {
   selector: 'app-synthese-audits',
   imports: [SqmBandeauAlerteComponent, SqmTableauDenseComponent, SqmSelecteurVueComponent],
   templateUrl: './synthese-audits.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './synthese-audits.component.scss',
 })
 export class SqmSyntheseAuditsComponent {
@@ -505,7 +515,9 @@ export class SqmSyntheseAuditsComponent {
       demande.motDePasse,
     );
     if (resultat.type === 'echec') {
-      this.notification.erreur("Une erreur inattendue est survenue lors de l'enregistrement de la vue.");
+      this.notification.erreur(
+        "Une erreur inattendue est survenue lors de l'enregistrement de la vue.",
+      );
     }
   }
 
@@ -516,7 +528,9 @@ export class SqmSyntheseAuditsComponent {
   public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
     const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
     if (resultat.type === 'echec') {
-      this.notification.erreur('Une erreur inattendue est survenue lors de la suppression de la vue.');
+      this.notification.erreur(
+        'Une erreur inattendue est survenue lors de la suppression de la vue.',
+      );
     }
   }
 

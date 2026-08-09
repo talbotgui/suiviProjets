@@ -22,7 +22,7 @@
 //   sous-formulaire répétable, pour limiter la complexité de ce premier incrément.
 // - Le motif de nommage des branches est validé comme expression régulière syntaxiquement correcte côté client
 //   (`new RegExp(...)`) avant tout envoi, en complément de la revalidation déjà effectuée côté cœur natif (RG-030).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -70,6 +70,7 @@ interface SuppressionEnAttente {
 @Component({
   selector: 'app-referentiels-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './referentiels-parametrage.component.html',
 })
 export class SqmReferentielsParametrageComponent {

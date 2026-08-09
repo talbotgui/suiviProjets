@@ -6,7 +6,7 @@
 // est déléguée à `SqmFormulaireSourceComponent` (`composants/formulaire-source/`) depuis C11-01 (Phase 11),
 // extrait de ce composant pour être également consommé par le mini-flux guidé de `SqmProjetsAdminComponent` sans
 // dupliquer cette logique.
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
@@ -20,6 +20,7 @@ import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/typ
 @Component({
   selector: 'app-sources-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmFormulaireSourceComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './sources-admin.component.html',
 })
 export class SqmSourcesAdminComponent {

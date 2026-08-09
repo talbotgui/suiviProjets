@@ -1,6 +1,6 @@
 // Fichier généré par Angular CLI (ng new) puis adapté avec l'assistance de l'IA (Claude Code), conformément à la
 // mention d'origine requise par les conventions du projet (cf. .claude/rules/01-usage-ia-et-conventions.md).
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 /**
@@ -11,6 +11,7 @@ import { RouterOutlet } from '@angular/router';
   selector: 'app-root',
   imports: [RouterOutlet],
   templateUrl: './app.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './app.scss',
 })
 export class App {}

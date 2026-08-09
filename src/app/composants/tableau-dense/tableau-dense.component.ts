@@ -32,7 +32,7 @@
 // déclencheurs identiques) sans bénéfice pour l'utilisateur. Import de `SqmExplicationJugementComponent` depuis un
 // autre composant transverse du même dossier `composants/` : ne crée aucune dépendance vers `services/avecetat/`
 // ni vers un domaine métier particulier (même précédent que l'import de `SqmBadgeComponent` ci-dessous).
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
 import { SqmBadgeComponent } from '../badge/badge.component';
 import { SqmExplicationJugementComponent } from '../explication-jugement/explication-jugement.component';
@@ -126,6 +126,7 @@ type SensTri = 'asc' | 'desc';
   selector: 'app-tableau-dense',
   imports: [SqmBadgeComponent, SqmExplicationJugementComponent],
   templateUrl: './tableau-dense.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './tableau-dense.component.scss',
 })
 export class SqmTableauDenseComponent<T> {

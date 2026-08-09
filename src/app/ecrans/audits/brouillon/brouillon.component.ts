@@ -16,7 +16,7 @@
 // `ecrans/audits/constitution-campagne/constitution-campagne.component.ts`) : même chemin d'URL, même composant.
 // RG-019 reste, comme décidé pour cet incrément, un bandeau de blocage dans Constitution de campagne plutôt qu'un
 // guard de route ; ce bandeau porte désormais un lien direct vers cet écran.
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
@@ -59,6 +59,7 @@ type ActionEnAttente =
   selector: 'app-brouillon',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
   templateUrl: './brouillon.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './brouillon.component.scss',
 })
 export class SqmBrouillonComponent {

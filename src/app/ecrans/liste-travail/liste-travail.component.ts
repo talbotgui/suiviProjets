@@ -30,7 +30,14 @@
 // (arborescence : « Liste de travail a un enfant contextuel Fiche projet, accès par clic sur une alerte ») est
 // proposé comme une action explicite de ce même panneau plutôt que déclenché directement par l'activation de ligne,
 // pour ne pas faire disparaître silencieusement le panneau de traitement à chaque simple consultation.
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -139,6 +146,7 @@ type ActionEnAttente = 'vu' | 'traitement' | null;
     SqmSelecteurVueComponent,
   ],
   templateUrl: './liste-travail.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './liste-travail.component.scss',
 })
 export class SqmListeTravailComponent {
@@ -338,7 +346,9 @@ export class SqmListeTravailComponent {
       demande.motDePasse,
     );
     if (resultat.type === 'echec') {
-      this.notification.erreur("Une erreur inattendue est survenue lors de l'enregistrement de la vue.");
+      this.notification.erreur(
+        "Une erreur inattendue est survenue lors de l'enregistrement de la vue.",
+      );
     }
   }
 
@@ -350,7 +360,9 @@ export class SqmListeTravailComponent {
   public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
     const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
     if (resultat.type === 'echec') {
-      this.notification.erreur('Une erreur inattendue est survenue lors de la suppression de la vue.');
+      this.notification.erreur(
+        'Une erreur inattendue est survenue lors de la suppression de la vue.',
+      );
     }
   }
 

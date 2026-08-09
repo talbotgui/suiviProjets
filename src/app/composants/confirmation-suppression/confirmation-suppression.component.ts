@@ -4,7 +4,7 @@
 // Composant réutilisable de confirmation avant une suppression irréversible (US-006, US-007 : « la suppression
 // est confirmée et rappelle la perte de l'historique d'audits associé »), sur le modèle du gabarit
 // `SqmExempleReferenceComponent`.
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, OutputEmitterRef } from '@angular/core';
 
 /**
@@ -14,6 +14,7 @@ import type { InputSignal, OutputEmitterRef } from '@angular/core';
  */
 @Component({
   selector: 'app-confirmation-suppression',
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './confirmation-suppression.component.html',
 })
 export class SqmConfirmationSuppressionComponent {

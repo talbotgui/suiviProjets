@@ -17,7 +17,7 @@
 // `SqmConfirmationSuppressionComponent`) : toute mutation (création, mise à jour, suppression d'une vue) sauvegarde
 // effectivement le fichier côté cœur natif et redemande donc le mot de passe (RG-002), qu'elle porte ou non par
 // ailleurs une confirmation de suppression préalable.
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../confirmation-mot-de-passe/confirmation-mot-de-passe.component';
@@ -85,6 +85,7 @@ export interface DemandeSuppressionVue {
   selector: 'app-selecteur-vue',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
   templateUrl: './selecteur-vue.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './selecteur-vue.component.scss',
 })
 export class SqmSelecteurVueComponent {

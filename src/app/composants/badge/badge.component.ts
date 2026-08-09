@@ -6,7 +6,7 @@
 // et un libellé textuel explicite, jamais une couleur seule porteuse de sens (RNF-020, WCAG 2.1 AA). La couleur est
 // un `Couleur` du Moteur de jugement (`services/sansetat/jugement/seuils-couleur.utils.ts`), jamais recalculée ici :
 // ce composant ne fait que restituer un jugement déjà calculé.
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal } from '@angular/core';
 import type { Couleur } from '../../services/sansetat/jugement/seuils-couleur.utils';
 
@@ -18,6 +18,7 @@ import type { Couleur } from '../../services/sansetat/jugement/seuils-couleur.ut
 @Component({
   selector: 'app-badge',
   templateUrl: './badge.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './badge.component.scss',
 })
 export class SqmBadgeComponent {

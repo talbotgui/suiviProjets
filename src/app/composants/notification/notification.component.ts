@@ -4,7 +4,7 @@
 // Affichage transverse des notifications empilées par `NotificationService` (Phase 11, R11-03) : monté une seule
 // fois par le Shell (`shell.component.html`), sur le même modèle que `SqmVerrouillageComponent`/
 // `SqmRechercheTransversaleComponent` (aucun état de visibilité interne, source unique de vérité dans le service).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import type { Signal } from '@angular/core';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { NotificationAffichee } from '../../services/avecetat/etat/notification.service';
@@ -16,6 +16,7 @@ import type { NotificationAffichee } from '../../services/avecetat/etat/notifica
 @Component({
   selector: 'app-notification',
   templateUrl: './notification.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './notification.component.scss',
 })
 export class SqmNotificationComponent {

@@ -7,7 +7,7 @@
 // groupe, RG-006 à RG-008) et sous-onglet Annotations (`SqmAnnotationsGroupeAdminComponent`, US-019, RG-033,
 // Phase 10 incrément 8, C10-04 : création et suppression des annotations de portée groupe, également porté par
 // `Groupe`), construit sur le même patron que le sous-onglet Membres connus.
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -49,6 +49,7 @@ type SousOngletGroupes = 'groupes' | 'membresConnus' | 'annotations';
     SqmAnnotationsGroupeAdminComponent,
   ],
   templateUrl: './groupes-admin.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './groupes-admin.component.scss',
 })
 export class SqmGroupesAdminComponent {

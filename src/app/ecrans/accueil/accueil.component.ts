@@ -28,7 +28,7 @@
 // les futurs types d'alerte au fil des incréments suivants. La clé d'alerte stable retenue (RG-026) est
 // `membreInconnu|{projetId}|{username}`.
 import { DatePipe } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { SqmBandeauAlerteComponent } from '../../composants/bandeau-alerte/bandeau-alerte.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import type { Groupe } from '../../services/avecetat/etat/types-donnees';
@@ -73,6 +73,7 @@ interface ProjetNonAudite {
   selector: 'app-accueil',
   imports: [SqmBandeauAlerteComponent, DatePipe],
   templateUrl: './accueil.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './accueil.component.scss',
 })
 export class SqmAccueilComponent {

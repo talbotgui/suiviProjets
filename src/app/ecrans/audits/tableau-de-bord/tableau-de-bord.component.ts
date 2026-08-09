@@ -10,7 +10,7 @@
 // Routé sous le shell applicatif depuis la Phase 6, incrément 3 (`ShellComponent`, `app.routes.ts`), sur le même
 // modèle que Constitution de campagne (cf. commentaire d'en-tête de ce dernier) : même chemin d'URL, même
 // composant, seule la navigation englobante a changé.
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
@@ -28,6 +28,7 @@ import { OrchestrateurCampagneService } from '../../../services/avecetat/campagn
   selector: 'app-tableau-de-bord',
   imports: [RouterLink],
   templateUrl: './tableau-de-bord.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './tableau-de-bord.component.scss',
 })
 export class SqmTableauDeBordComponent {

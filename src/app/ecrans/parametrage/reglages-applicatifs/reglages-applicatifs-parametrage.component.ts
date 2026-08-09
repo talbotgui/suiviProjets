@@ -10,7 +10,7 @@
 // clé, sur le modèle de `qualifierMembre`/`definirPolitiqueIA`. Cinq blocs indépendants, chacun avec son propre
 // discriminant d'édition/ressaisie du mot de passe, sur le patron de `SqmReferentielsParametrageComponent` (un seul
 // réglage modifiable à la fois par bloc).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -31,6 +31,7 @@ type ReglageEnAttente =
 @Component({
   selector: 'app-reglages-applicatifs-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './reglages-applicatifs-parametrage.component.html',
 })
 export class SqmReglagesApplicatifsParametrageComponent {

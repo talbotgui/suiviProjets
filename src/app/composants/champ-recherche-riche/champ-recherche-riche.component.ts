@@ -10,7 +10,16 @@
 //
 // État porté par des signals plutôt que des propriétés simples (R11-07, application zoneless) : toute mutation doit
 // déclencher un nouveau rendu, y compris depuis un gestionnaire clavier ou souris.
-import { Component, ElementRef, computed, input, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  input,
+  output,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
 import { IndexRechercheUtils } from '../../services/avecetat/recherche/index-recherche.utils';
 
@@ -46,6 +55,7 @@ interface SegmentLibelle {
 @Component({
   selector: 'app-champ-recherche-riche',
   templateUrl: './champ-recherche-riche.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './champ-recherche-riche.component.scss',
 })
 export class SqmChampRechercheRicheComponent {

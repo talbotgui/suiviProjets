@@ -19,7 +19,7 @@
 // faute de composant transverse de pagination existant dans le projet à ce jour (`SqmTableauDenseComponent` porte
 // déjà tri/filtre par colonne mais aucune pagination) ; taille de page fixée arbitrairement à 20 (aucune valeur
 // normative), toute modification de filtre réinitialise la page courante à 1.
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
@@ -41,6 +41,7 @@ import type {
 @Component({
   selector: 'app-journal-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './journal-parametrage.component.html',
 })
 export class SqmJournalParametrageComponent {

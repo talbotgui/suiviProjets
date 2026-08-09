@@ -8,7 +8,7 @@
 // depuis la Phase 9, incrément 3 (le dernier affichait jusque-là un contenu de repli, sur le même principe que les
 // entrées de sidebar « à venir » du shell). Coquille à onglets sur le patron exact de `SqmAdministrationComponent`
 // (Phase 3).
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { SqmExportImportParametrageComponent } from './export-import/export-import-parametrage.component';
 import { SqmJournalParametrageComponent } from './journal/journal-parametrage.component';
 import { SqmPurgeParametrageComponent } from './purge/purge-parametrage.component';
@@ -36,6 +36,7 @@ type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImp
     SqmExportImportParametrageComponent,
   ],
   templateUrl: './parametrage.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './parametrage.component.scss',
 })
 export class SqmParametrageComponent {

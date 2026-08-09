@@ -10,7 +10,7 @@
 // demandée pour l'ensemble des seuils modifiés au sein de ce formulaire ; la commande native `definirSeuil` est
 // ensuite invoquée séquentiellement, une fois par seuil réellement modifié (comparaison à l'instantané chargé),
 // en réutilisant cette même saisie. Aucune règle ni maquette haute-fidélité n'impose ni n'exclut ce regroupement.
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -39,6 +39,7 @@ interface ChampSeuilModifie {
 @Component({
   selector: 'app-seuils-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './seuils-parametrage.component.html',
 })
 export class SqmSeuilsParametrageComponent {

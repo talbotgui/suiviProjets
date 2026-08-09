@@ -7,7 +7,7 @@
 // jamais mis en cache côté UI (RG-002, cf. `docs/02_documentation/15_normesSecurite.md#gestion-des-secrets-et-
 // données-sensibles`) : il est réellement redemandé à chaque sauvegarde plutôt que réutilisé silencieusement, y
 // compris pour deux sauvegardes consécutives au sein de la même session.
-import { Component, input, output, signal } from '@angular/core';
+import { Component, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, OutputEmitterRef, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -18,6 +18,7 @@ import { FormsModule } from '@angular/forms';
 @Component({
   selector: 'app-confirmation-mot-de-passe',
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './confirmation-mot-de-passe.component.html',
 })
 export class SqmConfirmationMotDePasseComponent {

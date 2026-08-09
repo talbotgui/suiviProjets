@@ -14,7 +14,7 @@
 // (`supprimerAnnotation`) est ajoutée à cette même occasion, décision arbitraire élargie aux deux portées (groupe
 // et projet) plutôt qu'à la seule portée groupe nouvellement construite (cf. `SqmFicheProjetComponent`, qui en
 // bénéficie donc également).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -34,6 +34,7 @@ import type {
 @Component({
   selector: 'app-annotations-groupe-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './annotations-groupe-admin.component.html',
 })
 export class SqmAnnotationsGroupeAdminComponent {

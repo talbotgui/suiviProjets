@@ -14,7 +14,7 @@
 // Sélection de fichier exclusivement via la boîte de dialogue native de l'OS (`SelecteurFichierUtils`), jamais une
 // saisie libre de chemin (`docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`), sur le
 // même modèle que `SqmDemarrageComponent` (US-001, US-002).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
@@ -40,6 +40,7 @@ const NOM_FICHIER_EXPORT_PAR_DEFAUT = 'configuration-qualimetrie.json';
 @Component({
   selector: 'app-export-import-parametrage',
   imports: [SqmConfirmationMotDePasseComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './export-import-parametrage.component.html',
 })
 export class SqmExportImportParametrageComponent {

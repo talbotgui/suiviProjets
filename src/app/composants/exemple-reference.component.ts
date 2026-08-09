@@ -3,7 +3,7 @@
 // Ce composant n'est utilisé par aucun écran réel : il sert uniquement de modèle à reproduire, notamment lors
 // d'une génération de code assistée par IA. Généré avec l'assistance de l'IA (Claude Code), conformément à la
 // mention d'origine requise par .claude/rules/01-usage-ia-et-conventions.md.
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import type { OutputEmitterRef, InputSignal } from '@angular/core';
 
 /**
@@ -15,6 +15,7 @@ import type { OutputEmitterRef, InputSignal } from '@angular/core';
 @Component({
   selector: 'app-exemple-reference',
   templateUrl: './exemple-reference.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './exemple-reference.component.scss',
 })
 export class SqmExempleReferenceComponent {

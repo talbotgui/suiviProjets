@@ -13,7 +13,7 @@
 // simplement fermer le formulaire. Le mini-flux réutilise `SqmFormulaireSourceComponent` (`actionsVisibles` à
 // `false`), déjà extrait de l'onglet Sources pour cet usage : les boutons « Ajouter une autre source »/« Terminer
 // ce projet, projet suivant » l'invoquent via la variable de référence de gabarit `#formulaireSource`.
-import { Component, inject, viewChild } from '@angular/core';
+import { Component, inject, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -37,6 +37,7 @@ import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donne
     SqmConfirmationMotDePasseComponent,
     SqmFormulaireSourceComponent,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './projets-admin.component.html',
 })
 export class SqmProjetsAdminComponent {

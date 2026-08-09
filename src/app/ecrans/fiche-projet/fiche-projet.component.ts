@@ -12,7 +12,16 @@
 //
 // Route `fiche-projet/:projetId` (`app.routes.ts`), paramètre lié directement à l'`input()` {@link projetId} via
 // `withComponentInputBinding()` (`app.config.ts`).
-import { Component, ElementRef, computed, inject, input, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -284,6 +293,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmConfirmationSuppressionComponent,
   ],
   templateUrl: './fiche-projet.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './fiche-projet.component.scss',
 })
 export class SqmFicheProjetComponent {

@@ -9,7 +9,7 @@
 // navigation, est construit depuis la Phase 10, incrément 8 (C10-04, US-019 mis à jour) : porté par
 // `SqmAnnotationsGroupeAdminComponent`, lui-même troisième sous-onglet de `SqmGroupesAdminComponent` (aux côtés de
 // Groupes et Membres connus), et non par cet écran directement.
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { SqmGroupesAdminComponent } from './groupes/groupes-admin.component';
 import { SqmProjetsAdminComponent } from './projets/projets-admin.component';
 import { SqmSourcesAdminComponent } from './sources/sources-admin.component';
@@ -27,6 +27,7 @@ type OngletAdministration = 'groupes' | 'projets' | 'sources';
   selector: 'app-administration',
   imports: [SqmGroupesAdminComponent, SqmProjetsAdminComponent, SqmSourcesAdminComponent],
   templateUrl: './administration.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './administration.component.scss',
 })
 export class SqmAdministrationComponent {

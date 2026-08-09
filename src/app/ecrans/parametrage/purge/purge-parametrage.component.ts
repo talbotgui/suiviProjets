@@ -13,7 +13,7 @@
 // (`previsualiserPurgeDensite`/`previsualiserPurgeAge`) et d'invoquer, après confirmation du mot de passe, la
 // commande de mutation correspondante (`executerPurgeDensite`/`executerPurgeAge`), qui recalcule elle-même cette
 // sélection à partir de la racine transmise (cf. commentaire d'en-tête de `persistance::purge` côté cœur natif).
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -36,6 +36,7 @@ type ActionPurgeEnAttente = 'densite' | 'age' | null;
 @Component({
   selector: 'app-purge-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './purge-parametrage.component.html',
 })
 export class SqmPurgeParametrageComponent {

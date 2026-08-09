@@ -19,7 +19,14 @@
 // « — », jamais masquées (F24). Décision de périmètre de cet incrément (à valider par un humain) : le bouton
 // « tout tester » n'est construit qu'ici, pas encore repris en préambule de la constitution de campagne (second
 // emplacement littéralement cité par F24), laissé à un incrément ultérieur.
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
@@ -78,6 +85,7 @@ interface InstanceAffichee {
 @Component({
   selector: 'app-credentials',
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './credentials.component.html',
 })
 export class SqmCredentialsComponent {

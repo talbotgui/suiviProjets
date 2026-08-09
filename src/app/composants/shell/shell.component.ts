@@ -51,7 +51,15 @@
 //   utilisateur (clavier ou clic, mêmes événements globaux que `gererRaccourciClavier`), sur le modèle de mise en
 //   place/nettoyage de minuteur déjà retenu par `SqmGraphiqueEvolutionComponent` (`effect()` + `DestroyRef.onDestroy`
 //   plutôt qu'une implémentation de `OnDestroy`).
-import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { isTauri } from '@tauri-apps/api/core';
@@ -95,6 +103,7 @@ const DELAI_INACTIVITE_MINUTES_PAR_DEFAUT = 15;
     SqmVerrouillageComponent,
   ],
   templateUrl: './shell.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './shell.component.scss',
 })
 export class SqmShellComponent {

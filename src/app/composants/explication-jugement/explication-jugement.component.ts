@@ -13,7 +13,7 @@
 // typée sans assertion (`as` interdit par `@typescript-eslint/consistent-type-assertions` de ce projet) : un
 // switch dédié par clé délègue à une méthode privée dont le paramètre est le type de lecture défensive concret
 // correspondant, la réduction de type du discriminant `absent`/`valeur` s'opérant nativement.
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import {
   ParametresJugementUtils,
@@ -62,6 +62,7 @@ export type CleExplicationJugement =
 @Component({
   selector: 'app-explication-jugement',
   templateUrl: './explication-jugement.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './explication-jugement.component.scss',
 })
 export class SqmExplicationJugementComponent {
