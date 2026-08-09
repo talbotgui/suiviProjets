@@ -49,7 +49,7 @@ const NOM_FICHIER_PAR_DEFAUT = 'suivi-qualimetrie.sqm';
   selector: 'app-demarrage',
   imports: [FormsModule],
   templateUrl: './demarrage.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './demarrage.component.scss',
 })
 export class SqmDemarrageComponent {

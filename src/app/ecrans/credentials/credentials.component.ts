@@ -85,7 +85,7 @@ interface InstanceAffichee {
 @Component({
   selector: 'app-credentials',
   imports: [FormsModule],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './credentials.component.html',
 })
 export class SqmCredentialsComponent {

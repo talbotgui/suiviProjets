@@ -85,7 +85,7 @@ export interface DemandeSuppressionVue {
   selector: 'app-selecteur-vue',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
   templateUrl: './selecteur-vue.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './selecteur-vue.component.scss',
 })
 export class SqmSelecteurVueComponent {

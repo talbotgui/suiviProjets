@@ -62,7 +62,7 @@ export type CleExplicationJugement =
 @Component({
   selector: 'app-explication-jugement',
   templateUrl: './explication-jugement.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './explication-jugement.component.scss',
 })
 export class SqmExplicationJugementComponent {

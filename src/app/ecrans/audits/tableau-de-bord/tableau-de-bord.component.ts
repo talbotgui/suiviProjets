@@ -28,7 +28,7 @@ import { OrchestrateurCampagneService } from '../../../services/avecetat/campagn
   selector: 'app-tableau-de-bord',
   imports: [RouterLink],
   templateUrl: './tableau-de-bord.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tableau-de-bord.component.scss',
 })
 export class SqmTableauDeBordComponent {

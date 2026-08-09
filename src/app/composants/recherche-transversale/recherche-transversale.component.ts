@@ -45,7 +45,7 @@ import type {
 @Component({
   selector: 'app-recherche-transversale',
   templateUrl: './recherche-transversale.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './recherche-transversale.component.scss',
 })
 export class SqmRechercheTransversaleComponent implements AfterViewInit {

@@ -36,7 +36,7 @@ import { ParametresJugementUtils } from '../../../services/sansetat/jugement/par
   selector: 'app-constitution-campagne',
   imports: [SqmConfirmationMotDePasseComponent, RouterLink],
   templateUrl: './constitution-campagne.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './constitution-campagne.component.scss',
 })
 export class SqmConstitutionCampagneComponent {

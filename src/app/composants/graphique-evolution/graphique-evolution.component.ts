@@ -131,7 +131,7 @@ const STYLE_LIGNE_VERTICALE: Readonly<
 @Component({
   selector: 'app-graphique-evolution',
   templateUrl: './graphique-evolution.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './graphique-evolution.component.scss',
 })
 export class SqmGraphiqueEvolutionComponent {

@@ -55,7 +55,7 @@ interface SegmentLibelle {
 @Component({
   selector: 'app-champ-recherche-riche',
   templateUrl: './champ-recherche-riche.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './champ-recherche-riche.component.scss',
 })
 export class SqmChampRechercheRicheComponent {

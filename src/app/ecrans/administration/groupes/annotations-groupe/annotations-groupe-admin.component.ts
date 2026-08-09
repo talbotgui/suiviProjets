@@ -34,7 +34,7 @@ import type {
 @Component({
   selector: 'app-annotations-groupe-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './annotations-groupe-admin.component.html',
 })
 export class SqmAnnotationsGroupeAdminComponent {

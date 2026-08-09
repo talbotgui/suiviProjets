@@ -27,7 +27,7 @@ type OngletAdministration = 'groupes' | 'projets' | 'sources';
   selector: 'app-administration',
   imports: [SqmGroupesAdminComponent, SqmProjetsAdminComponent, SqmSourcesAdminComponent],
   templateUrl: './administration.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './administration.component.scss',
 })
 export class SqmAdministrationComponent {

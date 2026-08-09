@@ -20,7 +20,7 @@ import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/typ
 @Component({
   selector: 'app-sources-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmFormulaireSourceComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sources-admin.component.html',
 })
 export class SqmSourcesAdminComponent {

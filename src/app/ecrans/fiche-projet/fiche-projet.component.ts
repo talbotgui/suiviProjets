@@ -293,7 +293,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmConfirmationSuppressionComponent,
   ],
   templateUrl: './fiche-projet.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './fiche-projet.component.scss',
 })
 export class SqmFicheProjetComponent {

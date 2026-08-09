@@ -103,7 +103,7 @@ const DELAI_INACTIVITE_MINUTES_PAR_DEFAUT = 15;
     SqmVerrouillageComponent,
   ],
   templateUrl: './shell.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './shell.component.scss',
 })
 export class SqmShellComponent {

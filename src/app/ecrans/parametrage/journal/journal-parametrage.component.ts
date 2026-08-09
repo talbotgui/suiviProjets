@@ -41,7 +41,7 @@ import type {
 @Component({
   selector: 'app-journal-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './journal-parametrage.component.html',
 })
 export class SqmJournalParametrageComponent {

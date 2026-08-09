@@ -18,7 +18,7 @@ import type { Couleur } from '../../services/sansetat/jugement/seuils-couleur.ut
 @Component({
   selector: 'app-badge',
   templateUrl: './badge.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './badge.component.scss',
 })
 export class SqmBadgeComponent {

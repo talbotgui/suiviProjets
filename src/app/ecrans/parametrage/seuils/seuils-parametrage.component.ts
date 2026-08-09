@@ -39,7 +39,7 @@ interface ChampSeuilModifie {
 @Component({
   selector: 'app-seuils-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './seuils-parametrage.component.html',
 })
 export class SqmSeuilsParametrageComponent {

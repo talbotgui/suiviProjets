@@ -37,7 +37,7 @@ import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donne
     SqmConfirmationMotDePasseComponent,
     SqmFormulaireSourceComponent,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './projets-admin.component.html',
 })
 export class SqmProjetsAdminComponent {

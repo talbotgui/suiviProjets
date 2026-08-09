@@ -62,7 +62,7 @@ const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
 @Component({
   selector: 'app-formulaire-source',
   imports: [FormsModule, NgTemplateOutlet, SqmChampRechercheRicheComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './formulaire-source.component.html',
 })
 export class SqmFormulaireSourceComponent {

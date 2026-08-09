@@ -14,7 +14,7 @@ import type { InputSignal, OutputEmitterRef } from '@angular/core';
  */
 @Component({
   selector: 'app-confirmation-suppression',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './confirmation-suppression.component.html',
 })
 export class SqmConfirmationSuppressionComponent {

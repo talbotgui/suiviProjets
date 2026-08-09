@@ -59,7 +59,7 @@ type ActionEnAttente =
   selector: 'app-brouillon',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
   templateUrl: './brouillon.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './brouillon.component.scss',
 })
 export class SqmBrouillonComponent {

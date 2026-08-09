@@ -21,7 +21,7 @@ import type { InputSignal, OutputEmitterRef } from '@angular/core';
 @Component({
   selector: 'app-bandeau-alerte',
   templateUrl: './bandeau-alerte.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './bandeau-alerte.component.scss',
 })
 export class SqmBandeauAlerteComponent {

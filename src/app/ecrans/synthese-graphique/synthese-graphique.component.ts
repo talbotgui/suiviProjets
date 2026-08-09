@@ -116,7 +116,7 @@ const PALETTE_SERIES: readonly string[] = [
 @Component({
   selector: 'app-synthese-graphique',
   imports: [SqmGraphiqueEvolutionComponent, SqmSelecteurVueComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './synthese-graphique.component.html',
 })
 export class SqmSyntheseGraphiqueComponent {

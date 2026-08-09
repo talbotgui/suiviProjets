@@ -18,7 +18,7 @@ import { FormsModule } from '@angular/forms';
 @Component({
   selector: 'app-confirmation-mot-de-passe',
   imports: [FormsModule],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './confirmation-mot-de-passe.component.html',
 })
 export class SqmConfirmationMotDePasseComponent {

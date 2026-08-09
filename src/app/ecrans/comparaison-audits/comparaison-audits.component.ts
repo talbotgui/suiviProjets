@@ -203,7 +203,7 @@ export type RaccourciComparaisonAudits = 'dernierPrecedent' | 'unMois' | 'troisM
 @Component({
   selector: 'app-comparaison-audits',
   imports: [RouterLink, SqmBadgeComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './comparaison-audits.component.html',
 })
 export class SqmComparaisonAuditsComponent {

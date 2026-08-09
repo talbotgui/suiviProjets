@@ -70,7 +70,7 @@ interface SuppressionEnAttente {
 @Component({
   selector: 'app-referentiels-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './referentiels-parametrage.component.html',
 })
 export class SqmReferentielsParametrageComponent {

@@ -126,7 +126,7 @@ type SensTri = 'asc' | 'desc';
   selector: 'app-tableau-dense',
   imports: [SqmBadgeComponent, SqmExplicationJugementComponent],
   templateUrl: './tableau-dense.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tableau-dense.component.scss',
 })
 export class SqmTableauDenseComponent<T> {

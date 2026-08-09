@@ -146,7 +146,7 @@ type ActionEnAttente = 'vu' | 'traitement' | null;
     SqmSelecteurVueComponent,
   ],
   templateUrl: './liste-travail.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './liste-travail.component.scss',
 })
 export class SqmListeTravailComponent {

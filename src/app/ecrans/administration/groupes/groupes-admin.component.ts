@@ -49,7 +49,7 @@ type SousOngletGroupes = 'groupes' | 'membresConnus' | 'annotations';
     SqmAnnotationsGroupeAdminComponent,
   ],
   templateUrl: './groupes-admin.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './groupes-admin.component.scss',
 })
 export class SqmGroupesAdminComponent {

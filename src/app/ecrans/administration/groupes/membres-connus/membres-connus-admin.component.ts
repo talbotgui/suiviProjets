@@ -36,7 +36,7 @@ const ORIGINE_ADMINISTRATION = 'Administration';
   selector: 'app-membres-connus-admin',
   imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
   templateUrl: './membres-connus-admin.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './membres-connus-admin.component.scss',
 })
 export class SqmMembresConnusAdminComponent {

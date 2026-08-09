@@ -15,7 +15,7 @@ import { IndicateurChargementUtils } from '../../services/sansetat/commandes/ind
 @Component({
   selector: 'app-indicateur-chargement',
   templateUrl: './indicateur-chargement.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './indicateur-chargement.component.scss',
 })
 export class SqmIndicateurChargementComponent {

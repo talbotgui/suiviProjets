@@ -36,7 +36,7 @@ type ActionPurgeEnAttente = 'densite' | 'age' | null;
 @Component({
   selector: 'app-purge-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './purge-parametrage.component.html',
 })
 export class SqmPurgeParametrageComponent {

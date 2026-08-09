@@ -36,7 +36,7 @@ type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImp
     SqmExportImportParametrageComponent,
   ],
   templateUrl: './parametrage.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './parametrage.component.scss',
 })
 export class SqmParametrageComponent {

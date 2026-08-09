@@ -73,7 +73,7 @@ interface ProjetNonAudite {
   selector: 'app-accueil',
   imports: [SqmBandeauAlerteComponent, DatePipe],
   templateUrl: './accueil.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './accueil.component.scss',
 })
 export class SqmAccueilComponent {

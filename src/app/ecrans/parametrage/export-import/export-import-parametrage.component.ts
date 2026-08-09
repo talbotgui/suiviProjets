@@ -40,7 +40,7 @@ const NOM_FICHIER_EXPORT_PAR_DEFAUT = 'configuration-qualimetrie.json';
 @Component({
   selector: 'app-export-import-parametrage',
   imports: [SqmConfirmationMotDePasseComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './export-import-parametrage.component.html',
 })
 export class SqmExportImportParametrageComponent {

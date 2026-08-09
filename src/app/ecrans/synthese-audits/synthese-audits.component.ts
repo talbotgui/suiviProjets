@@ -219,7 +219,7 @@ interface SeuilsResolus {
   selector: 'app-synthese-audits',
   imports: [SqmBandeauAlerteComponent, SqmTableauDenseComponent, SqmSelecteurVueComponent],
   templateUrl: './synthese-audits.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './synthese-audits.component.scss',
 })
 export class SqmSyntheseAuditsComponent {

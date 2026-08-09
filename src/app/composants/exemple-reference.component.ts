@@ -15,7 +15,7 @@ import type { OutputEmitterRef, InputSignal } from '@angular/core';
 @Component({
   selector: 'app-exemple-reference',
   templateUrl: './exemple-reference.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './exemple-reference.component.scss',
 })
 export class SqmExempleReferenceComponent {

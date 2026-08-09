@@ -22,7 +22,7 @@ import { EtatSessionService } from '../../services/avecetat/etat/etat-session.se
   selector: 'app-verrouillage',
   imports: [SqmConfirmationMotDePasseComponent],
   templateUrl: './verrouillage.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './verrouillage.component.scss',
 })
 export class SqmVerrouillageComponent {

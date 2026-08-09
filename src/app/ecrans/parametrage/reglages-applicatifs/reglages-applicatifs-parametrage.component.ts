@@ -31,7 +31,7 @@ type ReglageEnAttente =
 @Component({
   selector: 'app-reglages-applicatifs-parametrage',
   imports: [FormsModule, SqmConfirmationMotDePasseComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './reglages-applicatifs-parametrage.component.html',
 })
 export class SqmReglagesApplicatifsParametrageComponent {

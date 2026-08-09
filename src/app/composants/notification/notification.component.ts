@@ -16,7 +16,7 @@ import type { NotificationAffichee } from '../../services/avecetat/etat/notifica
 @Component({
   selector: 'app-notification',
   templateUrl: './notification.component.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './notification.component.scss',
 })
 export class SqmNotificationComponent {
