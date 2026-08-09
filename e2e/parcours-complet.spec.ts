@@ -118,7 +118,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await page.locator('#sources-admin-bouton-creer').click();
     await page.locator('#formulaire-source-champ-type').selectOption(type);
     await page.locator('#formulaire-source-champ-instance').selectOption({ label: instanceNom });
-    await page.locator('#formulaire-source-champ-id-externe').fill(idExterne);
+    const champIdExterne = page.locator('#formulaire-source-champ-id-externe');
+    await champIdExterne.fill(idExterne);
+    // Ferme explicitement la liste de suggestions (R11-06, touche Échap déjà gérée par le composant) : sans champ
+    // suivant pour faire perdre le focus (cas Sonar, pas de « ref auditée »), elle resterait ouverte et son overlay
+    // intercepterait le clic sur le bouton Enregistrer situé en dessous.
+    await champIdExterne.press('Escape');
     if (refAuditee !== undefined) {
       await page.locator('#formulaire-source-champ-ref-auditee').fill(refAuditee);
     }
