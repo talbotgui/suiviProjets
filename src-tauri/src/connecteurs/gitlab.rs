@@ -1357,16 +1357,16 @@ fn parser_pom_xml(contenu: &str) -> Vec<Dependance> {
                         _ => {}
                     }
                 }
-                if nom == "dependency" && profondeur_gestion_dependances == 0 {
-                    if let Some((Some(groupe), Some(artefact), Some(version))) =
+                if nom == "dependency"
+                    && profondeur_gestion_dependances == 0
+                    && let Some((Some(groupe), Some(artefact), Some(version))) =
                         dependance_courante.take()
-                    {
-                        dependances.push(Dependance {
-                            reference: format!("{groupe}:{artefact}"),
-                            version,
-                            manifeste: "pom.xml".to_string(),
-                        });
-                    }
+                {
+                    dependances.push(Dependance {
+                        reference: format!("{groupe}:{artefact}"),
+                        version,
+                        manifeste: "pom.xml".to_string(),
+                    });
                 }
                 if nom == "dependencyManagement" && profondeur_gestion_dependances > 0 {
                     profondeur_gestion_dependances -= 1;
