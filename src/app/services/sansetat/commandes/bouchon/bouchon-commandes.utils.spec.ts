@@ -4,6 +4,8 @@ import { BouchonCommandesUtils } from './bouchon-commandes.utils';
 
 const SOURCE_ID_GITLAB_CONNU = 'f0000000-0000-4000-8000-000000000001';
 const SOURCE_ID_SONAR_CONNU = 'f0000000-0000-4000-8000-000000000002';
+const SOURCE_ID_GITLAB_FRONT_PORTAIL = 'f0000000-0000-4000-8000-000000000006';
+const SOURCE_ID_SONAR_FRONT_PORTAIL = 'f0000000-0000-4000-8000-000000000007';
 const ID_EXTERNE_GITLAB_CONNU = '1234';
 const ID_EXTERNE_SONAR_CONNU = 'entreprise:api-facturation';
 
@@ -49,6 +51,78 @@ describe('BouchonCommandesUtils', () => {
     );
 
     expect(resultat.refEffective).toBe('main');
+  });
+
+  it('doit résoudre interroger_taille_depot pour une source connue du jeu de données', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer('interroger_taille_depot', {
+      sourceId: SOURCE_ID_GITLAB_CONNU,
+    });
+
+    expect(resultat).toEqual({
+      sourceId: SOURCE_ID_GITLAB_CONNU,
+      refEffective: 'develop',
+      shaTete: '3fa2b91c',
+      tailleOctets: 52411002,
+    });
+  });
+
+  it('doit résoudre interroger_contributeurs sur une fenêtre glissante de 90 jours', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer<{
+      readonly fenetreJours: number;
+      readonly contributeurs: readonly unknown[];
+    }>('interroger_contributeurs', { sourceId: SOURCE_ID_GITLAB_CONNU });
+
+    expect(resultat.fenetreJours).toBe(90);
+    expect(resultat.contributeurs).toHaveLength(3);
+  });
+
+  it('doit résoudre interroger_merge_requests pour une source connue du jeu de données', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer<{
+      readonly mrOuvertes: readonly unknown[];
+    }>('interroger_merge_requests', { sourceId: SOURCE_ID_GITLAB_CONNU });
+
+    expect(resultat.mrOuvertes).toHaveLength(2);
+  });
+
+  it('doit résoudre interroger_membres pour une source connue du jeu de données', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer<{
+      readonly membres: readonly unknown[];
+    }>('interroger_membres', { sourceId: SOURCE_ID_GITLAB_CONNU });
+
+    expect(resultat.membres).toHaveLength(3);
+  });
+
+  it('doit résoudre interroger_branches_completes (RG-030, distinct de l’autocomplétion)', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer<{
+      readonly branches: readonly unknown[];
+    }>('interroger_branches_completes', { sourceId: SOURCE_ID_GITLAB_CONNU });
+
+    expect(resultat.branches).toHaveLength(3);
+  });
+
+  it('doit résoudre interroger_dependances pour une source connue du jeu de données', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer<{
+      readonly dependances: readonly unknown[];
+    }>('interroger_dependances', { sourceId: SOURCE_ID_GITLAB_CONNU });
+
+    expect(resultat.dependances).toHaveLength(3);
+  });
+
+  it('doit résoudre interroger_marqueurs_ia (F18) pour une source connue du jeu de données', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer<{
+      readonly marqueurs: readonly unknown[];
+    }>('interroger_marqueurs_ia', { sourceId: SOURCE_ID_GITLAB_FRONT_PORTAIL });
+
+    expect(resultat.marqueurs).toHaveLength(3);
+  });
+
+  it('doit résoudre definir_credentials sans réponse', async () => {
+    const resultat = await BouchonCommandesUtils.invoquer('definir_credentials', {
+      instance: { id: 'x' },
+      credential: 'peu importe',
+    });
+
+    expect(resultat).toBeUndefined();
   });
 
   it('doit filtrer les branches de interroger_branches par le terme de recherche', async () => {
@@ -151,6 +225,31 @@ describe('BouchonCommandesUtils', () => {
         parSeverite: { bloquant: 2, critique: 11, majeur: 88, mineur: 240, info: 31 },
         nouvellesViolations: 3,
       });
+    });
+
+    it('ne doit pas altérer la dette technique quand le tirage tombe au centre de l’amplitude', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      const resultat = await BouchonCommandesUtils.invoquer<{
+        readonly detteMinutes: number;
+        readonly ratioDette: number;
+      }>('interroger_dette', { sourceId: SOURCE_ID_SONAR_CONNU });
+
+      expect(resultat).toEqual({ sourceId: SOURCE_ID_SONAR_CONNU, detteMinutes: 13980, ratioDette: 3.1 });
+    });
+
+    it('doit inclure duplicationNouveauCode seulement quand le constat le porte', async () => {
+      const avecDuplication = await BouchonCommandesUtils.invoquer<Record<string, unknown>>(
+        'interroger_couverture',
+        { sourceId: SOURCE_ID_SONAR_FRONT_PORTAIL },
+      );
+      const sansDuplication = await BouchonCommandesUtils.invoquer<Record<string, unknown>>(
+        'interroger_couverture',
+        { sourceId: SOURCE_ID_SONAR_CONNU },
+      );
+
+      expect('duplicationNouveauCode' in avecDuplication).toBe(true);
+      expect('duplicationNouveauCode' in sansDuplication).toBe(false);
     });
 
     it('doit appliquer un écart maximal de +10 % quand le tirage est à son maximum', async () => {

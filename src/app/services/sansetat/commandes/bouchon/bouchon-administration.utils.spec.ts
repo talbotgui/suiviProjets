@@ -100,6 +100,60 @@ describe('BouchonAdministrationUtils', () => {
         }),
       ).rejects.toMatchObject({ type: 'groupeIntrouvable' });
     });
+
+    it('doit rejeter un groupe introuvable quand la racine ne porte aucun groupe', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('qualifier_membre', {
+          donnees: {},
+          groupeId: 'groupe-1',
+          critere: 'x',
+          typeCritere: 'username',
+          statut: 'interne',
+        }),
+      ).rejects.toMatchObject({ type: 'groupeIntrouvable' });
+    });
+
+    it('doit rejeter un paramètre « donnees » absent', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('qualifier_membre', {
+          groupeId: 'groupe-1',
+          critere: 'x',
+          typeCritere: 'username',
+          statut: 'interne',
+        }),
+      ).rejects.toThrow('donnees');
+    });
+
+    it('doit mettre à jour une règle existante plutôt que d’en créer une nouvelle (membreId fourni)', async () => {
+      const racineAvecMembre = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            membresConnus: [{ id: 'm1', critere: 'ancien', typeCritere: 'username', statut: 'interne' }],
+          },
+        ],
+      };
+
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        readonly donnees: DonneesTest;
+      }>('qualifier_membre', {
+        donnees: racineAvecMembre,
+        groupeId: 'groupe-1',
+        membreId: 'm1',
+        critere: 'jdupont',
+        typeCritere: 'username',
+        statut: 'externe',
+        libelle: 'Jean Dupont',
+      });
+
+      expect(resultat.donnees.groupes[0]?.membresConnus).toHaveLength(1);
+      expect(resultat.donnees.groupes[0]?.membresConnus[0]).toMatchObject({
+        id: 'm1',
+        critere: 'jdupont',
+        statut: 'externe',
+      });
+    });
   });
 
   describe('definir_politique_ia', () => {
@@ -129,6 +183,104 @@ describe('BouchonAdministrationUtils', () => {
           iaAutorisee: true,
         }),
       ).rejects.toMatchObject({ type: 'projetIntrouvable' });
+    });
+
+    it('ne doit rien modifier si la politique demandée est déjà en vigueur', async () => {
+      const racineIaDejaAutorisee = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            projets: [
+              {
+                id: 'projet-1',
+                iaAutorisee: true,
+                iaAutoriseeDepuis: '2026-01-01',
+                annotations: [],
+                audits: [],
+              },
+            ],
+          },
+        ],
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'definir_politique_ia',
+        { donnees: racineIaDejaAutorisee, groupeId: 'groupe-1', projetId: 'projet-1', iaAutorisee: true },
+      );
+
+      const projet = donnees.groupes[0]?.projets[0];
+      expect(projet?.['annotations']).toEqual([]);
+      expect(projet?.['iaAutoriseeDepuis']).toBe('2026-01-01');
+    });
+
+    it("doit désactiver l'IA sans ajouter d'annotation ni toucher iaAutoriseeDepuis", async () => {
+      const racineIaAutorisee = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            projets: [
+              {
+                id: 'projet-1',
+                iaAutorisee: true,
+                iaAutoriseeDepuis: '2026-01-01',
+                annotations: [],
+                audits: [],
+              },
+            ],
+          },
+        ],
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'definir_politique_ia',
+        {
+          donnees: racineIaAutorisee,
+          groupeId: 'groupe-1',
+          projetId: 'projet-1',
+          iaAutorisee: false,
+        },
+      );
+
+      const projet = donnees.groupes[0]?.projets[0];
+      expect(projet?.['iaAutorisee']).toBe(false);
+      expect(projet?.['annotations']).toEqual([]);
+      expect(projet?.['iaAutoriseeDepuis']).toBe('2026-01-01');
+    });
+
+    it('doit conserver iaAutoriseeDepuis déjà renseigné plutôt que de le réécrire', async () => {
+      const racineAvecDateAnterieure = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            projets: [
+              {
+                id: 'projet-1',
+                iaAutorisee: false,
+                iaAutoriseeDepuis: '2020-05-05',
+                annotations: [],
+                audits: [],
+              },
+            ],
+          },
+        ],
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'definir_politique_ia',
+        {
+          donnees: racineAvecDateAnterieure,
+          groupeId: 'groupe-1',
+          projetId: 'projet-1',
+          iaAutorisee: true,
+        },
+      );
+
+      const projet = donnees.groupes[0]?.projets[0];
+      expect(projet?.['iaAutoriseeDepuis']).toBe('2020-05-05');
+      expect(projet?.['annotations']).toHaveLength(1);
     });
   });
 
@@ -247,6 +399,59 @@ describe('BouchonAdministrationUtils', () => {
           selection: ['projet-inconnu'],
         }),
       ).rejects.toMatchObject({ type: 'projetAbsentDuBrouillon' });
+    });
+
+    it('doit intégrer uniquement les entrées sélectionnées et laisser le brouillon ouvert pour le reste', async () => {
+      const groupeDeuxProjets = {
+        id: 'groupe-1',
+        membresConnus: [],
+        projets: [
+          { id: 'projet-1', iaAutorisee: false, annotations: [], audits: [] },
+          { id: 'projet-2', iaAutorisee: false, annotations: [], audits: [] },
+        ],
+      };
+      const racineDeuxEntreesEnAttente = {
+        groupes: [groupeDeuxProjets],
+        brouillon: {
+          campagneId: 'campagne-1',
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+            { projetId: 'projet-2', audit: { id: 'audit-2' }, statut: 'enAttente' },
+          ],
+        },
+        campagnes: [],
+        meta: {},
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>('integrer_brouillon', {
+        donnees: racineDeuxEntreesEnAttente,
+        selection: ['projet-1'],
+      });
+
+      expect(donnees.brouillon).not.toBeNull();
+      expect(donnees.brouillon?.['resultatsParProjet']).toEqual([
+        { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'integre' },
+        { projetId: 'projet-2', audit: { id: 'audit-2' }, statut: 'enAttente' },
+      ]);
+      expect(donnees.groupes[0]?.projets[0]?.['audits']).toEqual([{ id: 'audit-1' }]);
+    });
+
+    it('doit rejeter une entrée dont le projet est introuvable dans les groupes', async () => {
+      const racineAvecEntreeOrpheline = {
+        ...RACINE_VIDE,
+        brouillon: {
+          campagneId: 'campagne-1',
+          resultatsParProjet: [
+            { projetId: 'projet-orphelin', audit: { id: 'audit-1' }, statut: 'enAttente' },
+          ],
+        },
+      };
+
+      await expect(
+        BouchonAdministrationUtils.invoquer('integrer_brouillon', {
+          donnees: racineAvecEntreeOrpheline,
+        }),
+      ).rejects.toMatchObject({ type: 'projetIntrouvable' });
     });
   });
 });

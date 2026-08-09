@@ -79,12 +79,58 @@ describe('BouchonParametrageUtils', () => {
     expect(resultat.referentiels.motifNommageBranches).toBe('main|master|develop');
   });
 
+  it('remplace le motif de nommage des branches par une chaîne vide si la valeur reçue n’est pas une chaîne', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly referentiels: { readonly motifNommageBranches: string };
+    }>('definir_referentiel', {
+      donnees: DONNEES_DE_BASE,
+      typeReferentiel: 'motifNommageBranches',
+      entree: 42,
+    });
+
+    expect(resultat.referentiels.motifNommageBranches).toBe('');
+  });
+
+  it('rejette une entrée de référentiel absente ou mal formée', async () => {
+    await expect(
+      BouchonParametrageUtils.invoquer('definir_referentiel', {
+        donnees: DONNEES_DE_BASE,
+        typeReferentiel: 'reglesDependances',
+        entree: 'pas-un-objet',
+      }),
+    ).rejects.toThrow('entree');
+  });
+
+  it('crée une catégorie de seuils absente jusque-là (chemin pointé et racine parametres inconnus)', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly parametres: { readonly seuils: { readonly nouvelleCategorie: { readonly champ: number } } };
+    }>('definir_seuil', { donnees: {}, cle: 'nouvelleCategorie.champ', valeur: 42 });
+
+    expect(resultat.parametres.seuils.nouvelleCategorie.champ).toBe(42);
+  });
+
   it('supprime une entrée du référentiel des règles de dépendances par identifiant', async () => {
     const resultat = await BouchonParametrageUtils.invoquer<{
       readonly referentiels: { readonly reglesDependances: readonly unknown[] };
     }>('supprimer_regle_dependance', { donnees: DONNEES_DE_BASE, id: 'd1' });
 
     expect(resultat.referentiels.reglesDependances).toHaveLength(0);
+  });
+
+  it('supprime une entrée du référentiel des règles de marqueurs IA par identifiant', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly referentiels: { readonly reglesMarqueursIA: readonly unknown[] };
+    }>('supprimer_regle_marqueur_ia', { donnees: DONNEES_DE_BASE, id: 'm1' });
+
+    expect(resultat.referentiels.reglesMarqueursIA).toHaveLength(0);
+  });
+
+  it('gère sans erreur un référentiel-liste absent de la racine reçue', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly referentiels: { readonly reglesMarqueursIA: readonly unknown[] };
+    }>('supprimer_regle_marqueur_ia', { donnees: { referentiels: {} }, id: 'm1' });
+
+    expect(resultat.referentiels.reglesMarqueursIA).toEqual([]);
   });
 
   it('modifie les réglages de verrouillage de session', async () => {
@@ -117,6 +163,18 @@ describe('BouchonParametrageUtils', () => {
     });
 
     expect(resultat.parametres.proxy.url).toBe('http://proxy.exemple.local:3128');
+  });
+
+  it('modifie le réglage de proxy sortant avec un chemin de bundle CA renseigné', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly parametres: { readonly proxy: { readonly cheminBundleCA: string } };
+    }>('definir_proxy', {
+      donnees: DONNEES_DE_BASE,
+      url: 'http://proxy.exemple.local:3128',
+      cheminBundleCa: '/etc/ssl/ca-bundle.pem',
+    });
+
+    expect(resultat.parametres.proxy.cheminBundleCA).toBe('/etc/ssl/ca-bundle.pem');
   });
 
   it('modifie le nombre de sauvegardes de sécurité', async () => {

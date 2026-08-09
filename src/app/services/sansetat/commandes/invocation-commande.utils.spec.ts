@@ -67,4 +67,66 @@ describe('InvocationCommandeUtils', () => {
     expect(resultat.membresEnConflit).toEqual([]);
     expect(resultat.donnees.meta.modifieLe).toBeDefined();
   });
+
+  it('ne doit jamais appeler `invoke` hors contexte Tauri, et déléguer au bouchon de paramétrage pour ses commandes', async () => {
+    isTauriSimule.mockReturnValue(false);
+
+    const resultat = await InvocationCommandeUtils.invoquer<{
+      readonly parametres: { readonly seuils: { readonly vitalite: { readonly mortJours: number } } };
+    }>('definir_seuil', { donnees: {}, cle: 'vitalite.mortJours', valeur: 400 });
+
+    expect(invokeSimule).not.toHaveBeenCalled();
+    expect(resultat.parametres.seuils.vitalite.mortJours).toBe(400);
+  });
+
+  it('ne doit jamais appeler `invoke` hors contexte Tauri, et déléguer au bouchon des alertes pour ses commandes', async () => {
+    isTauriSimule.mockReturnValue(false);
+
+    const resultat = await InvocationCommandeUtils.invoquer<{
+      readonly groupes: readonly { readonly annotations: readonly unknown[] }[];
+    }>('creer_annotation', {
+      donnees: { groupes: [{ id: 'g1', annotations: [] }] },
+      groupeId: 'g1',
+      date: '2026-08-09',
+      libelle: 'Annotation de test',
+      categorie: 'autre',
+    });
+
+    expect(invokeSimule).not.toHaveBeenCalled();
+    expect(resultat.groupes[0]?.annotations).toHaveLength(1);
+  });
+
+  it('ne doit jamais appeler `invoke` hors contexte Tauri, et déléguer au bouchon des vues pour ses commandes', async () => {
+    isTauriSimule.mockReturnValue(false);
+
+    const resultat = await InvocationCommandeUtils.invoquer<{
+      readonly vuesEnregistrees: readonly unknown[];
+    }>('definir_vue', {
+      donnees: {},
+      nom: 'Ma vue',
+      ecran: 'listeTravail',
+      parDefaut: false,
+      filtres: {},
+    });
+
+    expect(invokeSimule).not.toHaveBeenCalled();
+    expect(resultat.vuesEnregistrees).toHaveLength(1);
+  });
+
+  it.each([
+    'qualifier_membre',
+    'definir_seuil',
+    'creer_annotation',
+    'definir_vue',
+    'tester_connectivite',
+  ])(
+    'doit tolérer l’absence de paramètres hors contexte Tauri pour %s (transmet un objet vide au bouchon)',
+    async (commande) => {
+      isTauriSimule.mockReturnValue(false);
+
+      await InvocationCommandeUtils.invoquer(commande).catch(() => undefined);
+
+      expect(invokeSimule).not.toHaveBeenCalled();
+    },
+  );
 });
