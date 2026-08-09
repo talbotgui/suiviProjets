@@ -11,7 +11,11 @@ repository = "https://github.com/talbotgui/suiviProjets"
 # Édition fixée explicitement plutôt que laissée à la valeur par défaut de Cargo (cf. docs/02_documentation/14_normesDeveloppement.md#gestion-des-dépendances) :
 # dernière édition stable disponible pour le compilateur installé (rustc 1.97.1, cf. rust-toolchain.toml), stabilisée depuis rustc 1.85.
 edition = "2024"
-rust-version = "1.85"
+# Relevé à 1.88 (Phase 14, correction RUSTSEC-2026-0009) : `time` (dépendance transitive de `cookie`/`reqwest`) a
+# porté son MSRV à 1.88 à partir de la version 0.3.47 corrigeant cette vulnérabilité, restée sinon inaccessible au
+# résolveur de dépendances sensible au MSRV de Cargo tant que ce champ n'était pas relevé en conséquence. Toujours
+# bien en-deçà du compilateur installé (rustc 1.97.1, cf. rust-toolchain.toml).
+rust-version = "1.88"
 
 # Voir https://doc.rust-lang.org/cargo/reference/manifest.html pour les autres clés disponibles.
 
@@ -61,7 +65,11 @@ regex = "1"
 # Connecteur GitLab (Phase 5, incrément de rattrapage). `package.json` (JSON, déjà couvert par `serde_json`) et
 # `build.gradle` (extraction par expression régulière, déjà couvert par `regex` ci-dessus) ne nécessitent aucune
 # dépendance supplémentaire.
-quick-xml = "0.38"
+# Relevé à 0.41 (Phase 14, correction RUSTSEC-2026-0194/RUSTSEC-2026-0195 : déni de service par complexité
+# algorithmique quadratique de `BytesStart::attributes()`/allocations non bornées de `NsReader`, ni l'une ni
+# l'autre jamais appelées par `parser_pom_xml` ci-dessous, mais corrigé par rupture d'API assumée plutôt que par
+# une exception documentée, cf. `nom_element_xml`/`parser_pom_xml`).
+quick-xml = "0.41"
 
 [dev-dependencies]
 # Serveur HTTP simulé en boucle locale, seul moyen réaliste de tester la logique des connecteurs (en-têtes,
