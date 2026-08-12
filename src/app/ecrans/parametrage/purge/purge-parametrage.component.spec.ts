@@ -92,7 +92,7 @@ describe('SqmPurgeParametrageComponent', () => {
     expect(invokeSimule).toHaveBeenCalledWith('previsualiser_purge_densite', {
       donnees: DonneesDeTest.racineVide(),
     });
-    expect(composant.previsualisationDensite).toEqual({
+    expect(composant.previsualisationDensite()).toEqual({
       nbAuditsSupprimes: 3,
       nbProjetsConcernes: 1,
       octetsAvant: 2_400_000,
@@ -113,7 +113,7 @@ describe('SqmPurgeParametrageComponent', () => {
 
     composant.demanderExecutionDensite();
 
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('exécute une purge par densité après confirmation du mot de passe, réinitialise la prévisualisation', async () => {
@@ -126,7 +126,7 @@ describe('SqmPurgeParametrageComponent', () => {
     const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
     await composant.previsualiserDensite();
     composant.demanderExecutionDensite();
-    expect(composant.actionEnAttenteMotDePasse).toBe('densite');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('densite');
 
     invokeSimule.mockResolvedValueOnce(DonneesDeTest.racineVide());
     await composant.confirmerExecutionDensite('mot-de-passe');
@@ -138,8 +138,8 @@ describe('SqmPurgeParametrageComponent', () => {
         motDePasse: 'mot-de-passe',
       }),
     );
-    expect(composant.previsualisationDensite).toBeNull();
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.previsualisationDensite()).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
     const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
     expect(derniereNotification?.type).toBe('succes');
     expect(derniereNotification?.message).toContain('purge par densité');
@@ -160,12 +160,12 @@ describe('SqmPurgeParametrageComponent', () => {
       'previsualiser_purge_age',
       expect.objectContaining({ mode: 'suppression' }),
     );
-    expect(composant.previsualisationAge?.nbAuditsSupprimes).toBe(5);
+    expect(composant.previsualisationAge()?.nbAuditsSupprimes).toBe(5);
 
     composant.changerModeAge('agregationMensuelle');
 
     expect(composant.modeAge).toBe('agregationMensuelle');
-    expect(composant.previsualisationAge).toBeNull();
+    expect(composant.previsualisationAge()).toBeNull();
   });
 
   it('affiche un message explicite quand la commande native échoue', async () => {
@@ -177,7 +177,7 @@ describe('SqmPurgeParametrageComponent', () => {
     expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
       expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
     );
-    expect(composant.previsualisationDensite).toBeNull();
+    expect(composant.previsualisationDensite()).toBeNull();
   });
 
   it("n'ouvre pas la ressaisie du mot de passe pour l'âge sans prévisualisation préalable", () => {
@@ -185,7 +185,7 @@ describe('SqmPurgeParametrageComponent', () => {
 
     composant.demanderExecutionAge();
 
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('affiche un message explicite quand la prévisualisation par âge échoue', async () => {
@@ -200,7 +200,7 @@ describe('SqmPurgeParametrageComponent', () => {
         message: "Une erreur inattendue est survenue lors de l'opération.",
       }),
     );
-    expect(composant.previsualisationAge).toBeNull();
+    expect(composant.previsualisationAge()).toBeNull();
   });
 
   it("affiche un message explicite quand l'exécution de la purge par densité échoue", async () => {
@@ -223,7 +223,7 @@ describe('SqmPurgeParametrageComponent', () => {
         message: 'Le fichier de données est verrouillé par un autre processus.',
       }),
     );
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it("affiche un message explicite quand la session est verrouillée à l'exécution de la purge (R10-01)", async () => {
@@ -266,8 +266,8 @@ describe('SqmPurgeParametrageComponent', () => {
       'executer_purge_age',
       expect.objectContaining({ mode: 'suppression', motDePasse: 'mot-de-passe' }),
     );
-    expect(composant.previsualisationAge).toBeNull();
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.previsualisationAge()).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
     const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
     expect(derniereNotification?.type).toBe('succes');
     expect(derniereNotification?.message).toContain('purge par âge');
@@ -283,10 +283,10 @@ describe('SqmPurgeParametrageComponent', () => {
     const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
     await composant.previsualiserAge();
     composant.demanderExecutionAge();
-    expect(composant.actionEnAttenteMotDePasse).toBe('age');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('age');
 
     composant.annulerMotDePasse();
 
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 });

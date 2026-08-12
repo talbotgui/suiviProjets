@@ -544,7 +544,7 @@ describe('SqmFicheProjetComponent', () => {
     expect(composant.attenteMotDePasseAnnotation()).toBe(false);
   });
 
-  it('crée une annotation de portée projet après confirmation du mot de passe (US-019)', async () => {
+  it('crée une annotation de portée projet après confirmation du mot de passe (US-019, US-038 : notification de succès)', async () => {
     const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
     const racine = DonneesDeTest.racine(projet);
     const fixture = creerFixture('projet-1', racine);
@@ -571,6 +571,9 @@ describe('SqmFicheProjetComponent', () => {
       }),
     );
     expect(composant.formulaireAnnotationVisible()).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: "L'annotation a été créée." }),
+    ]);
   });
 
   it("affiche un message d'erreur lorsque la création d'annotation échoue", async () => {

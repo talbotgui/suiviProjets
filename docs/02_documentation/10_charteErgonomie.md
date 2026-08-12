@@ -36,6 +36,7 @@
 - Une anomalie technique (échec d'audit, instance injoignable) est présentée avec sa catégorie typée, un message technique repliable et une action suggérée en langage clair, distincte d'un message de validation métier (cf. [RG-021](./05_reglesGestion.md#audits-et-campagnes)).
 - Une erreur de saisie ou de validation métier (mot de passe incorrect, doublon de règle de membre) est signalée au plus près du champ concerné, avec un message explicite sur la correction attendue.
 - Une confirmation de succès (sauvegarde, intégration du brouillon, qualification d'un membre) reste discrète et n'interrompt jamais le flux de travail par une fenêtre modale, sauf lorsqu'elle porte sur une action destructive.
+- Toute action de mutation validée avec succès émet une confirmation via le service de notification centralisé, y compris lorsque le seul retour jusqu'ici observable était la fermeture du formulaire ou l'ajout à une liste, sans confirmation explicite (création/modification/suppression de groupe, de projet ou de source, qualification d'un membre connu, création d'une annotation, modification d'un réglage applicatif, ajout ou modification d'une règle de référentiel, enregistrement d'une vue) ([US-038](./04_casUsage.md#cas-dusage--user-stories), besoin identifié en Phase 12 (R12-03), absent de `Specification.md`).
 - Le ton des messages est professionnel et neutre, cohérent avec le registre retenu à l'étape 1, sans familiarité ni humour.
 
 ## Rappel des exigences d'accessibilité

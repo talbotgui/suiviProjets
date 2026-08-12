@@ -347,7 +347,7 @@
                       <button
                         type="button"
                         class="bouton bouton--discret"
-                        [disabled]="enCoursAnnotation"
+                        [disabled]="enCoursAnnotation()"
                         (click)="demanderSuppressionAnnotation(annotation.id)"
                       >
                         Supprimer
@@ -435,7 +435,7 @@
                   <button
                     type="submit"
                     class="bouton bouton--principal"
-                    [disabled]="enCoursAnnotation"
+                    [disabled]="enCoursAnnotation()"
                   >
                     Enregistrer
                   </button>

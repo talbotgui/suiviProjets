@@ -13,7 +13,8 @@
 // (`previsualiserPurgeDensite`/`previsualiserPurgeAge`) et d'invoquer, après confirmation du mot de passe, la
 // commande de mutation correspondante (`executerPurgeDensite`/`executerPurgeAge`), qui recalcule elle-même cette
 // sélection à partir de la racine transmise (cf. commentaire d'en-tête de `persistance::purge` côté cœur natif).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -46,14 +47,20 @@ export class SqmPurgeParametrageComponent {
 
   /**
    * Résumé de la dernière prévisualisation de purge par densité, `null` si aucune n'a encore été demandée ou si la
-   * racine a changé depuis (purge exécutée, ou par un autre onglet).
+   * racine a changé depuis (purge exécutée, ou par un autre onglet). Signal car mis à jour depuis la continuation
+   * asynchrone d'un appel à une commande native, hors de toute planification automatique de détection de
+   * changement en application zoneless (cf. commentaire d'en-tête de `cheminCreation` dans
+   * `demarrage.component.ts`).
    */
-  public previsualisationDensite: PrevisualisationPurge | null = null;
+  public readonly previsualisationDensite: WritableSignal<PrevisualisationPurge | null> =
+    signal<PrevisualisationPurge | null>(null);
 
   /**
-   * Résumé de la dernière prévisualisation de purge par âge, `null` si aucune n'a encore été demandée.
+   * Résumé de la dernière prévisualisation de purge par âge, `null` si aucune n'a encore été demandée. Signal pour
+   * le même motif que {@link previsualisationDensite}.
    */
-  public previsualisationAge: PrevisualisationPurge | null = null;
+  public readonly previsualisationAge: WritableSignal<PrevisualisationPurge | null> =
+    signal<PrevisualisationPurge | null>(null);
 
   /**
    * Mode de purge par âge actuellement sélectionné (RG-025).
@@ -61,27 +68,30 @@ export class SqmPurgeParametrageComponent {
   public modeAge: ModePurgeAge = 'suppression';
 
   /**
-   * Action de purge en attente de ressaisie du mot de passe (RG-002).
+   * Action de purge en attente de ressaisie du mot de passe (RG-002). Signal pour le même motif que
+   * {@link previsualisationDensite}.
    */
-  public actionEnAttenteMotDePasse: ActionPurgeEnAttente = null;
+  public readonly actionEnAttenteMotDePasse: WritableSignal<ActionPurgeEnAttente> =
+    signal<ActionPurgeEnAttente>(null);
 
   /**
-   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes. Signal pour
+   * le même motif que {@link previsualisationDensite}.
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Prévisualise une purge par densité (RG-024).
    */
   public async previsualiserDensite(): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.previsualiserPurgeDensite();
-    this.enCours = false;
+    this.enCours.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.previsualisationDensite = resultat.previsualisation;
+    this.previsualisationDensite.set(resultat.previsualisation);
   }
 
   /**
@@ -89,10 +99,11 @@ export class SqmPurgeParametrageComponent {
    * concernant au moins un audit a été demandée au préalable.
    */
   public demanderExecutionDensite(): void {
-    if (!this.previsualisationDensite || this.previsualisationDensite.nbAuditsSupprimes === 0) {
+    const previsualisation = this.previsualisationDensite();
+    if (!previsualisation || previsualisation.nbAuditsSupprimes === 0) {
       return;
     }
-    this.actionEnAttenteMotDePasse = 'densite';
+    this.actionEnAttenteMotDePasse.set('densite');
   }
 
   /**
@@ -100,15 +111,15 @@ export class SqmPurgeParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerExecutionDensite(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.executerPurgeDensite(motDePasse);
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.previsualisationDensite = null;
+    this.previsualisationDensite.set(null);
     this.notification.succes('La purge par densité a été effectuée.');
   }
 
@@ -116,14 +127,14 @@ export class SqmPurgeParametrageComponent {
    * Prévisualise une purge par âge pour le mode actuellement sélectionné (RG-025).
    */
   public async previsualiserAge(): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.previsualiserPurgeAge(this.modeAge);
-    this.enCours = false;
+    this.enCours.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.previsualisationAge = resultat.previsualisation;
+    this.previsualisationAge.set(resultat.previsualisation);
   }
 
   /**
@@ -131,10 +142,11 @@ export class SqmPurgeParametrageComponent {
    * concernant au moins un audit a été demandée au préalable pour le mode actuellement sélectionné.
    */
   public demanderExecutionAge(): void {
-    if (!this.previsualisationAge || this.previsualisationAge.nbAuditsSupprimes === 0) {
+    const previsualisation = this.previsualisationAge();
+    if (!previsualisation || previsualisation.nbAuditsSupprimes === 0) {
       return;
     }
-    this.actionEnAttenteMotDePasse = 'age';
+    this.actionEnAttenteMotDePasse.set('age');
   }
 
   /**
@@ -143,15 +155,15 @@ export class SqmPurgeParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerExecutionAge(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.executerPurgeAge(this.modeAge, motDePasse);
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.previsualisationAge = null;
+    this.previsualisationAge.set(null);
     this.notification.succes('La purge par âge a été effectuée.');
   }
 
@@ -162,14 +174,14 @@ export class SqmPurgeParametrageComponent {
    */
   public changerModeAge(mode: ModePurgeAge): void {
     this.modeAge = mode;
-    this.previsualisationAge = null;
+    this.previsualisationAge.set(null);
   }
 
   /**
    * Annule la ressaisie du mot de passe en cours.
    */
   public annulerMotDePasse(): void {
-    this.actionEnAttenteMotDePasse = null;
+    this.actionEnAttenteMotDePasse.set(null);
   }
 
   /**

@@ -79,18 +79,18 @@ describe('SqmSeuilsParametrageComponent', () => {
     expect(composant.fichierCharge()).toBe(false);
     expect(composant.nombreDeModifications()).toBe(0);
     composant.demanderEnregistrement();
-    expect(composant.actionEnAttenteMotDePasse).toBe(false);
+    expect(composant.actionEnAttenteMotDePasse()).toBe(false);
   });
 
   it('annule la ressaisie du mot de passe en cours', () => {
     donneesApplication.chargerRacine(DonneesDeTest.racineVide());
     const composant = TestBed.createComponent(SqmSeuilsParametrageComponent).componentInstance;
-    composant.vitaliteMortJours = 400;
+    composant.vitaliteMortJours.set(400);
     composant.demanderEnregistrement();
 
     composant.annulerMotDePasse();
 
-    expect(composant.actionEnAttenteMotDePasse).toBe(false);
+    expect(composant.actionEnAttenteMotDePasse()).toBe(false);
   });
 
   it.each([
@@ -105,7 +105,7 @@ describe('SqmSeuilsParametrageComponent', () => {
   ] as const)('traduit l’anomalie « %s » en message explicite', async (type, messageAttendu) => {
     donneesApplication.chargerRacine(DonneesDeTest.racineVide());
     const composant = TestBed.createComponent(SqmSeuilsParametrageComponent).componentInstance;
-    composant.vitaliteMortJours = 400;
+    composant.vitaliteMortJours.set(400);
     invokeSimule.mockRejectedValue({ type });
 
     composant.demanderEnregistrement();
@@ -122,8 +122,8 @@ describe('SqmSeuilsParametrageComponent', () => {
     const composant = TestBed.createComponent(SqmSeuilsParametrageComponent).componentInstance;
 
     expect(composant.fichierCharge()).toBe(true);
-    expect(composant.vitaliteMortJours).toBe(365);
-    expect(composant.materialiteBrouillonVariationRelative).toBe(0.1);
+    expect(composant.vitaliteMortJours()).toBe(365);
+    expect(composant.materialiteBrouillonVariationRelative()).toBe(0.1);
     expect(composant.nombreDeModifications()).toBe(0);
   });
 
@@ -132,20 +132,20 @@ describe('SqmSeuilsParametrageComponent', () => {
     const composant = TestBed.createComponent(SqmSeuilsParametrageComponent).componentInstance;
 
     composant.demanderEnregistrement();
-    expect(composant.actionEnAttenteMotDePasse).toBe(false);
+    expect(composant.actionEnAttenteMotDePasse()).toBe(false);
 
-    composant.vitaliteMortJours = 400;
+    composant.vitaliteMortJours.set(400);
     expect(composant.nombreDeModifications()).toBe(1);
 
     composant.demanderEnregistrement();
-    expect(composant.actionEnAttenteMotDePasse).toBe(true);
+    expect(composant.actionEnAttenteMotDePasse()).toBe(true);
   });
 
   it('invoque definir_seuil une fois par champ modifié puis réinitialise le formulaire', async () => {
     donneesApplication.chargerRacine(DonneesDeTest.racineVide());
     const composant = TestBed.createComponent(SqmSeuilsParametrageComponent).componentInstance;
-    composant.vitaliteMortJours = 400;
-    composant.couvertureSeuilRouge = 45;
+    composant.vitaliteMortJours.set(400);
+    composant.couvertureSeuilRouge.set(45);
     invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
 
     composant.demanderEnregistrement();
@@ -166,14 +166,14 @@ describe('SqmSeuilsParametrageComponent', () => {
       expect.objectContaining({ type: 'succes' }),
     ]);
     expect(composant.nombreDeModifications()).toBe(0);
-    expect(composant.actionEnAttenteMotDePasse).toBe(false);
+    expect(composant.actionEnAttenteMotDePasse()).toBe(false);
   });
 
   it('arrête la séquence au premier échec sans tenter les seuils suivants', async () => {
     donneesApplication.chargerRacine(DonneesDeTest.racineVide());
     const composant = TestBed.createComponent(SqmSeuilsParametrageComponent).componentInstance;
-    composant.vitaliteMortJours = 400;
-    composant.couvertureSeuilRouge = 45;
+    composant.vitaliteMortJours.set(400);
+    composant.couvertureSeuilRouge.set(45);
     invokeSimule.mockRejectedValue({ type: 'cleSeuilIntrouvable' });
 
     composant.demanderEnregistrement();

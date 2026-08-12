@@ -130,7 +130,7 @@ describe('SqmProjetsAdminComponent', () => {
     expect(composant.projets()).toEqual([]);
   });
 
-  it('crée un projet avec la politique IA interdite par défaut (RG-014)', () => {
+  it('crée un projet avec la politique IA interdite par défaut (RG-014, US-038 : notification de succès)', () => {
     composant.selectionnerGroupe(groupeId);
     composant.ouvrirCreation();
     composant.nom = 'API Facturation';
@@ -139,9 +139,12 @@ describe('SqmProjetsAdminComponent', () => {
 
     expect(composant.projets()[0].iaAutorisee).toBe(false);
     expect(composant.formulaireVisible).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le projet a été créé.' }),
+    ]);
   });
 
-  it('modifie un projet existant', () => {
+  it('modifie un projet existant (US-038 : notification de succès)', () => {
     const projetId = donneesApplication.creerProjet(groupeId, {
       nom: 'API Facturation',
       description: '',
@@ -153,9 +156,12 @@ describe('SqmProjetsAdminComponent', () => {
     composant.enregistrer();
 
     expect(composant.projets()[0].nom).toBe('Nouveau nom');
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le projet a été modifié.' }),
+    ]);
   });
 
-  it('duplique un projet avec ses sources', () => {
+  it('duplique un projet avec ses sources (US-038 : notification de succès)', () => {
     const projetId = donneesApplication.creerProjet(groupeId, {
       nom: 'API Facturation',
       description: '',
@@ -166,9 +172,12 @@ describe('SqmProjetsAdminComponent', () => {
 
     expect(composant.projets()).toHaveLength(2);
     expect(composant.projets().some((p) => p.nom === 'API Facturation (copie)')).toBe(true);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le projet a été dupliqué.' }),
+    ]);
   });
 
-  it('supprime un projet après confirmation', () => {
+  it('supprime un projet après confirmation (US-038 : notification de succès)', () => {
     const projetId = donneesApplication.creerProjet(groupeId, {
       nom: 'API Facturation',
       description: '',
@@ -179,6 +188,9 @@ describe('SqmProjetsAdminComponent', () => {
     composant.confirmerSuppression();
 
     expect(composant.projets()).toEqual([]);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le projet a été supprimé.' }),
+    ]);
   });
 
   it("n'effectue aucune suppression en cas d'annulation", () => {
@@ -208,7 +220,7 @@ describe('SqmProjetsAdminComponent', () => {
     it('ouvre la ressaisie du mot de passe avant toute bascule', () => {
       composant.demanderBasculePolitiqueIA(projetId);
 
-      expect(composant.projetPolitiqueIAEnAttenteId).toBe(projetId);
+      expect(composant.projetPolitiqueIAEnAttenteId()).toBe(projetId);
     });
 
     it('annule la bascule demandée', () => {
@@ -216,7 +228,7 @@ describe('SqmProjetsAdminComponent', () => {
 
       composant.annulerBasculePolitiqueIA();
 
-      expect(composant.projetPolitiqueIAEnAttenteId).toBeNull();
+      expect(composant.projetPolitiqueIAEnAttenteId()).toBeNull();
     });
 
     it('autorise l’IA après confirmation du mot de passe et crée une annotation système (RG-015)', async () => {
@@ -264,7 +276,7 @@ describe('SqmProjetsAdminComponent', () => {
       });
       expect(composant.projets()[0].iaAutorisee).toBe(true);
       expect(composant.projets()[0].annotations).toHaveLength(1);
-      expect(composant.projetPolitiqueIAEnAttenteId).toBeNull();
+      expect(composant.projetPolitiqueIAEnAttenteId()).toBeNull();
     });
 
     it('affiche un message d’erreur en cas de mot de passe incorrect', async () => {
@@ -319,7 +331,7 @@ describe('SqmProjetsAdminComponent', () => {
       expect(composant.projetPourSourcesId).toBe(composant.projets()[0].id);
     });
 
-    it('« Ajouter une autre source » enregistre la source puis réinitialise le formulaire sans fermer le mini-flux', () => {
+    it('« Ajouter une autre source » enregistre la source puis réinitialise le formulaire sans fermer le mini-flux (US-038 : notification de succès)', () => {
       composant.ouvrirCreationAvecSources();
       composant.nom = 'API Facturation';
       composant.enregistrer();
@@ -337,6 +349,10 @@ describe('SqmProjetsAdminComponent', () => {
       expect(composant.projetPourSourcesId).not.toBeNull();
       expect(formulaireSource.instanceId()).toBe('');
       expect(formulaireSource.idExterne()).toBe('');
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'succes', message: 'Le projet a été créé.' }),
+        expect.objectContaining({ type: 'succes', message: 'La source a été créée.' }),
+      ]);
     });
 
     it('« Terminer ce projet, projet suivant » enregistre la dernière source puis rouvre un formulaire Projet vierge en mode « avec sources »', () => {
@@ -358,6 +374,10 @@ describe('SqmProjetsAdminComponent', () => {
       expect(composant.formulaireVisible).toBe(true);
       expect(composant.nom).toBe('');
       expect(composant.creationAvecSourcesDemandee).toBe(true);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'succes', message: 'Le projet a été créé.' }),
+        expect.objectContaining({ type: 'succes', message: 'La source a été créée.' }),
+      ]);
     });
 
     it('« Terminer ce projet, projet suivant » avec un formulaire vide ne crée aucune source superflue', () => {

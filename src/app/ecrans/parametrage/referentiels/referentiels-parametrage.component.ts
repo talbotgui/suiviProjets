@@ -22,7 +22,8 @@
 //   sous-formulaire répétable, pour limiter la complexité de ce premier incrément.
 // - Le motif de nommage des branches est validé comme expression régulière syntaxiquement correcte côté client
 //   (`new RegExp(...)`) avant tout envoi, en complément de la revalidation déjà effectuée côté cœur natif (RG-030).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -99,14 +100,19 @@ export class SqmReferentielsParametrageComponent {
   public messageErreur: string | null = null;
 
   /**
-   * Action de référentiel en attente de ressaisie du mot de passe (RG-002).
+   * Action de référentiel en attente de ressaisie du mot de passe (RG-002). Signal (plutôt qu'une simple propriété)
+   * car mutée depuis la continuation asynchrone des quatre méthodes `confirmer*` de ce composant, hors de toute
+   * planification automatique de détection de changement en application zoneless (cf. `cheminCreation` de
+   * `SqmDemarrageComponent`, correctif de référence).
    */
-  public actionEnAttenteMotDePasse: ActionReferentielEnAttente = null;
+  public readonly actionEnAttenteMotDePasse: WritableSignal<ActionReferentielEnAttente> =
+    signal<ActionReferentielEnAttente>(null);
 
   /**
-   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes. Signal pour le
+   * même motif que {@link actionEnAttenteMotDePasse}.
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   // --- Règles de dépendances ---
 
@@ -118,7 +124,12 @@ export class SqmReferentielsParametrageComponent {
     return this.donneesApplication.racine()?.referentiels.reglesDependances ?? [];
   }
 
-  public formulaireDependanceVisible = false;
+  /**
+   * Visibilité du formulaire de règle de dépendances. Signal pour le même motif que
+   * {@link actionEnAttenteMotDePasse}.
+   */
+  public readonly formulaireDependanceVisible: WritableSignal<boolean> = signal(false);
+
   public dependanceEnEditionId: string | null = null;
   public motifDependance = '';
   public versionsDependanceTexte = '';
@@ -131,7 +142,7 @@ export class SqmReferentielsParametrageComponent {
     this.motifDependance = '';
     this.versionsDependanceTexte = '';
     this.messageErreur = null;
-    this.formulaireDependanceVisible = true;
+    this.formulaireDependanceVisible.set(true);
   }
 
   /**
@@ -149,14 +160,14 @@ export class SqmReferentielsParametrageComponent {
       .map((version) => `${version.motifVersion}=${version.statut}`)
       .join('\n');
     this.messageErreur = null;
-    this.formulaireDependanceVisible = true;
+    this.formulaireDependanceVisible.set(true);
   }
 
   /**
    * Referme le formulaire de règle de dépendances sans enregistrer.
    */
   public fermerFormulaireDependance(): void {
-    this.formulaireDependanceVisible = false;
+    this.formulaireDependanceVisible.set(false);
   }
 
   /**
@@ -197,7 +208,7 @@ export class SqmReferentielsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.actionEnAttenteMotDePasse = 'dependance';
+    this.actionEnAttenteMotDePasse.set('dependance');
   }
 
   /**
@@ -205,27 +216,33 @@ export class SqmReferentielsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementDependance(motDePasse: string): Promise<void> {
+    const dependanceEnEditionId = this.dependanceEnEditionId;
     const versions = this.analyserVersions(this.versionsDependanceTexte) ?? [];
     const entree: EntreeReglesDependances = {
-      id: this.dependanceEnEditionId ?? crypto.randomUUID(),
+      id: dependanceEnEditionId ?? crypto.randomUUID(),
       motif: this.motifDependance.trim(),
       versions,
     };
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirReferentiel(
       'reglesDependances',
       entree,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.formulaireDependanceVisible = false;
+    this.formulaireDependanceVisible.set(false);
+    this.notification.succes(
+      dependanceEnEditionId
+        ? 'La règle de dépendances a été modifiée.'
+        : 'La règle de dépendances a été ajoutée.',
+    );
   }
 
   // --- Règles de marqueurs IA ---
@@ -238,7 +255,12 @@ export class SqmReferentielsParametrageComponent {
     return this.donneesApplication.racine()?.referentiels.reglesMarqueursIA ?? [];
   }
 
-  public formulaireMarqueurIaVisible = false;
+  /**
+   * Visibilité du formulaire de règle de marqueur IA. Signal pour le même motif que
+   * {@link actionEnAttenteMotDePasse}.
+   */
+  public readonly formulaireMarqueurIaVisible: WritableSignal<boolean> = signal(false);
+
   public marqueurIaEnEditionId: string | null = null;
   public motifMarqueurIa = '';
   public typeCorrespondanceMarqueurIa: TypeCorrespondanceMarqueur = 'exact';
@@ -257,7 +279,7 @@ export class SqmReferentielsParametrageComponent {
     this.natureMarqueurIa = 'fichier';
     this.outilMarqueurIa = '';
     this.messageErreur = null;
-    this.formulaireMarqueurIaVisible = true;
+    this.formulaireMarqueurIaVisible.set(true);
   }
 
   /**
@@ -276,14 +298,14 @@ export class SqmReferentielsParametrageComponent {
     this.natureMarqueurIa = regle.nature;
     this.outilMarqueurIa = regle.outil;
     this.messageErreur = null;
-    this.formulaireMarqueurIaVisible = true;
+    this.formulaireMarqueurIaVisible.set(true);
   }
 
   /**
    * Referme le formulaire de règle de marqueur IA sans enregistrer.
    */
   public fermerFormulaireMarqueurIa(): void {
-    this.formulaireMarqueurIaVisible = false;
+    this.formulaireMarqueurIaVisible.set(false);
   }
 
   /**
@@ -295,7 +317,7 @@ export class SqmReferentielsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.actionEnAttenteMotDePasse = 'marqueurIA';
+    this.actionEnAttenteMotDePasse.set('marqueurIA');
   }
 
   /**
@@ -303,8 +325,9 @@ export class SqmReferentielsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementMarqueurIa(motDePasse: string): Promise<void> {
+    const marqueurIaEnEditionId = this.marqueurIaEnEditionId;
     const entree: EntreeReglesMarqueursIA = {
-      id: this.marqueurIaEnEditionId ?? crypto.randomUUID(),
+      id: marqueurIaEnEditionId ?? crypto.randomUUID(),
       motif: this.motifMarqueurIa.trim(),
       typeCorrespondance: this.typeCorrespondanceMarqueurIa,
       portee: this.porteeMarqueurIa,
@@ -312,20 +335,25 @@ export class SqmReferentielsParametrageComponent {
       outil: this.outilMarqueurIa.trim(),
     };
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirReferentiel(
       'reglesMarqueursIA',
       entree,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.formulaireMarqueurIaVisible = false;
+    this.formulaireMarqueurIaVisible.set(false);
+    this.notification.succes(
+      marqueurIaEnEditionId
+        ? 'La règle de marqueur IA a été modifiée.'
+        : 'La règle de marqueur IA a été ajoutée.',
+    );
   }
 
   // --- Motif de nommage des branches ---
@@ -338,7 +366,12 @@ export class SqmReferentielsParametrageComponent {
     return this.donneesApplication.racine()?.referentiels.motifNommageBranches ?? '';
   }
 
-  public formulaireMotifNommageVisible = false;
+  /**
+   * Visibilité du formulaire du motif de nommage des branches. Signal pour le même motif que
+   * {@link actionEnAttenteMotDePasse}.
+   */
+  public readonly formulaireMotifNommageVisible: WritableSignal<boolean> = signal(false);
+
   public motifNommageBranchesFormulaire = '';
 
   /**
@@ -347,14 +380,14 @@ export class SqmReferentielsParametrageComponent {
   public ouvrirEditionMotifNommage(): void {
     this.motifNommageBranchesFormulaire = this.motifNommageBranchesActuel();
     this.messageErreur = null;
-    this.formulaireMotifNommageVisible = true;
+    this.formulaireMotifNommageVisible.set(true);
   }
 
   /**
    * Referme le formulaire du motif de nommage sans enregistrer.
    */
   public fermerFormulaireMotifNommage(): void {
-    this.formulaireMotifNommageVisible = false;
+    this.formulaireMotifNommageVisible.set(false);
   }
 
   /**
@@ -374,7 +407,7 @@ export class SqmReferentielsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.actionEnAttenteMotDePasse = 'motifNommage';
+    this.actionEnAttenteMotDePasse.set('motifNommage');
   }
 
   /**
@@ -383,28 +416,31 @@ export class SqmReferentielsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementMotifNommage(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirReferentiel(
       'motifNommageBranches',
       this.motifNommageBranchesFormulaire.trim(),
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.formulaireMotifNommageVisible = false;
+    this.formulaireMotifNommageVisible.set(false);
+    this.notification.succes('Le motif de nommage des branches a été modifié.');
   }
 
   // --- Suppression d'une entrée de référentiel (US-033, RG-035, Phase 10 incrément 8) ---
 
   /**
-   * Suppression d'entrée de référentiel actuellement en attente de confirmation, `null` si aucune.
+   * Suppression d'entrée de référentiel actuellement en attente de confirmation, `null` si aucune. Signal pour le
+   * même motif que {@link actionEnAttenteMotDePasse}.
    */
-  public suppressionEnAttente: SuppressionEnAttente | null = null;
+  public readonly suppressionEnAttente: WritableSignal<SuppressionEnAttente | null> =
+    signal<SuppressionEnAttente | null>(null);
 
   /**
    * Demande la suppression d'une règle de dépendances : ouvre la confirmation de suppression (avant ressaisie du
@@ -413,7 +449,7 @@ export class SqmReferentielsParametrageComponent {
    */
   public demanderSuppressionDependance(id: string): void {
     this.messageErreur = null;
-    this.suppressionEnAttente = { type: 'dependance', id };
+    this.suppressionEnAttente.set({ type: 'dependance', id });
   }
 
   /**
@@ -423,27 +459,29 @@ export class SqmReferentielsParametrageComponent {
    */
   public demanderSuppressionMarqueurIa(id: string): void {
     this.messageErreur = null;
-    this.suppressionEnAttente = { type: 'marqueurIA', id };
+    this.suppressionEnAttente.set({ type: 'marqueurIA', id });
   }
 
   /**
    * Annule la suppression en attente de confirmation.
    */
   public annulerSuppression(): void {
-    this.suppressionEnAttente = null;
+    this.suppressionEnAttente.set(null);
   }
 
   /**
    * Confirme la suppression : ouvre la ressaisie du mot de passe (RG-002).
    */
   public confirmerSuppression(): void {
-    if (!this.suppressionEnAttente) {
+    const suppressionEnAttente = this.suppressionEnAttente();
+    if (!suppressionEnAttente) {
       return;
     }
-    this.actionEnAttenteMotDePasse =
-      this.suppressionEnAttente.type === 'dependance'
+    this.actionEnAttenteMotDePasse.set(
+      suppressionEnAttente.type === 'dependance'
         ? 'suppressionDependance'
-        : 'suppressionMarqueurIA';
+        : 'suppressionMarqueurIA',
+    );
   }
 
   /**
@@ -451,32 +489,33 @@ export class SqmReferentielsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerSuppressionMotDePasse(motDePasse: string): Promise<void> {
-    if (!this.suppressionEnAttente) {
+    const suppressionEnAttente = this.suppressionEnAttente();
+    if (!suppressionEnAttente) {
       return;
     }
-    const { type, id } = this.suppressionEnAttente;
+    const { type, id } = suppressionEnAttente;
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat =
       type === 'dependance'
         ? await this.donneesApplication.supprimerRegleDependance(id, motDePasse)
         : await this.donneesApplication.supprimerRegleMarqueurIA(id, motDePasse);
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
-      this.suppressionEnAttente = null;
+      this.suppressionEnAttente.set(null);
       return;
     }
-    this.suppressionEnAttente = null;
+    this.suppressionEnAttente.set(null);
   }
 
   /**
    * Annule la ressaisie du mot de passe en cours, quelle que soit l'action qui l'avait demandée.
    */
   public annulerMotDePasse(): void {
-    this.actionEnAttenteMotDePasse = null;
+    this.actionEnAttenteMotDePasse.set(null);
   }
 
   /**

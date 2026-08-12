@@ -16,7 +16,8 @@
 // `ecrans/audits/constitution-campagne/constitution-campagne.component.ts`) : même chemin d'URL, même composant.
 // RG-019 reste, comme décidé pour cet incrément, un bandeau de blocage dans Constitution de campagne plutôt qu'un
 // guard de route ; ce bandeau porte désormais un lien direct vers cet écran.
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
@@ -70,24 +71,30 @@ export class SqmBrouillonComponent {
   private readonly notification: NotificationService = inject(NotificationService);
 
   /**
-   * Identifiants des projets actuellement sélectionnés pour une action groupée.
+   * Identifiants des projets actuellement sélectionnés pour une action groupée. Porté par un signal : muté depuis
+   * la continuation asynchrone de {@link confirmerAction}, hors de toute planification automatique de détection de
+   * changement en application zoneless (cf. `cheminCreation` de `SqmDemarrageComponent`).
    */
-  public selectionProjetIds: ReadonlySet<string> = new Set();
+  public readonly selectionProjetIds: WritableSignal<ReadonlySet<string>> = signal(new Set());
 
   /**
-   * Motif de rejet en cours de saisie (F09 : « rejette (motif optionnel) »).
+   * Motif de rejet en cours de saisie (F09 : « rejette (motif optionnel) »). Signal pour le même motif que
+   * {@link selectionProjetIds}.
    */
-  public motifRejet = '';
+  public readonly motifRejet: WritableSignal<string> = signal('');
 
   /**
    * Action en attente de confirmation du mot de passe du fichier, `null` si aucune ressaisie n'est en cours.
+   * Signal pour le même motif que {@link selectionProjetIds}.
    */
-  public actionEnAttente: ActionEnAttente | null = null;
+  public readonly actionEnAttente: WritableSignal<ActionEnAttente | null> =
+    signal<ActionEnAttente | null>(null);
 
   /**
-   * Indique qu'une mutation est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'une mutation est en cours, pour désactiver les actions concurrentes. Signal pour le même motif que
+   * {@link selectionProjetIds}.
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
    * À la construction, reprend un éventuel échec d'enregistrement du brouillon survenu après la navigation
@@ -210,7 +217,7 @@ export class SqmBrouillonComponent {
    * @returns `true` si le projet est sélectionné.
    */
   public estSelectionne(projetId: string): boolean {
-    return this.selectionProjetIds.has(projetId);
+    return this.selectionProjetIds().has(projetId);
   }
 
   /**
@@ -218,13 +225,13 @@ export class SqmBrouillonComponent {
    * @param projetId - Identifiant du projet à basculer.
    */
   public basculerSelection(projetId: string): void {
-    const nouvelleSelection = new Set(this.selectionProjetIds);
+    const nouvelleSelection = new Set(this.selectionProjetIds());
     if (nouvelleSelection.has(projetId)) {
       nouvelleSelection.delete(projetId);
     } else {
       nouvelleSelection.add(projetId);
     }
-    this.selectionProjetIds = nouvelleSelection;
+    this.selectionProjetIds.set(nouvelleSelection);
   }
 
   /**
@@ -234,7 +241,8 @@ export class SqmBrouillonComponent {
   public estToutSelectionne(): boolean {
     const entrees = this.entrees();
     return (
-      entrees.length > 0 && entrees.every((entree) => this.selectionProjetIds.has(entree.projetId))
+      entrees.length > 0 &&
+      entrees.every((entree) => this.selectionProjetIds().has(entree.projetId))
     );
   }
 
@@ -243,9 +251,9 @@ export class SqmBrouillonComponent {
    */
   public basculerTout(): void {
     const entrees = this.entrees();
-    this.selectionProjetIds = this.estToutSelectionne()
-      ? new Set()
-      : new Set(entrees.map((entree) => entree.projetId));
+    this.selectionProjetIds.set(
+      this.estToutSelectionne() ? new Set() : new Set(entrees.map((entree) => entree.projetId)),
+    );
   }
 
   /**
@@ -253,14 +261,17 @@ export class SqmBrouillonComponent {
    * mot de passe du fichier (RG-002).
    */
   public demanderIntegrerTout(): void {
-    this.actionEnAttente = { type: 'integrer', selection: undefined };
+    this.actionEnAttente.set({ type: 'integrer', selection: undefined });
   }
 
   /**
    * Demande l'intégration de la sélection courante (F09 : « intègre projet par projet »).
    */
   public demanderIntegrerSelection(): void {
-    this.actionEnAttente = { type: 'integrer', selection: Array.from(this.selectionProjetIds) };
+    this.actionEnAttente.set({
+      type: 'integrer',
+      selection: Array.from(this.selectionProjetIds()),
+    });
   }
 
   /**
@@ -268,14 +279,17 @@ export class SqmBrouillonComponent {
    * @param projetId - Identifiant du projet à intégrer.
    */
   public demanderIntegrerUnique(projetId: string): void {
-    this.actionEnAttente = { type: 'integrer', selection: [projetId] };
+    this.actionEnAttente.set({ type: 'integrer', selection: [projetId] });
   }
 
   /**
    * Demande le rejet de la sélection courante (F09 : « rejette », motif optionnel).
    */
   public demanderRejeterSelection(): void {
-    this.actionEnAttente = { type: 'rejeter', selection: Array.from(this.selectionProjetIds) };
+    this.actionEnAttente.set({
+      type: 'rejeter',
+      selection: Array.from(this.selectionProjetIds()),
+    });
   }
 
   /**
@@ -283,14 +297,14 @@ export class SqmBrouillonComponent {
    * @param projetId - Identifiant du projet à rejeter.
    */
   public demanderRejeterUnique(projetId: string): void {
-    this.actionEnAttente = { type: 'rejeter', selection: [projetId] };
+    this.actionEnAttente.set({ type: 'rejeter', selection: [projetId] });
   }
 
   /**
    * Annule l'action en attente de confirmation du mot de passe.
    */
   public annulerAction(): void {
-    this.actionEnAttente = null;
+    this.actionEnAttente.set(null);
   }
 
   /**
@@ -299,29 +313,30 @@ export class SqmBrouillonComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerAction(motDePasse: string): Promise<void> {
-    const action = this.actionEnAttente;
+    const action = this.actionEnAttente();
     if (action === null) {
       return;
     }
-    this.enCours = true;
+    this.enCours.set(true);
+    const motifRejet = this.motifRejet().trim();
     const resultat =
       action.type === 'integrer'
         ? await this.donneesApplication.integrerBrouillon(action.selection, motDePasse)
         : await this.donneesApplication.rejeterBrouillon(
             action.selection,
-            this.motifRejet.trim().length > 0 ? this.motifRejet.trim() : undefined,
+            motifRejet.length > 0 ? motifRejet : undefined,
             motDePasse,
           );
-    this.enCours = false;
-    this.actionEnAttente = null;
+    this.enCours.set(false);
+    this.actionEnAttente.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
 
-    this.selectionProjetIds = new Set();
-    this.motifRejet = '';
+    this.selectionProjetIds.set(new Set());
+    this.motifRejet.set('');
     if (this.donneesApplication.racine()?.brouillon === null) {
       void this.router.navigateByUrl('/audits/constitution-campagne');
     }

@@ -7,8 +7,8 @@
 // `SqmConfirmationMotDePasseComponent` pour le champ de mot de passe (bouton « Annuler » sans effet ici au-delà de
 // vider le champ saisi, la superposition restant affichée tant que la session n'est pas déverrouillée ou le
 // fichier fermé : aucune action d'annulation légitime sur un écran de verrouillage).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
-import type { Signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { Signal, WritableSignal } from '@angular/core';
 import { Router } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
@@ -37,9 +37,11 @@ export class SqmVerrouillageComponent {
   public readonly echecsDeverrouillage: Signal<number> = this.etatSession.echecsDeverrouillage;
 
   /**
-   * Message d'erreur affiché après un échec de déverrouillage, `null` si aucun échec n'a encore été rejoué.
+   * Message d'erreur affiché après un échec de déverrouillage, `null` si aucun échec n'a encore été rejoué. Signal
+   * (plutôt qu'une simple propriété) car mis à jour depuis la continuation asynchrone de {@link deverrouiller},
+   * sans déclenchement automatique de rendu en zoneless (cf. `cheminCreation` de `demarrage.component.ts`).
    */
-  public messageErreur: string | null = null;
+  public readonly messageErreur: WritableSignal<string | null> = signal<string | null>(null);
 
   /**
    * Nombre d'essais restants avant fermeture automatique du fichier, `null` si le seuil paramétré n'est pas
@@ -64,13 +66,13 @@ export class SqmVerrouillageComponent {
   public async deverrouiller(motDePasse: string): Promise<void> {
     const resultat = await this.donneesApplication.deverrouillerSession(motDePasse);
     if (resultat.type === 'succes') {
-      this.messageErreur = null;
+      this.messageErreur.set(null);
       return;
     }
     if (resultat.fichierFerme) {
       void this.router.navigateByUrl('/demarrage');
       return;
     }
-    this.messageErreur = 'Mot de passe incorrect.';
+    this.messageErreur.set('Mot de passe incorrect.');
   }
 }

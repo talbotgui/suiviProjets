@@ -15,7 +15,7 @@
       <button
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirEditionVerrouillage()"
       >
         Modifier
@@ -27,7 +27,7 @@
       {{ echecsAvantFermetureFormulaire }} échec(s) avant fermeture.
     </p>
 
-    @if (verrouillageEditVisible) {
+    @if (verrouillageEditVisible()) {
       <form
         class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementVerrouillage()"
@@ -60,14 +60,14 @@
           <button type="button" class="bouton" (click)="fermerEditionVerrouillage()">
             Annuler
           </button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours()">
             Enregistrer
           </button>
         </div>
       </form>
     }
 
-    @if (reglageEnAttenteMotDePasse === 'verrouillage') {
+    @if (reglageEnAttenteMotDePasse() === 'verrouillage') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer le délai de verrouillage."
         (confirmee)="confirmerEnregistrementVerrouillage($event)"
@@ -87,14 +87,14 @@
         id="reglages-applicatifs-bouton-modifier-concurrence"
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirEditionConcurrence()"
       >
         Modifier
       </button>
     </header>
 
-    @if (concurrenceEditVisible) {
+    @if (concurrenceEditVisible()) {
       <form
         class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementConcurrence()"
@@ -126,7 +126,7 @@
             id="reglages-applicatifs-bouton-enregistrer-concurrence"
             type="submit"
             class="bouton bouton--principal"
-            [disabled]="enCours"
+            [disabled]="enCours()"
           >
             Enregistrer
           </button>
@@ -134,7 +134,7 @@
       </form>
     }
 
-    @if (reglageEnAttenteMotDePasse === 'concurrenceAudit') {
+    @if (reglageEnAttenteMotDePasse() === 'concurrenceAudit') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer la concurrence d'audit."
         (confirmee)="confirmerEnregistrementConcurrence($event)"
@@ -148,12 +148,12 @@
       class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
     >
       <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Proxy sortant</h3>
-      <button type="button" class="bouton" [disabled]="enCours" (click)="ouvrirEditionProxy()">
+      <button type="button" class="bouton" [disabled]="enCours()" (click)="ouvrirEditionProxy()">
         Modifier
       </button>
     </header>
 
-    @if (proxyEditVisible) {
+    @if (proxyEditVisible()) {
       <form
         class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementProxy()"
@@ -188,14 +188,14 @@
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
         >
           <button type="button" class="bouton" (click)="fermerEditionProxy()">Annuler</button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours()">
             Enregistrer
           </button>
         </div>
       </form>
     }
 
-    @if (reglageEnAttenteMotDePasse === 'proxy') {
+    @if (reglageEnAttenteMotDePasse() === 'proxy') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer le réglage de proxy."
         (confirmee)="confirmerEnregistrementProxy($event)"
@@ -214,14 +214,14 @@
       <button
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirEditionNombreSauvegardes()"
       >
         Modifier
       </button>
     </header>
 
-    @if (nombreSauvegardesEditVisible) {
+    @if (nombreSauvegardesEditVisible()) {
       <form
         class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementNombreSauvegardes()"
@@ -243,14 +243,14 @@
           <button type="button" class="bouton" (click)="fermerEditionNombreSauvegardes()">
             Annuler
           </button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours()">
             Enregistrer
           </button>
         </div>
       </form>
     }
 
-    @if (reglageEnAttenteMotDePasse === 'nombreSauvegardes') {
+    @if (reglageEnAttenteMotDePasse() === 'nombreSauvegardes') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer le nombre de sauvegardes de sécurité."
         (confirmee)="confirmerEnregistrementNombreSauvegardes($event)"
@@ -269,7 +269,7 @@
       <button
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirEditionSeuilAvertissement()"
       >
         Modifier
@@ -278,7 +278,7 @@
 
     <p class="texte-sm texte-discret">Seuil actuel : {{ seuilAvertissementMoActuel() }} Mo.</p>
 
-    @if (seuilAvertissementEditVisible) {
+    @if (seuilAvertissementEditVisible()) {
       <form
         class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
         (ngSubmit)="demanderEnregistrementSeuilAvertissement()"
@@ -300,14 +300,14 @@
           <button type="button" class="bouton" (click)="fermerEditionSeuilAvertissement()">
             Annuler
           </button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours()">
             Enregistrer
           </button>
         </div>
       </form>
     }
 
-    @if (reglageEnAttenteMotDePasse === 'seuilAvertissement') {
+    @if (reglageEnAttenteMotDePasse() === 'seuilAvertissement') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer le seuil d'avertissement de taille."
         (confirmee)="confirmerEnregistrementSeuilAvertissement($event)"

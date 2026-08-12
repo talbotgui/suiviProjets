@@ -359,7 +359,7 @@ describe('SqmJournalParametrageComponent', () => {
       await composant.previsualiserPurge();
 
       expect(invokeSimule).toHaveBeenCalledWith('previsualiser_purge_journal', expect.anything());
-      expect(composant.previsualisationPurge).toEqual({
+      expect(composant.previsualisationPurge()).toEqual({
         nbEntreesSupprimees: 4,
         octetsAvant: 100,
         octetsApres: 40,
@@ -370,36 +370,36 @@ describe('SqmJournalParametrageComponent', () => {
       const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
 
       composant.demanderExecutionPurge();
-      expect(composant.purgeEnAttenteMotDePasse).toBe(false);
+      expect(composant.purgeEnAttenteMotDePasse()).toBe(false);
 
-      composant.previsualisationPurge = {
+      composant.previsualisationPurge.set({
         nbEntreesSupprimees: 0,
         octetsAvant: 10,
         octetsApres: 10,
-      };
+      });
       composant.demanderExecutionPurge();
-      expect(composant.purgeEnAttenteMotDePasse).toBe(false);
+      expect(composant.purgeEnAttenteMotDePasse()).toBe(false);
     });
 
     it('exécute la purge après confirmation du mot de passe et réinitialise la prévisualisation', async () => {
       const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
-      composant.previsualisationPurge = {
+      composant.previsualisationPurge.set({
         nbEntreesSupprimees: 2,
         octetsAvant: 100,
         octetsApres: 60,
-      };
+      });
       invokeSimule.mockResolvedValue(DonneesDeTest.racine([]));
 
       composant.demanderExecutionPurge();
-      expect(composant.purgeEnAttenteMotDePasse).toBe(true);
+      expect(composant.purgeEnAttenteMotDePasse()).toBe(true);
       await composant.confirmerExecutionPurge('mot-de-passe');
 
       expect(invokeSimule).toHaveBeenCalledWith(
         'executer_purge_journal',
         expect.objectContaining({ motDePasse: 'mot-de-passe' }),
       );
-      expect(composant.previsualisationPurge).toBeNull();
-      expect(composant.purgeEnAttenteMotDePasse).toBe(false);
+      expect(composant.previsualisationPurge()).toBeNull();
+      expect(composant.purgeEnAttenteMotDePasse()).toBe(false);
       expect(TestBed.inject(NotificationService).liste()).toEqual([
         expect.objectContaining({ type: 'succes' }),
       ]);
@@ -407,11 +407,11 @@ describe('SqmJournalParametrageComponent', () => {
 
     it('convertit un rejet typé « sessionVerrouillee » en message explicite à la purge', async () => {
       const composant = TestBed.createComponent(SqmJournalParametrageComponent).componentInstance;
-      composant.previsualisationPurge = {
+      composant.previsualisationPurge.set({
         nbEntreesSupprimees: 2,
         octetsAvant: 100,
         octetsApres: 60,
-      };
+      });
       invokeSimule.mockRejectedValue({ type: 'sessionVerrouillee' });
 
       composant.demanderExecutionPurge();

@@ -6,7 +6,8 @@
 // autres CRUD de l'écran Administration (Phase 3, en mémoire uniquement), chaque mutation invoque ici directement
 // une commande native qui sauvegarde effectivement le fichier (RG-002 : le mot de passe est donc redemandé à
 // chaque enregistrement ou suppression, cf. `SqmConfirmationMotDePasseComponent`).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -68,9 +69,11 @@ export class SqmMembresConnusAdminComponent {
   public groupeSelectionneId: string | null = null;
 
   /**
-   * Indique si le formulaire de création/modification est actuellement affiché.
+   * Indique si le formulaire de création/modification est actuellement affiché. Signal car muté depuis la
+   * continuation asynchrone de {@link confirmerEnregistrement}, hors de toute planification automatique de
+   * détection de changement en application zoneless (cf. `cheminCreation` dans `demarrage.component.ts`).
    */
-  public formulaireVisible = false;
+  public readonly formulaireVisible: WritableSignal<boolean> = signal(false);
 
   /**
    * Identifiant de la règle en cours de modification, `null` en création.
@@ -109,13 +112,19 @@ export class SqmMembresConnusAdminComponent {
 
   /**
    * Identifiant de la règle dont la suppression est en cours de confirmation, `null` si aucune n'est en cours.
+   * Signal car muté depuis la continuation asynchrone de {@link confirmerSuppressionMotDePasse} (cf.
+   * {@link formulaireVisible}).
    */
-  public membreASupprimerId: string | null = null;
+  public readonly membreASupprimerId: WritableSignal<string | null> = signal<string | null>(null);
 
   /**
    * Action en attente de ressaisie du mot de passe (RG-002), `null` si aucune boîte de ressaisie n'est affichée.
+   * Signal car muté depuis la continuation asynchrone de {@link confirmerEnregistrement} et
+   * {@link confirmerSuppressionMotDePasse} (cf. {@link formulaireVisible}).
    */
-  public actionEnAttenteMotDePasse: 'enregistrement' | 'suppression' | null = null;
+  public readonly actionEnAttenteMotDePasse: WritableSignal<
+    'enregistrement' | 'suppression' | null
+  > = signal<'enregistrement' | 'suppression' | null>(null);
 
   /**
    * Identifiants des règles de membres connus du groupe sélectionné encore en conflit (RG-008) après le dernier
@@ -123,12 +132,16 @@ export class SqmMembresConnusAdminComponent {
    * (cf. `libelleAnomalie`) ; ce tableau ne signale donc plus qu'un conflit résiduel préexistant, non lié à la
    * saisie courante.
    */
-  public membresEnConflitIds: readonly string[] = [];
+  public readonly membresEnConflitIds: WritableSignal<readonly string[]> = signal<
+    readonly string[]
+  >([]);
 
   /**
-   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes. Signal car
+   * muté depuis la continuation asynchrone de {@link confirmerEnregistrement} et
+   * {@link confirmerSuppressionMotDePasse} (cf. {@link formulaireVisible}).
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Groupes disponibles pour la sélection.
@@ -144,8 +157,8 @@ export class SqmMembresConnusAdminComponent {
    */
   public selectionnerGroupe(groupeId: string): void {
     this.groupeSelectionneId = groupeId;
-    this.formulaireVisible = false;
-    this.membresEnConflitIds = [];
+    this.formulaireVisible.set(false);
+    this.membresEnConflitIds.set([]);
   }
 
   /**
@@ -164,7 +177,7 @@ export class SqmMembresConnusAdminComponent {
    * @returns `true` si cette règle est en conflit avec une autre règle du même groupe.
    */
   public estEnConflit(membreId: string): boolean {
-    return this.membresEnConflitIds.includes(membreId);
+    return this.membresEnConflitIds().includes(membreId);
   }
 
   /**
@@ -178,7 +191,7 @@ export class SqmMembresConnusAdminComponent {
     this.libelle = '';
     this.aliasEmail = '';
     this.messageErreur = null;
-    this.formulaireVisible = true;
+    this.formulaireVisible.set(true);
   }
 
   /**
@@ -197,14 +210,14 @@ export class SqmMembresConnusAdminComponent {
     this.libelle = regle.libelle ?? '';
     this.aliasEmail = regle.aliasEmail ?? '';
     this.messageErreur = null;
-    this.formulaireVisible = true;
+    this.formulaireVisible.set(true);
   }
 
   /**
    * Referme le formulaire sans enregistrer.
    */
   public fermerFormulaire(): void {
-    this.formulaireVisible = false;
+    this.formulaireVisible.set(false);
   }
 
   /**
@@ -217,7 +230,7 @@ export class SqmMembresConnusAdminComponent {
       return;
     }
     this.messageErreur = null;
-    this.actionEnAttenteMotDePasse = 'enregistrement';
+    this.actionEnAttenteMotDePasse.set('enregistrement');
   }
 
   /**
@@ -226,7 +239,7 @@ export class SqmMembresConnusAdminComponent {
    */
   public async confirmerEnregistrement(motDePasse: string): Promise<void> {
     if (!this.groupeSelectionneId) {
-      this.actionEnAttenteMotDePasse = null;
+      this.actionEnAttenteMotDePasse.set(null);
       return;
     }
     const donnees: DonneesMembreConnu = {
@@ -238,20 +251,25 @@ export class SqmMembresConnusAdminComponent {
       aliasEmail: this.aliasEmail.trim().length > 0 ? this.aliasEmail.trim() : undefined,
     };
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.qualifierMembre(
       this.groupeSelectionneId,
       donnees,
       ORIGINE_ADMINISTRATION,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     switch (resultat.type) {
       case 'succes':
-        this.membresEnConflitIds = resultat.membresEnConflit;
-        this.formulaireVisible = false;
+        this.membresEnConflitIds.set(resultat.membresEnConflit);
+        this.formulaireVisible.set(false);
+        this.notification.succes(
+          this.membreEnEditionId
+            ? 'La règle de membre a été modifiée.'
+            : 'Le membre a été qualifié.',
+        );
         break;
       case 'echec':
         this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
@@ -264,7 +282,7 @@ export class SqmMembresConnusAdminComponent {
    * @param membreId - Identifiant de la règle à supprimer.
    */
   public demanderSuppression(membreId: string): void {
-    this.membreASupprimerId = membreId;
+    this.membreASupprimerId.set(membreId);
   }
 
   /**
@@ -272,14 +290,14 @@ export class SqmMembresConnusAdminComponent {
    * la suppression effective (RG-002).
    */
   public confirmerSuppression(): void {
-    this.actionEnAttenteMotDePasse = 'suppression';
+    this.actionEnAttenteMotDePasse.set('suppression');
   }
 
   /**
    * Annule la suppression demandée.
    */
   public annulerSuppression(): void {
-    this.membreASupprimerId = null;
+    this.membreASupprimerId.set(null);
   }
 
   /**
@@ -287,21 +305,22 @@ export class SqmMembresConnusAdminComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerSuppressionMotDePasse(motDePasse: string): Promise<void> {
-    if (!this.groupeSelectionneId || !this.membreASupprimerId) {
-      this.actionEnAttenteMotDePasse = null;
+    const membreASupprimerId = this.membreASupprimerId();
+    if (!this.groupeSelectionneId || !membreASupprimerId) {
+      this.actionEnAttenteMotDePasse.set(null);
       return;
     }
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.supprimerMembreConnu(
       this.groupeSelectionneId,
-      this.membreASupprimerId,
+      membreASupprimerId,
       ORIGINE_ADMINISTRATION,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
-    this.membreASupprimerId = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
+    this.membreASupprimerId.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
@@ -312,7 +331,7 @@ export class SqmMembresConnusAdminComponent {
    * Annule la ressaisie du mot de passe en cours, quelle que soit l'action qui l'avait demandée.
    */
   public annulerMotDePasse(): void {
-    this.actionEnAttenteMotDePasse = null;
+    this.actionEnAttenteMotDePasse.set(null);
   }
 
   /**

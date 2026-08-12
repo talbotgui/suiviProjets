@@ -2,6 +2,7 @@
 // de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmGroupesAdminComponent } from './groupes-admin.component';
 
@@ -97,7 +98,7 @@ describe('SqmGroupesAdminComponent', () => {
     expect(composant.groupes()).toEqual([]);
   });
 
-  it('crée un groupe valide et referme le formulaire', () => {
+  it('crée un groupe valide et referme le formulaire (US-038 : notification de succès)', () => {
     composant.ouvrirCreation();
     composant.nom = 'Socle Comptable';
     composant.description = 'Description';
@@ -107,6 +108,9 @@ describe('SqmGroupesAdminComponent', () => {
     expect(composant.groupes()).toHaveLength(1);
     expect(composant.groupes()[0].nom).toBe('Socle Comptable');
     expect(composant.formulaireVisible).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le groupe a été créé.' }),
+    ]);
   });
 
   it('refuse une instance sans nom ni URL', () => {
@@ -155,7 +159,7 @@ describe('SqmGroupesAdminComponent', () => {
     expect(composant.nom).toBe('Socle Comptable');
   });
 
-  it('modifie un groupe existant', () => {
+  it('modifie un groupe existant (US-038 : notification de succès)', () => {
     const id = donneesApplication.creerGroupe({
       nom: 'Socle Comptable',
       description: 'Description',
@@ -167,9 +171,12 @@ describe('SqmGroupesAdminComponent', () => {
     composant.enregistrer();
 
     expect(composant.groupes()[0].nom).toBe('Nouveau nom');
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le groupe a été modifié.' }),
+    ]);
   });
 
-  it('supprime un groupe après confirmation', () => {
+  it('supprime un groupe après confirmation (US-038 : notification de succès)', () => {
     const id = donneesApplication.creerGroupe({
       nom: 'Socle Comptable',
       description: 'Description',
@@ -181,6 +188,9 @@ describe('SqmGroupesAdminComponent', () => {
 
     expect(composant.groupes()).toEqual([]);
     expect(composant.groupeASupprimerId).toBeNull();
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le groupe a été supprimé.' }),
+    ]);
   });
 
   it("n'effectue aucune suppression en cas d'annulation", () => {

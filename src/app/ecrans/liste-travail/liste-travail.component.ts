@@ -203,13 +203,18 @@ export class SqmListeTravailComponent {
 
   /**
    * Action en attente de ressaisie du mot de passe (RG-002), `null` si aucune boîte de ressaisie n'est affichée.
+   * Porté par un signal (plutôt qu'une simple propriété) car mis à jour depuis la continuation asynchrone de
+   * `confirmerQualification`, hors de toute planification automatique de détection de changement dans une
+   * application zoneless : seule une écriture de signal est garantie de déclencher un nouveau rendu à ce moment-là.
    */
-  public actionEnAttenteMotDePasse: ActionEnAttente = null;
+  public readonly actionEnAttenteMotDePasse: WritableSignal<ActionEnAttente> =
+    signal<ActionEnAttente>(null);
 
   /**
-   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes. Signal pour
+   * le même motif que {@link actionEnAttenteMotDePasse}.
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Ensemble complet des alertes actives, membres inconnus toujours en tête (RG-009, US-020), non filtré.
@@ -349,7 +354,9 @@ export class SqmListeTravailComponent {
       this.notification.erreur(
         "Une erreur inattendue est survenue lors de l'enregistrement de la vue.",
       );
+      return;
     }
+    this.notification.succes('La vue a été enregistrée.');
   }
 
   /**
@@ -461,21 +468,21 @@ export class SqmListeTravailComponent {
    * Ouvre la ressaisie du mot de passe (RG-002) avant de marquer l'alerte sélectionnée comme vue.
    */
   public demanderMarquerVu(): void {
-    this.actionEnAttenteMotDePasse = 'vu';
+    this.actionEnAttenteMotDePasse.set('vu');
   }
 
   /**
    * Ouvre la ressaisie du mot de passe (RG-002) avant de marquer l'alerte sélectionnée comme traitée.
    */
   public demanderTraiter(): void {
-    this.actionEnAttenteMotDePasse = 'traitement';
+    this.actionEnAttenteMotDePasse.set('traitement');
   }
 
   /**
    * Annule la ressaisie du mot de passe en cours, quelle que soit l'action qui l'avait demandée.
    */
   public annulerMotDePasse(): void {
-    this.actionEnAttenteMotDePasse = null;
+    this.actionEnAttenteMotDePasse.set(null);
   }
 
   /**
@@ -484,23 +491,23 @@ export class SqmListeTravailComponent {
    */
   public async confirmerQualification(motDePasse: string): Promise<void> {
     const cle = this.alerteSelectionneeCle();
-    const action = this.actionEnAttenteMotDePasse;
+    const action = this.actionEnAttenteMotDePasse();
     if (cle === null || action === null) {
-      this.actionEnAttenteMotDePasse = null;
+      this.actionEnAttenteMotDePasse.set(null);
       return;
     }
     const statut = action === 'vu' ? StatutTraitementAlerte.Vue : StatutTraitementAlerte.Traitee;
     const commentaire = this.commentaire.trim().length > 0 ? this.commentaire.trim() : undefined;
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.qualifierAlerte(
       cle,
       statut,
       commentaire,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur('Une erreur inattendue est survenue lors de la qualification.');

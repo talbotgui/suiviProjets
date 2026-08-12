@@ -12,6 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import type { DonneesGroupe } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
 import type { Instance } from '../../../services/sansetat/commandes/types-facade';
 import type { Groupe } from '../../../services/avecetat/etat/types-donnees';
@@ -55,6 +56,7 @@ type SousOngletGroupes = 'groupes' | 'membresConnus' | 'annotations';
 export class SqmGroupesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Sous-onglet actuellement affiché.
@@ -199,8 +201,10 @@ export class SqmGroupesAdminComponent {
 
     if (this.groupeEnEditionId) {
       this.donneesApplication.modifierGroupe(this.groupeEnEditionId, donnees);
+      this.notification.succes('Le groupe a été modifié.');
     } else {
       this.donneesApplication.creerGroupe(donnees);
+      this.notification.succes('Le groupe a été créé.');
     }
     this.formulaireVisible = false;
   }
@@ -220,6 +224,7 @@ export class SqmGroupesAdminComponent {
   public confirmerSuppression(): void {
     if (this.groupeASupprimerId) {
       this.donneesApplication.supprimerGroupe(this.groupeASupprimerId);
+      this.notification.succes('Le groupe a été supprimé.');
     }
     this.groupeASupprimerId = null;
   }

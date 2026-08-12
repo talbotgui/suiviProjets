@@ -353,9 +353,13 @@ export class SqmFicheProjetComponent {
   public messageErreurAnnotation: string | null = null;
 
   /**
-   * Indique qu'une création d'annotation est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'une création d'annotation est en cours, pour désactiver les actions concurrentes. Porté par un
+   * signal (plutôt qu'une simple propriété) : mis à jour depuis la continuation asynchrone de
+   * {@link confirmerCreationAnnotation}/{@link confirmerSuppressionAnnotationMotDePasse}, hors de toute
+   * planification automatique de détection de changement en application zoneless (cf. `cheminCreation` dans
+   * `demarrage.component.ts`).
    */
-  public enCoursAnnotation = false;
+  public readonly enCoursAnnotation: WritableSignal<boolean> = signal(false);
 
   /**
    * Ouvre le formulaire de création d'une annotation de portée projet (US-019), date du jour pré-remplie.
@@ -399,7 +403,7 @@ export class SqmFicheProjetComponent {
       return;
     }
 
-    this.enCoursAnnotation = true;
+    this.enCoursAnnotation.set(true);
     const resultat = await this.donneesApplication.creerAnnotation(
       etatCourant.donnees.groupeId,
       etatCourant.donnees.projetId,
@@ -414,13 +418,14 @@ export class SqmFicheProjetComponent {
       },
       motDePasse,
     );
-    this.enCoursAnnotation = false;
+    this.enCoursAnnotation.set(false);
 
     if (resultat.type === 'echec') {
       this.notification.erreur('Une erreur inattendue est survenue lors de la création.');
       return;
     }
     this.formulaireAnnotationVisible.set(false);
+    this.notification.succes("L'annotation a été créée.");
   }
 
   /**
@@ -477,14 +482,14 @@ export class SqmFicheProjetComponent {
       return;
     }
 
-    this.enCoursAnnotation = true;
+    this.enCoursAnnotation.set(true);
     const resultat = await this.donneesApplication.supprimerAnnotation(
       etatCourant.donnees.groupeId,
       etatCourant.donnees.projetId,
       annotationId,
       motDePasse,
     );
-    this.enCoursAnnotation = false;
+    this.enCoursAnnotation.set(false);
     this.annotationASupprimerId.set(null);
 
     if (resultat.type === 'echec') {

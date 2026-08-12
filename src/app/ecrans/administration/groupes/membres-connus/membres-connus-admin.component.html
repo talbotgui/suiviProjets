@@ -29,7 +29,7 @@
         id="membres-connus-admin-bouton-creer"
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirCreation()"
       >
         Créer une règle
@@ -60,7 +60,7 @@
           <button
             type="button"
             class="bouton bouton--discret"
-            [disabled]="enCours"
+            [disabled]="enCours()"
             (click)="ouvrirEdition(regle.id)"
           >
             Modifier
@@ -68,7 +68,7 @@
           <button
             type="button"
             class="bouton bouton--discret"
-            [disabled]="enCours"
+            [disabled]="enCours()"
             (click)="demanderSuppression(regle.id)"
           >
             Supprimer
@@ -87,7 +87,7 @@
       </p>
     }
 
-    @if (membreASupprimerId && actionEnAttenteMotDePasse === null) {
+    @if (membreASupprimerId() && actionEnAttenteMotDePasse() === null) {
       <app-confirmation-suppression
         message="La suppression d'une règle de membre connu est immédiate et irréversible."
         (confirmee)="confirmerSuppression()"
@@ -95,7 +95,7 @@
       />
     }
 
-    @if (actionEnAttenteMotDePasse === 'enregistrement') {
+    @if (actionEnAttenteMotDePasse() === 'enregistrement') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle."
         (confirmee)="confirmerEnregistrement($event)"
@@ -103,7 +103,7 @@
       />
     }
 
-    @if (actionEnAttenteMotDePasse === 'suppression') {
+    @if (actionEnAttenteMotDePasse() === 'suppression') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour supprimer cette règle."
         (confirmee)="confirmerSuppressionMotDePasse($event)"
@@ -111,7 +111,7 @@
       />
     }
 
-    @if (formulaireVisible) {
+    @if (formulaireVisible()) {
       <form
         class="membres-connus-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrement()"
@@ -195,7 +195,7 @@
             id="membres-connus-admin-bouton-enregistrer"
             type="submit"
             class="bouton bouton--principal"
-            [disabled]="enCours"
+            [disabled]="enCours()"
           >
             Enregistrer
           </button>

@@ -7,6 +7,7 @@
 // composant enfant (visibilité du formulaire, source à modifier transmise, fermeture sur `enregistree`/`annulee`).
 import { TestBed } from '@angular/core/testing';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
@@ -169,7 +170,40 @@ describe('SqmSourcesAdminComponent', () => {
     expect(composant.formulaireVisible).toBe(false);
   });
 
-  it('supprime une source après confirmation', () => {
+  it('notifie le succès et referme le formulaire à la création (US-038)', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    composant.selectionnerGroupe(groupeId);
+    composant.selectionnerProjet(projetId);
+    composant.ouvrirCreation();
+
+    composant.onSourceEnregistree();
+
+    expect(composant.formulaireVisible).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'La source a été créée.' }),
+    ]);
+  });
+
+  it('notifie le succès de la modification (US-038)', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    composant.selectionnerGroupe(groupeId);
+    composant.selectionnerProjet(projetId);
+    const sourceId = donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '1234',
+      refAuditee: undefined,
+    });
+    composant.ouvrirEdition(sourceId);
+
+    composant.onSourceEnregistree();
+
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'La source a été modifiée.' }),
+    ]);
+  });
+
+  it('supprime une source après confirmation (US-038 : notification de succès)', () => {
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
     composant.selectionnerGroupe(groupeId);
     composant.selectionnerProjet(projetId);
@@ -184,6 +218,9 @@ describe('SqmSourcesAdminComponent', () => {
     composant.confirmerSuppression();
 
     expect(composant.sources()).toEqual([]);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'La source a été supprimée.' }),
+    ]);
   });
 
   it('annule la suppression demandée', () => {

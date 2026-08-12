@@ -135,9 +135,12 @@ export class SqmCredentialsComponent {
   private readonly verdicts: WritableSignal<Readonly<Record<string, VerdictAffiche>>> = signal({});
 
   /**
-   * Indique qu'un enregistrement des credentials saisis est en cours.
+   * Indique qu'un enregistrement des credentials saisis est en cours. Porté par un signal, pas une propriété
+   * simple, car mutée aussi bien depuis le chemin succès que le chemin échec de la continuation asynchrone de
+   * {@link enregistrer}, hors de toute planification automatique de détection de changement dans une application
+   * zoneless (même motif déjà corrigé pour `demarrage.component.ts`, R11-07).
    */
-  public enregistrementEnCours = false;
+  public readonly enregistrementEnCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Contenu actuellement saisi dans la zone de collage JSON (US-003, R11-10) : vidé après un traitement réussi
@@ -170,9 +173,12 @@ export class SqmCredentialsComponent {
   public readonly secondesRestantesCopie: WritableSignal<number | null> = signal(null);
 
   /**
-   * Indique qu'un test de connectivité global (US-031) est en cours.
+   * Indique qu'un test de connectivité global (US-031) est en cours. Porté par un signal, pas une propriété
+   * simple, car mutée après un `await Promise.all(...)` dans {@link toutTester}, hors de toute planification
+   * automatique de détection de changement dans une application zoneless (même motif déjà corrigé pour
+   * `demarrage.component.ts`, R11-07).
    */
-  public testGlobalEnCours = false;
+  public readonly testGlobalEnCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Valeur actuellement affichée pour le champ de saisie d'une instance : la saisie en cours si elle existe,
@@ -206,7 +212,7 @@ export class SqmCredentialsComponent {
     for (const [instanceId, valeur] of saisies) {
       fusion[instanceId] = valeur;
     }
-    this.enregistrementEnCours = true;
+    this.enregistrementEnCours.set(true);
     try {
       await this.facadeCommandes.definirCredentials(fusion);
       this.etatSession.definirCredentials(fusion);
@@ -217,7 +223,7 @@ export class SqmCredentialsComponent {
         "Un ou plusieurs credentials saisis sont vides : aucun n'a été enregistré.",
       );
     } finally {
-      this.enregistrementEnCours = false;
+      this.enregistrementEnCours.set(false);
     }
   }
 
@@ -381,12 +387,12 @@ export class SqmCredentialsComponent {
     if (testables.length === 0) {
       return;
     }
-    this.testGlobalEnCours = true;
+    this.testGlobalEnCours.set(true);
     const file = [...testables];
     const concurrence = Math.min(this.extraireConcurrence(), file.length);
     const executants = Array.from({ length: concurrence }, () => this.executerFile(file));
     await Promise.all(executants);
-    this.testGlobalEnCours = false;
+    this.testGlobalEnCours.set(false);
   }
 
   /**

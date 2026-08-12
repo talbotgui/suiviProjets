@@ -146,7 +146,7 @@ describe('SqmMembresConnusAdminComponent', () => {
     composant.demanderEnregistrement();
 
     expect(composant.messageErreur).toBe('Le critère est obligatoire.');
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('ouvre la ressaisie du mot de passe pour un formulaire valide', () => {
@@ -156,7 +156,7 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     composant.demanderEnregistrement();
 
-    expect(composant.actionEnAttenteMotDePasse).toBe('enregistrement');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('enregistrement');
   });
 
   it('pré-remplit le formulaire lors de la modification', () => {
@@ -176,7 +176,7 @@ describe('SqmMembresConnusAdminComponent', () => {
     expect(composant.statut).toBe(StatutMembre.Interne);
   });
 
-  it('enregistre une règle après confirmation du mot de passe et met à jour la liste', async () => {
+  it('enregistre une règle après confirmation du mot de passe et met à jour la liste (US-038 : notification de succès)', async () => {
     const racineMiseAJour: DonneesRacine = {
       ...DonneesDeTest.racineActuelle(donneesApplication),
       groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
@@ -203,9 +203,33 @@ describe('SqmMembresConnusAdminComponent', () => {
         motDePasse: 'mot-de-passe',
       }),
     );
-    expect(composant.formulaireVisible).toBe(false);
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.formulaireVisible()).toBe(false);
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
     expect(composant.membresConnus()).toHaveLength(1);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le membre a été qualifié.' }),
+    ]);
+  });
+
+  it('notifie la modification d’une règle existante avec un libellé distinct (US-038)', async () => {
+    const racineAvecMembre: DonneesRacine = {
+      ...DonneesDeTest.racineActuelle(donneesApplication),
+      groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+        g.id === groupeId ? { ...g, membresConnus: [DonneesDeTest.membre('m1')] } : g,
+      ),
+    };
+    donneesApplication.chargerRacine(racineAvecMembre);
+    const reponse: ReponseQualificationMembre = { donnees: racineAvecMembre, membresEnConflit: [] };
+    invokeSimule.mockResolvedValue(reponse);
+    composant.selectionnerGroupe(groupeId);
+    composant.ouvrirEdition('m1');
+    composant.demanderEnregistrement();
+
+    await composant.confirmerEnregistrement('mot-de-passe');
+
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'La règle de membre a été modifiée.' }),
+    ]);
   });
 
   it('signale les règles en conflit renvoyées par la commande native (RG-008)', async () => {
@@ -241,7 +265,7 @@ describe('SqmMembresConnusAdminComponent', () => {
         message: 'Ce username est déjà utilisé par une autre règle de ce groupe.',
       }),
     ]);
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('affiche un message d’erreur en cas de conflit de règles courriel/domaine (RG-008, R10-07)', async () => {
@@ -260,7 +284,7 @@ describe('SqmMembresConnusAdminComponent', () => {
           'Cette règle entre en conflit avec une autre règle de ce groupe portant le même critère et un statut différent.',
       }),
     ]);
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('annule la ressaisie du mot de passe sans appeler la commande native', () => {
@@ -271,7 +295,7 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     composant.annulerMotDePasse();
 
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
     expect(invokeSimule).not.toHaveBeenCalled();
   });
 
@@ -298,8 +322,8 @@ describe('SqmMembresConnusAdminComponent', () => {
       origine: 'Administration',
       motDePasse: 'mot-de-passe',
     });
-    expect(composant.membreASupprimerId).toBeNull();
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.membreASupprimerId()).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it("n'effectue aucune suppression en cas d'annulation", () => {
@@ -308,7 +332,7 @@ describe('SqmMembresConnusAdminComponent', () => {
     composant.demanderSuppression('m1');
     composant.annulerSuppression();
 
-    expect(composant.membreASupprimerId).toBeNull();
+    expect(composant.membreASupprimerId()).toBeNull();
     expect(invokeSimule).not.toHaveBeenCalled();
   });
 
@@ -318,7 +342,7 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     composant.fermerFormulaire();
 
-    expect(composant.formulaireVisible).toBe(false);
+    expect(composant.formulaireVisible()).toBe(false);
   });
 
   it("n'invoque pas la commande native si le contexte de suppression est incomplet", async () => {
@@ -329,7 +353,7 @@ describe('SqmMembresConnusAdminComponent', () => {
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
     expect(invokeSimule).not.toHaveBeenCalled();
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('affiche un message d’erreur si la suppression échoue', async () => {

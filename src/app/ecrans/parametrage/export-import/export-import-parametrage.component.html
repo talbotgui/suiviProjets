@@ -13,7 +13,12 @@
       de nommage de branche) dans un fichier JSON partageable. Les membres connus et toute autre
       donnée de groupe en sont structurellement exclus.
     </p>
-    <button type="button" class="bouton exterieur-haut-2" [disabled]="enCours" (click)="exporter()">
+    <button
+      type="button"
+      class="bouton exterieur-haut-2"
+      [disabled]="enCours()"
+      (click)="exporter()"
+    >
       Choisir un emplacement et exporter
     </button>
   </section>
@@ -28,13 +33,13 @@
     <button
       type="button"
       class="bouton exterieur-haut-2"
-      [disabled]="enCours"
+      [disabled]="enCours()"
       (click)="choisirEtPrevisualiser()"
     >
       Choisir un fichier de configuration
     </button>
 
-    @if (differentiel) {
+    @if (differentiel(); as differentiel) {
       @if (differentiel.lignesInvalides.length > 0) {
         <div
           class="export-import-parametrage__avertissement texte-orange texte-sm exterieur-y-3"
@@ -58,10 +63,10 @@
         </p>
       } @else {
         <div class="export-import-parametrage__actions-groupees d-flex ecart-2 exterieur-y-3">
-          <button type="button" class="bouton" [disabled]="enCours" (click)="toutAccepter()">
+          <button type="button" class="bouton" [disabled]="enCours()" (click)="toutAccepter()">
             Tout accepter
           </button>
-          <button type="button" class="bouton" [disabled]="enCours" (click)="toutRefuser()">
+          <button type="button" class="bouton" [disabled]="enCours()" (click)="toutRefuser()">
             Tout refuser
           </button>
         </div>
@@ -84,7 +89,7 @@
                     @if (estLigneSelectionnable(ligne.chemin)) {
                       <input
                         type="checkbox"
-                        [checked]="lignesAcceptees.has(ligne.chemin)"
+                        [checked]="lignesAcceptees().has(ligne.chemin)"
                         (change)="basculerLigne(ligne.chemin)"
                         [attr.aria-label]="'Accepter la ligne ' + ligne.chemin"
                       />
@@ -104,19 +109,19 @@
           <button
             type="button"
             class="bouton bouton--principal"
-            [disabled]="enCours || lignesAcceptees.size === 0"
+            [disabled]="enCours() || lignesAcceptees().size === 0"
             (click)="demanderImport()"
           >
             Importer les lignes acceptées
           </button>
-          <button type="button" class="bouton" [disabled]="enCours" (click)="annulerImport()">
+          <button type="button" class="bouton" [disabled]="enCours()" (click)="annulerImport()">
             Annuler
           </button>
         </div>
       }
     }
 
-    @if (importEnAttenteMotDePasse) {
+    @if (importEnAttenteMotDePasse()) {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour appliquer les lignes acceptées."
         (confirmee)="confirmerImport($event)"

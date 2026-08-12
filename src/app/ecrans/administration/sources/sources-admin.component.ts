@@ -11,6 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/types-donnees';
 
 /**
@@ -26,6 +27,7 @@ import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/typ
 export class SqmSourcesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -124,6 +126,17 @@ export class SqmSourcesAdminComponent {
   }
 
   /**
+   * Referme le formulaire après un enregistrement réussi (création ou modification) et notifie le succès
+   * (US-038).
+   */
+  public onSourceEnregistree(): void {
+    this.notification.succes(
+      this.sourceEnEdition ? 'La source a été modifiée.' : 'La source a été créée.',
+    );
+    this.fermerFormulaire();
+  }
+
+  /**
    * Demande la confirmation de suppression d'une source (US-008).
    * @param sourceId - Identifiant de la source à supprimer.
    */
@@ -141,6 +154,7 @@ export class SqmSourcesAdminComponent {
         this.projetSelectionneId,
         this.sourceASupprimerId,
       );
+      this.notification.succes('La source a été supprimée.');
     }
     this.sourceASupprimerId = null;
   }

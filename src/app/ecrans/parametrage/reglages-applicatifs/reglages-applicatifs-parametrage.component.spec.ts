@@ -93,7 +93,7 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
     composant.demanderEnregistrementVerrouillage();
 
     expect(composant.messageErreur).not.toBeNull();
-    expect(composant.reglageEnAttenteMotDePasse).toBeNull();
+    expect(composant.reglageEnAttenteMotDePasse()).toBeNull();
   });
 
   it('enregistre le verrouillage après confirmation du mot de passe (US-034, RG-031)', async () => {
@@ -112,7 +112,13 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
       'definir_verrouillage',
       expect.objectContaining({ delaiInactiviteMinutes: 30, echecsAvantFermeture: 3 }),
     );
-    expect(composant.verrouillageEditVisible).toBe(false);
+    expect(composant.verrouillageEditVisible()).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'Les réglages de verrouillage ont été enregistrés.',
+      }),
+    ]);
   });
 
   it('enregistre la concurrence d’audit après confirmation du mot de passe (US-034, RG-031)', async () => {
@@ -130,6 +136,12 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
       'definir_concurrence_audit',
       expect.objectContaining({ concurrence: 8 }),
     );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'La concurrence d’audit a été enregistrée.',
+      }),
+    ]);
   });
 
   it('pré-remplit puis enregistre le réglage de proxy, url et chemin vides transmis comme absents', async () => {
@@ -149,6 +161,9 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
       'definir_proxy',
       expect.objectContaining({ url: undefined, cheminBundleCa: undefined }),
     );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: 'Le réglage de proxy a été enregistré.' }),
+    ]);
   });
 
   it('enregistre le nombre de sauvegardes de sécurité après confirmation du mot de passe (US-034, RG-031)', async () => {
@@ -166,6 +181,12 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
       'definir_nombre_sauvegardes_securite',
       expect.objectContaining({ nombre: 10 }),
     );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'Le nombre de sauvegardes de sécurité a été enregistré.',
+      }),
+    ]);
   });
 
   it('convertit le seuil d’avertissement en octets à l’enregistrement (US-035, RG-032)', async () => {
@@ -184,6 +205,12 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
       'definir_seuil_avertissement_taille',
       expect.objectContaining({ seuilOctets: 5 * 1024 * 1024 }),
     );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'Le seuil d’avertissement de taille a été enregistré.',
+      }),
+    ]);
   });
 
   it('convertit un rejet typé « reglageApplicatifInvalide » en message explicite', async () => {

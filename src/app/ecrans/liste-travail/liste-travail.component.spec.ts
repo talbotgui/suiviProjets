@@ -288,7 +288,7 @@ describe('SqmListeTravailComponent', () => {
     composant.activerLigne(composant.toutesLesAlertes()[0]);
     composant.commentaire = 'Qualifié comme partenaire';
     composant.demanderTraiter();
-    expect(composant.actionEnAttenteMotDePasse).toBe('traitement');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('traitement');
 
     await composant.confirmerQualification('mot-de-passe');
 
@@ -302,7 +302,7 @@ describe('SqmListeTravailComponent', () => {
       }),
     );
     expect(composant.alerteSelectionnee()).toBeUndefined();
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it("affiche un message d'erreur lorsque la qualification échoue", async () => {
@@ -320,9 +320,7 @@ describe('SqmListeTravailComponent', () => {
     composant.demanderMarquerVu();
     await composant.confirmerQualification('mot-de-passe');
 
-    expect(notification.liste()).toEqual([
-      expect.objectContaining({ type: 'erreur' }),
-    ]);
+    expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
     expect(composant.alerteSelectionnee()).toBeDefined();
   });
 
@@ -386,7 +384,7 @@ describe('SqmListeTravailComponent', () => {
           motDePasse: 'mot-de-passe',
         }),
       );
-      expect(notification.liste()).toEqual([]);
+      expect(notification.liste()).toEqual([expect.objectContaining({ type: 'succes' })]);
       expect(donneesApplication.racine()).toBe(racineMiseAJour);
     });
 

@@ -259,7 +259,7 @@ describe('SqmCredentialsComponent', () => {
     );
     expect(composant.verdict('i1')?.statut).toBe('succes');
     expect(composant.verdict('i2')).toBeUndefined();
-    expect(composant.testGlobalEnCours).toBe(false);
+    expect(composant.testGlobalEnCours()).toBe(false);
   });
 
   it("ne fait rien si aucune instance n'a de credential saisi (US-031)", async () => {
@@ -339,7 +339,9 @@ describe('SqmCredentialsComponent', () => {
 
       await composant.copierCredentialsJson();
 
-      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(JSON.stringify({ i1: 'glpat-xxxx' }, null, 2));
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(
+        JSON.stringify({ i1: 'glpat-xxxx' }, null, 2),
+      );
       expect(composant.secondesRestantesCopie()).toBe(10);
       expect(TestBed.inject(NotificationService).liste()).toEqual([]);
     });
@@ -414,7 +416,9 @@ describe('SqmCredentialsComponent', () => {
 
       await composant.copierCredentialsJson();
 
-      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(JSON.stringify({ i1: 'glpat-xxxx' }, null, 2));
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(
+        JSON.stringify({ i1: 'glpat-xxxx' }, null, 2),
+      );
     });
 
     it('affiche un message explicite si la copie dans le presse-papiers échoue', async () => {

@@ -266,18 +266,18 @@ describe('SqmBrouillonComponent', () => {
     composant.basculerSelection('projet-1');
 
     composant.demanderIntegrerSelection();
-    expect(composant.actionEnAttente).toEqual({ type: 'integrer', selection: ['projet-1'] });
+    expect(composant.actionEnAttente()).toEqual({ type: 'integrer', selection: ['projet-1'] });
 
     composant.demanderRejeterSelection();
-    expect(composant.actionEnAttente).toEqual({ type: 'rejeter', selection: ['projet-1'] });
+    expect(composant.actionEnAttente()).toEqual({ type: 'rejeter', selection: ['projet-1'] });
   });
 
   it('doit annuler une action en attente', () => {
     composant.demanderIntegrerTout();
-    expect(composant.actionEnAttente).not.toBeNull();
+    expect(composant.actionEnAttente()).not.toBeNull();
 
     composant.annulerAction();
-    expect(composant.actionEnAttente).toBeNull();
+    expect(composant.actionEnAttente()).toBeNull();
   });
 
   it.each([
@@ -314,7 +314,7 @@ describe('SqmBrouillonComponent', () => {
     });
 
     composant.demanderIntegrerTout();
-    expect(composant.actionEnAttente).not.toBeNull();
+    expect(composant.actionEnAttente()).not.toBeNull();
 
     await composant.confirmerAction('mot-de-passe-correct');
 
@@ -322,7 +322,7 @@ describe('SqmBrouillonComponent', () => {
       'integrer_brouillon',
       expect.objectContaining({ selection: undefined, motDePasse: 'mot-de-passe-correct' }),
     );
-    expect(composant.actionEnAttente).toBeNull();
+    expect(composant.actionEnAttente()).toBeNull();
     expect(TestBed.inject(NotificationService).liste()).toEqual([]);
     expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/constitution-campagne');
   });
@@ -332,7 +332,7 @@ describe('SqmBrouillonComponent', () => {
       ...DonneesDeTest.racineAvecBrouillonEnAttente(),
       brouillon: null,
     });
-    composant.motifRejet = '  Mauvaise ref  ';
+    composant.motifRejet.set('  Mauvaise ref  ');
 
     composant.demanderRejeterUnique('projet-1');
     await composant.confirmerAction('mot-de-passe-correct');
@@ -356,7 +356,7 @@ describe('SqmBrouillonComponent', () => {
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
     ]);
-    expect(composant.actionEnAttente).toBeNull();
+    expect(composant.actionEnAttente()).toBeNull();
     expect(routerMock.navigateByUrl).not.toHaveBeenCalled();
     expect(composant.brouillonPresent()).toBe(true);
   });

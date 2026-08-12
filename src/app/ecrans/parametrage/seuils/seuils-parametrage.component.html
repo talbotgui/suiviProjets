@@ -16,7 +16,8 @@
             type="number"
             class="champ__controle"
             name="vitaliteMourantJours"
-            [(ngModel)]="vitaliteMourantJours"
+            [ngModel]="vitaliteMourantJours()"
+            (ngModelChange)="vitaliteMourantJours.set($event)"
           />
         </label>
         <label class="champ">
@@ -26,7 +27,8 @@
             type="number"
             class="champ__controle"
             name="vitaliteMortJours"
-            [(ngModel)]="vitaliteMortJours"
+            [ngModel]="vitaliteMortJours()"
+            (ngModelChange)="vitaliteMortJours.set($event)"
           />
         </label>
       </fieldset>
@@ -41,7 +43,8 @@
             type="number"
             class="champ__controle"
             name="tailleDepotBorneS"
-            [(ngModel)]="tailleDepotBorneS"
+            [ngModel]="tailleDepotBorneS()"
+            (ngModelChange)="tailleDepotBorneS.set($event)"
           />
         </label>
         <label class="champ">
@@ -50,7 +53,8 @@
             type="number"
             class="champ__controle"
             name="tailleDepotBorneL"
-            [(ngModel)]="tailleDepotBorneL"
+            [ngModel]="tailleDepotBorneL()"
+            (ngModelChange)="tailleDepotBorneL.set($event)"
           />
         </label>
         <label class="champ">
@@ -59,7 +63,8 @@
             type="number"
             class="champ__controle"
             name="tailleDepotBorneXL"
-            [(ngModel)]="tailleDepotBorneXL"
+            [ngModel]="tailleDepotBorneXL()"
+            (ngModelChange)="tailleDepotBorneXL.set($event)"
           />
         </label>
       </fieldset>
@@ -72,7 +77,8 @@
             type="number"
             class="champ__controle"
             name="couvertureSeuilRouge"
-            [(ngModel)]="couvertureSeuilRouge"
+            [ngModel]="couvertureSeuilRouge()"
+            (ngModelChange)="couvertureSeuilRouge.set($event)"
           />
         </label>
         <label class="champ">
@@ -81,7 +87,8 @@
             type="number"
             class="champ__controle"
             name="couvertureSeuilOrange"
-            [(ngModel)]="couvertureSeuilOrange"
+            [ngModel]="couvertureSeuilOrange()"
+            (ngModelChange)="couvertureSeuilOrange.set($event)"
           />
         </label>
       </fieldset>
@@ -94,7 +101,8 @@
             type="number"
             class="champ__controle"
             name="fraicheurSonarToleranceJours"
-            [(ngModel)]="fraicheurSonarToleranceJours"
+            [ngModel]="fraicheurSonarToleranceJours()"
+            (ngModelChange)="fraicheurSonarToleranceJours.set($event)"
           />
         </label>
       </fieldset>
@@ -107,7 +115,8 @@
             type="number"
             class="champ__controle"
             name="activiteSansQualiteMinCommits"
-            [(ngModel)]="activiteSansQualiteMinCommits"
+            [ngModel]="activiteSansQualiteMinCommits()"
+            (ngModelChange)="activiteSansQualiteMinCommits.set($event)"
           />
         </label>
         <label class="champ">
@@ -116,7 +125,8 @@
             type="number"
             class="champ__controle"
             name="activiteSansQualiteMinNouvellesViolations"
-            [(ngModel)]="activiteSansQualiteMinNouvellesViolations"
+            [ngModel]="activiteSansQualiteMinNouvellesViolations()"
+            (ngModelChange)="activiteSansQualiteMinNouvellesViolations.set($event)"
           />
         </label>
       </fieldset>
@@ -129,7 +139,8 @@
             type="number"
             class="champ__controle"
             name="fraicheurAuditAncienJours"
-            [(ngModel)]="fraicheurAuditAncienJours"
+            [ngModel]="fraicheurAuditAncienJours()"
+            (ngModelChange)="fraicheurAuditAncienJours.set($event)"
           />
         </label>
       </fieldset>
@@ -144,7 +155,8 @@
             type="number"
             class="champ__controle"
             name="mrOuvertesAgeOrangeJours"
-            [(ngModel)]="mrOuvertesAgeOrangeJours"
+            [ngModel]="mrOuvertesAgeOrangeJours()"
+            (ngModelChange)="mrOuvertesAgeOrangeJours.set($event)"
           />
         </label>
         <label class="champ">
@@ -153,7 +165,8 @@
             type="number"
             class="champ__controle"
             name="mrOuvertesAgeRougeJours"
-            [(ngModel)]="mrOuvertesAgeRougeJours"
+            [ngModel]="mrOuvertesAgeRougeJours()"
+            (ngModelChange)="mrOuvertesAgeRougeJours.set($event)"
           />
         </label>
         <label class="champ">
@@ -162,7 +175,8 @@
             type="number"
             class="champ__controle"
             name="mrOuvertesPourcentageConflitRouge"
-            [(ngModel)]="mrOuvertesPourcentageConflitRouge"
+            [ngModel]="mrOuvertesPourcentageConflitRouge()"
+            (ngModelChange)="mrOuvertesPourcentageConflitRouge.set($event)"
           />
         </label>
       </fieldset>
@@ -177,7 +191,8 @@
             type="number"
             class="champ__controle"
             name="couleursViolationsBloquantSeuilOrange"
-            [(ngModel)]="couleursViolationsBloquantSeuilOrange"
+            [ngModel]="couleursViolationsBloquantSeuilOrange()"
+            (ngModelChange)="couleursViolationsBloquantSeuilOrange.set($event)"
           />
         </label>
         <label class="champ">
@@ -186,7 +201,8 @@
             type="number"
             class="champ__controle"
             name="couleursViolationsBloquantSeuilRouge"
-            [(ngModel)]="couleursViolationsBloquantSeuilRouge"
+            [ngModel]="couleursViolationsBloquantSeuilRouge()"
+            (ngModelChange)="couleursViolationsBloquantSeuilRouge.set($event)"
           />
         </label>
       </fieldset>
@@ -201,7 +217,8 @@
             type="number"
             class="champ__controle"
             name="couleursViolationsCritiqueSeuilOrange"
-            [(ngModel)]="couleursViolationsCritiqueSeuilOrange"
+            [ngModel]="couleursViolationsCritiqueSeuilOrange()"
+            (ngModelChange)="couleursViolationsCritiqueSeuilOrange.set($event)"
           />
         </label>
         <label class="champ">
@@ -210,7 +227,8 @@
             type="number"
             class="champ__controle"
             name="couleursViolationsCritiqueSeuilRouge"
-            [(ngModel)]="couleursViolationsCritiqueSeuilRouge"
+            [ngModel]="couleursViolationsCritiqueSeuilRouge()"
+            (ngModelChange)="couleursViolationsCritiqueSeuilRouge.set($event)"
           />
         </label>
       </fieldset>
@@ -226,7 +244,8 @@
             step="0.01"
             class="champ__controle"
             name="materialiteBrouillonVariationRelative"
-            [(ngModel)]="materialiteBrouillonVariationRelative"
+            [ngModel]="materialiteBrouillonVariationRelative()"
+            (ngModelChange)="materialiteBrouillonVariationRelative.set($event)"
           />
         </label>
       </fieldset>
@@ -239,14 +258,14 @@
           id="seuils-parametrage-bouton-enregistrer"
           type="submit"
           class="bouton bouton--principal"
-          [disabled]="enCours || nombreDeModifications() === 0"
+          [disabled]="enCours() || nombreDeModifications() === 0"
         >
           Enregistrer les seuils modifiés
         </button>
       </div>
     </form>
 
-    @if (actionEnAttenteMotDePasse) {
+    @if (actionEnAttenteMotDePasse()) {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer les seuils modifiés."
         (confirmee)="confirmerEnregistrement($event)"

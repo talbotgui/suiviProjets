@@ -12,8 +12,8 @@
       (confirmee)="deverrouiller($event)"
     />
 
-    @if (messageErreur) {
-      <p class="verrouillage__erreur" role="alert">{{ messageErreur }}</p>
+    @if (messageErreur()) {
+      <p class="verrouillage__erreur" role="alert">{{ messageErreur() }}</p>
     }
 
     @if (essaisRestants(); as essais) {

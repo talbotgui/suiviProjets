@@ -16,7 +16,7 @@
         id="referentiels-parametrage-bouton-ajouter-dependance"
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirCreationDependance()"
       >
         Ajouter une règle
@@ -37,7 +37,7 @@
             [id]="'referentiels-parametrage-dependance-' + i + '-bouton-modifier'"
             type="button"
             class="bouton bouton--discret"
-            [disabled]="enCours"
+            [disabled]="enCours()"
             (click)="ouvrirEditionDependance(regle.id)"
           >
             Modifier
@@ -46,7 +46,7 @@
             [id]="'referentiels-parametrage-dependance-' + i + '-bouton-supprimer'"
             type="button"
             class="bouton bouton--discret"
-            [disabled]="enCours"
+            [disabled]="enCours()"
             (click)="demanderSuppressionDependance(regle.id)"
           >
             Supprimer
@@ -59,7 +59,7 @@
       }
     </ul>
 
-    @if (formulaireDependanceVisible) {
+    @if (formulaireDependanceVisible()) {
       <form
         class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrementDependance()"
@@ -102,7 +102,7 @@
             id="referentiels-parametrage-bouton-enregistrer-dependance"
             type="submit"
             class="bouton bouton--principal"
-            [disabled]="enCours"
+            [disabled]="enCours()"
           >
             Enregistrer
           </button>
@@ -110,7 +110,7 @@
       </form>
     }
 
-    @if (actionEnAttenteMotDePasse === 'dependance') {
+    @if (actionEnAttenteMotDePasse() === 'dependance') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle de dépendances."
         (confirmee)="confirmerEnregistrementDependance($event)"
@@ -118,7 +118,7 @@
       />
     }
 
-    @if (suppressionEnAttente?.type === 'dependance') {
+    @if (suppressionEnAttente()?.type === 'dependance') {
       <app-confirmation-suppression
         message="Cette règle de dépendances sera supprimée définitivement du référentiel."
         (confirmee)="confirmerSuppression()"
@@ -126,7 +126,7 @@
       />
     }
 
-    @if (actionEnAttenteMotDePasse === 'suppressionDependance') {
+    @if (actionEnAttenteMotDePasse() === 'suppressionDependance') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour supprimer cette règle de dépendances."
         (confirmee)="confirmerSuppressionMotDePasse($event)"
@@ -146,7 +146,7 @@
         id="referentiels-parametrage-bouton-ajouter-marqueur-ia"
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirCreationMarqueurIa()"
       >
         Ajouter une règle
@@ -164,7 +164,7 @@
           <button
             type="button"
             class="bouton bouton--discret"
-            [disabled]="enCours"
+            [disabled]="enCours()"
             (click)="ouvrirEditionMarqueurIa(regle.id)"
           >
             Modifier
@@ -172,7 +172,7 @@
           <button
             type="button"
             class="bouton bouton--discret"
-            [disabled]="enCours"
+            [disabled]="enCours()"
             (click)="demanderSuppressionMarqueurIa(regle.id)"
           >
             Supprimer
@@ -185,7 +185,7 @@
       }
     </ul>
 
-    @if (formulaireMarqueurIaVisible) {
+    @if (formulaireMarqueurIaVisible()) {
       <form
         class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrementMarqueurIa()"
@@ -267,7 +267,7 @@
             id="referentiels-parametrage-bouton-enregistrer-marqueur-ia"
             type="submit"
             class="bouton bouton--principal"
-            [disabled]="enCours"
+            [disabled]="enCours()"
           >
             Enregistrer
           </button>
@@ -275,7 +275,7 @@
       </form>
     }
 
-    @if (actionEnAttenteMotDePasse === 'marqueurIA') {
+    @if (actionEnAttenteMotDePasse() === 'marqueurIA') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle de marqueur IA."
         (confirmee)="confirmerEnregistrementMarqueurIa($event)"
@@ -283,7 +283,7 @@
       />
     }
 
-    @if (suppressionEnAttente?.type === 'marqueurIA') {
+    @if (suppressionEnAttente()?.type === 'marqueurIA') {
       <app-confirmation-suppression
         message="Cette règle de marqueur IA sera supprimée définitivement du référentiel."
         (confirmee)="confirmerSuppression()"
@@ -291,7 +291,7 @@
       />
     }
 
-    @if (actionEnAttenteMotDePasse === 'suppressionMarqueurIA') {
+    @if (actionEnAttenteMotDePasse() === 'suppressionMarqueurIA') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour supprimer cette règle de marqueur IA."
         (confirmee)="confirmerSuppressionMotDePasse($event)"
@@ -310,7 +310,7 @@
       <button
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirEditionMotifNommage()"
       >
         Modifier
@@ -321,7 +321,7 @@
       <code class="police-mono">{{ motifNommageBranchesActuel() }}</code>
     </p>
 
-    @if (formulaireMotifNommageVisible) {
+    @if (formulaireMotifNommageVisible()) {
       <form
         class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderEnregistrementMotifNommage()"
@@ -340,14 +340,14 @@
           <button type="button" class="bouton" (click)="fermerFormulaireMotifNommage()">
             Annuler
           </button>
-          <button type="submit" class="bouton bouton--principal" [disabled]="enCours">
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours()">
             Enregistrer
           </button>
         </div>
       </form>
     }
 
-    @if (actionEnAttenteMotDePasse === 'motifNommage') {
+    @if (actionEnAttenteMotDePasse() === 'motifNommage') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer le motif de nommage des branches."
         (confirmee)="confirmerEnregistrementMotifNommage($event)"

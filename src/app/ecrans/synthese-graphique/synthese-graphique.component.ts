@@ -468,7 +468,9 @@ export class SqmSyntheseGraphiqueComponent {
       this.notification.erreur(
         "Une erreur inattendue est survenue lors de l'enregistrement de la vue.",
       );
+      return;
     }
+    this.notification.succes('La vue a été enregistrée.');
   }
 
   /**

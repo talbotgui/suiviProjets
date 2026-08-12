@@ -51,32 +51,38 @@ export class SqmJournalParametrageComponent {
 
   /**
    * Résumé de la dernière prévisualisation de purge du journal, `null` si aucune n'a encore été demandée ou si la
-   * racine a changé depuis (purge exécutée, ou par un autre onglet, US-036).
+   * racine a changé depuis (purge exécutée, ou par un autre onglet, US-036). Signal (plutôt qu'une simple propriété)
+   * car mis à jour depuis la continuation asynchrone de {@link previsualiserPurge}/{@link confirmerExecutionPurge},
+   * hors de toute planification automatique de détection de changement en application zoneless (cf. `cheminCreation`
+   * dans `demarrage.component.ts`).
    */
-  public previsualisationPurge: PrevisualisationPurgeJournal | null = null;
+  public readonly previsualisationPurge: WritableSignal<PrevisualisationPurgeJournal | null> =
+    signal<PrevisualisationPurgeJournal | null>(null);
 
   /**
-   * Indique si la ressaisie du mot de passe est actuellement affichée pour l'exécution de la purge (RG-002).
+   * Indique si la ressaisie du mot de passe est actuellement affichée pour l'exécution de la purge (RG-002). Signal
+   * pour le même motif que {@link previsualisationPurge}.
    */
-  public purgeEnAttenteMotDePasse = false;
+  public readonly purgeEnAttenteMotDePasse: WritableSignal<boolean> = signal(false);
 
   /**
    * Indique qu'un appel à une commande native de purge est en cours, pour désactiver les actions concurrentes.
+   * Signal pour le même motif que {@link previsualisationPurge}.
    */
-  public purgeEnCours = false;
+  public readonly purgeEnCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Prévisualise une purge du journal des modifications lui-même, limite fixe de deux ans (US-036, RG-034).
    */
   public async previsualiserPurge(): Promise<void> {
-    this.purgeEnCours = true;
+    this.purgeEnCours.set(true);
     const resultat = await this.donneesApplication.previsualiserPurgeJournal();
-    this.purgeEnCours = false;
+    this.purgeEnCours.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomaliePurge(resultat.anomalie));
       return;
     }
-    this.previsualisationPurge = resultat.previsualisation;
+    this.previsualisationPurge.set(resultat.previsualisation);
   }
 
   /**
@@ -84,17 +90,18 @@ export class SqmJournalParametrageComponent {
    * concernant au moins une entrée a été demandée au préalable.
    */
   public demanderExecutionPurge(): void {
-    if (!this.previsualisationPurge || this.previsualisationPurge.nbEntreesSupprimees === 0) {
+    const previsualisation = this.previsualisationPurge();
+    if (!previsualisation || previsualisation.nbEntreesSupprimees === 0) {
       return;
     }
-    this.purgeEnAttenteMotDePasse = true;
+    this.purgeEnAttenteMotDePasse.set(true);
   }
 
   /**
    * Annule la ressaisie du mot de passe en cours pour la purge du journal.
    */
   public annulerExecutionPurge(): void {
-    this.purgeEnAttenteMotDePasse = false;
+    this.purgeEnAttenteMotDePasse.set(false);
   }
 
   /**
@@ -102,15 +109,15 @@ export class SqmJournalParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerExecutionPurge(motDePasse: string): Promise<void> {
-    this.purgeEnCours = true;
+    this.purgeEnCours.set(true);
     const resultat = await this.donneesApplication.executerPurgeJournal(motDePasse);
-    this.purgeEnCours = false;
-    this.purgeEnAttenteMotDePasse = false;
+    this.purgeEnCours.set(false);
+    this.purgeEnAttenteMotDePasse.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomaliePurge(resultat.anomalie));
       return;
     }
-    this.previsualisationPurge = null;
+    this.previsualisationPurge.set(null);
     this.notification.succes('La purge du journal des modifications a été effectuée.');
   }
 

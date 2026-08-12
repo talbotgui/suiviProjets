@@ -13,7 +13,8 @@
 // simplement fermer le formulaire. Le mini-flux réutilise `SqmFormulaireSourceComponent` (`actionsVisibles` à
 // `false`), déjà extrait de l'onglet Sources pour cet usage : les boutons « Ajouter une autre source »/« Terminer
 // ce projet, projet suivant » l'invoquent via la variable de référence de gabarit `#formulaireSource`.
-import { Component, inject, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -88,14 +89,19 @@ export class SqmProjetsAdminComponent {
 
   /**
    * Identifiant du projet dont la bascule de politique IA attend la ressaisie du mot de passe du fichier
-   * (RG-002), `null` si aucune bascule n'est en cours.
+   * (RG-002), `null` si aucune bascule n'est en cours. Porté par un signal (plutôt qu'une simple propriété) car
+   * mis à jour depuis la continuation asynchrone de {@link confirmerBasculePolitiqueIA}, cf. `cheminCreation` de
+   * `demarrage.component.ts`.
    */
-  public projetPolitiqueIAEnAttenteId: string | null = null;
+  public readonly projetPolitiqueIAEnAttenteId: WritableSignal<string | null> = signal<
+    string | null
+  >(null);
 
   /**
-   * Indique qu'une bascule de politique IA est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'une bascule de politique IA est en cours, pour désactiver les actions concurrentes. Signal pour le
+   * même motif que {@link projetPolitiqueIAEnAttenteId}.
    */
-  public politiqueIAEnCours = false;
+  public readonly politiqueIAEnCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Indique que la soumission en cours du formulaire de création doit, une fois le projet créé, ouvrir le
@@ -208,11 +214,13 @@ export class SqmProjetsAdminComponent {
         donnees,
       );
       this.formulaireVisible = false;
+      this.notification.succes('Le projet a été modifié.');
       return;
     }
 
     const projetId = this.donneesApplication.creerProjet(this.groupeSelectionneId, donnees);
     this.formulaireVisible = false;
+    this.notification.succes('Le projet a été créé.');
     if (this.creationAvecSourcesDemandee) {
       this.creationAvecSourcesDemandee = false;
       this.projetPourSourcesId = projetId;
@@ -234,6 +242,7 @@ export class SqmProjetsAdminComponent {
    * enfant.
    */
   public reinitialiserApresAjoutSource(): void {
+    this.notification.succes('La source a été créée.');
     this.formulaireSource()?.reinitialiser();
   }
 
@@ -256,6 +265,7 @@ export class SqmProjetsAdminComponent {
       if (id === null) {
         return;
       }
+      this.notification.succes('La source a été créée.');
     }
     this.projetPourSourcesId = null;
     this.ouvrirCreationAvecSources();
@@ -270,6 +280,7 @@ export class SqmProjetsAdminComponent {
       return;
     }
     this.donneesApplication.dupliquerProjet(this.groupeSelectionneId, projetId);
+    this.notification.succes('Le projet a été dupliqué.');
   }
 
   /**
@@ -286,6 +297,7 @@ export class SqmProjetsAdminComponent {
   public confirmerSuppression(): void {
     if (this.groupeSelectionneId && this.projetASupprimerId) {
       this.donneesApplication.supprimerProjet(this.groupeSelectionneId, this.projetASupprimerId);
+      this.notification.succes('Le projet a été supprimé.');
     }
     this.projetASupprimerId = null;
   }
@@ -302,14 +314,14 @@ export class SqmProjetsAdminComponent {
    * @param projetId - Identifiant du projet concerné.
    */
   public demanderBasculePolitiqueIA(projetId: string): void {
-    this.projetPolitiqueIAEnAttenteId = projetId;
+    this.projetPolitiqueIAEnAttenteId.set(projetId);
   }
 
   /**
    * Annule la bascule de politique IA demandée.
    */
   public annulerBasculePolitiqueIA(): void {
-    this.projetPolitiqueIAEnAttenteId = null;
+    this.projetPolitiqueIAEnAttenteId.set(null);
   }
 
   /**
@@ -318,26 +330,26 @@ export class SqmProjetsAdminComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerBasculePolitiqueIA(motDePasse: string): Promise<void> {
-    const projetId = this.projetPolitiqueIAEnAttenteId;
+    const projetId = this.projetPolitiqueIAEnAttenteId();
     if (!this.groupeSelectionneId || !projetId) {
-      this.projetPolitiqueIAEnAttenteId = null;
+      this.projetPolitiqueIAEnAttenteId.set(null);
       return;
     }
     const projet = this.projets().find((candidat) => candidat.id === projetId);
     if (!projet) {
-      this.projetPolitiqueIAEnAttenteId = null;
+      this.projetPolitiqueIAEnAttenteId.set(null);
       return;
     }
 
-    this.politiqueIAEnCours = true;
+    this.politiqueIAEnCours.set(true);
     const resultat = await this.donneesApplication.definirPolitiqueIA(
       this.groupeSelectionneId,
       projetId,
       !projet.iaAutorisee,
       motDePasse,
     );
-    this.politiqueIAEnCours = false;
-    this.projetPolitiqueIAEnAttenteId = null;
+    this.politiqueIAEnCours.set(false);
+    this.projetPolitiqueIAEnAttenteId.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(

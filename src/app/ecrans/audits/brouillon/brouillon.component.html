@@ -19,7 +19,7 @@
         id="brouillon-bouton-integrer-tout"
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="demanderIntegrerTout()"
       >
         Intégrer tout
@@ -27,7 +27,7 @@
       <button
         type="button"
         class="bouton"
-        [disabled]="enCours || selectionProjetIds.size === 0"
+        [disabled]="enCours() || selectionProjetIds().size === 0"
         (click)="demanderIntegrerSelection()"
       >
         Intégrer la sélection
@@ -37,13 +37,14 @@
         class="champ__controle"
         placeholder="Motif de rejet (optionnel)"
         aria-label="Motif de rejet (optionnel)"
-        [(ngModel)]="motifRejet"
-        [disabled]="enCours"
+        [ngModel]="motifRejet()"
+        (ngModelChange)="motifRejet.set($event)"
+        [disabled]="enCours()"
       />
       <button
         type="button"
         class="bouton bouton--danger"
-        [disabled]="enCours || selectionProjetIds.size === 0"
+        [disabled]="enCours() || selectionProjetIds().size === 0"
         (click)="demanderRejeterSelection()"
       >
         Rejeter la sélection
@@ -87,7 +88,7 @@
             <button
               type="button"
               class="bouton bouton--discret"
-              [disabled]="enCours"
+              [disabled]="enCours()"
               (click)="demanderIntegrerUnique(entree.projetId)"
             >
               Intégrer
@@ -95,7 +96,7 @@
             <button
               type="button"
               class="bouton bouton--discret"
-              [disabled]="enCours"
+              [disabled]="enCours()"
               (click)="demanderRejeterUnique(entree.projetId)"
             >
               Rejeter
@@ -109,7 +110,7 @@
       }
     </ul>
 
-    @if (actionEnAttente !== null) {
+    @if (actionEnAttente() !== null) {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour enregistrer cette décision."
         (confirmee)="confirmerAction($event)"

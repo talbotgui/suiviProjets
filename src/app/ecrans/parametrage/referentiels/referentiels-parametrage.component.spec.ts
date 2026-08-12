@@ -109,15 +109,15 @@ describe('SqmReferentielsParametrageComponent', () => {
     ).componentInstance;
 
     composant.ouvrirEditionDependance('id-inconnu');
-    expect(composant.formulaireDependanceVisible).toBe(false);
+    expect(composant.formulaireDependanceVisible()).toBe(false);
 
     composant.ouvrirEditionDependance('d1');
-    expect(composant.formulaireDependanceVisible).toBe(true);
+    expect(composant.formulaireDependanceVisible()).toBe(true);
     expect(composant.motifDependance).toBe('moment');
     expect(composant.versionsDependanceTexte).toBe('*=obsolete');
 
     composant.fermerFormulaireDependance();
-    expect(composant.formulaireDependanceVisible).toBe(false);
+    expect(composant.formulaireDependanceVisible()).toBe(false);
   });
 
   it('ouvre le formulaire de création de marqueur IA avec des valeurs par défaut, referme sans enregistrer', () => {
@@ -129,10 +129,10 @@ describe('SqmReferentielsParametrageComponent', () => {
 
     expect(composant.marqueurIaEnEditionId).toBeNull();
     expect(composant.typeCorrespondanceMarqueurIa).toBe('exact');
-    expect(composant.formulaireMarqueurIaVisible).toBe(true);
+    expect(composant.formulaireMarqueurIaVisible()).toBe(true);
 
     composant.fermerFormulaireMarqueurIa();
-    expect(composant.formulaireMarqueurIaVisible).toBe(false);
+    expect(composant.formulaireMarqueurIaVisible()).toBe(false);
   });
 
   it('ignore une édition de marqueur IA désignant un identifiant introuvable', () => {
@@ -142,7 +142,7 @@ describe('SqmReferentielsParametrageComponent', () => {
 
     composant.ouvrirEditionMarqueurIa('id-inconnu');
 
-    expect(composant.formulaireMarqueurIaVisible).toBe(false);
+    expect(composant.formulaireMarqueurIaVisible()).toBe(false);
   });
 
   it('bloque l’enregistrement d’une règle de marqueur IA sans motif ni outil', () => {
@@ -154,7 +154,7 @@ describe('SqmReferentielsParametrageComponent', () => {
     composant.demanderEnregistrementMarqueurIa();
 
     expect(composant.messageErreur).toBe('Le motif et l’outil sont obligatoires.');
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('referme le formulaire du motif de nommage sans enregistrer', () => {
@@ -165,7 +165,7 @@ describe('SqmReferentielsParametrageComponent', () => {
 
     composant.fermerFormulaireMotifNommage();
 
-    expect(composant.formulaireMotifNommageVisible).toBe(false);
+    expect(composant.formulaireMotifNommageVisible()).toBe(false);
   });
 
   it.each([
@@ -207,7 +207,7 @@ describe('SqmReferentielsParametrageComponent', () => {
     composant.demanderEnregistrementDependance();
 
     expect(composant.messageErreur).toBe('Le motif est obligatoire.');
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('bloque la création avec une ligne de version malformée', () => {
@@ -223,7 +223,7 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.messageErreur).toContain('motifVersion=statut');
   });
 
-  it('crée une nouvelle règle de dépendances avec un identifiant généré', async () => {
+  it('crée une nouvelle règle de dépendances avec un identifiant généré (US-038 : notification de succès)', async () => {
     const composant = TestBed.createComponent(
       SqmReferentielsParametrageComponent,
     ).componentInstance;
@@ -249,10 +249,16 @@ describe('SqmReferentielsParametrageComponent', () => {
         ],
       },
     });
-    expect(composant.formulaireDependanceVisible).toBe(false);
+    expect(composant.formulaireDependanceVisible()).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'La règle de dépendances a été ajoutée.',
+      }),
+    ]);
   });
 
-  it('modifie une règle de marqueur IA existante en réutilisant son identifiant', async () => {
+  it('modifie une règle de marqueur IA existante en réutilisant son identifiant (US-038 : notification de succès)', async () => {
     const composant = TestBed.createComponent(
       SqmReferentielsParametrageComponent,
     ).componentInstance;
@@ -270,6 +276,12 @@ describe('SqmReferentielsParametrageComponent', () => {
     );
     const parametresAppel = invokeSimule.mock.calls[0]?.[1];
     expect(parametresAppel).toMatchObject({ entree: { id: 'm1', outil: 'claude-code' } });
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'La règle de marqueur IA a été modifiée.',
+      }),
+    ]);
   });
 
   it('bloque le motif de nommage vide', () => {
@@ -297,7 +309,7 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(invokeSimule).not.toHaveBeenCalled();
   });
 
-  it('enregistre le motif de nommage valide après confirmation', async () => {
+  it('enregistre le motif de nommage valide après confirmation (US-038 : notification de succès)', async () => {
     const composant = TestBed.createComponent(
       SqmReferentielsParametrageComponent,
     ).componentInstance;
@@ -312,7 +324,13 @@ describe('SqmReferentielsParametrageComponent', () => {
       'definir_referentiel',
       expect.objectContaining({ typeReferentiel: 'motifNommageBranches', entree: '^feature/.+$' }),
     );
-    expect(composant.formulaireMotifNommageVisible).toBe(false);
+    expect(composant.formulaireMotifNommageVisible()).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'Le motif de nommage des branches a été modifié.',
+      }),
+    ]);
   });
 
   it('convertit un rejet typé « entreeReferentielInvalide » en message explicite', async () => {
@@ -340,10 +358,10 @@ describe('SqmReferentielsParametrageComponent', () => {
     ).componentInstance;
 
     composant.demanderSuppressionDependance('d1');
-    expect(composant.suppressionEnAttente).toEqual({ type: 'dependance', id: 'd1' });
+    expect(composant.suppressionEnAttente()).toEqual({ type: 'dependance', id: 'd1' });
 
     composant.annulerSuppression();
-    expect(composant.suppressionEnAttente).toBeNull();
+    expect(composant.suppressionEnAttente()).toBeNull();
     expect(invokeSimule).not.toHaveBeenCalled();
   });
 
@@ -355,15 +373,15 @@ describe('SqmReferentielsParametrageComponent', () => {
 
     composant.demanderSuppressionDependance('d1');
     composant.confirmerSuppression();
-    expect(composant.actionEnAttenteMotDePasse).toBe('suppressionDependance');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('suppressionDependance');
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
     expect(invokeSimule).toHaveBeenCalledWith(
       'supprimer_regle_dependance',
       expect.objectContaining({ id: 'd1', motDePasse: 'mot-de-passe' }),
     );
-    expect(composant.suppressionEnAttente).toBeNull();
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.suppressionEnAttente()).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
   it('supprime une règle de marqueur IA après confirmation puis ressaisie du mot de passe (US-033, RG-035)', async () => {
@@ -374,7 +392,7 @@ describe('SqmReferentielsParametrageComponent', () => {
 
     composant.demanderSuppressionMarqueurIa('m1');
     composant.confirmerSuppression();
-    expect(composant.actionEnAttenteMotDePasse).toBe('suppressionMarqueurIA');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('suppressionMarqueurIA');
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
     expect(invokeSimule).toHaveBeenCalledWith(
@@ -399,6 +417,6 @@ describe('SqmReferentielsParametrageComponent', () => {
         message: "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).",
       }),
     ]);
-    expect(composant.suppressionEnAttente).toBeNull();
+    expect(composant.suppressionEnAttente()).toBeNull();
   });
 });

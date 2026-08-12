@@ -105,7 +105,7 @@ describe('SqmVerrouillageComponent', () => {
     const fixture = creerFixture();
 
     expect(fixture.componentInstance.echecsDeverrouillage()).toBe(0);
-    expect(fixture.componentInstance.messageErreur).toBeNull();
+    expect(fixture.componentInstance.messageErreur()).toBeNull();
     expect(fixture.componentInstance.essaisRestants()).toBe(3);
   });
 
@@ -115,7 +115,7 @@ describe('SqmVerrouillageComponent', () => {
 
     await fixture.componentInstance.deverrouiller('bon-mot-de-passe');
 
-    expect(fixture.componentInstance.messageErreur).toBeNull();
+    expect(fixture.componentInstance.messageErreur()).toBeNull();
     expect(etatSession.etatFichier()).toBe(EtatFichier.Ouvert);
   });
 
@@ -125,7 +125,7 @@ describe('SqmVerrouillageComponent', () => {
 
     await fixture.componentInstance.deverrouiller('mauvais-mot-de-passe');
 
-    expect(fixture.componentInstance.messageErreur).toBe('Mot de passe incorrect.');
+    expect(fixture.componentInstance.messageErreur()).toBe('Mot de passe incorrect.');
     expect(fixture.componentInstance.echecsDeverrouillage()).toBe(1);
     expect(fixture.componentInstance.essaisRestants()).toBe(2);
     expect(etatSession.etatFichier()).toBe(EtatFichier.Verrouille);

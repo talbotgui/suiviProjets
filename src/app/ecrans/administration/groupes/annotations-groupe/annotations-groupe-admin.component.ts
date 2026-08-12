@@ -14,7 +14,8 @@
 // (`supprimerAnnotation`) est ajoutée à cette même occasion, décision arbitraire élargie aux deux portées (groupe
 // et projet) plutôt qu'à la seule portée groupe nouvellement construite (cf. `SqmFicheProjetComponent`, qui en
 // bénéficie donc également).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -48,9 +49,11 @@ export class SqmAnnotationsGroupeAdminComponent {
   public groupeSelectionneId: string | null = null;
 
   /**
-   * Indique si le formulaire de création est actuellement affiché.
+   * Indique si le formulaire de création est actuellement affiché. Signal (plutôt qu'une simple propriété) car
+   * muté depuis la continuation asynchrone de {@link confirmerCreation}, sur le modèle de
+   * `SqmDemarrageComponent.cheminCreation`.
    */
-  public formulaireVisible = false;
+  public readonly formulaireVisible: WritableSignal<boolean> = signal(false);
 
   /**
    * Date saisie dans le formulaire.
@@ -79,18 +82,28 @@ export class SqmAnnotationsGroupeAdminComponent {
 
   /**
    * Identifiant de l'annotation dont la suppression est en cours de confirmation, `null` si aucune n'est en cours.
+   * Signal (plutôt qu'une simple propriété) car muté depuis la continuation asynchrone de
+   * {@link confirmerSuppressionMotDePasse}, sur le modèle de `SqmDemarrageComponent.cheminCreation`.
    */
-  public annotationASupprimerId: string | null = null;
+  public readonly annotationASupprimerId: WritableSignal<string | null> = signal<string | null>(
+    null,
+  );
 
   /**
    * Action en attente de ressaisie du mot de passe (RG-002), `null` si aucune boîte de ressaisie n'est affichée.
+   * Signal (plutôt qu'une simple propriété) car muté depuis la continuation asynchrone de
+   * {@link confirmerCreation}/{@link confirmerSuppressionMotDePasse}, sur le modèle de
+   * `SqmDemarrageComponent.cheminCreation`.
    */
-  public actionEnAttenteMotDePasse: 'creation' | 'suppression' | null = null;
+  public readonly actionEnAttenteMotDePasse: WritableSignal<'creation' | 'suppression' | null> =
+    signal<'creation' | 'suppression' | null>(null);
 
   /**
-   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes. Signal
+   * (plutôt qu'une simple propriété) car muté depuis la continuation asynchrone de {@link confirmerCreation}/
+   * {@link confirmerSuppressionMotDePasse}, sur le modèle de `SqmDemarrageComponent.cheminCreation`.
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Groupes disponibles pour la sélection.
@@ -106,7 +119,7 @@ export class SqmAnnotationsGroupeAdminComponent {
    */
   public selectionnerGroupe(groupeId: string): void {
     this.groupeSelectionneId = groupeId;
-    this.formulaireVisible = false;
+    this.formulaireVisible.set(false);
     this.messageErreur = null;
   }
 
@@ -130,14 +143,14 @@ export class SqmAnnotationsGroupeAdminComponent {
     this.categorie = '';
     this.description = '';
     this.messageErreur = null;
-    this.formulaireVisible = true;
+    this.formulaireVisible.set(true);
   }
 
   /**
    * Referme le formulaire sans enregistrer.
    */
   public fermerFormulaire(): void {
-    this.formulaireVisible = false;
+    this.formulaireVisible.set(false);
   }
 
   /**
@@ -150,7 +163,7 @@ export class SqmAnnotationsGroupeAdminComponent {
       return;
     }
     this.messageErreur = null;
-    this.actionEnAttenteMotDePasse = 'creation';
+    this.actionEnAttenteMotDePasse.set('creation');
   }
 
   /**
@@ -159,7 +172,7 @@ export class SqmAnnotationsGroupeAdminComponent {
    */
   public async confirmerCreation(motDePasse: string): Promise<void> {
     if (!this.groupeSelectionneId) {
-      this.actionEnAttenteMotDePasse = null;
+      this.actionEnAttenteMotDePasse.set(null);
       return;
     }
     const donnees: DonneesAnnotation = {
@@ -169,21 +182,22 @@ export class SqmAnnotationsGroupeAdminComponent {
       description: this.description.trim().length > 0 ? this.description.trim() : undefined,
     };
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.creerAnnotation(
       this.groupeSelectionneId,
       undefined,
       donnees,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.formulaireVisible = false;
+    this.formulaireVisible.set(false);
+    this.notification.succes("L'annotation a été créée.");
   }
 
   /**
@@ -191,7 +205,7 @@ export class SqmAnnotationsGroupeAdminComponent {
    * @param annotationId - Identifiant de l'annotation à supprimer.
    */
   public demanderSuppression(annotationId: string): void {
-    this.annotationASupprimerId = annotationId;
+    this.annotationASupprimerId.set(annotationId);
   }
 
   /**
@@ -199,14 +213,14 @@ export class SqmAnnotationsGroupeAdminComponent {
    * la suppression effective (RG-002).
    */
   public confirmerSuppression(): void {
-    this.actionEnAttenteMotDePasse = 'suppression';
+    this.actionEnAttenteMotDePasse.set('suppression');
   }
 
   /**
    * Annule la suppression demandée.
    */
   public annulerSuppression(): void {
-    this.annotationASupprimerId = null;
+    this.annotationASupprimerId.set(null);
   }
 
   /**
@@ -214,21 +228,22 @@ export class SqmAnnotationsGroupeAdminComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerSuppressionMotDePasse(motDePasse: string): Promise<void> {
-    if (!this.groupeSelectionneId || !this.annotationASupprimerId) {
-      this.actionEnAttenteMotDePasse = null;
+    const annotationASupprimerId = this.annotationASupprimerId();
+    if (!this.groupeSelectionneId || !annotationASupprimerId) {
+      this.actionEnAttenteMotDePasse.set(null);
       return;
     }
 
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.supprimerAnnotation(
       this.groupeSelectionneId,
       undefined,
-      this.annotationASupprimerId,
+      annotationASupprimerId,
       motDePasse,
     );
-    this.enCours = false;
-    this.actionEnAttenteMotDePasse = null;
-    this.annotationASupprimerId = null;
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
+    this.annotationASupprimerId.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
@@ -239,7 +254,7 @@ export class SqmAnnotationsGroupeAdminComponent {
    * Annule la ressaisie du mot de passe en cours, quelle que soit l'action qui l'avait demandée.
    */
   public annulerMotDePasse(): void {
-    this.actionEnAttenteMotDePasse = null;
+    this.actionEnAttenteMotDePasse.set(null);
   }
 
   /**

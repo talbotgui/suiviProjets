@@ -29,7 +29,7 @@
         id="annotations-groupe-admin-bouton-creer"
         type="button"
         class="bouton"
-        [disabled]="enCours"
+        [disabled]="enCours()"
         (click)="ouvrirCreation()"
       >
         Créer une annotation
@@ -57,7 +57,7 @@
             <button
               type="button"
               class="bouton bouton--discret"
-              [disabled]="enCours"
+              [disabled]="enCours()"
               (click)="demanderSuppression(annotation.id)"
             >
               Supprimer
@@ -77,7 +77,7 @@
       </p>
     }
 
-    @if (annotationASupprimerId && actionEnAttenteMotDePasse === null) {
+    @if (annotationASupprimerId() && actionEnAttenteMotDePasse() === null) {
       <app-confirmation-suppression
         message="La suppression d'une annotation est immédiate et irréversible."
         (confirmee)="confirmerSuppression()"
@@ -85,7 +85,7 @@
       />
     }
 
-    @if (actionEnAttenteMotDePasse === 'creation') {
+    @if (actionEnAttenteMotDePasse() === 'creation') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour créer cette annotation."
         (confirmee)="confirmerCreation($event)"
@@ -93,7 +93,7 @@
       />
     }
 
-    @if (actionEnAttenteMotDePasse === 'suppression') {
+    @if (actionEnAttenteMotDePasse() === 'suppression') {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour supprimer cette annotation."
         (confirmee)="confirmerSuppressionMotDePasse($event)"
@@ -101,7 +101,7 @@
       />
     }
 
-    @if (formulaireVisible) {
+    @if (formulaireVisible()) {
       <form
         class="annotations-groupe-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
         (ngSubmit)="demanderCreation()"
@@ -167,7 +167,7 @@
             id="annotations-groupe-admin-bouton-enregistrer"
             type="submit"
             class="bouton bouton--principal"
-            [disabled]="enCours"
+            [disabled]="enCours()"
           >
             Enregistrer
           </button>

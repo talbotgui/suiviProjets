@@ -10,7 +10,8 @@
 // clé, sur le modèle de `qualifierMembre`/`definirPolitiqueIA`. Cinq blocs indépendants, chacun avec son propre
 // discriminant d'édition/ressaisie du mot de passe, sur le patron de `SqmReferentielsParametrageComponent` (un seul
 // réglage modifiable à la fois par bloc).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -45,18 +46,26 @@ export class SqmReglagesApplicatifsParametrageComponent {
   public messageErreur: string | null = null;
 
   /**
-   * Réglage en attente de ressaisie du mot de passe (RG-002).
+   * Réglage en attente de ressaisie du mot de passe (RG-002). Porté par un signal (plutôt qu'une simple propriété)
+   * car mis à jour depuis la continuation asynchrone de chacune des cinq méthodes `confirmerEnregistrementXxx`,
+   * hors de toute planification automatique de détection de changement dans une application zoneless (aucune
+   * dépendance `zone.js`, cf. `app.config.ts`) : seule une écriture de signal est garantie de déclencher un
+   * nouveau rendu à ce moment-là, à la différence d'une propriété mutée après un `await` (même motif que
+   * `cheminCreation` dans `demarrage.component.ts`, gabarit de ce correctif). Les six autres propriétés
+   * converties en signal ci-dessous, pour ce même motif, ne répètent pas cette explication.
    */
-  public reglageEnAttenteMotDePasse: ReglageEnAttente = null;
+  public readonly reglageEnAttenteMotDePasse: WritableSignal<ReglageEnAttente> =
+    signal<ReglageEnAttente>(null);
 
   /**
    * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   // --- Délai de verrouillage ---
 
-  public verrouillageEditVisible = false;
+  /** Visibilité du formulaire d'édition du délai de verrouillage. */
+  public readonly verrouillageEditVisible: WritableSignal<boolean> = signal(false);
   public delaiInactiviteMinutesFormulaire = 0;
   public echecsAvantFermetureFormulaire = 0;
 
@@ -68,14 +77,14 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.delaiInactiviteMinutesFormulaire = verrouillage?.delaiInactiviteMinutes ?? 15;
     this.echecsAvantFermetureFormulaire = verrouillage?.echecsAvantFermeture ?? 5;
     this.messageErreur = null;
-    this.verrouillageEditVisible = true;
+    this.verrouillageEditVisible.set(true);
   }
 
   /**
    * Referme le formulaire des réglages de verrouillage sans enregistrer.
    */
   public fermerEditionVerrouillage(): void {
-    this.verrouillageEditVisible = false;
+    this.verrouillageEditVisible.set(false);
   }
 
   /**
@@ -88,7 +97,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.reglageEnAttenteMotDePasse = 'verrouillage';
+    this.reglageEnAttenteMotDePasse.set('verrouillage');
   }
 
   /**
@@ -96,25 +105,27 @@ export class SqmReglagesApplicatifsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementVerrouillage(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirVerrouillage(
       this.delaiInactiviteMinutesFormulaire,
       this.echecsAvantFermetureFormulaire,
       motDePasse,
     );
-    this.enCours = false;
-    this.reglageEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.reglageEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.verrouillageEditVisible = false;
+    this.verrouillageEditVisible.set(false);
+    this.notification.succes('Les réglages de verrouillage ont été enregistrés.');
   }
 
   // --- Concurrence d'audit ---
 
-  public concurrenceEditVisible = false;
+  /** Visibilité du formulaire d'édition de la concurrence d'audit. */
+  public readonly concurrenceEditVisible: WritableSignal<boolean> = signal(false);
   public concurrenceFormulaire = 0;
 
   /**
@@ -124,14 +135,14 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.concurrenceFormulaire =
       this.donneesApplication.racine()?.parametres.audit.concurrence ?? 4;
     this.messageErreur = null;
-    this.concurrenceEditVisible = true;
+    this.concurrenceEditVisible.set(true);
   }
 
   /**
    * Referme le formulaire de concurrence d'audit sans enregistrer.
    */
   public fermerEditionConcurrence(): void {
-    this.concurrenceEditVisible = false;
+    this.concurrenceEditVisible.set(false);
   }
 
   /**
@@ -143,7 +154,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.reglageEnAttenteMotDePasse = 'concurrenceAudit';
+    this.reglageEnAttenteMotDePasse.set('concurrenceAudit');
   }
 
   /**
@@ -151,24 +162,26 @@ export class SqmReglagesApplicatifsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementConcurrence(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirConcurrenceAudit(
       this.concurrenceFormulaire,
       motDePasse,
     );
-    this.enCours = false;
-    this.reglageEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.reglageEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.concurrenceEditVisible = false;
+    this.concurrenceEditVisible.set(false);
+    this.notification.succes('La concurrence d’audit a été enregistrée.');
   }
 
   // --- Proxy ---
 
-  public proxyEditVisible = false;
+  /** Visibilité du formulaire d'édition du proxy. */
+  public readonly proxyEditVisible: WritableSignal<boolean> = signal(false);
   public urlProxyFormulaire = '';
   public cheminBundleCaFormulaire = '';
 
@@ -180,14 +193,14 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.urlProxyFormulaire = proxy?.url ?? '';
     this.cheminBundleCaFormulaire = proxy?.cheminBundleCa ?? '';
     this.messageErreur = null;
-    this.proxyEditVisible = true;
+    this.proxyEditVisible.set(true);
   }
 
   /**
    * Referme le formulaire de proxy sans enregistrer.
    */
   public fermerEditionProxy(): void {
-    this.proxyEditVisible = false;
+    this.proxyEditVisible.set(false);
   }
 
   /**
@@ -196,7 +209,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
    */
   public demanderEnregistrementProxy(): void {
     this.messageErreur = null;
-    this.reglageEnAttenteMotDePasse = 'proxy';
+    this.reglageEnAttenteMotDePasse.set('proxy');
   }
 
   /**
@@ -205,25 +218,27 @@ export class SqmReglagesApplicatifsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementProxy(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirProxy(
       this.urlProxyFormulaire.trim() || undefined,
       this.cheminBundleCaFormulaire.trim() || undefined,
       motDePasse,
     );
-    this.enCours = false;
-    this.reglageEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.reglageEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.proxyEditVisible = false;
+    this.proxyEditVisible.set(false);
+    this.notification.succes('Le réglage de proxy a été enregistré.');
   }
 
   // --- Nombre de sauvegardes de sécurité ---
 
-  public nombreSauvegardesEditVisible = false;
+  /** Visibilité du formulaire d'édition du nombre de sauvegardes de sécurité. */
+  public readonly nombreSauvegardesEditVisible: WritableSignal<boolean> = signal(false);
   public nombreSauvegardesFormulaire = 0;
 
   /**
@@ -233,14 +248,14 @@ export class SqmReglagesApplicatifsParametrageComponent {
     this.nombreSauvegardesFormulaire =
       this.donneesApplication.racine()?.parametres.sauvegarde.nombreSauvegardesSecurite ?? 5;
     this.messageErreur = null;
-    this.nombreSauvegardesEditVisible = true;
+    this.nombreSauvegardesEditVisible.set(true);
   }
 
   /**
    * Referme le formulaire de nombre de sauvegardes sans enregistrer.
    */
   public fermerEditionNombreSauvegardes(): void {
-    this.nombreSauvegardesEditVisible = false;
+    this.nombreSauvegardesEditVisible.set(false);
   }
 
   /**
@@ -252,7 +267,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.reglageEnAttenteMotDePasse = 'nombreSauvegardes';
+    this.reglageEnAttenteMotDePasse.set('nombreSauvegardes');
   }
 
   /**
@@ -261,24 +276,26 @@ export class SqmReglagesApplicatifsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementNombreSauvegardes(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirNombreSauvegardesSecurite(
       this.nombreSauvegardesFormulaire,
       motDePasse,
     );
-    this.enCours = false;
-    this.reglageEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.reglageEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.nombreSauvegardesEditVisible = false;
+    this.nombreSauvegardesEditVisible.set(false);
+    this.notification.succes('Le nombre de sauvegardes de sécurité a été enregistré.');
   }
 
   // --- Seuil d'avertissement de taille (US-035, RG-032) ---
 
-  public seuilAvertissementEditVisible = false;
+  /** Visibilité du formulaire d'édition du seuil d'avertissement de taille. */
+  public readonly seuilAvertissementEditVisible: WritableSignal<boolean> = signal(false);
 
   /** Seuil saisi par l'utilisateur, en mébioctets (converti en octets à l'enregistrement). */
   public seuilAvertissementMoFormulaire = 0;
@@ -298,14 +315,14 @@ export class SqmReglagesApplicatifsParametrageComponent {
   public ouvrirEditionSeuilAvertissement(): void {
     this.seuilAvertissementMoFormulaire = this.seuilAvertissementMoActuel();
     this.messageErreur = null;
-    this.seuilAvertissementEditVisible = true;
+    this.seuilAvertissementEditVisible.set(true);
   }
 
   /**
    * Referme le formulaire du seuil d'avertissement sans enregistrer.
    */
   public fermerEditionSeuilAvertissement(): void {
-    this.seuilAvertissementEditVisible = false;
+    this.seuilAvertissementEditVisible.set(false);
   }
 
   /**
@@ -317,7 +334,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
       return;
     }
     this.messageErreur = null;
-    this.reglageEnAttenteMotDePasse = 'seuilAvertissement';
+    this.reglageEnAttenteMotDePasse.set('seuilAvertissement');
   }
 
   /**
@@ -326,26 +343,27 @@ export class SqmReglagesApplicatifsParametrageComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementSeuilAvertissement(motDePasse: string): Promise<void> {
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.definirSeuilAvertissementTaille(
       Math.round(this.seuilAvertissementMoFormulaire * 1024 * 1024),
       motDePasse,
     );
-    this.enCours = false;
-    this.reglageEnAttenteMotDePasse = null;
+    this.enCours.set(false);
+    this.reglageEnAttenteMotDePasse.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.seuilAvertissementEditVisible = false;
+    this.seuilAvertissementEditVisible.set(false);
+    this.notification.succes('Le seuil d’avertissement de taille a été enregistré.');
   }
 
   /**
    * Annule la ressaisie du mot de passe en cours, quel que soit le réglage qui l'avait demandée.
    */
   public annulerMotDePasse(): void {
-    this.reglageEnAttenteMotDePasse = null;
+    this.reglageEnAttenteMotDePasse.set(null);
   }
 
   /**

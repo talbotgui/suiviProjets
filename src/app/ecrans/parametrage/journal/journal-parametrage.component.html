@@ -123,27 +123,27 @@
     <button
       type="button"
       class="bouton exterieur-haut-2"
-      [disabled]="purgeEnCours"
+      [disabled]="purgeEnCours()"
       (click)="previsualiserPurge()"
     >
       Prévisualiser la purge
     </button>
 
-    @if (previsualisationPurge) {
+    @if (previsualisationPurge(); as previsualisation) {
       <p class="exterieur-haut-2">
-        {{ previsualisationPurge.nbEntreesSupprimees }} entrée(s) seraient supprimée(s).
+        {{ previsualisation.nbEntreesSupprimees }} entrée(s) seraient supprimée(s).
       </p>
       <button
         type="button"
         class="bouton bouton--danger"
-        [disabled]="purgeEnCours || previsualisationPurge.nbEntreesSupprimees === 0"
+        [disabled]="purgeEnCours() || previsualisation.nbEntreesSupprimees === 0"
         (click)="demanderExecutionPurge()"
       >
         Exécuter la purge
       </button>
     }
 
-    @if (purgeEnAttenteMotDePasse) {
+    @if (purgeEnAttenteMotDePasse()) {
       <app-confirmation-mot-de-passe
         message="Ressaisissez le mot de passe du fichier pour exécuter la purge du journal des modifications."
         (confirmee)="confirmerExecutionPurge($event)"

@@ -813,7 +813,9 @@ describe('SqmSyntheseAuditsComponent', () => {
           motDePasse: 'mot-de-passe',
         }),
       );
-      expect(TestBed.inject(NotificationService).liste()).toEqual([]);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'succes' }),
+      ]);
       expect(TestBed.inject(DonneesApplicationService).racine()).toBe(racineMiseAJour);
     });
 

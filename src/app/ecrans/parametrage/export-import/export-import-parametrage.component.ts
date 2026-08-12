@@ -14,7 +14,8 @@
 // Sélection de fichier exclusivement via la boîte de dialogue native de l'OS (`SelecteurFichierUtils`), jamais une
 // saisie libre de chemin (`docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`), sur le
 // même modèle que `SqmDemarrageComponent` (US-001, US-002).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
@@ -49,32 +50,40 @@ export class SqmExportImportParametrageComponent {
   private readonly notification: NotificationService = inject(NotificationService);
 
   /**
-   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes.
+   * Indique qu'un appel à une commande native est en cours, pour désactiver les actions concurrentes. Porté par un
+   * signal (plutôt qu'une simple propriété) car mis à jour depuis la continuation asynchrone d'un appel natif, hors
+   * de toute planification automatique de détection de changement en application zoneless (cf. `cheminCreation` de
+   * `SqmDemarrageComponent`).
    */
-  public enCours = false;
+  public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
    * Différentiel de la dernière prévisualisation d'import, `null` si aucun fichier n'a encore été prévisualisé ou
-   * si l'import vient d'être appliqué (ou annulé).
+   * si l'import vient d'être appliqué (ou annulé). Signal pour le même motif que {@link enCours}.
    */
-  public differentiel: DifferentielImportConfiguration | null = null;
+  public readonly differentiel: WritableSignal<DifferentielImportConfiguration | null> =
+    signal<DifferentielImportConfiguration | null>(null);
 
   /**
    * Chemin du fichier de configuration dont {@link differentiel} est issu, nécessaire à la confirmation de l'import
-   * (relu et recalculé côté cœur natif, jamais transmis en confiance depuis la prévisualisation).
+   * (relu et recalculé côté cœur natif, jamais transmis en confiance depuis la prévisualisation). Jamais lu dans le
+   * template : propriété simple conservée telle quelle, sans impact sur le rendu.
    */
   private cheminConfigurationCourant: string | null = null;
 
   /**
    * Chemins des lignes de {@link differentiel} actuellement acceptées par l'utilisateur (RG-029 : acceptation
-   * globale ou ligne à ligne).
+   * globale ou ligne à ligne). Signal pour le même motif que {@link enCours}.
    */
-  public lignesAcceptees: ReadonlySet<string> = new Set();
+  public readonly lignesAcceptees: WritableSignal<ReadonlySet<string>> = signal<
+    ReadonlySet<string>
+  >(new Set());
 
   /**
    * Indique si la ressaisie du mot de passe est actuellement affichée pour la confirmation de l'import (RG-002).
+   * Signal pour le même motif que {@link enCours}.
    */
-  public importEnAttenteMotDePasse = false;
+  public readonly importEnAttenteMotDePasse: WritableSignal<boolean> = signal(false);
 
   /**
    * Ouvre la boîte de dialogue native de sélection d'emplacement puis exporte la configuration partageable
@@ -88,9 +97,9 @@ export class SqmExportImportParametrageComponent {
     if (chemin === null) {
       return;
     }
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.exporterConfiguration(chemin);
-    this.enCours = false;
+    this.enCours.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
@@ -112,19 +121,19 @@ export class SqmExportImportParametrageComponent {
     if (typeof chemin !== 'string') {
       return;
     }
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.previsualiserImportConfiguration(chemin);
-    this.enCours = false;
+    this.enCours.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
-      this.differentiel = null;
+      this.differentiel.set(null);
       this.cheminConfigurationCourant = null;
       return;
     }
-    this.differentiel = resultat.differentiel;
+    this.differentiel.set(resultat.differentiel);
     this.cheminConfigurationCourant = chemin;
-    this.lignesAcceptees = SqmExportImportParametrageComponent.lignesNonIdentiques(
-      resultat.differentiel,
+    this.lignesAcceptees.set(
+      SqmExportImportParametrageComponent.lignesNonIdentiques(resultat.differentiel),
     );
   }
 
@@ -137,32 +146,31 @@ export class SqmExportImportParametrageComponent {
     if (!this.estLigneSelectionnable(chemin)) {
       return;
     }
-    const copie = new Set(this.lignesAcceptees);
+    const copie = new Set(this.lignesAcceptees());
     if (copie.has(chemin)) {
       copie.delete(chemin);
     } else {
       copie.add(chemin);
     }
-    this.lignesAcceptees = copie;
+    this.lignesAcceptees.set(copie);
   }
 
   /**
    * Accepte globalement toutes les lignes d'ajout et de modification du différentiel courant (RG-029).
    */
   public toutAccepter(): void {
-    if (this.differentiel === null) {
+    const differentiel = this.differentiel();
+    if (differentiel === null) {
       return;
     }
-    this.lignesAcceptees = SqmExportImportParametrageComponent.lignesNonIdentiques(
-      this.differentiel,
-    );
+    this.lignesAcceptees.set(SqmExportImportParametrageComponent.lignesNonIdentiques(differentiel));
   }
 
   /**
    * Désélectionne globalement toutes les lignes du différentiel courant (RG-029).
    */
   public toutRefuser(): void {
-    this.lignesAcceptees = new Set();
+    this.lignesAcceptees.set(new Set());
   }
 
   /**
@@ -172,7 +180,8 @@ export class SqmExportImportParametrageComponent {
    */
   public estLigneSelectionnable(chemin: string): boolean {
     return (
-      this.differentiel?.lignes.find((ligne) => ligne.chemin === chemin)?.categorie !== 'identique'
+      this.differentiel()?.lignes.find((ligne) => ligne.chemin === chemin)?.categorie !==
+      'identique'
     );
   }
 
@@ -181,17 +190,17 @@ export class SqmExportImportParametrageComponent {
    * actuellement acceptée.
    */
   public demanderImport(): void {
-    if (this.differentiel === null || this.lignesAcceptees.size === 0) {
+    if (this.differentiel() === null || this.lignesAcceptees().size === 0) {
       return;
     }
-    this.importEnAttenteMotDePasse = true;
+    this.importEnAttenteMotDePasse.set(true);
   }
 
   /**
    * Annule la ressaisie du mot de passe en cours, sans modifier la prévisualisation affichée.
    */
   public annulerMotDePasse(): void {
-    this.importEnAttenteMotDePasse = false;
+    this.importEnAttenteMotDePasse.set(false);
   }
 
   /**
@@ -199,9 +208,9 @@ export class SqmExportImportParametrageComponent {
    * confirmation explicite).
    */
   public annulerImport(): void {
-    this.differentiel = null;
+    this.differentiel.set(null);
     this.cheminConfigurationCourant = null;
-    this.lignesAcceptees = new Set();
+    this.lignesAcceptees.set(new Set());
   }
 
   /**
@@ -212,21 +221,21 @@ export class SqmExportImportParametrageComponent {
     if (this.cheminConfigurationCourant === null) {
       return;
     }
-    this.enCours = true;
+    this.enCours.set(true);
     const resultat = await this.donneesApplication.importerConfiguration(
       this.cheminConfigurationCourant,
-      Array.from(this.lignesAcceptees),
+      Array.from(this.lignesAcceptees()),
       motDePasse,
     );
-    this.enCours = false;
-    this.importEnAttenteMotDePasse = false;
+    this.enCours.set(false);
+    this.importEnAttenteMotDePasse.set(false);
     if (resultat.type === 'echec') {
       this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
       return;
     }
-    this.differentiel = null;
+    this.differentiel.set(null);
     this.cheminConfigurationCourant = null;
-    this.lignesAcceptees = new Set();
+    this.lignesAcceptees.set(new Set());
     this.notification.succes('La configuration importée a été appliquée.');
   }
 

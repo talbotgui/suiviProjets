@@ -140,10 +140,10 @@ describe('SqmAnnotationsGroupeAdminComponent', () => {
     composant.demanderCreation();
 
     expect(composant.messageErreur).toBe('La date et le libellé sont obligatoires.');
-    expect(composant.actionEnAttenteMotDePasse).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
   });
 
-  it('crée une annotation de portée groupe après confirmation du mot de passe (projetId omis)', async () => {
+  it('crée une annotation de portée groupe après confirmation du mot de passe (projetId omis, US-038 : notification de succès)', async () => {
     invokeSimule.mockResolvedValue(DonneesDeTest.racineActuelle(donneesApplication));
     composant.selectionnerGroupe(groupeId);
     composant.ouvrirCreation();
@@ -151,14 +151,17 @@ describe('SqmAnnotationsGroupeAdminComponent', () => {
     composant.categorie = 'incident';
 
     composant.demanderCreation();
-    expect(composant.actionEnAttenteMotDePasse).toBe('creation');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('creation');
     await composant.confirmerCreation('mot-de-passe');
 
     expect(invokeSimule).toHaveBeenCalledWith(
       'creer_annotation',
       expect.objectContaining({ groupeId, projetId: undefined, libelle: 'Rupture de charge' }),
     );
-    expect(composant.formulaireVisible).toBe(false);
+    expect(composant.formulaireVisible()).toBe(false);
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({ type: 'succes', message: "L'annotation a été créée." }),
+    ]);
   });
 
   it('supprime une annotation après confirmation puis ressaisie du mot de passe (US-019, RG-033)', async () => {
@@ -173,16 +176,16 @@ describe('SqmAnnotationsGroupeAdminComponent', () => {
     invokeSimule.mockResolvedValue(racineAvecAnnotation);
 
     composant.demanderSuppression('a1');
-    expect(composant.annotationASupprimerId).toBe('a1');
+    expect(composant.annotationASupprimerId()).toBe('a1');
     composant.confirmerSuppression();
-    expect(composant.actionEnAttenteMotDePasse).toBe('suppression');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('suppression');
     await composant.confirmerSuppressionMotDePasse('mot-de-passe');
 
     expect(invokeSimule).toHaveBeenCalledWith(
       'supprimer_annotation',
       expect.objectContaining({ groupeId, projetId: undefined, annotationId: 'a1' }),
     );
-    expect(composant.annotationASupprimerId).toBeNull();
+    expect(composant.annotationASupprimerId()).toBeNull();
   });
 
   it('convertit un rejet typé « annotationSystemeNonSupprimable » en message explicite', async () => {

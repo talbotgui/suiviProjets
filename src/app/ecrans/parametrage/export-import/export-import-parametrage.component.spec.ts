@@ -164,10 +164,10 @@ describe('SqmExportImportParametrageComponent', () => {
       chemin: '/tmp/configuration.json',
       donnees: DonneesDeTest.racineVide(),
     });
-    expect(composant.differentiel?.lignes.length).toBe(3);
-    expect(composant.lignesAcceptees.has('referentiels.reglesDependances/d1')).toBe(true);
-    expect(composant.lignesAcceptees.has('referentiels.reglesDependances/d2')).toBe(true);
-    expect(composant.lignesAcceptees.has('parametres.seuils.vitalite.mourantJours')).toBe(false);
+    expect(composant.differentiel()?.lignes.length).toBe(3);
+    expect(composant.lignesAcceptees().has('referentiels.reglesDependances/d1')).toBe(true);
+    expect(composant.lignesAcceptees().has('referentiels.reglesDependances/d2')).toBe(true);
+    expect(composant.lignesAcceptees().has('parametres.seuils.vitalite.mourantJours')).toBe(false);
   });
 
   it('signale explicitement les lignes importées structurellement invalides, sans les proposer à l’acceptation', async () => {
@@ -187,8 +187,8 @@ describe('SqmExportImportParametrageComponent', () => {
     await composant.choisirEtPrevisualiser();
     fixture.detectChanges();
 
-    expect(composant.differentiel?.lignesInvalides).toHaveLength(1);
-    expect(composant.lignesAcceptees.has('referentiels.motifNommageBranches')).toBe(false);
+    expect(composant.differentiel()?.lignesInvalides).toHaveLength(1);
+    expect(composant.lignesAcceptees().has('referentiels.motifNommageBranches')).toBe(false);
     const element = DomTestUtils.obtenirElementNatif(fixture);
     expect(element.textContent).toContain('referentiels.motifNommageBranches');
     expect(element.textContent).toContain('le motif de nommage de branche soumis est invalide');
@@ -203,7 +203,7 @@ describe('SqmExportImportParametrageComponent', () => {
     await composant.choisirEtPrevisualiser();
 
     expect(invokeSimule).not.toHaveBeenCalled();
-    expect(composant.differentiel).toBeNull();
+    expect(composant.differentiel()).toBeNull();
   });
 
   it('affiche un message explicite quand la prévisualisation échoue et efface le différentiel courant', async () => {
@@ -222,7 +222,7 @@ describe('SqmExportImportParametrageComponent', () => {
           'Ce fichier de configuration a été produit par une version plus récente de cette application.',
       }),
     );
-    expect(composant.differentiel).toBeNull();
+    expect(composant.differentiel()).toBeNull();
   });
 
   it('bascule une ligne acceptée, sans effet sur une ligne identique', async () => {
@@ -238,15 +238,15 @@ describe('SqmExportImportParametrageComponent', () => {
       SqmExportImportParametrageComponent,
     ).componentInstance;
     await composant.choisirEtPrevisualiser();
-    expect(composant.lignesAcceptees.has('d1')).toBe(true);
+    expect(composant.lignesAcceptees().has('d1')).toBe(true);
 
     composant.basculerLigne('d1');
-    expect(composant.lignesAcceptees.has('d1')).toBe(false);
+    expect(composant.lignesAcceptees().has('d1')).toBe(false);
     composant.basculerLigne('d1');
-    expect(composant.lignesAcceptees.has('d1')).toBe(true);
+    expect(composant.lignesAcceptees().has('d1')).toBe(true);
 
     composant.basculerLigne('d2');
-    expect(composant.lignesAcceptees.has('d2')).toBe(false);
+    expect(composant.lignesAcceptees().has('d2')).toBe(false);
   });
 
   it('tout refuser puis tout accepter réinitialisent la sélection sur les lignes non identiques', async () => {
@@ -265,10 +265,10 @@ describe('SqmExportImportParametrageComponent', () => {
     await composant.choisirEtPrevisualiser();
 
     composant.toutRefuser();
-    expect(composant.lignesAcceptees.size).toBe(0);
+    expect(composant.lignesAcceptees().size).toBe(0);
 
     composant.toutAccepter();
-    expect(composant.lignesAcceptees).toEqual(new Set(['d1', 'd2']));
+    expect(composant.lignesAcceptees()).toEqual(new Set(['d1', 'd2']));
   });
 
   it("n'ouvre pas la ressaisie du mot de passe si aucune ligne n'est acceptée", async () => {
@@ -285,7 +285,7 @@ describe('SqmExportImportParametrageComponent', () => {
 
     composant.demanderImport();
 
-    expect(composant.importEnAttenteMotDePasse).toBe(false);
+    expect(composant.importEnAttenteMotDePasse()).toBe(false);
   });
 
   it('importe les lignes acceptées après confirmation du mot de passe, réinitialise la prévisualisation', async () => {
@@ -299,7 +299,7 @@ describe('SqmExportImportParametrageComponent', () => {
     ).componentInstance;
     await composant.choisirEtPrevisualiser();
     composant.demanderImport();
-    expect(composant.importEnAttenteMotDePasse).toBe(true);
+    expect(composant.importEnAttenteMotDePasse()).toBe(true);
 
     invokeSimule.mockResolvedValueOnce(DonneesDeTest.racineVide());
     await composant.confirmerImport('mot-de-passe');
@@ -311,8 +311,8 @@ describe('SqmExportImportParametrageComponent', () => {
       cheminsAcceptes: ['referentiels.reglesDependances/d1'],
       motDePasse: 'mot-de-passe',
     });
-    expect(composant.differentiel).toBeNull();
-    expect(composant.importEnAttenteMotDePasse).toBe(false);
+    expect(composant.differentiel()).toBeNull();
+    expect(composant.importEnAttenteMotDePasse()).toBe(false);
     const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
     expect(derniereNotification?.type).toBe('succes');
     expect(derniereNotification?.message).toContain('appliquée');
@@ -339,8 +339,8 @@ describe('SqmExportImportParametrageComponent', () => {
         message: 'Le contenu du fichier a changé depuis la prévisualisation : recommencez.',
       }),
     );
-    expect(composant.importEnAttenteMotDePasse).toBe(false);
-    expect(composant.differentiel).not.toBeNull();
+    expect(composant.importEnAttenteMotDePasse()).toBe(false);
+    expect(composant.differentiel()).not.toBeNull();
   });
 
   it("affiche un message explicite quand le mot de passe saisi diverge de la session à l'import (R10-01)", async () => {
@@ -380,8 +380,8 @@ describe('SqmExportImportParametrageComponent', () => {
 
     composant.annulerMotDePasse();
 
-    expect(composant.importEnAttenteMotDePasse).toBe(false);
-    expect(composant.differentiel).not.toBeNull();
+    expect(composant.importEnAttenteMotDePasse()).toBe(false);
+    expect(composant.differentiel()).not.toBeNull();
   });
 
   it('annule la prévisualisation en cours', async () => {
@@ -397,8 +397,8 @@ describe('SqmExportImportParametrageComponent', () => {
 
     composant.annulerImport();
 
-    expect(composant.differentiel).toBeNull();
-    expect(composant.lignesAcceptees.size).toBe(0);
+    expect(composant.differentiel()).toBeNull();
+    expect(composant.lignesAcceptees().size).toBe(0);
   });
 
   it('met en forme les valeurs simples et complexes sans jamais lever', () => {

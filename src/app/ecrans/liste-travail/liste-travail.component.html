@@ -92,7 +92,7 @@
           id="liste-travail-bouton-ouvrir-fiche-projet"
           type="button"
           class="bouton"
-          [disabled]="enCours"
+          [disabled]="enCours()"
           (click)="ouvrirFicheProjet()"
         >
           Ouvrir la fiche projet
@@ -101,7 +101,7 @@
           id="liste-travail-bouton-marquer-vue"
           type="button"
           class="bouton"
-          [disabled]="enCours"
+          [disabled]="enCours()"
           (click)="demanderMarquerVu()"
         >
           Marquer vue
@@ -110,14 +110,14 @@
           id="liste-travail-bouton-marquer-traitee"
           type="button"
           class="bouton bouton--principal"
-          [disabled]="enCours"
+          [disabled]="enCours()"
           (click)="demanderTraiter()"
         >
           Marquer traitée
         </button>
       </div>
 
-      @if (actionEnAttenteMotDePasse === 'vu') {
+      @if (actionEnAttenteMotDePasse() === 'vu') {
         <app-confirmation-mot-de-passe
           message="Ressaisissez le mot de passe du fichier pour marquer cette alerte comme vue."
           (confirmee)="confirmerQualification($event)"
@@ -125,7 +125,7 @@
         />
       }
 
-      @if (actionEnAttenteMotDePasse === 'traitement') {
+      @if (actionEnAttenteMotDePasse() === 'traitement') {
         <app-confirmation-mot-de-passe
           message="Ressaisissez le mot de passe du fichier pour marquer cette alerte comme traitée."
           (confirmee)="confirmerQualification($event)"
