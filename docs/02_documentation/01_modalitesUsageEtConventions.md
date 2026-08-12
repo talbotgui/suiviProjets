@@ -115,6 +115,8 @@ Cette vérification concrète s'applique également au compte-rendu du Codeur lu
 
 Une affirmation portant sur une correction de configuration (par exemple l'ajustement d'un seuil d'avertissement de build) est vérifiée par comparaison directe avec la liste réelle des fichiers modifiés de l'incrément, et non simplement rejouée en observant un comportement qui peut déjà être conforme pour une autre raison (ajouté le 2026-07-26 : à la relecture de la Phase 6 incrément 7, le compte-rendu du Codeur affirmait qu'un seuil de taille de fascicule avait été ajusté à cet incrément, alors que le fichier de configuration concerné n'apparaissait pas parmi les fichiers effectivement modifiés constatés à la relecture).
 
+Quand deux sessions de développement s'exécutent en parallèle sur un même arbre de travail partagé, l'attribution par l'une d'elles à une phase antérieure déjà close d'un comportement observé dans du code qu'elle n'a pas écrit elle-même n'est jamais acceptée sans vérification indépendante : ce comportement peut avoir été introduit entre-temps par la session concurrente elle-même (ajouté le 2026-08-12 : le compte-rendu de la session ayant traité R11-07 attribuait à R11-03 la notification de succès de l'enregistrement d'une vue sur trois écrans, alors que ce comportement provenait en réalité d'une session concurrente traitant R12-03/US-038 au même moment sur les mêmes fichiers ; tranché à la relecture de cet incrément par lecture directe du texte d'origine de R12-03, qui listait explicitement cette action comme dépourvue de toute notification de succès avant cette correction).
+
 #### Responsabilité humaine finale
 
 L'auteur humain reste seul responsable du contenu livré, quelle que soit la part de génération automatique par l'IA.
