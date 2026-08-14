@@ -1,0 +1,371 @@
+# Workflow généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+# .claude/rules/01-usage-ia-et-conventions.md.
+#
+# Fusion, à l'usage, des trois anciens workflows séparés (`validation.yml`, `montee-version.yml`,
+# `publication.yml`) en un unique workflow déclenchable manuellement (`workflow_dispatch`, numéro de version saisi)
+# qui enchaîne, sans appel à un fichier `.yml` séparé : les validations existantes (analyse statique, tests et
+# couverture, tests de bout en bout, analyse des dépendances vulnérables), la montée de version committée
+# directement sur `master` (sans Pull Request), le build multiplateforme, la création du tag et la publication de
+# la GitHub Release, ainsi que la publication de la couverture de code sur GitHub Pages
+# (cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline).
+#
+# Le build multiplateforme exige des runners d'OS distincts (Windows/macOS/Linux) : il reste donc un job à part
+# (matrice), tout comme la publication de la couverture et de la Release, mais toujours au sein de ce seul et
+# unique fichier workflow, sans jamais déléguer à un autre fichier via `uses: ./.github/workflows/...`.
+name: Validation, montée de version et publication
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Nouveau numéro de version à appliquer (SemVer, sans préfixe v), ex. 0.2.0'
+        required: true
+        type: string
+
+jobs:
+  validation-et-montee-version:
+    name: Validations et montée de version sur master
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Contrôle du format SemVer
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Le numéro de version '${{ inputs.version }}' ne respecte pas le format SemVer attendu (X.Y.Z)."
+            exit 1
+          fi
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml, dont llvm-tools-preview)
+        run: rustup show
+
+      - name: Installation des dépendances système Tauri (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            build-essential
+
+      - name: ESLint (avertissements bloquants)
+        run: npm run lint
+
+      # Avertissements traités comme des erreurs, cf. docs/02_documentation/14_normesDeveloppement.md#règles-de-qualité-de-code.
+      - name: Clippy (avertissements bloquants)
+        working-directory: src-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Installation de cargo-llvm-cov (binaire préconstruit)
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      # Seuil global 80 %, cf. docs/02_documentation/16_normesTests.md#stratégie-de-couverture-de-code (pas de
+      # découpage par module côté Rust, à la différence du Moteur de jugement TypeScript ci-dessous). Rapport HTML
+      # généré dans le même temps, réutilisé par le job de publication de la couverture ci-après.
+      - name: Tests unitaires Rust avec couverture (cargo-llvm-cov, seuil 80 %)
+        working-directory: src-tauri
+        run: |
+          cargo llvm-cov --locked --workspace --html \
+            --output-dir "$GITHUB_WORKSPACE/site-couverture/rust" \
+            --fail-under-lines 80
+
+      # Seuils par périmètre déjà configurés dans jest.config.js (90 % Moteur de jugement, 80 % reste de la logique
+      # applicative) ; rapport par fonctions non bloquant pour les composants graphiques, cf.
+      # docs/02_documentation/16_normesTests.md#stratégie-de-couverture-de-code.
+      - name: Tests unitaires Angular/TypeScript avec couverture (Jest/Istanbul)
+        run: npm run test:coverage
+
+      - name: Assemblage du site de couverture combiné (page de renvoi Rust/TypeScript)
+        run: |
+          mkdir -p site-couverture
+          cp -r coverage site-couverture/ts
+          cat > site-couverture/index.html <<'EOF'
+          <!doctype html>
+          <html lang="fr">
+          <head><meta charset="utf-8"><title>Couverture de code — Suivi Qualimétrie</title></head>
+          <body>
+            <h1>Rapports de couverture de code</h1>
+            <ul>
+              <li><a href="rust/html/index.html">Cœur natif (Rust, cargo-llvm-cov)</a></li>
+              <li><a href="ts/index.html">Interface (Angular/TypeScript, Jest/Istanbul)</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Archivage du site de couverture (consommé par le job de publication de la couverture)
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-couverture
+          path: site-couverture/
+          retention-days: 14
+
+      - name: Installation des navigateurs Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Exécution du parcours de bout en bout (npx playwright test, contre ng serve)
+        run: npx playwright test
+
+      - name: Archivage des captures d'écran en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-output
+          path: e2e/test-output/
+          retention-days: 7
+
+      - name: Installation de cargo-audit (binaire préconstruit)
+        uses: taiki-e/install-action@cargo-audit
+
+      # Croisement avec docs/02_documentation/15_normesSecurite.md#analyse-des-dépendances-vulnérables : toute
+      # vulnérabilité critique/élevée non listée dans audit-exceptions.json (justification + date de réévaluation)
+      # fait échouer ce job, cf. scripts/verifier-audit.js. `cargo audit`/`npm audit` sortent en erreur dès qu'une
+      # vulnérabilité est trouvée : la sortie JSON est donc d'abord capturée (`|| true`) avant d'être transmise au
+      # script de vérification, seul habilité à faire échouer ce job.
+      - name: cargo audit, croisé avec le fichier d'exceptions
+        working-directory: src-tauri
+        run: |
+          cargo audit --json > /tmp/cargo-audit.json || true
+          node ../scripts/verifier-audit.js --ecosysteme cargo < /tmp/cargo-audit.json
+
+      - name: npm audit, croisé avec le fichier d'exceptions
+        run: |
+          npm audit --json > /tmp/npm-audit.json || true
+          node scripts/verifier-audit.js --ecosysteme npm < /tmp/npm-audit.json
+
+      - name: Mise à jour de package.json et package-lock.json
+        run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Mise à jour de src-tauri/tauri.conf.json
+        run: |
+          jq --arg version "${{ inputs.version }}" '.version = $version' src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp
+          mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
+      # Seule la première occurrence de `version = "..."` est remplacée (celle du bloc [package]), les dépendances
+      # exprimant la leur en table inline (`{ version = "..." }`) et non en clé de premier niveau.
+      - name: Mise à jour de src-tauri/Cargo.toml
+        run: |
+          sed -i "0,/^version = \".*\"/s//version = \"${{ inputs.version }}\"/" src-tauri/Cargo.toml
+
+      - name: Régénération de src-tauri/Cargo.lock (cohérence avec le Cargo.toml mis à jour)
+        working-directory: src-tauri
+        run: cargo check
+
+      - name: Contrôle de cohérence des trois fichiers avant commit
+        run: |
+          version_package=$(node -pe "require('./package.json').version")
+          version_tauri=$(node -pe "require('./src-tauri/tauri.conf.json').version")
+          version_cargo=$(grep -m1 '^version = ' src-tauri/Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          if [[ "$version_package" != "${{ inputs.version }}" || "$version_tauri" != "${{ inputs.version }}" || "$version_cargo" != "${{ inputs.version }}" ]]; then
+            echo "::error::Incohérence après mise à jour (package.json: $version_package, tauri.conf.json: $version_tauri, Cargo.toml: $version_cargo) pour la version demandée '${{ inputs.version }}'."
+            exit 1
+          fi
+
+      - name: Configuration de l'identité Git du commit automatique
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Commit et push directs sur master, sans branche ni Pull Request (arbitrage humain explicite : le contenu du
+      # commit est une substitution mécanique de numéro de version dans des fichiers déterministes, la revue a
+      # posteriori du commit sur master étant jugée suffisante). `git push` échoue si master a avancé entre le
+      # checkout et le push (pas de --force), plutôt que d'écraser silencieusement un commit concurrent.
+      - name: Commit et push direct sur master (montée de version, sans PR)
+        id: commit
+        run: |
+          git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "::notice::Aucun changement à committer : les trois fichiers portent déjà la version '${{ inputs.version }}'."
+          else
+            git commit -m "chore(version): passage en ${{ inputs.version }}"
+            git push origin HEAD:master
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Génération des livrables
+    needs: validation-et-montee-version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Récupération du code (commit de montée de version)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validation-et-montee-version.outputs.sha }}
+
+      - name: Installation de Node.js (version fixée par .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Installation des dépendances Angular/npm verrouillées
+        run: npm ci
+
+      - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml)
+        run: rustup show
+
+      - name: Installation des dépendances système Tauri (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            build-essential \
+            file
+
+      - name: 'Build de l''installeur natif via Tauri (bundle.targets: "all" de tauri.conf.json)'
+        run: npm run tauri build
+
+      - name: Constitution de l'archive .zip portable (Windows uniquement, exécutable autonome sans installation)
+        if: runner.os == 'Windows'
+        run: |
+          $version = "${{ inputs.version }}"
+          $exeSource = "src-tauri/target/release/suivi_qualimetrie.exe"
+          $stagingDir = "src-tauri/target/release/bundle/portable/SuiviQualimetrie-$version-portable"
+          New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+          Copy-Item $exeSource -Destination "$stagingDir/SuiviQualimetrie.exe"
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath "src-tauri/target/release/bundle/portable/SuiviQualimetrie-$version-portable.zip"
+
+      - name: Archivage temporaire des livrables Windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: livrable-windows
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/portable/*.zip
+          retention-days: 7
+
+      - name: Archivage temporaire des livrables macOS
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: livrable-macos
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          retention-days: 7
+
+      - name: Archivage temporaire des livrables Linux
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: livrable-linux
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
+
+  couverture-pages:
+    name: Publication de la couverture de code (GitHub Pages)
+    needs: validation-et-montee-version
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    outputs:
+      lien: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - name: Récupération du site de couverture généré par le job de validation
+        uses: actions/download-artifact@v4
+        with:
+          name: site-couverture
+          path: site-couverture
+
+      - name: Préparation de l'artefact Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site-couverture
+
+      - name: Déploiement sur GitHub Pages
+        id: deploiement
+        uses: actions/deploy-pages@v4
+
+  publication-release:
+    name: Création du tag et publication de la GitHub Release
+    needs: [validation-et-montee-version, build, couverture-pages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Récupération du code (commit de montée de version, historique complet pour le changelog)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validation-et-montee-version.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Création et publication du tag de version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "Version v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Récupération des livrables Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: livrable-windows
+          path: livrables
+
+      - name: Récupération des livrables macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: livrable-macos
+          path: livrables
+
+      - name: Récupération des livrables Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: livrable-linux
+          path: livrables
+
+      - name: Publication de la GitHub Release avec changelog Conventional Commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            --title "v${{ inputs.version }}" \
+            --generate-notes \
+            livrables/msi/*.msi \
+            livrables/nsis/*.exe \
+            livrables/portable/*.zip \
+            livrables/dmg/*.dmg \
+            livrables/deb/*.deb \
+            livrables/appimage/*.AppImage
+
+      # `gh release create --notes`/`--generate-notes` sont mutuellement exclusifs : le lien vers le rapport de
+      # couverture est donc ajouté séparément, en tête des notes déjà générées à partir des Conventional Commits.
+      - name: Ajout du lien vers le rapport de couverture de code aux notes de la Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIEN_COUVERTURE: ${{ needs.couverture-pages.outputs.lien }}
+        run: |
+          notes_existantes=$(gh release view "v${{ inputs.version }}" --json body -q .body)
+          printf 'Rapport de couverture de code (Rust + TypeScript) : %s\n\n%s' "$LIEN_COUVERTURE" "$notes_existantes" \
+            | gh release edit "v${{ inputs.version }}" --notes-file -
