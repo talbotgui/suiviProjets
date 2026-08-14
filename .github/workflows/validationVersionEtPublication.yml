@@ -3,11 +3,12 @@
 #
 # Fusion, à l'usage, des trois anciens workflows séparés (`validation.yml`, `montee-version.yml`,
 # `publication.yml`) en un unique workflow déclenchable manuellement (`workflow_dispatch`, numéro de version saisi)
-# qui enchaîne, sans appel à un fichier `.yml` séparé : les validations existantes (analyse statique, tests et
-# couverture, tests de bout en bout, analyse des dépendances vulnérables), la montée de version committée
-# directement sur `master` (sans Pull Request), le build multiplateforme, la création du tag et la publication de
-# la GitHub Release, ainsi que la publication de la couverture de code sur GitHub Pages
-# (cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline).
+# qui enchaîne, sans appel à un fichier `.yml` séparé : les montées de version mineure des dépendances
+# (`npm audit fix`/`cargo audit fix`, committées directement sur `master` si modifications), les validations
+# existantes (analyse statique, tests et couverture, tests de bout en bout, analyse des dépendances vulnérables),
+# la montée de version applicative committée directement sur `master` (sans Pull Request dans les deux cas), le
+# build multiplateforme, la création du tag et la publication de la GitHub Release, ainsi que la publication de la
+# couverture de code sur GitHub Pages (cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline).
 #
 # Le build multiplateforme exige des runners d'OS distincts (Windows/macOS/Linux) : il reste donc un job à part
 # (matrice), tout comme la publication de la couverture et de la Release, mais toujours au sein de ce seul et
@@ -52,6 +53,37 @@ jobs:
 
       - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml, dont llvm-tools-preview)
         run: rustup show
+
+      - name: Configuration de l'identité Git des commits automatiques
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Installée avec la fonctionnalité "fix" (compilation depuis les sources, intègre cargo-edit) : le binaire
+      # préconstruit habituel (taiki-e/install-action) ne l'inclut pas. Réutilisée sans réinstallation par l'étape
+      # « cargo audit, croisé avec le fichier d'exceptions » plus loin dans ce même job.
+      - name: Installation de cargo-audit (avec la fonctionnalité de correction automatique "fix")
+        run: cargo install cargo-audit --locked --features=fix
+
+      - name: npm audit fix (montées de version mineure de correctifs de sécurité, sans rupture de compatibilité)
+        run: npm audit fix
+
+      - name: cargo audit fix (montées de version mineure de correctifs de sécurité)
+        working-directory: src-tauri
+        run: cargo audit fix
+
+      # Commit et push directs sur master, distincts du commit de montée de version applicative plus loin dans ce
+      # même job (même arbitrage : mise à jour mécanique de dépendances, sans logique métier, revue a posteriori du
+      # commit jugée suffisante).
+      - name: Commit et push des montées de version mineure, si modifications
+        run: |
+          git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "::notice::npm audit fix / cargo audit fix n'ont introduit aucune modification."
+          else
+            git commit -m "Montées de version mineure pour la version ${{ inputs.version }}"
+            git push origin HEAD:master
+          fi
 
       - name: Installation des dépendances système Tauri (Linux)
         run: |
@@ -130,9 +162,6 @@ jobs:
           path: e2e/test-output/
           retention-days: 7
 
-      - name: Installation de cargo-audit (binaire préconstruit)
-        uses: taiki-e/install-action@cargo-audit
-
       # Croisement avec docs/02_documentation/15_normesSecurite.md#analyse-des-dépendances-vulnérables : toute
       # vulnérabilité critique/élevée non listée dans audit-exceptions.json (justification + date de réévaluation)
       # fait échouer ce job, cf. scripts/verifier-audit.js. `cargo audit`/`npm audit` sortent en erreur dès qu'une
@@ -176,11 +205,6 @@ jobs:
             echo "::error::Incohérence après mise à jour (package.json: $version_package, tauri.conf.json: $version_tauri, Cargo.toml: $version_cargo) pour la version demandée '${{ inputs.version }}'."
             exit 1
           fi
-
-      - name: Configuration de l'identité Git du commit automatique
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       # Commit et push directs sur master, sans branche ni Pull Request (arbitrage humain explicite : le contenu du
       # commit est une substitution mécanique de numéro de version dans des fichiers déterministes, la revue a
