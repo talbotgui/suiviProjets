@@ -401,9 +401,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await page.locator('#selecteur-vue-champ-nom').fill('Vue E2E');
     await page.locator('#selecteur-vue-bouton-enregistrer').click();
     await confirmerMotDePasse();
-    // `SqmSyntheseAuditsComponent.enregistrerVue` n'appelle `NotificationService` qu'en cas d'échec, jamais en cas
-    // de succès (constat R12-02, cf. Phase 12 du plan) : le retour visuel attendu est la fermeture du formulaire.
+    // Depuis R12-03, `SqmSyntheseAuditsComponent.enregistrerVue` émet désormais une notification de succès (retour
+    // visuel générique), en plus de la fermeture du formulaire : on l'attend puis on la ferme explicitement pour
+    // qu'elle n'expire pas (auto-disparition à 5 s) pendant la vérification des boutons de l'étape suivante.
     await expect(page.locator('#selecteur-vue-champ-nom')).toBeHidden();
+    await attendreNotificationSucces(page);
+    await page.locator('button[aria-label="Fermer la notification"]').first().click();
   });
 
   // 16. Fiche projet — détail d'un projet, assertions à bornes tolérantes sur les indicateurs Sonar.
