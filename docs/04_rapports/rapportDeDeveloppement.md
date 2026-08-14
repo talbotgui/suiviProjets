@@ -30,6 +30,34 @@
 26. [Étape 8 — Alertes et annotations](#étape-8--alertes-et-annotations)
 27. [Étape 9 (incrément 1) — Vues enregistrées : socle et écran Liste de travail](#étape-9-incrément-1--vues-enregistrées--socle-et-écran-liste-de-travail)
 28. [Étape 9 (incrément 2) — Vues enregistrées : écrans Synthèse des audits et Synthèse graphique](#étape-9-incrément-2--vues-enregistrées--écrans-synthèse-des-audits-et-synthèse-graphique)
+29. [Étape 10 (incrément 1) — Rattrapage & bugs : R10-01, revérification du mot de passe avant toute réécriture du fichier](#étape-10-incrément-1--rattrapage--bugs--r10-01-revérification-du-mot-de-passe-avant-toute-réécriture-du-fichier)
+30. [Étape 10 (incrément 2) — Rattrapage & bugs : R10-02 (pagination de `interroger_membres`), R10-17 (journalisation des purges)](#étape-10-incrément-2--rattrapage--bugs--r10-02-pagination-de-interroger_membres-r10-17-journalisation-des-purges)
+31. [Étape 10 (incrément 3) — Rattrapage & bugs : R10-06 (échec de sauvegarde finale du brouillon non signalé), R10-09 (source vers instance introuvable non consignée)](#étape-10-incrément-3--rattrapage--bugs--r10-06-échec-de-sauvegarde-finale-du-brouillon-non-signalé-r10-09-source-vers-instance-introuvable-non-consignée)
+32. [Étape 10 (incrément 4) — Rattrapage & bugs : R10-03 (couleur dédiée du badge de statut IA conforme sous réserve), R10-14 (gravité alerte membre inconnu distinguée visuellement)](#étape-10-incrément-4--rattrapage--bugs--r10-03-couleur-dédiée-du-badge-de-statut-ia-conforme-sous-réserve-r10-14-gravité-alerte-membre-inconnu-distinguée-visuellement)
+33. [Étape 10 (incrément 5) — Rattrapage & bugs : R10-07 (blocage du conflit de règles courriel domaine), R10-11 (retrait du segment bugfix du motif Gitflow), R10-08 (test d'encodage d'une ref porteuse d'un slash), R10-10 (timers simulés pour les tests de concurrence)](#étape-10-incrément-5--rattrapage--bugs--r10-07-blocage-du-conflit-de-règles-courriel-domaine-r10-11-retrait-du-segment-bugfix-du-motif-gitflow-r10-08-test-dencodage-dune-ref-porteuse-dun-slash-r10-10-timers-simulés-pour-les-tests-de-concurrence)
+34. [Étape 10 (incrément 6) — Rattrapage & bugs : R10-13, R10-15, R10-16, R10-18](#étape-10-incrément-6--rattrapage--bugs--r10-13-r10-15-r10-16-r10-18)
+35. [Étape 10 (incrément 7) — Rattrapage & bugs : R10-04, R10-05, R10-12](#étape-10-incrément-7--rattrapage--bugs--r10-04-r10-05-r10-12)
+36. [Étape 10 (incrément 8) — Rattrapage & bugs : C10-01 à C10-05, compléments fonctionnels](#étape-10-incrément-8--rattrapage--bugs--c10-01-à-c10-05-compléments-fonctionnels)
+37. [Étape 10 (incrément 9) — Rattrapage & bugs : C10-06, socle de la charte visuelle](#étape-10-incrément-9--rattrapage--bugs--c10-06-socle-de-la-charte-visuelle)
+38. [Étape 10 (incrément 10) — Rattrapage & bugs : C10-06, écran Paramétrage](#étape-10-incrément-10--rattrapage--bugs--c10-06-écran-paramétrage)
+39. [Étape 10 (incrément 11) — Rattrapage & bugs : C10-06, écran Démarrage](#étape-10-incrément-11--rattrapage--bugs--c10-06-écran-démarrage)
+40. [Étape 10 (incrément 12) — Rattrapage & bugs : C10-06, écran Accueil](#étape-10-incrément-12--rattrapage--bugs--c10-06-écran-accueil)
+41. [Étape 10 (incrément 13) — Rattrapage & bugs : C10-06, écran Credentials](#étape-10-incrément-13--rattrapage--bugs--c10-06-écran-credentials)
+42. [Étape 10 (incrément 14) — Rattrapage & bugs : C10-06, écran Administration](#étape-10-incrément-14--rattrapage--bugs--c10-06-écran-administration)
+43. [Étape 10 (incrément 15) — Rattrapage & bugs : C10-06, écran Audits](#étape-10-incrément-15--rattrapage--bugs--c10-06-écran-audits)
+44. [Étape 10 (incrément 16) — Rattrapage & bugs : C10-06, écran Synthèse des audits](#étape-10-incrément-16--rattrapage--bugs--c10-06-écran-synthèse-des-audits)
+45. [Étape 10 (incrément 17) — Rattrapage & bugs : C10-06, écran Synthèse graphique](#étape-10-incrément-17--rattrapage--bugs--c10-06-écran-synthèse-graphique)
+46. [Étape 10 (incrément 18) — Rattrapage & bugs : C10-06, écran Fiche projet](#étape-10-incrément-18--rattrapage--bugs--c10-06-écran-fiche-projet)
+47. [Étape 10 (incrément 19) — Rattrapage & bugs : C10-06, écran Comparaison entre deux audits](#étape-10-incrément-19--rattrapage--bugs--c10-06-écran-comparaison-entre-deux-audits)
+48. [Étape 10 (incrément 20) — Rattrapage & bugs : C10-06, écran Liste de travail](#étape-10-incrément-20--rattrapage--bugs--c10-06-écran-liste-de-travail)
+49. [Étape 11 (incrément 1) — Journalisation technique et confort de saisie : R11-01, journalisation technique](#étape-11-incrément-1--journalisation-technique-et-confort-de-saisie--r11-01-journalisation-technique)
+50. [Étape 11 (incrément 2) — Journalisation technique et confort de saisie : R11-02 à R11-05, R11-08 à R11-10](#étape-11-incrément-2--journalisation-technique-et-confort-de-saisie--r11-02-à-r11-05-r11-08-à-r11-10)
+51. [Étape 11 (incrément 3) — Journalisation technique et confort de saisie : C11-01, enchaînement guidé projet → sources](#étape-11-incrément-3--journalisation-technique-et-confort-de-saisie--c11-01-enchaînement-guidé-projet--sources)
+52. [Étape 12 (incrément 1) — Test de bout en bout Playwright (ng serve)](#étape-12-incrément-1--test-de-bout-en-bout-playwright-ng-serve)
+53. [Étape 11 (incrément 4) — Journalisation technique et confort de saisie : C11-02 à C11-04](#étape-11-incrément-4--journalisation-technique-et-confort-de-saisie--c11-02-à-c11-04)
+54. [Étape 12 (incrément 2) — Constats de test manuel de l'application packagée (R12-05 à R12-08)](#étape-12-incrément-2--constats-de-test-manuel-de-lapplication-packagée-r12-05-à-r12-08)
+55. [Étape 11 (incrément 5) — Journalisation technique et confort de saisie : R11-07, audit et correction transverses du défaut zoneless](#étape-11-incrément-5--journalisation-technique-et-confort-de-saisie--r11-07-audit-et-correction-transverses-du-défaut-zoneless)
+56. [Étape 12 (incrément 3) — R12-03 : notification de succès des actions de mutation (US-038)](#étape-12-incrément-3--r12-03--notification-de-succès-des-actions-de-mutation-us-038)
 
 ## Étape 0 — Bootstrap du poste de développement et de l'outillage
 
@@ -2119,6 +2147,10 @@ En consultant `docs/03_plan/plan_13_developpement.md#phase-12--test-de-bout-en-b
 
 Ce complément n'a pas été soumis à une relecture isolée dédiée ; à confirmer par la validation humaine explicite avant intégration.
 
+### Doute levé a posteriori (identifiant R12-04)
+
+Le doute ci-dessus sur l'identifiant `R12-04` référencé dans `shell.component.ts`/`shell.component.spec.ts` est levé par comparaison directe du commentaire et du test concernés avec la description de R12-02 du tableau des manquements constatés (ci-dessus) : même méthode (`SqmShellComponent.cibleAudits`), même cause racine (`EtatSessionService.progressionCampagne` non nul pour le reste de la session dès la première campagne lancée), même correctif (alignement sur `SqmTableauDeBordComponent.campagneEnCours`). Il ne s'agit donc pas d'un quatrième constat distinct mais d'une référence mal étiquetée au correctif de R12-02 : aucun point manquant du tableau des manquements constatés, aucune action de développement supplémentaire requise. Le libellé `R12-04` reste tel quel dans le code (commentaire et nom de test), conformément à la règle du projet sur la stabilité des identifiants déjà utilisés ; sa correction éventuelle en `R12-02` relève d'un arbitrage humain, non tranché ici.
+
 ## Étape 11 (incrément 5) — Journalisation technique et confort de saisie : R11-07, audit et correction transverses du défaut zoneless
 
 ### Codeur
@@ -2194,6 +2226,14 @@ Les deux points laissés en arbitrage ont été tranchés explicitement par l'ut
 
 Ce complément (trois lignes d'assertion modifiées, sur la seule base de l'arbitrage humain explicite ci-dessus, sans nouvelle initiative du Codeur) n'a pas été soumis à une seconde relecture isolée dédiée.
 
+### Doute levé a posteriori (attribution R11-03/R12-03)
+
+Le doute consigné ci-dessus dans « Doutes et ambiguïtés rencontrés » sur l'origine de la confirmation de succès de `enregistrerVue()` des trois écrans de vue enregistrée est levé : la relecture de l'Étape 12 (incrément 3), développée en parallèle sur plusieurs des mêmes fichiers, a établi par lecture directe du code au moment où cet incrément a démarré que cet appel n'existait pas encore et provient en réalité de R12-03/US-038, non de R11-03 comme affirmé plus haut dans la relecture de cet incrément (cf. [rapport, Étape 12 incrément 3](#étape-12-incrément-3--r12-03--notification-de-succès-des-actions-de-mutation-us-038), section Relecteur, « attribution erronée... explicitement tranchée »). Conformément à la convention de registre append-only déjà appliquée à ce cas précis, l'affirmation d'origine (ci-dessus : « leur méthode `enregistrerVue`/équivalent appelle bien `this.notification.succes(...)` ») n'est pas réécrite mais explicitement corrigée ici : elle résultait d'une méprise entre deux sessions concurrentes plutôt que d'un fait vérifiable au moment où elle a été écrite. Sans conséquence sur le statut de R11-07 lui-même : l'audit et les corrections zoneless des quatorze fichiers (dont `liste-travail.component.ts`, dont la propriété concernée par R11-07 n'est pas celle en cause ici) restent inchangés et conformes.
+
+### Clôture de la Phase 11
+
+Phase 11 close (constatée le 2026-08-14) : les dix points R11-01 à R11-10 et les quatre compléments C11-01 à C11-04 sont tous au statut « Fait » dans `docs/03_plan/plan_13_developpement.md#phase-11--journalisation-technique-et-confort-de-saisie-projets-sources`, vérifié par relecture directe de ce document à cette date. Le seul doute resté ouvert sur le périmètre de cette phase (attribution R11-03/R12-03 ci-dessus) est levé. Aucune réserve bloquante ne subsiste sur cette phase à ce stade.
+
 ## Étape 12 (incrément 3) — R12-03 : notification de succès des actions de mutation (US-038)
 
 ### Codeur
@@ -2242,3 +2282,7 @@ Aucune anomalie fonctionnelle, aucun bug et aucune violation de règle trouvés 
 Aucun complément apporté au prompt de documentation : l'enseignement de cet incrément relève de la méthodologie de développement en binôme, déjà couverte par ailleurs.
 
 Avis global du Relecteur : conforme.
+
+### Clôture de la Phase 12
+
+Phase 12 close (constatée le 2026-08-14) : les points R12-01, R12-02, R12-03 et R12-05 à R12-08 sont tous au statut « Fait » dans `docs/03_plan/plan_13_developpement.md#phase-12--test-de-bout-en-bout-playwright-ng-serve`, vérifié par relecture directe de ce document à cette date. Le doute sur l'identifiant `R12-04` (ci-dessus) est levé : référence mal étiquetée au correctif de R12-02, sans point manquant du tableau des manquements constatés. Aucune réserve bloquante ne subsiste sur cette phase à ce stade.
