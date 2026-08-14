@@ -52,7 +52,19 @@ export async function verifierBoutonsVisibles(page: Page): Promise<void> {
       return texte.length > 0 ? texte : ariaLabel.length > 0 ? ariaLabel : title;
     });
     expect(nomAccessible.length, `Bouton sans nom accessible (index ${index})`).toBeGreaterThan(0);
-    await poignee.focus();
+    try {
+      await poignee.focus();
+    } catch (erreur) {
+      // Élément retiré du DOM entre l'instantané figé ci-dessus et cette itération (ex. bulle d'aide, notification
+      // ou menu refermé entre-temps par la réactivité de l'application, constaté en CI sur le déclencheur
+      // d'explication de la dernière colonne du tableau dense) : il n'appartient plus à l'écran courant, donc hors
+      // périmètre de ce contrôle — `focus()` est la seule des actions ci-dessus à lever effectivement sur un
+      // élément détaché (`evaluate` continue de fonctionner sur une référence détachée).
+      if (erreur instanceof Error && erreur.message.includes('not attached to the DOM')) {
+        continue;
+      }
+      throw erreur;
+    }
     const estFocalise = await poignee.evaluate((element) => document.activeElement === element);
     expect(estFocalise, `Bouton non focusable : « ${nomAccessible} »`).toBe(true);
   }
