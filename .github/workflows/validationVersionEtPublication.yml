@@ -369,6 +369,11 @@ jobs:
           name: livrable-linux
           path: livrables
 
+      # `livrables/*.dmg` (sans sous-dossier), à la différence des livrables Windows/Linux ci-dessous : le job
+      # `build` n'archive qu'un seul motif pour macOS (bundle/dmg/*.dmg, un seul fichier), et actions/upload-artifact
+      # calcule alors le plus petit ancêtre commun comme étant ce dossier `dmg/` lui-même, qui disparaît donc
+      # entièrement de la structure de l'artefact téléchargé. Windows (3 sous-dossiers) et Linux (2 sous-dossiers)
+      # ont un ancêtre commun plus haut (`bundle/`), qui préserve `msi/`, `nsis/`, `portable/`, `deb/`, `appimage/`.
       - name: Publication de la GitHub Release avec changelog Conventional Commits
         env:
           GH_TOKEN: ${{ github.token }}
@@ -379,7 +384,7 @@ jobs:
             livrables/msi/*.msi \
             livrables/nsis/*.exe \
             livrables/portable/*.zip \
-            livrables/dmg/*.dmg \
+            livrables/*.dmg \
             livrables/deb/*.deb \
             livrables/appimage/*.AppImage
 
