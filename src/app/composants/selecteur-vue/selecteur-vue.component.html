@@ -16,16 +16,19 @@
   <div class="selecteur-vue__actions">
     <button
       id="selecteur-vue-bouton-enregistrer-sous"
+      class="bouton bouton--principal"
       type="button"
       (click)="ouvrirFormulaireEnregistrement()"
     >
       Enregistrer sous...
     </button>
     @if (vueSelectionnee(); as vue) {
-      <button type="button" (click)="mettreAJourVueSelectionnee()">
+      <button class="bouton bouton--principal" type="button" (click)="mettreAJourVueSelectionnee()">
         Mettre à jour « {{ vue.nom }} »
       </button>
-      <button type="button" (click)="demanderSuppression()">Supprimer « {{ vue.nom }} »</button>
+      <button class="bouton bouton--danger" type="button" (click)="demanderSuppression()">
+        Supprimer « {{ vue.nom }} »
+      </button>
     }
   </div>
 
@@ -52,8 +55,16 @@
         Définir comme vue par défaut de cet écran
       </label>
       <div class="selecteur-vue__actions">
-        <button type="button" (click)="annulerFormulaireEnregistrement()">Annuler</button>
-        <button id="selecteur-vue-bouton-enregistrer" type="submit">Enregistrer</button>
+        <button class="bouton" type="button" (click)="annulerFormulaireEnregistrement()">
+          Annuler
+        </button>
+        <button
+          id="selecteur-vue-bouton-enregistrer"
+          class="bouton bouton--principal"
+          type="submit"
+        >
+          Enregistrer
+        </button>
       </div>
     </form>
   }
