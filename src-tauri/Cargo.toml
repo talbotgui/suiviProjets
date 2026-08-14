@@ -3,7 +3,7 @@
 
 [package]
 name = "suivi_qualimetrie"
-version = "0.1.8"
+version = "0.1.9"
 description = "Cœur natif (Rust/Tauri) de l'application de suivi de la qualimétrie logicielle (GitLab/SonarQube)."
 authors = ["TALBOT Guillaume <talbotgui@gmail.com>"]
 license = "GPL-3.0-or-later"
