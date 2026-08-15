@@ -145,6 +145,19 @@ describe('SqmCredentialsComponent', () => {
     expect(composant.libelleType(TypeInstance.Sonar)).toBe('Sonar');
   });
 
+  it('vide la saisie non enregistrée dès que la session quitte l’état ouvert (verrouillage RNF-014)', () => {
+    const fixture = TestBed.createComponent(SqmCredentialsComponent);
+    fixture.detectChanges();
+    const composant = fixture.componentInstance;
+    composant.definirSaisie('i1', 'saisie-non-enregistree');
+    expect(composant.valeurSaisie('i1')).toBe('saisie-non-enregistree');
+
+    TestBed.inject(EtatSessionService).verrouiller();
+    fixture.detectChanges();
+
+    expect(composant.valeurSaisie('i1')).toBe('');
+  });
+
   it('reflète la saisie en cours, avec repli sur le credential déjà en mémoire de session', () => {
     const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
     TestBed.inject(EtatSessionService).definirCredentials({ i1: 'deja-enregistre' });

@@ -23,6 +23,7 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   signal,
   ChangeDetectionStrategy,
@@ -30,7 +31,7 @@ import {
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
-import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { EtatFichier, EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { ErreurConnecteurUtils } from '../../services/sansetat/commandes/erreur-connecteur.utils';
 import { FacadeCommandesService } from '../../services/sansetat/commandes/facade-commandes.service';
@@ -100,13 +101,23 @@ export class SqmCredentialsComponent {
    * Construit l'écran : désarme le minuteur d'expiration du presse-papiers à la destruction du composant, en
    * effaçant immédiatement le presse-papiers si un compte à rebours était encore en cours (jamais laissé courir
    * sans plus aucun affichage), sur le modèle déjà retenu par `SqmShellComponent` pour son propre minuteur
-   * d'inactivité.
+   * d'inactivité. Purge également toute saisie de credential non encore enregistrée dès que la session quitte
+   * l'état `Ouvert` (verrouillage automatique par inactivité RNF-014, verrouillage manuel ou fermeture) : ce
+   * composant restant monté sous la superposition de Verrouillage (`router-outlet` jamais démonté, cf.
+   * `SqmShellComponent`), une saisie tapée mais non confirmée par « Enregistrer » restait sinon affichée
+   * indéfiniment dans les champs, alors même que le credential correspondant n'est plus utilisable nulle part
+   * (RG-004).
    */
   public constructor() {
     inject(DestroyRef).onDestroy(() => {
       if (this.minuteurExpirationPressePapiers !== undefined) {
         this.arreterExpirationPressePapiers();
         void this.viderPressePapiers();
+      }
+    });
+    effect(() => {
+      if (this.etatSession.etatFichier() !== EtatFichier.Ouvert) {
+        this.saisieInterne.set({});
       }
     });
   }
