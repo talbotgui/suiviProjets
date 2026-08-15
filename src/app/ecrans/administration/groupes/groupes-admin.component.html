@@ -194,7 +194,11 @@
       }
     }
     @case ('membresConnus') {
-      <app-membres-connus-admin />
+      <app-membres-connus-admin
+        [groupeIdPreselectionne]="groupeIdPreselectionne()"
+        [critereInitial]="critere()"
+        [typeCritereInitial]="typeCritere()"
+      />
     }
     @case ('annotations') {
       <app-annotations-groupe-admin />

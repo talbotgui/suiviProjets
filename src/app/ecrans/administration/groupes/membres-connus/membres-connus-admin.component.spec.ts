@@ -401,4 +401,49 @@ describe('SqmMembresConnusAdminComponent', () => {
       }),
     ]);
   });
+
+  describe(
+    'présélection depuis la Fiche projet (lien « Qualifier ce membre », groupeIdPreselectionne/' +
+      'critereInitial/typeCritereInitial)',
+    () => {
+      it('présélectionne le groupe et pré-remplit le formulaire de création (membre inconnu)', () => {
+        const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+        fixture.componentRef.setInput('groupeIdPreselectionne', groupeId);
+        fixture.componentRef.setInput('critereInitial', 'exemple.fr');
+        fixture.componentRef.setInput('typeCritereInitial', 'domaineEmail');
+
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.groupeSelectionneId).toBe(groupeId);
+        expect(fixture.componentInstance.formulaireVisible()).toBe(true);
+        expect(fixture.componentInstance.critere).toBe('exemple.fr');
+        expect(fixture.componentInstance.typeCritere).toBe(TypeCritereMembre.DomaineEmail);
+      });
+
+      it(
+        'présélectionne uniquement le groupe, sans ouvrir de formulaire, quand aucun critère n’est ' +
+          'fourni (membre en conflit de règles)',
+        () => {
+          const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+          fixture.componentRef.setInput('groupeIdPreselectionne', groupeId);
+
+          fixture.detectChanges();
+
+          expect(fixture.componentInstance.groupeSelectionneId).toBe(groupeId);
+          expect(fixture.componentInstance.formulaireVisible()).toBe(false);
+        },
+      );
+
+      it("ignore un type de critère non reconnu transmis par l'URL, sans ouvrir de formulaire", () => {
+        const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+        fixture.componentRef.setInput('groupeIdPreselectionne', groupeId);
+        fixture.componentRef.setInput('critereInitial', 'exemple.fr');
+        fixture.componentRef.setInput('typeCritereInitial', 'valeurInconnue');
+
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.formulaireVisible()).toBe(false);
+      });
+    },
+  );
 });

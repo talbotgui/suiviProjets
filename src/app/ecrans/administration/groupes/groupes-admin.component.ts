@@ -7,7 +7,13 @@
 // groupe, RG-006 à RG-008) et sous-onglet Annotations (`SqmAnnotationsGroupeAdminComponent`, US-019, RG-033,
 // Phase 10 incrément 8, C10-04 : création et suppression des annotations de portée groupe, également porté par
 // `Groupe`), construit sur le même patron que le sous-onglet Membres connus.
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+//
+// Entrées `groupeIdPreselectionne`/`critere`/`typeCritere`, relayées telles quelles depuis `SqmAdministrationComponent`
+// (paramètres de requête portés par le lien « Qualifier ce membre » de la Fiche projet) : un simple effet
+// (constructeur) bascule une fois pour toutes sur le sous-onglet Membres connus dès que `groupeIdPreselectionne`
+// est renseigné, sur le modèle de `vueParDefautDejaAppliquee` (`SqmListeTravailComponent`).
+import { Component, effect, inject, ChangeDetectionStrategy, input } from '@angular/core';
+import type { InputSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -57,6 +63,37 @@ export class SqmGroupesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+
+  /**
+   * Identifiant du groupe à présélectionner dans le sous-onglet Membres connus (cf. commentaire d'en-tête).
+   */
+  public readonly groupeIdPreselectionne: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Critère à pré-remplir dans le formulaire de création d'une règle de membre connu (cf. commentaire d'en-tête).
+   */
+  public readonly critere: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Type du critère à pré-remplir (cf. {@link critere}).
+   */
+  public readonly typeCritere: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Indique que la présélection du sous-onglet Membres connus a déjà été appliquée une fois pour cette instance
+   * (cf. commentaire d'en-tête, même patron que `SqmListeTravailComponent.vueParDefautDejaAppliquee`).
+   */
+  private preselectionDejaAppliquee = false;
+
+  public constructor() {
+    effect(() => {
+      if (this.preselectionDejaAppliquee || this.groupeIdPreselectionne() === undefined) {
+        return;
+      }
+      this.preselectionDejaAppliquee = true;
+      this.sousOngletActif = 'membresConnus';
+    });
+  }
 
   /**
    * Sous-onglet actuellement affiché.

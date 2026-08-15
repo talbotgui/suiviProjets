@@ -6,8 +6,14 @@
 // autres CRUD de l'écran Administration (Phase 3, en mémoire uniquement), chaque mutation invoque ici directement
 // une commande native qui sauvegarde effectivement le fichier (RG-002 : le mot de passe est donc redemandé à
 // chaque enregistrement ou suppression, cf. `SqmConfirmationMotDePasseComponent`).
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import type { WritableSignal } from '@angular/core';
+//
+// Entrées `groupeIdPreselectionne`/`critere`/`typeCritere`, relayées depuis `SqmGroupesAdminComponent` (lien
+// « Qualifier ce membre » de la Fiche projet, cf. `fiche-projet.component.ts`) : un effet (constructeur) présélectionne
+// une fois pour toutes le groupe visé puis, si `critere`/`typeCritere` sont tous deux présents et reconnus, ouvre
+// directement le formulaire de création pré-rempli (membre `inconnu`) ; sinon (absents : membre en `conflit`), le
+// groupe est simplement présélectionné et sa liste de règles existantes reste affichée sans ouvrir de formulaire.
+import { Component, effect, inject, signal, ChangeDetectionStrategy, input } from '@angular/core';
+import type { InputSignal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -44,6 +50,57 @@ export class SqmMembresConnusAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+
+  /**
+   * Identifiant du groupe à présélectionner (cf. commentaire d'en-tête).
+   */
+  public readonly groupeIdPreselectionne: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Critère à pré-remplir dans le formulaire de création (cf. commentaire d'en-tête). Nommé distinctement du champ
+   * de formulaire {@link critere} (même nom que le paramètre de requête d'origine, RG-006 à RG-008), qu'il ne fait
+   * qu'initialiser une fois.
+   */
+  public readonly critereInitial: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Type du critère à pré-remplir (cf. {@link critereInitial} et {@link typeCritere}).
+   */
+  public readonly typeCritereInitial: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Indique que la présélection depuis {@link groupeIdPreselectionne} a déjà été appliquée une fois pour cette
+   * instance (cf. commentaire d'en-tête, même patron que `SqmListeTravailComponent.vueParDefautDejaAppliquee`).
+   */
+  private preselectionDejaAppliquee = false;
+
+  public constructor() {
+    effect(() => {
+      const groupeCible = this.groupeIdPreselectionne();
+      if (this.preselectionDejaAppliquee || groupeCible === undefined) {
+        return;
+      }
+      this.preselectionDejaAppliquee = true;
+      this.selectionnerGroupe(groupeCible);
+      const typeCritereCible = this.analyserTypeCritere(this.typeCritereInitial());
+      const critereCible = this.critereInitial();
+      if (typeCritereCible !== undefined && critereCible !== undefined && critereCible.length > 0) {
+        this.ouvrirCreation();
+        this.typeCritere = typeCritereCible;
+        this.critere = critereCible;
+      }
+    });
+  }
+
+  /**
+   * Valide qu'une valeur de paramètre de requête correspond bien à un type de critère reconnu, sans accès non sûr
+   * à cette valeur d'origine externe (URL).
+   * @param valeur - Valeur brute du paramètre de requête `typeCritere`.
+   * @returns Le type de critère reconnu, `undefined` si la valeur ne correspond à aucun type connu.
+   */
+  private analyserTypeCritere(valeur: string | undefined): TypeCritereMembre | undefined {
+    return this.typesCritere.find((type) => type === valeur);
+  }
 
   /**
    * Types de critère proposés au formulaire.

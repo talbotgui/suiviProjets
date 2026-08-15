@@ -33,7 +33,11 @@
 
   @switch (ongletActif) {
     @case ('groupes') {
-      <app-groupes-admin />
+      <app-groupes-admin
+        [groupeIdPreselectionne]="groupeId()"
+        [critere]="critere()"
+        [typeCritere]="typeCritere()"
+      />
     }
     @case ('projets') {
       <app-projets-admin />

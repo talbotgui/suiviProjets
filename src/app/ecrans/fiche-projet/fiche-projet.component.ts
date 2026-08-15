@@ -25,6 +25,7 @@ import {
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import type { Params } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBadgeComponent } from '../../composants/badge/badge.component';
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
@@ -35,7 +36,7 @@ import type { AnomalieResolue } from '../../services/avecetat/campagne/rapport-a
 import type { ResultatCroiseFraicheurSonar } from '../../services/avecetat/campagne/connecteur-croise.utils';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import { StatutMembre } from '../../services/avecetat/etat/types-donnees';
+import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/types-donnees';
 import type {
   Annotation,
   EntreeJournal,
@@ -154,6 +155,13 @@ interface LigneMembre {
   readonly inconnu: boolean;
   /** Gravité de l'alerte associée (RG-010), présente uniquement si {@link inconnu}. */
   readonly graviteAlerte: GraviteAlerteMembreInconnu | undefined;
+  /**
+   * Critère par défaut proposé pour pré-remplir le formulaire de création d'une règle de membre connu (lien
+   * « Qualifier ce membre »), présent uniquement pour un membre réellement `inconnu` : un membre en `conflit` doit
+   * plutôt être orienté vers la liste des règles existantes du groupe (cf. gabarit), aucune création n'étant
+   * pertinente par défaut dans ce cas.
+   */
+  readonly critereParDefautQualification: { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
 }
 
 /**
@@ -1042,6 +1050,46 @@ export class SqmFicheProjetComponent {
       graviteAlerte: inconnu
         ? StatutMembreUtils.calculerGraviteAlerteMembreInconnu(membre.niveauAcces)
         : undefined,
+      critereParDefautQualification:
+        resolution.type === 'inconnu' ? this.calculerCritereParDefautQualification(membre) : undefined,
+    };
+  }
+
+  /**
+   * Calcule le critère par défaut à proposer pour qualifier un membre inconnu (lien « Qualifier ce membre ») :
+   * domaine de son email public s'il en dispose (partie suivant le premier `@`), sinon son username.
+   * @param membre - Membre du dépôt constaté.
+   * @returns Le critère par défaut et son type.
+   */
+  private calculerCritereParDefautQualification(membre: MembreGitlab): {
+    type: TypeCritereMembre;
+    valeur: string;
+  } {
+    const email = membre.emailPublic;
+    const indexArobase = email !== undefined ? email.indexOf('@') : -1;
+    if (email !== undefined && indexArobase >= 0) {
+      return { type: TypeCritereMembre.DomaineEmail, valeur: email.slice(indexArobase + 1) };
+    }
+    return { type: TypeCritereMembre.Username, valeur: membre.username };
+  }
+
+  /**
+   * Construit les paramètres de requête du lien « Qualifier ce membre », qui ouvre l'écran Administration
+   * directement sur le sous-onglet Membres connus du groupe de rattachement, avec le formulaire de création
+   * pré-rempli si {@link LigneMembre.critereParDefautQualification} est présent (membre `inconnu`) ou avec la
+   * seule liste des règles existantes sinon (membre en `conflit`, cf. commentaire de ce champ).
+   * @param groupeId - Identifiant du groupe de rattachement du projet affiché.
+   * @param membre - Ligne d'affichage du membre concerné.
+   * @returns Les paramètres de requête à transmettre à `routerLink`.
+   */
+  public queryParamsQualification(groupeId: string, membre: LigneMembre): Params {
+    if (membre.critereParDefautQualification === undefined) {
+      return { groupeId };
+    }
+    return {
+      groupeId,
+      typeCritere: membre.critereParDefautQualification.type,
+      critere: membre.critereParDefautQualification.valeur,
     };
   }
 

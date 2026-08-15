@@ -462,14 +462,119 @@ describe('SqmFicheProjetComponent', () => {
     expect(element.querySelector('.fiche-projet__anomalie')).toBeNull();
   });
 
-  it('propose un lien « Qualifier ce membre » vers l’Administration pour un membre inconnu', () => {
-    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
-    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
-    const element = DomTestUtils.obtenirElementNatif(fixture);
-    const lien = element.querySelector('a[href="/administration"]');
-    expect(lien).not.toBeNull();
-    expect(lien?.textContent).toContain('Qualifier ce membre');
-  });
+  it(
+    'propose un lien « Qualifier ce membre » vers Administration, pré-rempli du username faute ' +
+      'd’email public (membre inconnu)',
+    () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const lien = element.querySelector<HTMLAnchorElement>('a[href^="/administration?"]');
+      expect(lien).not.toBeNull();
+      expect(lien?.textContent).toContain('Qualifier ce membre');
+      const params = new URLSearchParams(lien?.getAttribute('href')?.split('?')[1]);
+      expect(params.get('groupeId')).toBe('groupe-1');
+      expect(params.get('typeCritere')).toBe('username');
+      expect(params.get('critere')).toBe('inconnu1');
+    },
+  );
+
+  it(
+    'pré-remplit le lien « Qualifier ce membre » avec le domaine de l’email public plutôt que le ' +
+      'username, quand le membre inconnu en dispose',
+    () => {
+      const audit = DonneesDeTest.auditComplet({});
+      const projet = DonneesDeTest.projet('projet-1', [
+        {
+          ...audit,
+          resultats: audit.resultats.map((resultat) =>
+            resultat.type === 'gitlab.membres'
+              ? {
+                  ...resultat,
+                  membres: resultat.membres.map((membre) =>
+                    membre.username === 'inconnu1'
+                      ? { ...membre, emailPublic: 'inconnu1@exemple.fr' }
+                      : membre,
+                  ),
+                }
+              : resultat,
+          ),
+        },
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const lien = element.querySelector<HTMLAnchorElement>('a[href^="/administration?"]');
+      const params = new URLSearchParams(lien?.getAttribute('href')?.split('?')[1]);
+      expect(params.get('typeCritere')).toBe('domaineEmail');
+      expect(params.get('critere')).toBe('exemple.fr');
+    },
+  );
+
+  it(
+    'ne pré-remplit pas le lien « Qualifier ce membre » pour un membre en conflit de règles : seul le ' +
+      'groupe est transmis, pour orienter vers la liste des règles existantes plutôt qu’une création',
+    () => {
+      const audit = DonneesDeTest.auditComplet({});
+      const projet = DonneesDeTest.projet('projet-1', [
+        {
+          ...audit,
+          resultats: audit.resultats.map((resultat) =>
+            resultat.type === 'gitlab.membres'
+              ? {
+                  ...resultat,
+                  membres: [
+                    ...resultat.membres,
+                    {
+                      username: 'conflit1',
+                      nom: 'Conflit Un',
+                      niveauAcces: 40,
+                      herite: false,
+                      emailPublic: 'conflit1@exemple.fr',
+                    },
+                  ],
+                }
+              : resultat,
+          ),
+        },
+      ]);
+      const racineBase = DonneesDeTest.racine(projet);
+      const racine: DonneesRacine = {
+        ...racineBase,
+        groupes: racineBase.groupes.map((groupe) => ({
+          ...groupe,
+          membresConnus: [
+            ...groupe.membresConnus,
+            {
+              id: 'membre-connu-email',
+              critere: 'conflit1@exemple.fr',
+              typeCritere: TypeCritereMembre.Email,
+              statut: StatutMembre.Interne,
+            },
+            {
+              id: 'membre-connu-alias',
+              critere: 'quelquun',
+              typeCritere: TypeCritereMembre.Username,
+              statut: StatutMembre.Client,
+              aliasEmail: 'conflit1@exemple.fr',
+            },
+          ],
+        })),
+      };
+      const fixture = creerFixture('projet-1', racine);
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const liens = Array.from(
+        element.querySelectorAll<HTMLAnchorElement>('a[href^="/administration?"]'),
+      );
+      const lienConflit = liens.find((lien) => {
+        const params = new URLSearchParams(lien.getAttribute('href')?.split('?')[1]);
+        return !params.has('critere');
+      });
+      expect(lienConflit).toBeDefined();
+      const params = new URLSearchParams(lienConflit?.getAttribute('href')?.split('?')[1]);
+      expect(params.get('groupeId')).toBe('groupe-1');
+      expect(params.has('typeCritere')).toBe(false);
+    },
+  );
 
   it(
     'câble un lien vers la Comparaison entre deux audits (US-018, `ecrans/comparaison-audits/`) sans ' +

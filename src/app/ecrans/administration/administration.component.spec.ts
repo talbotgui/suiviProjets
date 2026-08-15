@@ -23,4 +23,19 @@ describe('SqmAdministrationComponent', () => {
 
     expect(composant.ongletActif).toBe(onglet);
   });
+
+  it(
+    'expose groupeId/critere/typeCritere (paramètres de requête du lien « Qualifier ce membre » de la ' +
+      'Fiche projet) pour relais vers Groupes/Membres connus',
+    () => {
+      const fixture = TestBed.createComponent(SqmAdministrationComponent);
+      fixture.componentRef.setInput('groupeId', 'groupe-1');
+      fixture.componentRef.setInput('critere', 'exemple.fr');
+      fixture.componentRef.setInput('typeCritere', 'domaineEmail');
+
+      expect(fixture.componentInstance.groupeId()).toBe('groupe-1');
+      expect(fixture.componentInstance.critere()).toBe('exemple.fr');
+      expect(fixture.componentInstance.typeCritere()).toBe('domaineEmail');
+    },
+  );
 });

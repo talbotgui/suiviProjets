@@ -9,7 +9,13 @@
 // navigation, est construit depuis la Phase 10, incrément 8 (C10-04, US-019 mis à jour) : porté par
 // `SqmAnnotationsGroupeAdminComponent`, lui-même troisième sous-onglet de `SqmGroupesAdminComponent` (aux côtés de
 // Groupes et Membres connus), et non par cet écran directement.
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+//
+// Paramètres de requête `groupeId`/`critere`/`typeCritere` (`withComponentInputBinding()`, `app.config.ts`) ajoutés
+// pour le seul besoin du lien « Qualifier ce membre » de la Fiche projet (`fiche-projet.component.ts`) : relayés
+// tels quels vers `SqmGroupesAdminComponent`, qui porte la présélection du groupe et du sous-onglet Membres
+// connus. Aucun effet local ici : l'onglet par défaut de cet écran est déjà « groupes ».
+import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import type { InputSignal } from '@angular/core';
 import { SqmGroupesAdminComponent } from './groupes/groupes-admin.component';
 import { SqmProjetsAdminComponent } from './projets/projets-admin.component';
 import { SqmSourcesAdminComponent } from './sources/sources-admin.component';
@@ -31,6 +37,23 @@ type OngletAdministration = 'groupes' | 'projets' | 'sources';
   styleUrl: './administration.component.scss',
 })
 export class SqmAdministrationComponent {
+  /**
+   * Identifiant du groupe à présélectionner dans le sous-onglet Membres connus, lié au paramètre de requête
+   * homonyme (cf. commentaire d'en-tête). Absent hors navigation depuis la Fiche projet.
+   */
+  public readonly groupeId: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Critère à pré-remplir dans le formulaire de création d'une règle de membre connu, lié au paramètre de requête
+   * homonyme. Absent si aucun pré-remplissage n'est demandé (cf. commentaire d'en-tête).
+   */
+  public readonly critere: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Type du critère à pré-remplir, lié au paramètre de requête homonyme. Cf. {@link critere}.
+   */
+  public readonly typeCritere: InputSignal<string | undefined> = input<string>();
+
   /**
    * Onglet actuellement affiché.
    */

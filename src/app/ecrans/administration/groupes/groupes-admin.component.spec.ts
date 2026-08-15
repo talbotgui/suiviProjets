@@ -206,4 +206,27 @@ describe('SqmGroupesAdminComponent', () => {
     expect(composant.groupes()).toHaveLength(1);
     expect(composant.groupeASupprimerId).toBeNull();
   });
+
+  describe(
+    'présélection du sous-onglet Membres connus (lien « Qualifier ce membre » de la Fiche projet, relayé ' +
+      'depuis SqmAdministrationComponent)',
+    () => {
+      it('bascule sur Membres connus dès que groupeIdPreselectionne est renseigné', () => {
+        const fixture = TestBed.createComponent(SqmGroupesAdminComponent);
+        fixture.componentRef.setInput('groupeIdPreselectionne', 'groupe-1');
+
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.sousOngletActif).toBe('membresConnus');
+      });
+
+      it("n'affecte pas le sous-onglet par défaut quand aucun groupe n'est présélectionné", () => {
+        const fixture = TestBed.createComponent(SqmGroupesAdminComponent);
+
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.sousOngletActif).toBe('groupes');
+      });
+    },
+  );
 });
