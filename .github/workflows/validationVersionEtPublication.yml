@@ -55,6 +55,15 @@ jobs:
       - name: Sélection de la toolchain Rust (version et composants fixés par rust-toolchain.toml, dont llvm-tools-preview)
         run: rustup show
 
+      - name: Installation de Python (version fixée par .python-version, site documentaire MkDocs)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: '.python-version'
+          cache: 'pip'
+
+      - name: Installation des dépendances Python verrouillées (site documentaire)
+        run: pip install -r requirements.txt
+
       - name: Configuration de l'identité Git des commits automatiques
         run: |
           git config user.name "github-actions[bot]"
@@ -138,30 +147,21 @@ jobs:
       - name: Génération de la documentation technique Angular/TypeScript (Compodoc)
         run: npm run doc
 
-      - name: Assemblage du site de rapports combiné (couverture de code et documentation technique, Rust/TypeScript)
+      # Site documentaire (MkDocs + Material), portail principal du domaine publié (page de présentation, méthode de
+      # construction, arborescence complète de docs/, page de qualité renvoyant vers les rapports ci-dessous) : cf.
+      # docs/02_documentation/18_pic.md#mise-en-place-du-pipeline. Généré dans un répertoire à part (`site-doc`),
+      # distinct de `site-rapports` déjà en cours de constitution par les étapes précédentes (cargo-llvm-cov ci-dessus
+      # a déjà commencé à y écrire), pour ne pas subir le nettoyage automatique du répertoire de sortie par MkDocs.
+      - name: Génération du site documentaire (MkDocs + Material)
+        run: mkdocs build -d "$GITHUB_WORKSPACE/site-doc"
+
+      - name: Assemblage du site de rapports combiné (site documentaire, couverture de code et documentation technique)
         run: |
           mkdir -p site-rapports/documentation
           cp -r coverage site-rapports/couverture/ts
           cp -r documentation site-rapports/documentation/ts
           cp -r src-tauri/target/doc site-rapports/documentation/rust
-          cat > site-rapports/index.html <<'EOF'
-          <!doctype html>
-          <html lang="fr">
-          <head><meta charset="utf-8"><title>Rapports — Suivi Qualimétrie</title></head>
-          <body>
-            <h1>Couverture de code</h1>
-            <ul>
-              <li><a href="couverture/rust/html/index.html">Cœur natif (Rust, cargo-llvm-cov)</a></li>
-              <li><a href="couverture/ts/index.html">Interface (Angular/TypeScript, Jest/Istanbul)</a></li>
-            </ul>
-            <h1>Documentation technique</h1>
-            <ul>
-              <li><a href="documentation/rust/suivi_qualimetrie_lib/index.html">Cœur natif (Rust, rustdoc)</a></li>
-              <li><a href="documentation/ts/index.html">Interface (Angular/TypeScript, Compodoc)</a></li>
-            </ul>
-          </body>
-          </html>
-          EOF
+          cp -r site-doc/. site-rapports/
 
       - name: Archivage du site de rapports (consommé par le job de publication sur GitHub Pages)
         uses: actions/upload-artifact@v4

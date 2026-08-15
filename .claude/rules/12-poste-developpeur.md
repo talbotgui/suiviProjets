@@ -9,6 +9,7 @@ Synthèse actionnable de [17_posteDeveloppeur.md](../../docs/02_documentation/17
 - Test de bout en bout (Phase 12) : `npm run test:e2e` (Playwright, démarre `ng serve` automatiquement via `webServer`) ; résultats et captures d'écran dans `e2e/test-output/` (strictement local, jamais committé).
 - Build : `npm run tauri build` (build de production, packaging natif du poste courant) ; `cargo build --locked`/`cargo check --locked` pour vérifier la seule compilation Rust ([source](../../docs/02_documentation/17_posteDeveloppeur.md#commandes-de-build)). Le build multiplateforme est produit par la CI, pas en local.
 - Documentation technique : `npm run doc` ([Compodoc](https://compodoc.app/), Angular/TypeScript) ; `cargo doc --locked --no-deps --open` (rustdoc, cœur natif Rust — outil standard de la toolchain, pas d'équivalent tiers nécessaire) ; les deux publiés sur GitHub Pages à chaque publication, aux côtés de la couverture de code ([source](../../docs/02_documentation/17_posteDeveloppeur.md#commandes-de-documentation-technique)).
+- Site documentaire (MkDocs + Material, portail principal du domaine publié) : `pip install -r requirements.txt` puis `mkdocs serve` (prévisualisation locale, rechargement à chaud) ou `mkdocs build` (sortie statique dans `site/`) ; distinct de la documentation technique ci-dessus.
 
 ## Variables d'environnement
 
@@ -21,8 +22,8 @@ Synthèse actionnable de [17_posteDeveloppeur.md](../../docs/02_documentation/17
 ## Éditeur et outillage
 
 - VS Code est l'éditeur de référence ; extensions déclarées dans `.vscode/extensions.json` ([source](../../docs/02_documentation/17_posteDeveloppeur.md#utilisation-de-vs-code)).
-- Toolchain figée : version Rust/composants par `rust-toolchain.toml`, version Node.js par `.nvmrc`.
-- Toute dépendance installée en mode strict (`npm ci`, `cargo build --locked`), jamais `npm install`/`cargo build` seul.
+- Toolchain figée : version Rust/composants par `rust-toolchain.toml`, version Node.js par `.nvmrc`, version Python par `.python-version` (site documentaire uniquement).
+- Toute dépendance installée en mode strict (`npm ci`, `cargo build --locked`, `pip install -r requirements.txt`), jamais `npm install`/`cargo build` seul.
 - Formatage/analyse statique (rustfmt, Clippy, Prettier, ESLint) : cf. [09-normes-developpement.md#qualité-de-code](./09-normes-developpement.md#qualité-de-code).
 
 ## Traçabilité des échanges avec l'IA

@@ -1,0 +1,103 @@
+# Configuration générée avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+# .claude/rules/01-usage-ia-et-conventions.md.
+#
+# Site documentaire (GitHub Pages) du dépôt, cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline.
+# docs_dir pointe directement sur le répertoire ./docs, source de vérité unique du projet (aucune copie), afin que
+# les très nombreux liens relatifs déjà écrits entre les documents (ex. `../02_documentation/...md#ancre`) continuent
+# de fonctionner tels quels : MkDocs les réécrit automatiquement vers les pages générées correspondantes.
+site_name: Suivi Qualimétrie — Documentation
+site_description: Application de suivi de la qualimétrie et de l'obsolescence des dépendances (GitLab/SonarQube).
+site_url: https://me.guillaumetalbot.com/suiviProjets/
+repo_url: https://github.com/talbotgui/suiviProjets
+repo_name: talbotgui/suiviProjets
+edit_uri: ''
+docs_dir: docs
+site_dir: site
+
+# Répertoires de gabarits non fonctionnels (cf. docs/02_documentation/14_normesDeveloppement.md#structuration-du-code-et-découpage-en-couches)
+# et artefacts bruts du dossier de besoin (fichier de maquette propriétaire, logique de démonstration, jeu de
+# données d'exemple) exclus du site : ce ne sont pas des documents de référence à publier.
+exclude_docs: |
+  _modèles/
+  01_besoin/Suivi Qualimetrie.dc.html
+  01_besoin/data.js
+  01_besoin/exemple-donnees.json
+
+theme:
+  name: material
+  language: fr
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Basculer en thème sombre
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Basculer en thème clair
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - tables
+  - admonition
+  - attr_list
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+
+nav:
+  - Présentation: index.md
+  - La méthode: methode.md
+  - La documentation:
+      - Cadrage:
+          - Prompt de cadrage initial: '00_init&prompt/00_promptInitial.md'
+          - Prompt de développement (binôme Codeur/Relecteur): '00_init&prompt/00_promptDeveloppement.md'
+          - Notes d'initialisation du dépôt: '00_init&prompt/00_init.md'
+      - Expression de besoin:
+          - Handoff (maquettes et spécification): 01_besoin/README.md
+          - Spécification fonctionnelle et technique: 01_besoin/Specification.md
+      - Documentation normative:
+          - Modalités d'usage de l'IA et conventions: 02_documentation/01_modalitesUsageEtConventions.md
+          - Glossaire et journal des décisions: 02_documentation/02_glossaire.md
+          - Réexpression du besoin: 02_documentation/03_expressionBesoin.md
+          - Cas d'usage / user stories: 02_documentation/04_casUsage.md
+          - Règles de gestion métier: 02_documentation/05_reglesGestion.md
+          - Parcours utilisateurs: 02_documentation/06_parcoursUtilisateurs.md
+          - Exigences non fonctionnelles: 02_documentation/07_exigencesNonFonctionnelles.md
+          - Arborescence des écrans et navigation: 02_documentation/08_arborescenceNavigation.md
+          - Maquettes / wireframes: 02_documentation/09_maquettes.md
+          - Charte d'ergonomie: 02_documentation/10_charteErgonomie.md
+          - Architecture technique: 02_documentation/11_architectureTechnique.md
+          - Modèle de données: 02_documentation/12_modeleDonnees.md
+          - Conception détaillée: 02_documentation/13_conceptionDetaillee.md
+          - Normes de développement: 02_documentation/14_normesDeveloppement.md
+          - Normes de sécurité applicative: 02_documentation/15_normesSecurite.md
+          - Normes de tests automatisés: 02_documentation/16_normesTests.md
+          - Poste développeur: 02_documentation/17_posteDeveloppeur.md
+          - Intégration continue (PIC): 02_documentation/18_pic.md
+          - Environnement de production: 02_documentation/19_environnementProduction.md
+          - Guide utilisateur: 02_documentation/20_guideUtilisateur.md
+      - Plans de mise en place:
+          - "Étape 1 — Modalités d'usage de l'IA et glossaire": 03_plan/plan_01_miseEnPlace.md
+          - Étape 9 — Normes de développement: 03_plan/plan_09_normesDeveloppement.md
+          - Étape 10 — Normes de sécurité: 03_plan/plan_10_normesSecurite.md
+          - Étape 11 — Normes de tests: 03_plan/plan_11_normesTests.md
+          - Étape 12 — Environnements et intégration continue: 03_plan/plan_12_environnementsEtCI.md
+          - Plan de développement (15 phases): 03_plan/plan_13_developpement.md
+      - Rapports:
+          - Rapport de développement (Codeur / Relecteur): 04_rapports/rapportDeDeveloppement.md
+  - Qualité et téléchargements: qualite.md

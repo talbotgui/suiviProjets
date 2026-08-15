@@ -12,6 +12,14 @@
 /node_modules/
 /yarn.lock
 
+# Site documentaire (MkDocs) : sortie de build locale, environnement virtuel Python et caches associés
+/site/
+/site-doc/
+/site-rapports/
+/.venv/
+__pycache__/
+*.pyc
+
 # Rust / Tauri build artefacts
 /src-tauri/target/
 # Schémas générés par la CLI Tauri (ex. lors de l'ajout de plugins) : artefacts régénérables, jamais suivis.

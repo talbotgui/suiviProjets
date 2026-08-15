@@ -22,8 +22,8 @@ Synthèse actionnable de [14_normesDeveloppement.md](../../docs/02_documentation
 
 ## Dépendances
 
-- Lockfiles (`Cargo.lock`, `package-lock.json`) toujours committés ; installation stricte via `cargo build --locked`/`npm ci`, jamais `cargo build`/`npm install` seul ([source](../../docs/02_documentation/14_normesDeveloppement.md#gestion-des-dépendances)).
-- Toolchain figée par `rust-toolchain.toml` et `.nvmrc` versionnés.
+- Lockfiles (`Cargo.lock`, `package-lock.json`) toujours committés ; installation stricte via `cargo build --locked`/`npm ci`, jamais `cargo build`/`npm install` seul ([source](../../docs/02_documentation/14_normesDeveloppement.md#gestion-des-dépendances)). Côté Python (site documentaire MkDocs uniquement), `requirements.txt` épingle chaque version exacte (`==`), installation via `pip install -r requirements.txt`.
+- Toolchain figée par `rust-toolchain.toml`, `.nvmrc` et `.python-version` versionnés.
 - Aucune mise à jour automatique de dépendance ; changelog lu avant toute montée de version majeure. Toute nouvelle dépendance est justifiée dans le commit qui l'introduit.
 
 ## Qualité de code

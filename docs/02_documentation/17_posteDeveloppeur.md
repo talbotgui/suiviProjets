@@ -21,6 +21,7 @@
 | Système d'exploitation | Windows, macOS ou Linux — les trois plateformes de développement sont équivalentes, cohérent avec la portabilité visée par [RNF-021](./07_exigencesNonFonctionnelles.md#portabilité-et-environnements-cibles) |
 | [Node.js](https://nodejs.org/) | Version fixée par `.nvmrc` (action tracée à l'étape 9, cf. [gestion des dépendances](./14_normesDeveloppement.md#gestion-des-dépendances)) |
 | [Rust](https://www.rust-lang.org/) (via [rustup](https://rustup.rs/)) | Version et composants (`rustfmt`, `clippy`) fixés par `rust-toolchain.toml` (action tracée à l'étape 9, cf. [gestion des dépendances](./14_normesDeveloppement.md#gestion-des-dépendances)) |
+| [Python](https://www.python.org/) | Version fixée par `.python-version` ; nécessaire uniquement à la génération locale du [site documentaire](#commandes-de-documentation-technique) (MkDocs), pas au fonctionnement de l'application elle-même |
 | [Tauri CLI](https://tauri.app/reference/cli/) | Nécessaire pour lancer, compiler et empaqueter l'application desktop (cf. [étape 6](./11_architectureTechnique.md#choix-technologiques-structurants)) |
 | Dépendance système du webview | [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) sous Windows (généralement déjà présent), WebKitGTK sous Linux, WebKit natif sous macOS — requis par Tauri pour l'interface embarquée |
 | [Git](https://git-scm.com/) | Nécessaire pour cloner le dépôt et appliquer la [stratégie de branches de l'étape 9](./14_normesDeveloppement.md#stratégie-de-branches-et-de-contribution-git) |
@@ -29,7 +30,7 @@
 
 1. Cloner le dépôt (`https://github.com/talbotgui/suiviProjets`).
 2. Installer Node.js (respectant `.nvmrc`) et Rust via `rustup` (respectant `rust-toolchain.toml`).
-3. Installer les dépendances verrouillées : `npm ci` côté Angular, `cargo build --locked` côté cœur natif (cf. [gestion des dépendances, étape 9](./14_normesDeveloppement.md#gestion-des-dépendances)).
+3. Installer les dépendances verrouillées : `npm ci` côté Angular, `cargo build --locked` côté cœur natif, et, uniquement pour générer le site documentaire en local, `pip install -r requirements.txt` (cf. [gestion des dépendances, étape 9](./14_normesDeveloppement.md#gestion-des-dépendances)).
 4. Installer la Tauri CLI et vérifier la dépendance système du webview correspondant à son poste.
 5. Sur un poste GitHub Codespaces, la configuration `.devcontainer/devcontainer.json` (élément préexistant, cf. [00_init.md](../00_init&prompt/00_init.md)) initialise automatiquement le répertoire de mémoire Claude Code à l'ouverture du Codespace ; sur un poste physique, la commande équivalente documentée dans ce même fichier est exécutée manuellement.
 6. Créer, si nécessaire, un fichier `.env.local` à la racine du dépôt pour y définir les [variables d'environnement locales](#variables-denvironnement) (credentials de test, proxy, etc.), sans jamais le committer.
@@ -96,6 +97,7 @@ Sa mise en place effective (déclaration du hook, création du répertoire `.cla
 - `npm run doc` génère la documentation technique de l'interface Angular/TypeScript avec [Compodoc](https://compodoc.app/) (`compodoc -p tsconfig.app.json -d documentation`), à partir des commentaires TSDoc déjà obligatoires sur toute classe/méthode (cf. [rigueur du typage et de la documentation, étape 9](./14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--typescript)) ; le résultat, exclu du suivi de version, s'ouvre localement via `documentation/index.html`.
 - `cargo doc --locked --no-deps --open` (depuis `src-tauri/`) génère et ouvre la documentation technique du cœur natif Rust avec [rustdoc](https://doc.rust-lang.org/rustdoc/), outil standard livré avec la toolchain Rust : aucun équivalent tiers de Compodoc n'est nécessaire côté Rust. Générée à partir des commentaires Rustdoc (`///`) déjà obligatoires sur tout élément public (cf. [rigueur du typage et de la documentation, étape 9](./14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--rust)) ; `--no-deps` exclut la documentation des dépendances, limitant le résultat au seul code de ce dépôt.
 - Ces deux rapports sont régénérés et publiés sur GitHub Pages à chaque exécution du workflow de publication, aux côtés des rapports de couverture de code (cf. [mise en place du pipeline, étape 12](./18_pic.md#mise-en-place-du-pipeline)).
+- Le [site documentaire](../../mkdocs.yml) (présentation, méthode de construction, arborescence complète de `docs/`, page de qualité), distinct de la documentation technique ci-dessus, se prévisualise en local avec `mkdocs serve` (rechargement à chaud, `http://127.0.0.1:8000/` par défaut) une fois les [dépendances Python installées](#étapes-dinstallation) ; `mkdocs build` en produit une version statique dans `site/` (exclu du suivi de version), sans passer par le pipeline.
 
 ## Résolution des problèmes courants
 
