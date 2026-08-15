@@ -32,7 +32,7 @@ use crate::modele::racine::{
 };
 use regex::Regex;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Portée minimale en lecture seule recommandée par l'assistant de création de token
 /// (`docs/01_besoin/Specification.md#52-f02--gestion-des-credentials-et-assistant-de-création`, à titre indicatif) :
@@ -1291,14 +1291,87 @@ fn nom_element_xml(nom_qualifie: &[u8]) -> String {
     String::from_utf8_lossy(nom_qualifie).into_owned()
 }
 
-/// Parseur best-effort d'un manifeste `pom.xml` (Maven, périmètre V1 cf. en-tête de module) : extrait les
-/// dépendances directement déclarées sous `<project><dependencies><dependency>`, en ignorant délibérément tout
-/// contenu de `<dependencyManagement>` (versions gérées, pas des dépendances effectivement déclarées) ainsi que
-/// toute dépendance sans `<version>` explicite (héritée d'un parent ou d'une BOM, non résolvable sans télécharger
-/// le POM parent, hors périmètre V1). Un XML malformé ne fait jamais échouer l'audit : l'analyse s'arrête et
-/// retourne les dépendances déjà extraites avant le point de rupture (algorithme figé, cf. rapport de développement
-/// de cette phase).
-fn parser_pom_xml(contenu: &str) -> Vec<Dependance> {
+/// Représentation brute (non résolue) d'un manifeste `pom.xml`, obtenue par [`parser_pom_xml_brut`] avant toute
+/// résolution de la chaîne de parents ou des properties Maven (cf. [`resoudre_dependances_pom`]). Distincte de
+/// [`Dependance`] (type de sortie final, inchangé par cette résolution).
+#[derive(Debug, Clone, Default)]
+struct PomBrut {
+    /// `<project><groupId>` déclaré directement dans ce pom (jamais hérité en soi ; `None` si absent, auquel cas
+    /// hérité du `<parent>` le cas échéant, cf. [`fusionner_properties`]).
+    group_id: Option<String>,
+    /// `<project><artifactId>`. Jamais hérité en Maven, `Option` uniquement par robustesse best-effort.
+    artifact_id: Option<String>,
+    /// `<project><version>` déclarée directement dans ce pom (`None` si absente, auquel cas héritée du `<parent>`
+    /// le cas échéant).
+    version: Option<String>,
+    /// `<project><parent>`, `None` si absent.
+    parent: Option<ParentBrut>,
+    /// `<project><properties>` déclarées localement, clé -> valeur littérale non résolue.
+    properties: HashMap<String, String>,
+    /// `<project><dependencyManagement><dependencies><dependency>` déclarées localement (versions potentiellement
+    /// encore des tokens `${...}` non substitués à ce stade).
+    gestion_dependances: Vec<DependanceBrute>,
+    /// `<project><dependencies><dependency>` déclarées localement, hors `dependencyManagement`.
+    dependances: Vec<DependanceBrute>,
+}
+
+/// Coordonnées et localisation du `<parent>` d'un [`PomBrut`].
+#[derive(Debug, Clone, Default)]
+struct ParentBrut {
+    group_id: String,
+    artifact_id: String,
+    version: String,
+    /// Texte littéral de `<relativePath>` si l'élément est présent (peut être une chaîne vide) ; `None` si
+    /// l'élément est totalement absent — dans ce cas la valeur par défaut Maven `../pom.xml` est appliquée au
+    /// moment de la résolution ([`construire_chaine_parents`]), pas ici.
+    chemin_relatif: Option<String>,
+}
+
+/// Une `<dependency>` (directe ou gérée) telle qu'écrite dans le XML, avant résolution de sa version.
+#[derive(Debug, Clone, Default)]
+struct DependanceBrute {
+    group_id: Option<String>,
+    artifact_id: Option<String>,
+    /// Version littérale, potentiellement un token `${...}` ; `None` si l'élément `<version>` est absent.
+    version: Option<String>,
+}
+
+/// Cible d'une `<dependency>` capturée lors du parsing, déterminée à l'ouverture de l'élément selon la profondeur
+/// de `<dependencyManagement>` courante : directement déclarée sous `<dependencies>`, ou gérée sous
+/// `<dependencyManagement><dependencies>` (capturée mais jamais traitée comme une dépendance effective, cf.
+/// [`resoudre_dependances_pom`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CibleDependance {
+    Directe,
+    Geree,
+}
+
+/// Champ scalaire actuellement capturé (texte de l'élément XML en cours) par [`parser_pom_xml_brut`], en dehors du
+/// cas particulier d'une property (dont la clé est le nom de balise lui-même).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChampActif {
+    ProjetGroupId,
+    ProjetArtifactId,
+    ProjetVersion,
+    ParentGroupId,
+    ParentArtifactId,
+    ParentVersion,
+    ParentCheminRelatif,
+    DependanceGroupId,
+    DependanceArtifactId,
+    DependanceVersion,
+}
+
+/// Parseur best-effort d'un manifeste `pom.xml` (Maven) : extrait la structure brute non résolue du pom (identité
+/// du projet, `<parent>`, `<properties>`, `<dependencyManagement>` et `<dependencies>`), sans tenter aucune
+/// résolution de property ni de chaîne de parents — cette résolution est faite séparément par
+/// [`resoudre_dependances_pom`], qui a besoin de connaître les autres pom.xml du dépôt (cf.
+/// [`interroger_dependances`]). Un XML malformé ne fait jamais échouer l'audit : l'analyse s'arrête et retourne la
+/// structure déjà remplie avant le point de rupture (algorithme figé, cf. rapport de développement de cette
+/// phase). Limite assumée, inchangée par rapport au parseur précédent : un `<properties>`/`<dependencies>` niché
+/// ailleurs que directement sous `<project>`/`<parent>` (ex. dans un `<profile>`) est capturé de la même façon peu
+/// discriminante qu'un bloc de premier niveau.
+fn parser_pom_xml_brut(contenu: &str) -> PomBrut {
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
 
@@ -1307,36 +1380,69 @@ fn parser_pom_xml(contenu: &str) -> Vec<Dependance> {
 
     let mut pile: Vec<String> = Vec::new();
     let mut profondeur_gestion_dependances = 0u32;
-    let mut dependance_courante: Option<(Option<String>, Option<String>, Option<String>)> = None;
-    let mut champ_actif: Option<&'static str> = None;
+    let mut pom = PomBrut::default();
+    let mut parent_courant: Option<ParentBrut> = None;
+    let mut dependance_courante: Option<DependanceBrute> = None;
+    let mut cible_dependance_courante: Option<CibleDependance> = None;
+    let mut champ_actif: Option<ChampActif> = None;
+    let mut property_active: Option<String> = None;
     let mut texte_courant = String::new();
-    let mut dependances = Vec::new();
 
     loop {
         match lecteur.read_event() {
             Ok(Event::Start(element)) => {
                 let nom = nom_element_xml(element.name().as_ref());
                 let parent = pile.last().map(String::as_str);
+
                 if nom == "dependencyManagement" {
                     profondeur_gestion_dependances += 1;
                 }
-                if profondeur_gestion_dependances == 0
-                    && nom == "dependency"
-                    && parent == Some("dependencies")
-                {
-                    dependance_courante = Some((None, None, None));
+
+                if nom == "dependency" && parent == Some("dependencies") {
+                    dependance_courante = Some(DependanceBrute::default());
+                    cible_dependance_courante = Some(if profondeur_gestion_dependances > 0 {
+                        CibleDependance::Geree
+                    } else {
+                        CibleDependance::Directe
+                    });
                 }
-                champ_actif = if profondeur_gestion_dependances == 0 && parent == Some("dependency")
-                {
+
+                if nom == "parent" && parent == Some("project") {
+                    parent_courant = Some(ParentBrut::default());
+                }
+
+                champ_actif = if parent == Some("project") {
                     match nom.as_str() {
-                        "groupId" => Some("groupId"),
-                        "artifactId" => Some("artifactId"),
-                        "version" => Some("version"),
+                        "groupId" => Some(ChampActif::ProjetGroupId),
+                        "artifactId" => Some(ChampActif::ProjetArtifactId),
+                        "version" => Some(ChampActif::ProjetVersion),
+                        _ => None,
+                    }
+                } else if parent == Some("parent") {
+                    match nom.as_str() {
+                        "groupId" => Some(ChampActif::ParentGroupId),
+                        "artifactId" => Some(ChampActif::ParentArtifactId),
+                        "version" => Some(ChampActif::ParentVersion),
+                        "relativePath" => Some(ChampActif::ParentCheminRelatif),
+                        _ => None,
+                    }
+                } else if parent == Some("dependency") {
+                    match nom.as_str() {
+                        "groupId" => Some(ChampActif::DependanceGroupId),
+                        "artifactId" => Some(ChampActif::DependanceArtifactId),
+                        "version" => Some(ChampActif::DependanceVersion),
                         _ => None,
                     }
                 } else {
                     None
                 };
+
+                property_active = if parent == Some("properties") {
+                    Some(nom.clone())
+                } else {
+                    None
+                };
+
                 pile.push(nom);
                 texte_courant.clear();
             }
@@ -1347,32 +1453,79 @@ fn parser_pom_xml(contenu: &str) -> Vec<Dependance> {
             }
             Ok(Event::End(element)) => {
                 let nom = nom_element_xml(element.name().as_ref());
-                if let (Some(champ), Some((groupe, artefact, version))) =
-                    (champ_actif, dependance_courante.as_mut())
-                {
+                let valeur = texte_courant.trim().to_string();
+
+                if let Some(champ) = champ_actif {
                     match champ {
-                        "groupId" => *groupe = Some(texte_courant.trim().to_string()),
-                        "artifactId" => *artefact = Some(texte_courant.trim().to_string()),
-                        "version" => *version = Some(texte_courant.trim().to_string()),
-                        _ => {}
+                        ChampActif::ProjetGroupId => pom.group_id = Some(valeur.clone()),
+                        ChampActif::ProjetArtifactId => pom.artifact_id = Some(valeur.clone()),
+                        ChampActif::ProjetVersion => pom.version = Some(valeur.clone()),
+                        ChampActif::ParentGroupId => {
+                            if let Some(p) = parent_courant.as_mut() {
+                                p.group_id = valeur.clone();
+                            }
+                        }
+                        ChampActif::ParentArtifactId => {
+                            if let Some(p) = parent_courant.as_mut() {
+                                p.artifact_id = valeur.clone();
+                            }
+                        }
+                        ChampActif::ParentVersion => {
+                            if let Some(p) = parent_courant.as_mut() {
+                                p.version = valeur.clone();
+                            }
+                        }
+                        ChampActif::ParentCheminRelatif => {
+                            if let Some(p) = parent_courant.as_mut() {
+                                p.chemin_relatif = Some(valeur.clone());
+                            }
+                        }
+                        ChampActif::DependanceGroupId => {
+                            if let Some(d) = dependance_courante.as_mut() {
+                                d.group_id = Some(valeur.clone());
+                            }
+                        }
+                        ChampActif::DependanceArtifactId => {
+                            if let Some(d) = dependance_courante.as_mut() {
+                                d.artifact_id = Some(valeur.clone());
+                            }
+                        }
+                        ChampActif::DependanceVersion => {
+                            if let Some(d) = dependance_courante.as_mut() {
+                                d.version = Some(valeur.clone());
+                            }
+                        }
+                    }
+                } else if let Some(cle) = property_active.as_ref() {
+                    pom.properties.insert(cle.clone(), valeur);
+                }
+
+                if nom == "dependency"
+                    && let (Some(d), Some(cible)) =
+                        (dependance_courante.take(), cible_dependance_courante.take())
+                {
+                    match cible {
+                        CibleDependance::Directe => pom.dependances.push(d),
+                        CibleDependance::Geree => pom.gestion_dependances.push(d),
                     }
                 }
-                if nom == "dependency"
-                    && profondeur_gestion_dependances == 0
-                    && let Some((Some(groupe), Some(artefact), Some(version))) =
-                        dependance_courante.take()
+
+                if nom == "parent"
+                    && let Some(p) = parent_courant.take()
+                    && !p.group_id.is_empty()
+                    && !p.artifact_id.is_empty()
+                    && !p.version.is_empty()
                 {
-                    dependances.push(Dependance {
-                        reference: format!("{groupe}:{artefact}"),
-                        version,
-                        manifeste: "pom.xml".to_string(),
-                    });
+                    pom.parent = Some(p);
                 }
+
                 if nom == "dependencyManagement" && profondeur_gestion_dependances > 0 {
                     profondeur_gestion_dependances -= 1;
                 }
+
                 pile.pop();
                 champ_actif = None;
+                property_active = None;
                 texte_courant.clear();
             }
             Ok(Event::Eof) => break,
@@ -1380,7 +1533,232 @@ fn parser_pom_xml(contenu: &str) -> Vec<Dependance> {
             _ => {}
         }
     }
-    dependances
+
+    pom
+}
+
+/// Résout un `<relativePath>` de `<parent>` (littéral, non vide) en un chemin de dépôt normalisé, relatif à la
+/// racine, par pure manipulation de chaînes (le répertoire du pom.xml courant est déjà connu via son chemin dans
+/// l'arborescence déjà récupérée ; aucun accès disque). Si le dernier composant résolu se termine par `.xml`, il
+/// désigne directement un fichier pom ; sinon `pom.xml` lui est implicitement ajouté (comportement réel de Maven
+/// pour `relativePath`).
+fn resoudre_chemin_parent(chemin_pom_courant: &str, chemin_relatif: &str) -> String {
+    let mut segments: Vec<&str> = chemin_pom_courant.split('/').collect();
+    segments.pop();
+
+    for composant in chemin_relatif.split('/') {
+        match composant {
+            "" | "." => {}
+            ".." => {
+                segments.pop();
+            }
+            autre => segments.push(autre),
+        }
+    }
+
+    if segments
+        .last()
+        .is_some_and(|dernier| dernier.ends_with(".xml"))
+    {
+        segments.join("/")
+    } else {
+        segments.push("pom.xml");
+        segments.join("/")
+    }
+}
+
+/// Profondeur maximale suivie lors de la résolution d'une chaîne de `<parent>` (garde anti-cycle et anti-
+/// dénormalisation) : au-delà, la résolution s'arrête silencieusement, jamais en erreur d'audit.
+const PROFONDEUR_MAX_CHAINE_PARENTS: usize = 10;
+
+/// Reconstitue la chaîne des ancêtres disponibles d'un pom.xml du dépôt, du plus proche au plus lointain, en
+/// suivant `<parent><relativePath>` (ou son défaut Maven `../pom.xml`) résolu via [`resoudre_chemin_parent`].
+/// S'arrête dès que : le pom courant ne déclare pas de `<parent>` ; `<relativePath>` est explicitement vide
+/// (sémantique Maven « résoudre via le dépôt d'artefacts », hors périmètre — traité comme parent introuvable) ; le
+/// chemin résolu ne correspond à aucune entrée de `poms_bruts` (parent hors du dépôt audité, jamais une anomalie) ;
+/// le chemin résolu a déjà été visité (cycle) ; ou [`PROFONDEUR_MAX_CHAINE_PARENTS`] est atteinte.
+fn construire_chaine_parents<'a>(
+    chemin_pom: &str,
+    poms_bruts: &'a HashMap<String, PomBrut>,
+) -> Vec<&'a PomBrut> {
+    let mut chaine = Vec::new();
+    let mut visites: HashSet<String> = HashSet::new();
+    visites.insert(chemin_pom.to_string());
+    let mut chemin_courant = chemin_pom.to_string();
+
+    while chaine.len() < PROFONDEUR_MAX_CHAINE_PARENTS {
+        let Some(pom_courant) = poms_bruts.get(&chemin_courant) else {
+            break;
+        };
+        let Some(parent) = pom_courant.parent.as_ref() else {
+            break;
+        };
+        let relatif = parent.chemin_relatif.as_deref().unwrap_or("../pom.xml");
+        if relatif.is_empty() {
+            break;
+        }
+        let chemin_parent = resoudre_chemin_parent(&chemin_courant, relatif);
+        if visites.contains(&chemin_parent) {
+            break;
+        }
+        let Some(pom_parent) = poms_bruts.get(&chemin_parent) else {
+            break;
+        };
+        chaine.push(pom_parent);
+        visites.insert(chemin_parent.clone());
+        chemin_courant = chemin_parent;
+    }
+
+    chaine
+}
+
+/// Fusionne les `<properties>` d'un pom.xml avec celles de sa chaîne d'ancêtres disponible (résultat de
+/// [`construire_chaine_parents`], du plus proche au plus lointain) — l'enfant l'emporte sur le parent, et un
+/// parent plus proche l'emporte sur un parent plus lointain en cas de clé en conflit — puis complète avec les
+/// properties implicites Maven `project.groupId`/`project.artifactId`/`project.version`, calculées pour ce pom
+/// (héritage de `groupId`/`version` depuis le premier ancêtre de la chaîne qui les déclare, si absents du pom
+/// courant ; `artifactId` n'est en revanche jamais hérité en Maven). Limite assumée : ces properties implicites
+/// sont celles du pom en cours de résolution, jamais recalculées pour chaque ancêtre individuellement lors de la
+/// résolution de son propre `dependencyManagement` — écart mineur face à la sémantique Maven réelle par module,
+/// accepté pour ce périmètre.
+fn fusionner_properties(pom: &PomBrut, chaine_parents: &[&PomBrut]) -> HashMap<String, String> {
+    let mut properties = HashMap::new();
+    for ancetre in chaine_parents.iter().rev() {
+        properties.extend(ancetre.properties.clone());
+    }
+    properties.extend(pom.properties.clone());
+
+    let group_id_effectif = pom.group_id.clone().or_else(|| {
+        chaine_parents
+            .iter()
+            .find_map(|ancetre| ancetre.group_id.clone())
+    });
+    let version_effective = pom.version.clone().or_else(|| {
+        chaine_parents
+            .iter()
+            .find_map(|ancetre| ancetre.version.clone())
+    });
+
+    if let Some(groupe) = group_id_effectif {
+        properties.insert("project.groupId".to_string(), groupe);
+    }
+    if let Some(version) = version_effective {
+        properties.insert("project.version".to_string(), version);
+    }
+    if let Some(artefact) = pom.artifact_id.clone() {
+        properties.insert("project.artifactId".to_string(), artefact);
+    }
+
+    properties
+}
+
+/// Substitue chaque token `${clé}` d'un texte de version par la valeur correspondante trouvée dans `properties`
+/// (correspondance exacte de la clé). Un token dont la clé n'est trouvée dans aucune property de la chaîne de
+/// parents disponible est laissé tel quel, littéralement (décision produit : property non résolue conservée dans
+/// le résultat plutôt que d'exclure la dépendance). Analyse manuelle du texte (recherche de paires `${` / `}`),
+/// sans dépendance regex supplémentaire ; aucune re-substitution récursive de la valeur substituée (pas de
+/// résolution en chaîne de properties imbriquées, hors périmètre).
+fn substituer_properties(texte: &str, properties: &HashMap<String, String>) -> String {
+    let mut resultat = String::with_capacity(texte.len());
+    let mut reste = texte;
+
+    while let Some(debut) = reste.find("${") {
+        resultat.push_str(&reste[..debut]);
+        let apres_ouverture = &reste[debut + 2..];
+        match apres_ouverture.find('}') {
+            Some(fin) => {
+                let cle = &apres_ouverture[..fin];
+                match properties.get(cle) {
+                    Some(valeur) => resultat.push_str(valeur),
+                    None => {
+                        resultat.push_str("${");
+                        resultat.push_str(cle);
+                        resultat.push('}');
+                    }
+                }
+                reste = &apres_ouverture[fin + 1..];
+            }
+            None => {
+                resultat.push_str(&reste[debut..]);
+                return resultat;
+            }
+        }
+    }
+    resultat.push_str(reste);
+
+    resultat
+}
+
+/// Insère dans `gestion` chaque entrée complète (`groupId`/`artifactId`/`version` tous présents) de `entrees`, une
+/// insertion plus tardive écrasant une précédente pour une même coordonnée `(groupId, artifactId)`.
+fn inserer_gestion_dependances(
+    gestion: &mut HashMap<(String, String), String>,
+    entrees: &[DependanceBrute],
+) {
+    for entree in entrees {
+        if let (Some(groupe), Some(artefact), Some(version)) =
+            (&entree.group_id, &entree.artifact_id, &entree.version)
+        {
+            gestion.insert((groupe.clone(), artefact.clone()), version.clone());
+        }
+    }
+}
+
+/// Fusionne le `<dependencyManagement>` d'un pom.xml avec celui de sa chaîne d'ancêtres disponible — l'enfant
+/// l'emporte sur le parent pour une même coordonnée `(groupId, artifactId)` en conflit — puis substitue les tokens
+/// `${...}` de chaque version gérée retenue via les `properties` déjà fusionnées ([`fusionner_properties`]). Une
+/// entrée sans `groupId`/`artifactId`/`version` complets est silencieusement ignorée (best-effort, symétrique à
+/// l'exclusion actuelle d'une dépendance sans version).
+fn fusionner_gestion_dependances(
+    pom: &PomBrut,
+    chaine_parents: &[&PomBrut],
+    properties: &HashMap<String, String>,
+) -> HashMap<(String, String), String> {
+    let mut gestion: HashMap<(String, String), String> = HashMap::new();
+
+    for ancetre in chaine_parents.iter().rev() {
+        inserer_gestion_dependances(&mut gestion, &ancetre.gestion_dependances);
+    }
+    inserer_gestion_dependances(&mut gestion, &pom.gestion_dependances);
+
+    gestion
+        .into_iter()
+        .map(|(cle, version)| (cle, substituer_properties(&version, properties)))
+        .collect()
+}
+
+/// Produit les [`Dependance`] finales d'un pom.xml à partir de sa forme brute et de la chaîne de ses ancêtres
+/// disponibles déjà résolue ([`construire_chaine_parents`], éventuellement vide pour un pom sans parent ou dont le
+/// parent n'est pas dans le dépôt audité). Pour chaque `<dependency>` directement déclarée du pom (jamais celles
+/// de `dependencyManagement` lui-même, portée V1 préservée) : ignore silencieusement toute entrée sans
+/// `groupId`/`artifactId` ; retient la version littérale si déclarée, sinon celle du `dependencyManagement`
+/// fusionné pour la même coordonnée, sinon exclut silencieusement la dépendance (aucune version déterminable,
+/// comportement V1 préservé) ; substitue enfin les tokens `${...}` de la version retenue (token non résolu laissé
+/// littéral, cf. [`substituer_properties`]).
+fn resoudre_dependances_pom(pom: &PomBrut, chaine_parents: &[&PomBrut]) -> Vec<Dependance> {
+    let properties = fusionner_properties(pom, chaine_parents);
+    let gestion = fusionner_gestion_dependances(pom, chaine_parents, &properties);
+
+    pom.dependances
+        .iter()
+        .filter_map(|dependance| {
+            let (Some(groupe), Some(artefact)) = (
+                dependance.group_id.as_ref(),
+                dependance.artifact_id.as_ref(),
+            ) else {
+                return None;
+            };
+            let version_brute = dependance
+                .version
+                .clone()
+                .or_else(|| gestion.get(&(groupe.clone(), artefact.clone())).cloned())?;
+            Some(Dependance {
+                reference: format!("{groupe}:{artefact}"),
+                version: substituer_properties(&version_brute, &properties),
+                manifeste: "pom.xml".to_string(),
+            })
+        })
+        .collect()
 }
 
 /// Parseur d'un manifeste `package.json` (npm, périmètre V1 cf. en-tête de module) : extrait les dépendances de
@@ -1441,6 +1819,15 @@ fn parser_build_gradle(contenu: &str) -> Vec<Dependance> {
 /// auditée (même algorithme paginé que [`interroger_marqueurs_ia`]), retient les fichiers dont le basename
 /// correspond à un manifeste reconnu, lit leur contenu brut puis les parse avec le module dédié à leur écosystème.
 /// L'absence de tout manifeste dans le dépôt n'est jamais une anomalie : `dependances` est alors simplement vide.
+///
+/// Pour l'écosystème Maven, le traitement se fait en deux passes : tous les `pom.xml` du dépôt sont d'abord parsés
+/// en forme brute non résolue ([`parser_pom_xml_brut`]), puis chacun est résolu ([`resoudre_dependances_pom`]) en
+/// tenant compte de sa chaîne de `<parent>` disponible parmi les autres `pom.xml` déjà parsés
+/// ([`construire_chaine_parents`]) — nécessaire pour résoudre les properties Maven et le `dependencyManagement`
+/// hérités (cf. leur documentation respective). `package.json`/`build.gradle` restent traités à la volée, fichier
+/// par fichier, sans changement. Conséquence observable : dans `dependances`, les dépendances Maven apparaissent
+/// désormais regroupées après celles des autres écosystèmes plutôt qu'entrelacées selon l'ordre de découverte des
+/// fichiers dans l'arborescence — aucun consommateur connu ne dépend de cet ordre.
 ///
 /// # Erreurs
 ///
@@ -1512,6 +1899,7 @@ pub(crate) async fn interroger_dependances(
     }
 
     let mut dependances = Vec::new();
+    let mut poms_bruts_ordonnes: Vec<(String, PomBrut)> = Vec::new();
     for chemin in chemins_manifestes {
         let Some(contenu) = recuperer_contenu_manifeste(
             url_base,
@@ -1525,13 +1913,18 @@ pub(crate) async fn interroger_dependances(
         else {
             continue;
         };
-        let dependances_manifeste = match basename(&chemin) {
-            "pom.xml" => parser_pom_xml(&contenu),
-            "package.json" => parser_package_json(&contenu),
-            "build.gradle" => parser_build_gradle(&contenu),
-            _ => Vec::new(),
-        };
-        dependances.extend(dependances_manifeste);
+        match basename(&chemin) {
+            "pom.xml" => poms_bruts_ordonnes.push((chemin.clone(), parser_pom_xml_brut(&contenu))),
+            "package.json" => dependances.extend(parser_package_json(&contenu)),
+            "build.gradle" => dependances.extend(parser_build_gradle(&contenu)),
+            _ => {}
+        }
+    }
+
+    let poms_bruts: HashMap<String, PomBrut> = poms_bruts_ordonnes.iter().cloned().collect();
+    for (chemin, pom_brut) in &poms_bruts_ordonnes {
+        let chaine_parents = construire_chaine_parents(chemin, &poms_bruts);
+        dependances.extend(resoudre_dependances_pom(pom_brut, &chaine_parents));
     }
 
     Ok(ResultatGitlabDependances {
@@ -3172,10 +3565,14 @@ mod tests {
         ));
     }
 
-    // -- parser_pom_xml, parser_package_json, parser_build_gradle (parseurs purs) -----------------------------
+    // -- parser_pom_xml_brut, résolution Maven, parser_package_json, parser_build_gradle (parseurs purs) --------
 
     #[test]
-    fn parser_pom_xml_ignore_la_gestion_de_dependances_et_les_versions_absentes() {
+    fn resoudre_dependances_pom_utilise_la_gestion_de_dependances_geree_pour_une_coordonnee_non_declaree_et_exclut_les_versions_non_resolues()
+     {
+        // La coordonnée `com.example:geree` du dependencyManagement ne correspond à aucune dépendance déclarée de
+        // ce pom : elle ne sert donc à rien ici (cf. test dédié à la résolution effective plus bas), et
+        // `org.example:sans-version` reste exclue faute de coordonnée correspondante dans le dependencyManagement.
         let pom = r#"<project>
             <dependencyManagement>
                 <dependencies>
@@ -3200,7 +3597,8 @@ mod tests {
             </dependencies>
         </project>"#;
 
-        let dependances = parser_pom_xml(pom);
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[]);
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(
@@ -3212,15 +3610,362 @@ mod tests {
     }
 
     #[test]
-    fn parser_pom_xml_malforme_retourne_les_dependances_deja_extraites() {
+    fn parser_pom_xml_brut_malforme_retourne_les_dependances_deja_extraites() {
         // XML jamais fermé après la première dépendance complète : l'analyse s'arrête au point de rupture plutôt
-        // que de faire échouer l'audit (algorithme best-effort, cf. commentaire de `parser_pom_xml`).
+        // que de faire échouer l'audit (algorithme best-effort, cf. commentaire de `parser_pom_xml_brut`).
         let pom = r#"<project><dependencies><dependency><groupId>a</groupId><artifactId>b</artifactId><version>1</version></dependency><dependency><groupId>c</groupId>"#;
 
-        let dependances = parser_pom_xml(pom);
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[]);
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].reference, "a:b");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_resout_une_property_declaree_localement() {
+        let pom = r#"<project>
+            <properties>
+                <spring.version>5.3.12</spring.version>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>${spring.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[]);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "5.3.12");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_resout_une_property_heritee_dun_parent_du_meme_depot() {
+        let parent = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>parent</artifactId>
+            <version>1.0.0</version>
+            <properties>
+                <spring.version>5.3.12</spring.version>
+            </properties>
+        </project>"#;
+        let enfant = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <artifactId>module-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>${spring.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let enfant_brut = parser_pom_xml_brut(enfant);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
+        poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
+
+        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "5.3.12");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_conserve_le_token_litteral_quand_le_parent_est_absent_du_depot() {
+        let enfant = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>${spring.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let enfant_brut = parser_pom_xml_brut(enfant);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
+
+        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
+        assert!(chaine.is_empty());
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "${spring.version}");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_utilise_la_gestion_de_dependances_heritee_pour_completer_une_version_absente()
+     {
+        let parent = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>parent</artifactId>
+            <version>1.0.0</version>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-core</artifactId>
+                        <version>5.3.12</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+        </project>"#;
+        let enfant = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let enfant_brut = parser_pom_xml_brut(enfant);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
+        poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
+
+        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "5.3.12");
+    }
+
+    #[test]
+    fn fusionner_gestion_dependances_l_enfant_prime_sur_le_parent() {
+        let parent = r#"<project>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-core</artifactId>
+                        <version>5.3.12</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+        </project>"#;
+        let enfant_brut = r#"<project>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-core</artifactId>
+                        <version>5.3.20</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let parent_brut = parser_pom_xml_brut(parent);
+        let enfant = parser_pom_xml_brut(enfant_brut);
+        let dependances = resoudre_dependances_pom(&enfant, &[&parent_brut]);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "5.3.20");
+    }
+
+    #[test]
+    fn construire_chaine_parents_detecte_un_cycle() {
+        let pom_a = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>b</artifactId>
+                <version>1.0.0</version>
+                <relativePath>../b/pom.xml</relativePath>
+            </parent>
+        </project>"#;
+        let pom_b = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <relativePath>../a/pom.xml</relativePath>
+            </parent>
+        </project>"#;
+
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("a/pom.xml".to_string(), parser_pom_xml_brut(pom_a));
+        poms_bruts.insert("b/pom.xml".to_string(), parser_pom_xml_brut(pom_b));
+
+        let chaine = construire_chaine_parents("a/pom.xml", &poms_bruts);
+
+        assert_eq!(chaine.len(), 1);
+    }
+
+    #[test]
+    fn construire_chaine_parents_respecte_la_profondeur_maximale() {
+        let mut poms_bruts = HashMap::new();
+        for niveau in 0..(PROFONDEUR_MAX_CHAINE_PARENTS + 5) {
+            let chemin = format!("niveau-{niveau}/pom.xml");
+            let contenu = if niveau == 0 {
+                "<project></project>".to_string()
+            } else {
+                format!(
+                    r#"<project>
+                        <parent>
+                            <groupId>com.example</groupId>
+                            <artifactId>niveau-{}</artifactId>
+                            <version>1.0.0</version>
+                            <relativePath>../niveau-{}/pom.xml</relativePath>
+                        </parent>
+                    </project>"#,
+                    niveau - 1,
+                    niveau - 1
+                )
+            };
+            poms_bruts.insert(chemin, parser_pom_xml_brut(&contenu));
+        }
+
+        let chemin_depart = format!("niveau-{}/pom.xml", PROFONDEUR_MAX_CHAINE_PARENTS + 4);
+        let chaine = construire_chaine_parents(&chemin_depart, &poms_bruts);
+
+        assert_eq!(chaine.len(), PROFONDEUR_MAX_CHAINE_PARENTS);
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_multi_module_plusieurs_enfants_partagent_un_parent() {
+        let parent = r#"<project>
+            <properties>
+                <spring.version>5.3.12</spring.version>
+            </properties>
+        </project>"#;
+        let module_a = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>${spring.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+        let module_b = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                    <version>${spring.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let module_a_brut = parser_pom_xml_brut(module_a);
+        let module_b_brut = parser_pom_xml_brut(module_b);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
+        poms_bruts.insert("module-a/pom.xml".to_string(), module_a_brut.clone());
+        poms_bruts.insert("module-b/pom.xml".to_string(), module_b_brut.clone());
+
+        let chaine_a = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
+        let dependances_a = resoudre_dependances_pom(&module_a_brut, &chaine_a);
+        let chaine_b = construire_chaine_parents("module-b/pom.xml", &poms_bruts);
+        let dependances_b = resoudre_dependances_pom(&module_b_brut, &chaine_b);
+
+        assert_eq!(dependances_a.len(), 1);
+        assert_eq!(dependances_a[0].version, "5.3.12");
+        assert_eq!(dependances_b.len(), 1);
+        assert_eq!(dependances_b[0].version, "5.3.12");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_resout_la_property_implicite_project_version_heritee_du_parent() {
+        let parent = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>parent</artifactId>
+            <version>3.2.1</version>
+        </project>"#;
+        let enfant = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>3.2.1</version>
+            </parent>
+            <artifactId>module-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>com.example</groupId>
+                    <artifactId>module-b</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let enfant_brut = parser_pom_xml_brut(enfant);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
+        poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
+
+        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "3.2.1");
+    }
+
+    #[test]
+    fn resoudre_chemin_parent_applique_le_defaut_maven_depuis_un_sous_repertoire() {
+        assert_eq!(
+            resoudre_chemin_parent("module-a/pom.xml", "../pom.xml"),
+            "pom.xml"
+        );
+        assert_eq!(
+            resoudre_chemin_parent("module-a/sub/pom.xml", "../pom.xml"),
+            "module-a/pom.xml"
+        );
+    }
+
+    #[test]
+    fn resoudre_chemin_parent_ajoute_pom_xml_quand_le_chemin_relatif_designe_un_repertoire() {
+        assert_eq!(
+            resoudre_chemin_parent("module-a/pom.xml", "../parent"),
+            "parent/pom.xml"
+        );
+    }
+
+    #[test]
+    fn resoudre_chemin_parent_respecte_un_fichier_explicite() {
+        assert_eq!(
+            resoudre_chemin_parent("module-a/pom.xml", "../parent/pom.xml"),
+            "parent/pom.xml"
+        );
     }
 
     #[test]
