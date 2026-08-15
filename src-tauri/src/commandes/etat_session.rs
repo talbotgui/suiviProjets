@@ -50,6 +50,15 @@ struct EtatSessionInterieur {
     /// effacé par [`EtatSession::purger`] : ce n'est pas un secret, et le proxy réseau du poste reste pertinent
     /// même verrouillé.
     proxy: Option<Proxy>,
+    /// Client HTTP mis en cache avec le réglage de proxy avec lequel il a été construit, pour réutiliser le pool de
+    /// connexions HTTP/TLS sous-jacent d'un appel à l'autre au sein d'une même campagne d'audit plutôt que de rouvrir
+    /// une connexion neuve à chaque interrogation d'indicateur (plusieurs appels consécutifs vers la même instance
+    /// Sonar/GitLab en quelques secondes, constat relevé lors du diagnostic d'un blocage de campagne signalé par
+    /// l'utilisateur). Reconstruit automatiquement dès que le réglage de proxy en cache diverge de celui
+    /// actuellement en vigueur (comparaison à chaque appel de [`EtatSession::client_http`]), jamais invalidé
+    /// autrement : `reqwest::Client` ne porte aucun credential (transmis par requête via `bearer_auth`, jamais au
+    /// niveau du client), sa mise en cache ne pose donc pas de risque de fuite entre deux sessions différentes.
+    client_http_cache: Option<(Option<Proxy>, reqwest::Client)>,
 }
 
 /// État de session de la Façade de commandes, partagé entre les commandes via l'état managé de Tauri.
@@ -152,13 +161,24 @@ impl EtatSession {
     }
 
     /// Construit un client HTTP tenant compte du réglage applicatif de proxy actuellement en cache (US-034,
-    /// RG-031), en plus du proxy système déjà pris en compte nativement. Reconstruit un client à chaque appel
-    /// plutôt que de le mettre en cache pour le processus entier (à la différence de
-    /// `connecteurs::commun::client_http`) : le réglage peut changer en cours de session, ce qu'un singleton ne
-    /// pourrait jamais refléter.
+    /// RG-031), en plus du proxy système déjà pris en compte nativement. Réutilise le client HTTP mis en cache
+    /// (`EtatSessionInterieur::client_http_cache`) tant que le réglage de proxy n'a pas changé depuis sa
+    /// construction, afin que les appels consécutifs d'une même campagne d'audit vers la même instance
+    /// Sonar/GitLab réutilisent le même pool de connexions HTTP/TLS plutôt que d'en rouvrir une neuve à chaque
+    /// interrogation d'indicateur ; `reqwest::Client::clone()` partage ce pool sans le reconstruire (coût
+    /// négligeable). Un changement de proxy (`definirProxy`) n'a pas besoin d'invalider explicitement ce cache :
+    /// la comparaison ci-dessous le détecte et reconstruit un client au prochain appel.
     pub(crate) fn client_http(&self) -> reqwest::Client {
-        let proxy = deverrouiller_mutex(self.interieur.lock()).proxy.clone();
-        crate::connecteurs::commun::client_http_avec_proxy(proxy.as_ref())
+        let mut interieur = deverrouiller_mutex(self.interieur.lock());
+        let proxy_courant = interieur.proxy.clone();
+        if let Some((proxy_cache, client)) = &interieur.client_http_cache
+            && *proxy_cache == proxy_courant
+        {
+            return client.clone();
+        }
+        let client = crate::connecteurs::commun::client_http_avec_proxy(proxy_courant.as_ref());
+        interieur.client_http_cache = Some((proxy_courant, client.clone()));
+        client
     }
 
     /// Indique si une clé dérivée est actuellement détenue (session déverrouillée avec un fichier ouvert).
@@ -355,6 +375,42 @@ mod tests {
 
         // Le client se construit sans panique avec un réglage de proxy valide.
         let _client = etat.client_http();
+    }
+
+    #[test]
+    fn client_http_met_en_cache_le_client_avec_le_proxy_courant() {
+        let etat = EtatSession::nouveau();
+
+        let _client = etat.client_http();
+
+        let proxy_en_cache = deverrouiller_mutex(etat.interieur.lock())
+            .client_http_cache
+            .as_ref()
+            .map(|(proxy, _)| proxy.clone());
+        assert_eq!(proxy_en_cache, Some(None));
+    }
+
+    #[test]
+    fn client_http_reconstruit_le_client_quand_le_proxy_change() {
+        let etat = EtatSession::nouveau();
+        let _premier_client = etat.client_http();
+
+        etat.definir_proxy(Some(Proxy {
+            url: Some("http://proxy.exemple.local:3128".to_string()),
+            chemin_bundle_ca: None,
+        }));
+        let _second_client = etat.client_http();
+
+        let proxy_en_cache = deverrouiller_mutex(etat.interieur.lock())
+            .client_http_cache
+            .as_ref()
+            .and_then(|(proxy, _)| proxy.as_ref())
+            .and_then(|proxy| proxy.url.clone());
+        assert_eq!(
+            proxy_en_cache,
+            Some("http://proxy.exemple.local:3128".to_string()),
+            "le cache doit refléter le nouveau réglage de proxy après reconstruction"
+        );
     }
 
     #[test]
