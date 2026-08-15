@@ -22,8 +22,14 @@
 //   sous-formulaire répétable, pour limiter la complexité de ce premier incrément.
 // - Le motif de nommage des branches est validé comme expression régulière syntaxiquement correcte côté client
 //   (`new RegExp(...)`) avant tout envoi, en complément de la revalidation déjà effectuée côté cœur natif (RG-030).
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import type { WritableSignal } from '@angular/core';
+//
+// Entrées `motifPreselectionne`/`versionPreselectionnee`, relayées depuis `SqmParametrageComponent` (lien « Créer
+// une règle » de la Fiche projet, sur une dépendance « non référencée », cf. `fiche-projet.component.ts`) : un
+// effet (constructeur) ouvre une fois pour toutes le formulaire de création d'une règle de dépendances pré-rempli
+// avec le motif reçu et, si présente, une première borne de version dont seul le motif de version est renseigné (le
+// statut restant à la charge de l'utilisateur), sur le même patron que `SqmMembresConnusAdminComponent` (Phase 4).
+import { Component, effect, inject, signal, ChangeDetectionStrategy, input } from '@angular/core';
+import type { InputSignal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -78,6 +84,39 @@ export class SqmReferentielsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+
+  /**
+   * Motif à présélectionner dans le formulaire de création d'une règle de dépendances (cf. commentaire d'en-tête).
+   */
+  public readonly motifPreselectionne: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Version à présélectionner dans le formulaire de création d'une règle de dépendances (cf. commentaire
+   * d'en-tête).
+   */
+  public readonly versionPreselectionnee: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Indique que la présélection depuis {@link motifPreselectionne} a déjà été appliquée une fois pour cette
+   * instance (cf. commentaire d'en-tête, même patron que `SqmMembresConnusAdminComponent.preselectionDejaAppliquee`).
+   */
+  private preselectionDejaAppliquee = false;
+
+  public constructor() {
+    effect(() => {
+      const motifCible = this.motifPreselectionne();
+      if (this.preselectionDejaAppliquee || motifCible === undefined) {
+        return;
+      }
+      this.preselectionDejaAppliquee = true;
+      this.ouvrirCreationDependance();
+      this.motifDependance = motifCible;
+      const versionCible = this.versionPreselectionnee();
+      if (versionCible !== undefined && versionCible.length > 0) {
+        this.versionsDependanceTexte = `${versionCible}=`;
+      }
+    });
+  }
 
   /**
    * Types de correspondance proposés au formulaire d'une règle de marqueur IA.

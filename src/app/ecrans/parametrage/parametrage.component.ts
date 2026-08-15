@@ -8,7 +8,14 @@
 // depuis la Phase 9, incrément 3 (le dernier affichait jusque-là un contenu de repli, sur le même principe que les
 // entrées de sidebar « à venir » du shell). Coquille à onglets sur le patron exact de `SqmAdministrationComponent`
 // (Phase 3).
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+//
+// Paramètres de requête `motifDependance`/`versionDependance` (`withComponentInputBinding()`, `app.config.ts`)
+// ajoutés pour le seul besoin du lien « Créer une règle » de la Fiche projet (`fiche-projet.component.ts`), sur les
+// dépendances « non référencées » : relayés tels quels vers `SqmReferentielsParametrageComponent`, qui porte la
+// pré-ouverture du formulaire de création. Aucun effet local ici : l'onglet par défaut de cet écran est déjà
+// « seuilsReferentiels ».
+import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import type { InputSignal } from '@angular/core';
 import { SqmExportImportParametrageComponent } from './export-import/export-import-parametrage.component';
 import { SqmJournalParametrageComponent } from './journal/journal-parametrage.component';
 import { SqmPurgeParametrageComponent } from './purge/purge-parametrage.component';
@@ -40,6 +47,18 @@ type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImp
   styleUrl: './parametrage.component.scss',
 })
 export class SqmParametrageComponent {
+  /**
+   * Motif à présélectionner dans le formulaire de création d'une règle de dépendances, lié au paramètre de requête
+   * homonyme (cf. commentaire d'en-tête). Absent hors navigation depuis la Fiche projet.
+   */
+  public readonly motifDependance: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Version à présélectionner dans le formulaire de création d'une règle de dépendances, lié au paramètre de
+   * requête homonyme. Cf. {@link motifDependance}.
+   */
+  public readonly versionDependance: InputSignal<string | undefined> = input<string>();
+
   /**
    * Onglet actuellement affiché.
    */

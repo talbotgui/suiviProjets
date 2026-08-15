@@ -242,6 +242,15 @@
                           } @else {
                             <span>{{ dependance.statut.label }}</span>
                           }
+                          @if (dependance.nonReference) {
+                            <a
+                              class="texte-sm"
+                              routerLink="/parametrage"
+                              [queryParams]="queryParamsReferentielDependance(dependance)"
+                            >
+                              Créer une règle
+                            </a>
+                          }
                         </td>
                       </tr>
                     }

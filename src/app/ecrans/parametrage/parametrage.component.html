@@ -44,7 +44,10 @@
     @case ('seuilsReferentiels') {
       <div class="d-flex direction-colonne ecart-6">
         <app-seuils-parametrage />
-        <app-referentiels-parametrage />
+        <app-referentiels-parametrage
+          [motifPreselectionne]="motifDependance()"
+          [versionPreselectionnee]="versionDependance()"
+        />
         <app-reglages-applicatifs-parametrage />
       </div>
     }

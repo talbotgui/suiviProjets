@@ -122,6 +122,11 @@ interface LigneDependance {
   readonly manifeste: string;
   /** Étiquette du statut d'obsolescence calculé. */
   readonly statut: EtiquetteCouleur;
+  /**
+   * `true` si cette dépendance n'est couverte par aucune règle du référentiel des dépendances, pour afficher le
+   * lien de création d'une règle pré-remplie (cf. {@link SqmFicheProjetComponent.queryParamsReferentielDependance}).
+   */
+  readonly nonReference: boolean;
 }
 
 /**
@@ -941,6 +946,7 @@ export class SqmFicheProjetComponent {
       version: dependance.version,
       manifeste: dependance.manifeste,
       statut: this.libelleEtCouleurObsolescence(resultat),
+      nonReference: resultat.type === 'nonReference',
     };
   }
 
@@ -1094,6 +1100,18 @@ export class SqmFicheProjetComponent {
       typeCritere: membre.critereParDefautQualification.type,
       critere: membre.critereParDefautQualification.valeur,
     };
+  }
+
+  /**
+   * Construit les paramètres de requête du lien « Créer une règle », affiché pour chaque dépendance « non
+   * référencée » (cf. {@link LigneDependance.nonReference}), qui ouvre l'écran Paramétrage directement sur le
+   * formulaire de création d'une règle du référentiel des dépendances, pré-rempli avec le motif (référence exacte
+   * de la dépendance) et la version constatée, sur le même patron que {@link queryParamsQualification}.
+   * @param dependance - Ligne d'affichage de la dépendance non référencée concernée.
+   * @returns Les paramètres de requête à transmettre à `routerLink`.
+   */
+  public queryParamsReferentielDependance(dependance: LigneDependance): Params {
+    return { motifDependance: dependance.reference, versionDependance: dependance.version };
   }
 
   /**
