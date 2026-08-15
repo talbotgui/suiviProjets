@@ -466,6 +466,11 @@ pub(crate) struct MergeRequestOuverte {
     pub(crate) titre: String,
     pub(crate) cree_le: String,
     pub(crate) en_conflit: bool,
+    /// URL de la merge request sur l'instance GitLab ; champ optionnel à la désérialisation pour
+    /// compatibilité avec les fichiers de données plus anciens, créés avant l'ajout de ce champ
+    /// (Phase 14, incrément 7). Absent des fichiers antérieurs, la valeur par défaut est une
+    /// chaîne vide.
+    #[serde(default)]
     pub(crate) web_url: String,
 }
 
