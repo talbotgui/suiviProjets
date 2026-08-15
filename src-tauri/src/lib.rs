@@ -112,6 +112,7 @@ pub fn run() {
             commandes::configuration_partageable::exporter_configuration,
             commandes::configuration_partageable::previsualiser_import_configuration,
             commandes::configuration_partageable::importer_configuration,
+            commandes::diagnostic::consigner_erreur_ui,
         ])
         .setup(|app| {
             let cible_fichier = journalisation::dossier_logs().map(|dossier| {

@@ -110,6 +110,23 @@ export class FacadeCommandesService {
   }
 
   /**
+   * Consigne, dans le journal technique local du cœur natif, une erreur JavaScript non interceptée par ailleurs
+   * (`ErrorHandlerGlobal`). Best-effort : toute erreur en cours de consignation (ex. commande non bouchonnée hors
+   * contexte Tauri, `ng serve`) est silencieusement ignorée plutôt que relancée, cette méthode ne devant jamais
+   * devenir elle-même une nouvelle source d'exception non gérée.
+   * @param nom - Nom de l'erreur JavaScript (`Error.name`).
+   * @param message - Message de l'erreur JavaScript (`Error.message`).
+   * @param pile - Pile d'appel de l'erreur (`Error.stack`), absente si indisponible.
+   */
+  public async consignerErreurUi(nom: string, message: string, pile?: string): Promise<void> {
+    try {
+      await InvocationCommandeUtils.invoquer<void>('consigner_erreur_ui', { nom, message, pile });
+    } catch {
+      // Volontairement ignoré : cf. commentaire ci-dessus.
+    }
+  }
+
+  /**
    * Interroge les branches d'un dépôt GitLab pour l'autocomplétion de la ref auditée d'une source (US-008). Le
    * credential utilisé est celui déjà mémorisé côté cœur natif pour cette instance (`definirCredentials`) : il
    * n'est jamais retransmis par cette méthode.

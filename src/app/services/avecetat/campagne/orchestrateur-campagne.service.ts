@@ -698,8 +698,8 @@ export class OrchestrateurCampagneService {
    * Type-guard sans assertion `as` : vérifie qu'une valeur `unknown` est un objet non nul, donc indexable en
    * sûreté par une clé dynamique (contrairement à l'opérateur `in` seul, qui ne suffit pas à narrower un type
    * indexable pour une clé non littérale). Utilisé par la détection du type de résultat brut d'un audit (ligne
-   * ~596) et par {@link validerRegleMarqueurIa} (contenu de `referentiels.reglesMarqueursIA` non typé item par
-   * item).
+   * ~596), par {@link validerRegleMarqueurIa} (contenu de `referentiels.reglesMarqueursIA` non typé item par item)
+   * et par {@link extraireVariationRelative} (`parametres.seuils`, `serde_json::Value` générique côté cœur natif).
    * @param valeur - Valeur à vérifier.
    * @returns `true` si `valeur` est un objet non nul.
    */
@@ -722,15 +722,25 @@ export class OrchestrateurCampagneService {
 
   /**
    * Extrait le seuil de matérialité paramétré du brouillon (`parametres.seuils.materialiteBrouillon.
-   * variationRelative`, RG-020), avec repli documenté sur {@link VARIATION_RELATIVE_PAR_DEFAUT}. Simplifié à la
-   * Phase 6, incrément 1 (`parametres.seuils` désormais typé `SeuilsJugement`, cf. `types-donnees.ts`) : accès
-   * direct sans traversée générique, la seule prudence restante portant sur l'absence de racine chargée
-   * (`racine()` nullable) et sur une valeur paramétrée invalide (zéro ou négative).
+   * variationRelative`, RG-020), avec repli documenté sur {@link VARIATION_RELATIVE_PAR_DEFAUT}. À la différence de
+   * {@link extraireConcurrence}, `parametres.seuils` reste côté cœur natif un `serde_json::Value` générique, non une
+   * structure Rust typée (`src-tauri/src/modele/racine.rs`, hors périmètre détaillé de la Phase 1) : sa valeur par
+   * défaut y est `null`, aussi bien pour un fichier tout juste créé que pour un fichier antérieur à l'ajout de ce
+   * champ. Le typage TypeScript `SeuilsJugement` de `parametres.seuils` (`types-donnees.ts`) ne reflète donc pas
+   * fidèlement cette possibilité réelle ; traversée via {@link estObjetIndexable} (comme pour tout accès à une
+   * valeur JSON non garantie par un type Rust propre) plutôt qu'un enchaînement de propriétés typées, pour ne pas
+   * lever d'exception nonInterceptée sur ce cas réel plutôt que théorique (corrigé à la suite d'un blocage de
+   * campagne d'audit provoqué par ce `null`, cf. rapport de développement).
    * @returns Le seuil de matérialité à appliquer.
    */
   private extraireVariationRelative(): number {
-    const valeur =
-      this.donneesApplication.racine()?.parametres.seuils.materialiteBrouillon.variationRelative;
+    const seuils: unknown = this.donneesApplication.racine()?.parametres.seuils;
+    const materialiteBrouillon = this.estObjetIndexable(seuils)
+      ? seuils['materialiteBrouillon']
+      : undefined;
+    const valeur = this.estObjetIndexable(materialiteBrouillon)
+      ? materialiteBrouillon['variationRelative']
+      : undefined;
     return typeof valeur === 'number' && valeur > 0 ? valeur : VARIATION_RELATIVE_PAR_DEFAUT;
   }
 

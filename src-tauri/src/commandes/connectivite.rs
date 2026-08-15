@@ -77,6 +77,10 @@ pub(crate) fn definir_credentials(
     etat: State<'_, EtatSession>,
 ) -> Result<(), ErreurFacade> {
     crate::journalisation::consigner_debut_commande("definirCredentials");
+    #[allow(
+        clippy::redundant_closure_call,
+        reason = "closure immédiatement invoquée pour permettre l'opérateur ? localement, motif reconnu"
+    )]
     let resultat = (|| -> Result<(), ErreurFacade> {
         if etat.definir_credentials(credentials) {
             Ok(())

@@ -365,6 +365,28 @@ describe('OrchestrateurCampagneService', () => {
     });
 
     it(
+      'ne doit pas planter et doit retomber sur le seuil de matérialité par défaut quand parametres.seuils vaut ' +
+        'null (cas réel du cœur natif : serde_json::Value générique, jamais peuplé par défaut, cf. ' +
+        'extraireVariationRelative)',
+      async () => {
+        const projet = DonneesDeTest.projet('projet-1', [
+          DonneesDeTest.sourceGitlab('source-1'),
+          DonneesDeTest.sourceSonar('source-2'),
+        ]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        donneesApplicationMock.racine.mockReturnValue({
+          parametres: { ...PARAMETRES_DE_TEST, seuils: null },
+          referentiels: REFERENTIELS_DE_TEST,
+        });
+
+        const resultat = await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        expect(resultat).toEqual({ type: 'succes' });
+        expect(donneesApplicationMock.enregistrerBrouillon).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it(
       'doit interroger la liste complète des branches et les dépendances du dépôt et les faire apparaître dans ' +
         'resultats (US-009, incrément de rattrapage de la Phase 5 précédant la Phase 6)',
       async () => {

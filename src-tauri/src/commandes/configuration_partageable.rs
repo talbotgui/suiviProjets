@@ -39,6 +39,10 @@ pub(crate) fn exporter_configuration(
     donnees: DonneesRacine,
 ) -> Result<(), ErreurFacade> {
     crate::journalisation::consigner_debut_commande("exporterConfiguration");
+    #[allow(
+        clippy::redundant_closure_call,
+        reason = "closure immédiatement invoquée pour permettre l'opérateur ? localement, motif reconnu"
+    )]
     let resultat = (|| -> Result<(), ErreurFacade> {
         let configuration: ConfigurationPartageable =
             configuration_partageable::exporter_configuration(&donnees);

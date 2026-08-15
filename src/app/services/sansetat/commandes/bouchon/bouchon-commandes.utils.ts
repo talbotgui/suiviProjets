@@ -219,6 +219,8 @@ export class BouchonCommandesUtils {
         return BouchonCommandesUtils.constatNcloc(parametres);
       case 'interroger_derniere_analyse':
         return BouchonCommandesUtils.derniereAnalyse(parametres);
+      case 'consigner_erreur_ui':
+        return undefined;
       default:
         throw new Error(`BouchonCommandesUtils : commande « ${commande} » non bouchonnée.`);
     }

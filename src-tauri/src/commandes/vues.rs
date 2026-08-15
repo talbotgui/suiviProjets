@@ -59,12 +59,8 @@ pub(crate) fn definir_vue(
             filtres,
         )?;
 
-        let cle = moteur::sauvegarder_fichier(
-            Path::new(&chemin),
-            &donnees,
-            &mot_de_passe,
-            "definirVue",
-        )?;
+        let cle =
+            moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirVue")?;
         etat.definir(PathBuf::from(chemin), cle);
 
         Ok(donnees)

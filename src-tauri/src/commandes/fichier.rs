@@ -328,6 +328,10 @@ pub(crate) fn sauvegarder_fichier(
 #[tauri::command]
 pub(crate) fn verrouiller_session(etat: State<'_, EtatSession>) -> Result<(), ErreurFacade> {
     crate::journalisation::consigner_debut_commande("verrouillerSession");
+    #[allow(
+        clippy::redundant_closure_call,
+        reason = "closure immédiatement invoquée pour permettre l'opérateur ? localement, motif reconnu"
+    )]
     let resultat = (|| -> Result<(), ErreurFacade> {
         etat.purger();
         Ok(())

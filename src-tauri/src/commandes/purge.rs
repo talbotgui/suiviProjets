@@ -26,6 +26,10 @@ pub(crate) fn previsualiser_purge_densite(
     donnees: DonneesRacine,
 ) -> Result<PrevisualisationPurge, ErreurFacade> {
     crate::journalisation::consigner_debut_commande("previsualiserPurgeDensite");
+    #[allow(
+        clippy::redundant_closure_call,
+        reason = "closure immédiatement invoquée pour permettre l'opérateur ? localement, motif reconnu"
+    )]
     let resultat = (|| -> Result<PrevisualisationPurge, ErreurFacade> {
         Ok(purge::previsualiser_purge_densite(&donnees))
     })();
@@ -69,6 +73,10 @@ pub(crate) fn previsualiser_purge_journal(
     donnees: DonneesRacine,
 ) -> Result<PrevisualisationPurgeJournal, ErreurFacade> {
     crate::journalisation::consigner_debut_commande("previsualiserPurgeJournal");
+    #[allow(
+        clippy::redundant_closure_call,
+        reason = "closure immédiatement invoquée pour permettre l'opérateur ? localement, motif reconnu"
+    )]
     let resultat = (|| -> Result<PrevisualisationPurgeJournal, ErreurFacade> {
         let aujourdhui = Utc::now().date_naive();
         Ok(purge::previsualiser_purge_journal(&donnees, aujourdhui))

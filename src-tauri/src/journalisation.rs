@@ -92,6 +92,26 @@ pub(crate) fn consigner_fin_commande(commande: &str) {
     log::info!(target: CIBLE_ACTION_TRACEE, "{commande} : fin");
 }
 
+/// Consigne une erreur JavaScript non interceptée par ailleurs, remontée depuis l'interface (`ErrorHandler` Angular
+/// global, écouteur `unhandledrejection`) via la commande `consignerErreurUi` (`commandes::diagnostic`) : sans ce
+/// relais, une telle erreur ne restait visible que dans la console du navigateur, jamais dans le journal technique
+/// local consulté pour tout autre diagnostic (constat relevé lors du diagnostic d'un blocage de campagne d'audit,
+/// cf. rapport de développement). Ne reçoit que le nom, le message et la pile d'appel de l'erreur JavaScript, jamais
+/// une donnée applicative ni un credential : la signature de la commande appelante l'exclut déjà, cf.
+/// `docs/02_documentation/15_normesSecurite.md#journalisation-des-événements-sensibles`.
+pub(crate) fn consigner_erreur_ui(nom: &str, message: &str, pile: Option<&str>) {
+    match pile {
+        Some(pile) => log::error!(
+            target: CIBLE_ACTION_TRACEE,
+            "erreur UI non interceptée : {nom} : {message}\n{pile}"
+        ),
+        None => log::error!(
+            target: CIBLE_ACTION_TRACEE,
+            "erreur UI non interceptée : {nom} : {message}"
+        ),
+    }
+}
+
 /// Consigne une écriture du fichier de données (R11-01b), au point de convergence unique
 /// `persistance::moteur::sauvegarder_fichier` : nom de la commande de la Façade à l'origine de cette écriture,
 /// jamais le contenu du fichier ni le mot de passe.
