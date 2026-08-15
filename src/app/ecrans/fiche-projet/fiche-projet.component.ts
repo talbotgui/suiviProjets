@@ -1069,7 +1069,7 @@ export class SqmFicheProjetComponent {
     valeur: string;
   } {
     const email = membre.emailPublic;
-    const indexArobase = email !== undefined ? email.indexOf('@') : -1;
+    const indexArobase = email ? email.indexOf('@') : -1;
     if (email !== undefined && indexArobase >= 0) {
       return { type: TypeCritereMembre.DomaineEmail, valeur: email.slice(indexArobase + 1) };
     }
