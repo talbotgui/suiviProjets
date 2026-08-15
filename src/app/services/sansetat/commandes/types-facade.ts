@@ -260,6 +260,7 @@ export interface MergeRequestOuverte {
   readonly titre: string;
   readonly creeLe: string;
   readonly enConflit: boolean;
+  readonly webUrl: string;
 }
 
 /**

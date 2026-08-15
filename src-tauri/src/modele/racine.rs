@@ -466,6 +466,7 @@ pub(crate) struct MergeRequestOuverte {
     pub(crate) titre: String,
     pub(crate) cree_le: String,
     pub(crate) en_conflit: bool,
+    pub(crate) web_url: String,
 }
 
 /// Constat brut de `gitlab.merge_requests`.

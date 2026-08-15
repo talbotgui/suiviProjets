@@ -92,6 +92,7 @@ class DonneesDeTest {
           titre: `MR ${index}`,
           creeLe: date,
           enConflit: false,
+          webUrl: `https://gitlab.exemple.test/groupe/projet/-/merge_requests/${index}`,
         })),
       });
     }

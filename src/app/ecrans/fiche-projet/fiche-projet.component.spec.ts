@@ -125,6 +125,7 @@ class DonneesDeTest {
               titre: 'Ajout fonctionnalité',
               creeLe: DonneesDeTest.ilYA(-5),
               enConflit: false,
+              webUrl: 'https://gitlab.exemple.test/groupe/projet/-/merge_requests/1',
             },
           ],
         },

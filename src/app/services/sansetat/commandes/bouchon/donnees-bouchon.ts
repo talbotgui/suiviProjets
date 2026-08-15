@@ -91,8 +91,20 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         { email: 'a.lopez@presta-dev.io', nom: 'Ana Lopez', nombreCommits: 8 },
       ],
       mrOuvertes: [
-        { iid: 214, titre: 'Paiement SEPA', creeLe: '2026-06-20', enConflit: false },
-        { iid: 209, titre: 'Refonte mapping tiers', creeLe: '2026-04-02', enConflit: true },
+        {
+          iid: 214,
+          titre: 'Paiement SEPA',
+          creeLe: '2026-06-20',
+          enConflit: false,
+          webUrl: 'https://gitlab.entreprise.fr/finance/api-facturation/-/merge_requests/214',
+        },
+        {
+          iid: 209,
+          titre: 'Refonte mapping tiers',
+          creeLe: '2026-04-02',
+          enConflit: true,
+          webUrl: 'https://gitlab.entreprise.fr/finance/api-facturation/-/merge_requests/209',
+        },
       ],
       membres: [
         { username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: false },
@@ -154,7 +166,15 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
       dernierCommitLe: '2024-11-03',
       tailleOctets: 3120440,
       contributeurs: [],
-      mrOuvertes: [{ iid: 45, titre: 'Montée Spring 5', creeLe: '2024-09-12', enConflit: true }],
+      mrOuvertes: [
+        {
+          iid: 45,
+          titre: 'Montée Spring 5',
+          creeLe: '2024-09-12',
+          enConflit: true,
+          webUrl: 'https://gitlab.entreprise.fr/legacy/referentiel-tiers/-/merge_requests/45',
+        },
+      ],
       membres: [{ username: 'jpetit', nom: 'Julien Petit', niveauAcces: 40, herite: true }],
       marqueurs: [],
       dependances: [
@@ -177,7 +197,13 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         { email: 'k.benali@nova-corp.com', nom: 'Karim Benali', nombreCommits: 24 },
       ],
       mrOuvertes: [
-        { iid: 88, titre: 'Dashboard client v2', creeLe: '2026-07-01', enConflit: false },
+        {
+          iid: 88,
+          titre: 'Dashboard client v2',
+          creeLe: '2026-07-01',
+          enConflit: false,
+          webUrl: 'https://gitlab.entreprise.fr/portail-nova/front-portail/-/merge_requests/88',
+        },
       ],
       membres: [
         { username: 'smartin', nom: 'Sofia Martin', niveauAcces: 40, herite: false },
@@ -210,9 +236,27 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         { email: 'dev.mystere@gmail.com', nom: 'dmx', nombreCommits: 6 },
       ],
       mrOuvertes: [
-        { iid: 31, titre: 'Auth OIDC', creeLe: '2026-05-14', enConflit: true },
-        { iid: 29, titre: 'Rate limiting', creeLe: '2026-03-02', enConflit: true },
-        { iid: 34, titre: 'Logs structurés', creeLe: '2026-06-28', enConflit: false },
+        {
+          iid: 31,
+          titre: 'Auth OIDC',
+          creeLe: '2026-05-14',
+          enConflit: true,
+          webUrl: 'https://gitlab.entreprise.fr/portail-nova/api-portail/-/merge_requests/31',
+        },
+        {
+          iid: 29,
+          titre: 'Rate limiting',
+          creeLe: '2026-03-02',
+          enConflit: true,
+          webUrl: 'https://gitlab.entreprise.fr/portail-nova/api-portail/-/merge_requests/29',
+        },
+        {
+          iid: 34,
+          titre: 'Logs structurés',
+          creeLe: '2026-06-28',
+          enConflit: false,
+          webUrl: 'https://gitlab.entreprise.fr/portail-nova/api-portail/-/merge_requests/34',
+        },
       ],
       membres: [
         { username: 'kbenali', nom: 'Karim Benali', niveauAcces: 40, herite: false },

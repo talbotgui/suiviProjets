@@ -141,6 +141,8 @@ interface LigneMr {
   readonly ageLabel: string;
   /** `true` si la demande de fusion est en conflit. */
   readonly enConflit: boolean;
+  /** Adresse de la demande de fusion sur l'instance GitLab d'origine. */
+  readonly webUrl: string;
 }
 
 /**
@@ -1030,6 +1032,7 @@ export class SqmFicheProjetComponent {
       titre: mr.titre,
       ageLabel: `${this.joursDepuis(mr.creeLe, maintenant)} j`,
       enConflit: mr.enConflit,
+      webUrl: mr.webUrl,
     };
   }
 

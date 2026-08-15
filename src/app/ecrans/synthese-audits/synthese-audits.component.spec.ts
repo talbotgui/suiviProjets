@@ -70,6 +70,7 @@ class DonneesDeTest {
       readonly titre: string;
       readonly creeLe: string;
       readonly enConflit: boolean;
+      readonly webUrl: string;
     }[];
     readonly marqueurs?: readonly {
       readonly chemin: string;
@@ -310,8 +311,20 @@ class DonneesDeTest {
         DonneesDeTest.auditComplet({
           dernierCommitLe: DonneesDeTest.ilYA(-200),
           mrOuvertes: [
-            { iid: 1, titre: 'A', creeLe: DonneesDeTest.ilYA(-40), enConflit: true },
-            { iid: 2, titre: 'B', creeLe: DonneesDeTest.ilYA(-5), enConflit: false },
+            {
+              iid: 1,
+              titre: 'A',
+              creeLe: DonneesDeTest.ilYA(-40),
+              enConflit: true,
+              webUrl: 'https://gitlab.exemple.test/groupe/projet/-/merge_requests/1',
+            },
+            {
+              iid: 2,
+              titre: 'B',
+              creeLe: DonneesDeTest.ilYA(-5),
+              enConflit: false,
+              webUrl: 'https://gitlab.exemple.test/groupe/projet/-/merge_requests/2',
+            },
           ],
           marqueurs: [{ chemin: 'CLAUDE.md', nature: 'fichier', outil: 'claude' }],
         }),

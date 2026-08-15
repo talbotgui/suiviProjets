@@ -855,6 +855,7 @@ struct ReponseMergeRequest {
     created_at: String,
     #[serde(default)]
     has_conflicts: bool,
+    web_url: String,
 }
 
 /// Interroge les demandes de fusion ouvertes d'un dépôt GitLab (US-009, `gitlab.merge_requests`).
@@ -913,6 +914,7 @@ pub(crate) async fn interroger_merge_requests(
             titre: mr.title,
             cree_le: mr.created_at,
             en_conflit: mr.has_conflicts,
+            web_url: mr.web_url,
         })
         .collect();
 
@@ -2698,8 +2700,8 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/api/v4/projects/1234/merge_requests"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                { "iid": 214, "title": "Paiement SEPA", "created_at": "2026-06-20T00:00:00Z", "has_conflicts": false },
-                { "iid": 209, "title": "Refonte mapping tiers", "created_at": "2026-04-02T00:00:00Z" }
+                { "iid": 214, "title": "Paiement SEPA", "created_at": "2026-06-20T00:00:00Z", "has_conflicts": false, "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/214" },
+                { "iid": 209, "title": "Refonte mapping tiers", "created_at": "2026-04-02T00:00:00Z", "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/209" }
             ])))
             .mount(&serveur)
             .await;
