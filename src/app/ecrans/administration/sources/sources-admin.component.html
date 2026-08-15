@@ -8,105 +8,95 @@
         [ngModel]="groupeSelectionneId"
         (ngModelChange)="selectionnerGroupe($event)"
       >
-        @if (!groupeSelectionneId) {
-          <option [ngValue]="null" disabled>Sélectionner un groupe</option>
-        }
+        <option [ngValue]="null">Tous les groupes</option>
         @for (groupe of groupes(); track groupe.id) {
           <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
         }
       </select>
     </label>
 
-    @if (groupeSelectionneId) {
-      <label class="champ">
-        Projet
-        <select
-          id="sources-admin-champ-projet"
-          class="champ__controle"
-          [ngModel]="projetSelectionneId"
-          (ngModelChange)="selectionnerProjet($event)"
-        >
-          @if (!projetSelectionneId) {
-            <option [ngValue]="null" disabled>Sélectionner un projet</option>
-          }
-          @for (projet of projets(); track projet.id) {
-            <option [ngValue]="projet.id">{{ projet.nom }}</option>
-          }
-        </select>
-      </label>
-    }
+    <label class="champ">
+      Projet
+      <select
+        id="sources-admin-champ-projet"
+        class="champ__controle"
+        [ngModel]="projetSelectionneId"
+        (ngModelChange)="selectionnerProjet($event)"
+      >
+        <option [ngValue]="null">Tous les projets</option>
+        @for (projet of projets(); track projet.id) {
+          <option [ngValue]="projet.id">{{ projet.nom }}</option>
+        }
+      </select>
+    </label>
   </div>
 
-  @if (!projetSelectionneId) {
-    <p class="sources-admin__vide texte-discret">
-      Sélectionnez un groupe puis un projet pour gérer ses sources.
-    </p>
-  } @else {
-    <header
-      class="sources-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
+  <header
+    class="sources-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
+  >
+    <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Sources</h2>
+    <button
+      id="sources-admin-bouton-creer"
+      type="button"
+      class="bouton"
+      [disabled]="!groupeSelectionneId || !projetSelectionneId"
+      [title]="
+        !groupeSelectionneId || !projetSelectionneId
+          ? 'Sélectionnez un groupe et un projet pour créer une source'
+          : null
+      "
+      (click)="ouvrirCreation()"
     >
-      <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Sources</h2>
-      <button
-        id="sources-admin-bouton-creer"
-        type="button"
-        class="bouton"
-        (click)="ouvrirCreation()"
+      Créer une source
+    </button>
+  </header>
+
+  <ul
+    id="sources-admin-liste"
+    class="sources-admin__liste sans-liste d-flex direction-colonne ecart-2"
+  >
+    @for (ligne of lignesSources(); track ligne.source.id) {
+      <li
+        class="sources-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
       >
-        Créer une source
-      </button>
-    </header>
+        <span class="sources-admin__groupe texte-discret texte-sm">{{ ligne.groupeNom }}</span>
+        <span class="sources-admin__projet texte-discret texte-sm">{{ ligne.projetNom }}</span>
+        <span class="sources-admin__type poids-demi-gras">{{ ligne.source.type }}</span>
+        <span class="sources-admin__id-externe texte-sm">{{ ligne.source.idExterne }}</span>
+        <span class="sources-admin__ref-auditee texte-discret texte-sm">
+          {{ ligne.source.refAuditee ?? 'branche par défaut du dépôt (résolue à l’audit)' }}
+        </span>
+        <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(ligne)">
+          Modifier
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="demanderSuppression(ligne)">
+          Supprimer
+        </button>
+      </li>
+    } @empty {
+      <li class="sources-admin__vide texte-discret">Aucune source ne correspond à ces filtres.</li>
+    }
+  </ul>
 
-    <ul
-      id="sources-admin-liste"
-      class="sources-admin__liste sans-liste d-flex direction-colonne ecart-2"
+  @if (ligneASupprimer) {
+    <app-confirmation-suppression
+      message="Cette suppression est irréversible."
+      (confirmee)="confirmerSuppression()"
+      (annulee)="annulerSuppression()"
+    />
+  }
+
+  @if (formulaireVisible && groupeIdFormulaire && projetIdFormulaire) {
+    <div
+      class="sources-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
     >
-      @for (source of sources(); track source.id) {
-        <li
-          class="sources-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
-        >
-          <span class="sources-admin__type poids-demi-gras">{{ source.type }}</span>
-          <span class="sources-admin__id-externe texte-sm">{{ source.idExterne }}</span>
-          <span class="sources-admin__ref-auditee texte-discret texte-sm">
-            {{ source.refAuditee ?? 'branche par défaut du dépôt (résolue à l’audit)' }}
-          </span>
-          <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(source.id)">
-            Modifier
-          </button>
-          <button
-            type="button"
-            class="bouton bouton--discret"
-            (click)="demanderSuppression(source.id)"
-          >
-            Supprimer
-          </button>
-        </li>
-      } @empty {
-        <li class="sources-admin__vide texte-discret">
-          Aucune source n'est encore définie pour ce projet.
-        </li>
-      }
-    </ul>
-
-    @if (sourceASupprimerId) {
-      <app-confirmation-suppression
-        message="Cette suppression est irréversible."
-        (confirmee)="confirmerSuppression()"
-        (annulee)="annulerSuppression()"
+      <app-formulaire-source
+        [groupeId]="groupeIdFormulaire"
+        [projetId]="projetIdFormulaire"
+        [sourceAModifier]="ligneEnEdition?.source ?? null"
+        (enregistree)="onSourceEnregistree()"
+        (annulee)="fermerFormulaire()"
       />
-    }
-
-    @if (formulaireVisible && groupeSelectionneId && projetSelectionneId) {
-      <div
-        class="sources-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
-      >
-        <app-formulaire-source
-          [groupeId]="groupeSelectionneId"
-          [projetId]="projetSelectionneId"
-          [sourceAModifier]="sourceEnEdition"
-          (enregistree)="onSourceEnregistree()"
-          (annulee)="fermerFormulaire()"
-        />
-      </div>
-    }
+    </div>
   }
 </section>

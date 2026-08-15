@@ -7,194 +7,195 @@
       [ngModel]="groupeSelectionneId"
       (ngModelChange)="selectionnerGroupe($event)"
     >
-      @if (!groupeSelectionneId) {
-        <option [ngValue]="null" disabled>Sélectionner un groupe</option>
-      }
+      <option [ngValue]="null">Tous les groupes</option>
       @for (groupe of groupes(); track groupe.id) {
         <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
       }
     </select>
   </label>
 
-  @if (!groupeSelectionneId) {
-    <p class="projets-admin__vide texte-discret">Sélectionnez un groupe pour gérer ses projets.</p>
-  } @else {
-    <header
-      class="projets-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
-    >
-      <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Projets</h2>
-      <div class="d-flex retour-ligne ecart-2">
+  <header
+    class="projets-admin__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-4"
+  >
+    <h2 class="texte-lg poids-gras exterieur-bas-0 exterieur-haut-0">Projets</h2>
+    <div class="d-flex retour-ligne ecart-2">
+      <button
+        id="projets-admin-bouton-creer"
+        type="button"
+        class="bouton"
+        [disabled]="!groupeSelectionneId"
+        [title]="groupeSelectionneId ? null : 'Sélectionnez un groupe pour créer un projet'"
+        (click)="ouvrirCreation()"
+      >
+        Créer un projet
+      </button>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="!groupeSelectionneId"
+        [title]="
+          groupeSelectionneId
+            ? null
+            : 'Sélectionnez un groupe pour créer un projet et ajouter des sources'
+        "
+        (click)="ouvrirCreationAvecSources()"
+      >
+        Créer et ajouter des sources
+      </button>
+    </div>
+  </header>
+
+  <ul
+    id="projets-admin-liste"
+    class="projets-admin__liste sans-liste d-flex direction-colonne ecart-2"
+  >
+    @for (ligne of lignesProjets(); track ligne.projet.id) {
+      <li
+        class="projets-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+      >
+        <span class="projets-admin__groupe texte-discret texte-sm">{{ ligne.groupeNom }}</span>
+        <span class="projets-admin__nom poids-demi-gras">{{ ligne.projet.nom }}</span>
+        <span class="projets-admin__description texte-discret texte-sm">{{
+          ligne.projet.description
+        }}</span>
+        <span class="projets-admin__nombre-sources texte-discret texte-sm"
+          >{{ ligne.projet.sources.length }} source(s)</span
+        >
+        <span class="projets-admin__politique-ia texte-discret texte-sm italique">
+          {{ ligne.projet.iaAutorisee ? 'IA autorisée' : 'IA interdite' }}
+        </span>
         <button
-          id="projets-admin-bouton-creer"
+          type="button"
+          class="bouton bouton--discret"
+          [disabled]="politiqueIAEnCours()"
+          (click)="demanderBasculePolitiqueIA(ligne)"
+        >
+          {{ ligne.projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(ligne)">
+          Modifier
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="dupliquer(ligne)">
+          Dupliquer
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="demanderSuppression(ligne)">
+          Supprimer
+        </button>
+      </li>
+    } @empty {
+      <li class="projets-admin__vide texte-discret">Aucun projet ne correspond à ce filtre.</li>
+    }
+  </ul>
+
+  @if (lignePolitiqueIAEnAttente()) {
+    <app-confirmation-mot-de-passe
+      message="Ressaisissez le mot de passe du fichier pour modifier la politique IA de ce projet."
+      (confirmee)="confirmerBasculePolitiqueIA($event)"
+      (annulee)="annulerBasculePolitiqueIA()"
+    />
+  }
+
+  @if (ligneASupprimer) {
+    <app-confirmation-suppression
+      message="La suppression d'un projet entraîne la perte de son historique d'audits. Cette action est irréversible."
+      (confirmee)="confirmerSuppression()"
+      (annulee)="annulerSuppression()"
+    />
+  }
+
+  @if (formulaireVisible) {
+    <form
+      class="projets-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
+      (ngSubmit)="enregistrer()"
+    >
+      <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+        {{
+          ligneEnEdition
+            ? 'Modifier le projet'
+            : creationAvecSourcesDemandee
+              ? 'Créer un projet et ajouter des sources'
+              : 'Créer un projet'
+        }}
+      </h3>
+
+      @if (messageErreur) {
+        <p class="projets-admin__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
+      }
+
+      <label class="champ">
+        Nom
+        <input
+          id="projets-admin-champ-nom"
+          type="text"
+          class="champ__controle"
+          name="nom"
+          [(ngModel)]="nom"
+          required
+        />
+      </label>
+
+      <label class="champ">
+        Description
+        <textarea
+          id="projets-admin-champ-description"
+          class="champ__controle"
+          name="description"
+          [(ngModel)]="description"
+        ></textarea>
+      </label>
+
+      <div class="projets-admin__actions-formulaire d-flex justifie-fin ecart-2">
+        <button
+          id="projets-admin-bouton-annuler"
           type="button"
           class="bouton"
-          (click)="ouvrirCreation()"
+          (click)="fermerFormulaire()"
         >
-          Créer un projet
+          Annuler
         </button>
-        <button type="button" class="bouton" (click)="ouvrirCreationAvecSources()">
-          Créer et ajouter des sources
+        <button
+          id="projets-admin-bouton-enregistrer"
+          type="submit"
+          class="bouton bouton--principal"
+        >
+          Enregistrer
         </button>
       </div>
-    </header>
+    </form>
+  }
 
-    <ul
-      id="projets-admin-liste"
-      class="projets-admin__liste sans-liste d-flex direction-colonne ecart-2"
+  @if (projetPourSourcesId && groupeSelectionneId) {
+    <section
+      class="projets-admin__mini-flux-sources carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
     >
-      @for (projet of projets(); track projet.id) {
-        <li
-          class="projets-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+      <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+        Ajouter des sources au projet créé
+      </h3>
+      <p class="texte-discret texte-sm exterieur-bas-0 exterieur-haut-0">
+        Groupe et projet déjà sélectionnés : ajoutez une ou plusieurs sources, ou terminez pour
+        créer le projet suivant.
+      </p>
+
+      <app-formulaire-source
+        #formulaireSource
+        [groupeId]="groupeSelectionneId"
+        [projetId]="projetPourSourcesId"
+        [actionsVisibles]="false"
+        (enregistree)="reinitialiserApresAjoutSource()"
+      />
+
+      <div class="projets-admin__actions-mini-flux d-flex justifie-fin ecart-2">
+        <button type="button" class="bouton" (click)="ajouterAutreSource()">
+          Ajouter une autre source
+        </button>
+        <button
+          type="button"
+          class="bouton bouton--principal"
+          (click)="terminerProjetPasserAuSuivant()"
         >
-          <span class="projets-admin__nom poids-demi-gras">{{ projet.nom }}</span>
-          <span class="projets-admin__description texte-discret texte-sm">{{
-            projet.description
-          }}</span>
-          <span class="projets-admin__nombre-sources texte-discret texte-sm"
-            >{{ projet.sources.length }} source(s)</span
-          >
-          <span class="projets-admin__politique-ia texte-discret texte-sm italique">
-            {{ projet.iaAutorisee ? 'IA autorisée' : 'IA interdite' }}
-          </span>
-          <button
-            type="button"
-            class="bouton bouton--discret"
-            [disabled]="politiqueIAEnCours()"
-            (click)="demanderBasculePolitiqueIA(projet.id)"
-          >
-            {{ projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
-          </button>
-          <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(projet.id)">
-            Modifier
-          </button>
-          <button type="button" class="bouton bouton--discret" (click)="dupliquer(projet.id)">
-            Dupliquer
-          </button>
-          <button
-            type="button"
-            class="bouton bouton--discret"
-            (click)="demanderSuppression(projet.id)"
-          >
-            Supprimer
-          </button>
-        </li>
-      } @empty {
-        <li class="projets-admin__vide texte-discret">
-          Aucun projet n'est encore défini pour ce groupe.
-        </li>
-      }
-    </ul>
-
-    @if (projetPolitiqueIAEnAttenteId()) {
-      <app-confirmation-mot-de-passe
-        message="Ressaisissez le mot de passe du fichier pour modifier la politique IA de ce projet."
-        (confirmee)="confirmerBasculePolitiqueIA($event)"
-        (annulee)="annulerBasculePolitiqueIA()"
-      />
-    }
-
-    @if (projetASupprimerId) {
-      <app-confirmation-suppression
-        message="La suppression d'un projet entraîne la perte de son historique d'audits. Cette action est irréversible."
-        (confirmee)="confirmerSuppression()"
-        (annulee)="annulerSuppression()"
-      />
-    }
-
-    @if (formulaireVisible) {
-      <form
-        class="projets-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
-        (ngSubmit)="enregistrer()"
-      >
-        <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
-          {{
-            projetEnEditionId
-              ? 'Modifier le projet'
-              : creationAvecSourcesDemandee
-                ? 'Créer un projet et ajouter des sources'
-                : 'Créer un projet'
-          }}
-        </h3>
-
-        @if (messageErreur) {
-          <p class="projets-admin__erreur texte-rouge" role="alert">{{ messageErreur }}</p>
-        }
-
-        <label class="champ">
-          Nom
-          <input
-            id="projets-admin-champ-nom"
-            type="text"
-            class="champ__controle"
-            name="nom"
-            [(ngModel)]="nom"
-            required
-          />
-        </label>
-
-        <label class="champ">
-          Description
-          <textarea
-            id="projets-admin-champ-description"
-            class="champ__controle"
-            name="description"
-            [(ngModel)]="description"
-          ></textarea>
-        </label>
-
-        <div class="projets-admin__actions-formulaire d-flex justifie-fin ecart-2">
-          <button
-            id="projets-admin-bouton-annuler"
-            type="button"
-            class="bouton"
-            (click)="fermerFormulaire()"
-          >
-            Annuler
-          </button>
-          <button
-            id="projets-admin-bouton-enregistrer"
-            type="submit"
-            class="bouton bouton--principal"
-          >
-            Enregistrer
-          </button>
-        </div>
-      </form>
-    }
-
-    @if (projetPourSourcesId && groupeSelectionneId) {
-      <section
-        class="projets-admin__mini-flux-sources carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
-      >
-        <h3 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
-          Ajouter des sources au projet créé
-        </h3>
-        <p class="texte-discret texte-sm exterieur-bas-0 exterieur-haut-0">
-          Groupe et projet déjà sélectionnés : ajoutez une ou plusieurs sources, ou terminez pour
-          créer le projet suivant.
-        </p>
-
-        <app-formulaire-source
-          #formulaireSource
-          [groupeId]="groupeSelectionneId"
-          [projetId]="projetPourSourcesId"
-          [actionsVisibles]="false"
-          (enregistree)="reinitialiserApresAjoutSource()"
-        />
-
-        <div class="projets-admin__actions-mini-flux d-flex justifie-fin ecart-2">
-          <button type="button" class="bouton" (click)="ajouterAutreSource()">
-            Ajouter une autre source
-          </button>
-          <button
-            type="button"
-            class="bouton bouton--principal"
-            (click)="terminerProjetPasserAuSuivant()"
-          >
-            Terminer ce projet, projet suivant
-          </button>
-        </div>
-      </section>
-    }
+          Terminer ce projet, projet suivant
+        </button>
+      </div>
+    </section>
   }
 </section>

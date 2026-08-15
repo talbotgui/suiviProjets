@@ -107,8 +107,23 @@ describe('SqmProjetsAdminComponent', () => {
     composant = fixture.componentInstance;
   });
 
-  it("n'affiche aucun projet tant qu'aucun groupe n'est sélectionné", () => {
-    expect(composant.projets()).toEqual([]);
+  it('agrège les projets de tous les groupes tant qu’aucun filtre Groupe n’est sélectionné', () => {
+    const autreGroupeId = donneesApplication.creerGroupe({
+      nom: 'Socle Technique',
+      description: '',
+      instances: [],
+    });
+    donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
+    donneesApplication.creerProjet(autreGroupeId, { nom: 'API Paiement', description: '' });
+
+    const lignes = composant.lignesProjets();
+
+    expect(lignes).toHaveLength(2);
+    expect(lignes.find((l) => l.projet.nom === 'API Facturation')?.groupeId).toBe(groupeId);
+    expect(lignes.find((l) => l.projet.nom === 'API Facturation')?.groupeNom).toBe(
+      'Socle Comptable',
+    );
+    expect(lignes.find((l) => l.projet.nom === 'API Paiement')?.groupeId).toBe(autreGroupeId);
   });
 
   it('affiche les projets du groupe sélectionné', () => {
@@ -116,7 +131,7 @@ describe('SqmProjetsAdminComponent', () => {
 
     composant.selectionnerGroupe(groupeId);
 
-    expect(composant.projets()).toHaveLength(1);
+    expect(composant.lignesProjets()).toHaveLength(1);
   });
 
   it('refuse la création sans nom', () => {
@@ -127,7 +142,7 @@ describe('SqmProjetsAdminComponent', () => {
     composant.enregistrer();
 
     expect(composant.messageErreur).toBe('Le nom du projet est obligatoire.');
-    expect(composant.projets()).toEqual([]);
+    expect(composant.lignesProjets()).toEqual([]);
   });
 
   it('crée un projet avec la politique IA interdite par défaut (RG-014, US-038 : notification de succès)', () => {
@@ -137,7 +152,7 @@ describe('SqmProjetsAdminComponent', () => {
 
     composant.enregistrer();
 
-    expect(composant.projets()[0].iaAutorisee).toBe(false);
+    expect(composant.lignesProjets()[0].projet.iaAutorisee).toBe(false);
     expect(composant.formulaireVisible).toBe(false);
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'succes', message: 'Le projet a été créé.' }),
@@ -145,65 +160,100 @@ describe('SqmProjetsAdminComponent', () => {
   });
 
   it('modifie un projet existant (US-038 : notification de succès)', () => {
-    const projetId = donneesApplication.creerProjet(groupeId, {
-      nom: 'API Facturation',
-      description: '',
-    });
+    donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
     composant.selectionnerGroupe(groupeId);
 
-    composant.ouvrirEdition(projetId);
+    composant.ouvrirEdition(composant.lignesProjets()[0]);
     composant.nom = 'Nouveau nom';
     composant.enregistrer();
 
-    expect(composant.projets()[0].nom).toBe('Nouveau nom');
+    expect(composant.lignesProjets()[0].projet.nom).toBe('Nouveau nom');
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'succes', message: 'Le projet a été modifié.' }),
     ]);
   });
 
-  it('duplique un projet avec ses sources (US-038 : notification de succès)', () => {
-    const projetId = donneesApplication.creerProjet(groupeId, {
-      nom: 'API Facturation',
+  it('modifie un projet à partir de la liste agrégée « Tous les groupes », en utilisant son groupe réel plutôt que le filtre courant (nul ici)', () => {
+    const autreGroupeId = donneesApplication.creerGroupe({
+      nom: 'Socle Technique',
       description: '',
+      instances: [],
     });
+    donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
+    donneesApplication.creerProjet(autreGroupeId, { nom: 'API Paiement', description: '' });
+    const ligne = composant.lignesProjets().find((l) => l.projet.nom === 'API Paiement');
+    if (!ligne) {
+      throw new Error('ligne attendue pour ce test');
+    }
+
+    composant.ouvrirEdition(ligne);
+    composant.nom = 'API Paiement v2';
+    composant.enregistrer();
+
+    const racine = DonneesDeTest.racineActuelle(donneesApplication);
+    const groupeModifie = racine.groupes.find((g) => g.id === autreGroupeId);
+    expect(groupeModifie?.projets[0]?.nom).toBe('API Paiement v2');
+    const groupeInitial = racine.groupes.find((g) => g.id === groupeId);
+    expect(groupeInitial?.projets[0]?.nom).toBe('API Facturation');
+  });
+
+  it('duplique un projet avec ses sources (US-038 : notification de succès)', () => {
+    donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
     composant.selectionnerGroupe(groupeId);
 
-    composant.dupliquer(projetId);
+    composant.dupliquer(composant.lignesProjets()[0]);
 
-    expect(composant.projets()).toHaveLength(2);
-    expect(composant.projets().some((p) => p.nom === 'API Facturation (copie)')).toBe(true);
+    expect(composant.lignesProjets()).toHaveLength(2);
+    expect(composant.lignesProjets().some((l) => l.projet.nom === 'API Facturation (copie)')).toBe(
+      true,
+    );
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'succes', message: 'Le projet a été dupliqué.' }),
     ]);
   });
 
   it('supprime un projet après confirmation (US-038 : notification de succès)', () => {
-    const projetId = donneesApplication.creerProjet(groupeId, {
-      nom: 'API Facturation',
-      description: '',
-    });
+    donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
     composant.selectionnerGroupe(groupeId);
 
-    composant.demanderSuppression(projetId);
+    composant.demanderSuppression(composant.lignesProjets()[0]);
     composant.confirmerSuppression();
 
-    expect(composant.projets()).toEqual([]);
+    expect(composant.lignesProjets()).toEqual([]);
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'succes', message: 'Le projet a été supprimé.' }),
     ]);
   });
 
   it("n'effectue aucune suppression en cas d'annulation", () => {
-    const projetId = donneesApplication.creerProjet(groupeId, {
-      nom: 'API Facturation',
-      description: '',
-    });
+    donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
     composant.selectionnerGroupe(groupeId);
 
-    composant.demanderSuppression(projetId);
+    composant.demanderSuppression(composant.lignesProjets()[0]);
     composant.annulerSuppression();
 
-    expect(composant.projets()).toHaveLength(1);
+    expect(composant.lignesProjets()).toHaveLength(1);
+  });
+
+  it('rend le gabarit sans erreur et marque le bouton de création comme désactivé tant qu’aucun groupe n’est sélectionné', () => {
+    fixture.detectChanges();
+
+    const boutonCreer = DomTestUtils.obtenirElementNatif(fixture).querySelector(
+      '#projets-admin-bouton-creer',
+    );
+    if (!(boutonCreer instanceof HTMLButtonElement)) {
+      throw new Error('bouton de création introuvable dans le gabarit sous test.');
+    }
+    expect(boutonCreer.disabled).toBe(true);
+  });
+
+  it('n’effectue aucune création tant qu’aucun groupe n’est sélectionné (filet de sécurité du bouton désactivé)', () => {
+    composant.ouvrirCreation();
+    composant.nom = 'API Facturation';
+
+    composant.enregistrer();
+
+    expect(composant.lignesProjets()).toEqual([]);
   });
 
   describe('politique IA (US-024, Phase 4)', () => {
@@ -218,17 +268,19 @@ describe('SqmProjetsAdminComponent', () => {
     });
 
     it('ouvre la ressaisie du mot de passe avant toute bascule', () => {
-      composant.demanderBasculePolitiqueIA(projetId);
+      const ligne = composant.lignesProjets()[0];
 
-      expect(composant.projetPolitiqueIAEnAttenteId()).toBe(projetId);
+      composant.demanderBasculePolitiqueIA(ligne);
+
+      expect(composant.lignePolitiqueIAEnAttente()).toBe(ligne);
     });
 
     it('annule la bascule demandée', () => {
-      composant.demanderBasculePolitiqueIA(projetId);
+      composant.demanderBasculePolitiqueIA(composant.lignesProjets()[0]);
 
       composant.annulerBasculePolitiqueIA();
 
-      expect(composant.projetPolitiqueIAEnAttenteId()).toBeNull();
+      expect(composant.lignePolitiqueIAEnAttente()).toBeNull();
     });
 
     it('autorise l’IA après confirmation du mot de passe et crée une annotation système (RG-015)', async () => {
@@ -263,7 +315,7 @@ describe('SqmProjetsAdminComponent', () => {
       invokeSimule.mockResolvedValue(racineAutorisee);
       const racineAvantAppel = DonneesDeTest.racineActuelle(donneesApplication);
 
-      composant.demanderBasculePolitiqueIA(projetId);
+      composant.demanderBasculePolitiqueIA(composant.lignesProjets()[0]);
       await composant.confirmerBasculePolitiqueIA('mot-de-passe');
 
       expect(invokeSimule).toHaveBeenCalledWith('definir_politique_ia', {
@@ -274,21 +326,21 @@ describe('SqmProjetsAdminComponent', () => {
         iaAutorisee: true,
         motDePasse: 'mot-de-passe',
       });
-      expect(composant.projets()[0].iaAutorisee).toBe(true);
-      expect(composant.projets()[0].annotations).toHaveLength(1);
-      expect(composant.projetPolitiqueIAEnAttenteId()).toBeNull();
+      expect(composant.lignesProjets()[0].projet.iaAutorisee).toBe(true);
+      expect(composant.lignesProjets()[0].projet.annotations).toHaveLength(1);
+      expect(composant.lignePolitiqueIAEnAttente()).toBeNull();
     });
 
     it('affiche un message d’erreur en cas de mot de passe incorrect', async () => {
       invokeSimule.mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
 
-      composant.demanderBasculePolitiqueIA(projetId);
+      composant.demanderBasculePolitiqueIA(composant.lignesProjets()[0]);
       await composant.confirmerBasculePolitiqueIA('mauvais-mot-de-passe');
 
       expect(TestBed.inject(NotificationService).liste()).toEqual([
         expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
       ]);
-      expect(composant.projets()[0].iaAutorisee).toBe(false);
+      expect(composant.lignesProjets()[0].projet.iaAutorisee).toBe(false);
     });
   });
 
@@ -327,8 +379,8 @@ describe('SqmProjetsAdminComponent', () => {
       composant.enregistrer();
 
       expect(composant.formulaireVisible).toBe(false);
-      expect(composant.projets()).toHaveLength(1);
-      expect(composant.projetPourSourcesId).toBe(composant.projets()[0].id);
+      expect(composant.lignesProjets()).toHaveLength(1);
+      expect(composant.projetPourSourcesId).toBe(composant.lignesProjets()[0].projet.id);
     });
 
     it('« Ajouter une autre source » enregistre la source puis réinitialise le formulaire sans fermer le mini-flux (US-038 : notification de succès)', () => {
@@ -345,7 +397,7 @@ describe('SqmProjetsAdminComponent', () => {
 
       composant.ajouterAutreSource();
 
-      expect(composant.projets()[0].sources).toHaveLength(1);
+      expect(composant.lignesProjets()[0].projet.sources).toHaveLength(1);
       expect(composant.projetPourSourcesId).not.toBeNull();
       expect(formulaireSource.instanceId()).toBe('');
       expect(formulaireSource.idExterne()).toBe('');
@@ -369,7 +421,7 @@ describe('SqmProjetsAdminComponent', () => {
 
       composant.terminerProjetPasserAuSuivant();
 
-      expect(composant.projets()[0].sources).toHaveLength(1);
+      expect(composant.lignesProjets()[0].projet.sources).toHaveLength(1);
       expect(composant.projetPourSourcesId).toBeNull();
       expect(composant.formulaireVisible).toBe(true);
       expect(composant.nom).toBe('');
@@ -388,7 +440,7 @@ describe('SqmProjetsAdminComponent', () => {
 
       composant.terminerProjetPasserAuSuivant();
 
-      expect(composant.projets()[0].sources).toEqual([]);
+      expect(composant.lignesProjets()[0].projet.sources).toEqual([]);
       expect(composant.projetPourSourcesId).toBeNull();
       expect(composant.formulaireVisible).toBe(true);
       expect(composant.creationAvecSourcesDemandee).toBe(true);
@@ -421,9 +473,9 @@ describe('SqmProjetsAdminComponent', () => {
       composant.nom = 'API Paiement';
       composant.enregistrer();
 
-      expect(composant.projets()).toHaveLength(2);
+      expect(composant.lignesProjets()).toHaveLength(2);
       expect(composant.projetPourSourcesId).toBe(
-        composant.projets().find((p) => p.nom === 'API Paiement')?.id,
+        composant.lignesProjets().find((l) => l.projet.nom === 'API Paiement')?.projet.id,
       );
     });
   });

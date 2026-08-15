@@ -15,6 +15,19 @@ import { NotificationService } from '../../../services/avecetat/etat/notificatio
 import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/types-donnees';
 
 /**
+ * Ligne agrégée de la liste des sources : porte la source ainsi que les identifiants et noms de son groupe et de
+ * son projet de rattachement réels, indépendamment des filtres Groupe/Projet actuellement sélectionnés (ces
+ * filtres restreignent l'affichage sans être un préalable obligatoire).
+ */
+export interface LigneSource {
+  readonly groupeId: string;
+  readonly groupeNom: string;
+  readonly projetId: string;
+  readonly projetNom: string;
+  readonly source: Source;
+}
+
+/**
  * Onglet Sources de l'écran Administration : sélection d'un groupe puis d'un projet, liste et suppression de ses
  * sources ; création/modification déléguée à `SqmFormulaireSourceComponent` (US-008).
  */
@@ -45,14 +58,32 @@ export class SqmSourcesAdminComponent {
   public formulaireVisible = false;
 
   /**
-   * Source en cours de modification, `null` en création.
+   * Ligne de la source en cours de modification, `null` en création. Porte les `groupeId`/`projetId` réels de la
+   * source, indépendants des filtres Groupe/Projet actuellement sélectionnés.
    */
-  public sourceEnEdition: Source | null = null;
+  public ligneEnEdition: LigneSource | null = null;
 
   /**
-   * Identifiant de la source dont la suppression est en cours de confirmation, `null` si aucune n'est en cours.
+   * Ligne de la source dont la suppression est en cours de confirmation, `null` si aucune n'est en cours. Porte
+   * les `groupeId`/`projetId` réels de la source, indépendants des filtres Groupe/Projet actuellement
+   * sélectionnés.
    */
-  public sourceASupprimerId: string | null = null;
+  public ligneASupprimer: LigneSource | null = null;
+
+  /**
+   * Identifiant du groupe transmis au formulaire de création/modification (`SqmFormulaireSourceComponent`),
+   * `null` tant que le formulaire n'est pas ouvert. Calculé une fois à l'ouverture ({@link ouvrirCreation}/
+   * {@link ouvrirEdition}) à partir du filtre courant ou de la ligne éditée, car l'input `groupeId` du composant
+   * enfant est obligatoire (`input.required`) et ne peut donc pas être lié directement aux filtres, qui peuvent
+   * valoir `null`.
+   */
+  public groupeIdFormulaire: string | null = null;
+
+  /**
+   * Identifiant du projet transmis au formulaire de création/modification, même principe que
+   * {@link groupeIdFormulaire}.
+   */
+  public projetIdFormulaire: string | null = null;
 
   /**
    * Groupes disponibles pour la sélection.
@@ -63,58 +94,106 @@ export class SqmSourcesAdminComponent {
   }
 
   /**
-   * Sélectionne le groupe dont les projets sont proposés.
-   * @param groupeId - Identifiant du groupe à sélectionner.
+   * Sélectionne le groupe filtrant les projets proposés et les sources affichées, `null` pour ne filtrer sur
+   * aucun groupe (tous les groupes confondus).
+   * @param groupeId - Identifiant du groupe à sélectionner, `null` pour « Tous les groupes ».
    */
-  public selectionnerGroupe(groupeId: string): void {
+  public selectionnerGroupe(groupeId: string | null): void {
     this.groupeSelectionneId = groupeId;
     this.projetSelectionneId = null;
     this.formulaireVisible = false;
   }
 
   /**
-   * Projets du groupe actuellement sélectionné.
-   * @returns Le tableau des projets du groupe sélectionné.
+   * Projets à proposer dans le filtre Projet compte tenu du filtre Groupe actuellement sélectionné. Sans filtre
+   * Groupe, agrège les projets de tous les groupes.
+   * @returns Le tableau des projets proposés.
    */
   public projets(): readonly Projet[] {
-    return this.groupes().find((groupe) => groupe.id === this.groupeSelectionneId)?.projets ?? [];
+    return this.groupes()
+      .filter(
+        (groupe) => this.groupeSelectionneId === null || groupe.id === this.groupeSelectionneId,
+      )
+      .flatMap((groupe) => groupe.projets);
   }
 
   /**
-   * Sélectionne le projet dont les sources sont affichées et administrées.
-   * @param projetId - Identifiant du projet à sélectionner.
+   * Recherche le groupe de rattachement réel d'un projet, quel que soit le filtre Groupe actuellement sélectionné.
+   * @param projetId - Identifiant du projet recherché.
+   * @returns L'identifiant du groupe de rattachement, `null` si aucun groupe ne contient ce projet.
    */
-  public selectionnerProjet(projetId: string): void {
+  private trouverGroupeDuProjet(projetId: string): string | null {
+    return (
+      this.groupes().find((groupe) => groupe.projets.some((projet) => projet.id === projetId))
+        ?.id ?? null
+    );
+  }
+
+  /**
+   * Sélectionne le projet filtrant les sources affichées, `null` pour ne filtrer sur aucun projet (tous les
+   * projets du filtre Groupe confondus). Choisir un projet aligne automatiquement le filtre Groupe sur le groupe
+   * de rattachement réel de ce projet, pour permettre de sélectionner un projet directement sans avoir au
+   * préalable choisi son groupe.
+   * @param projetId - Identifiant du projet à sélectionner, `null` pour « Tous les projets ».
+   */
+  public selectionnerProjet(projetId: string | null): void {
     this.projetSelectionneId = projetId;
+    if (projetId) {
+      const groupeDuProjet = this.trouverGroupeDuProjet(projetId);
+      if (groupeDuProjet) {
+        this.groupeSelectionneId = groupeDuProjet;
+      }
+    }
     this.formulaireVisible = false;
   }
 
   /**
-   * Sources du projet actuellement sélectionné.
-   * @returns Le tableau des sources du projet sélectionné.
+   * Sources à afficher compte tenu des filtres Groupe/Projet actuellement sélectionnés, chacune accompagnée des
+   * identifiants et noms de son groupe et de son projet de rattachement réels. Sans filtre, agrège les sources de
+   * tous les groupes et projets.
+   * @returns Le tableau des lignes de sources à afficher.
    */
-  public sources(): readonly Source[] {
-    return this.projets().find((projet) => projet.id === this.projetSelectionneId)?.sources ?? [];
+  public lignesSources(): readonly LigneSource[] {
+    return this.groupes()
+      .filter(
+        (groupe) => this.groupeSelectionneId === null || groupe.id === this.groupeSelectionneId,
+      )
+      .flatMap((groupe) =>
+        groupe.projets
+          .filter(
+            (projet) => this.projetSelectionneId === null || projet.id === this.projetSelectionneId,
+          )
+          .flatMap((projet) =>
+            projet.sources.map((source) => ({
+              groupeId: groupe.id,
+              groupeNom: groupe.nom,
+              projetId: projet.id,
+              projetNom: projet.nom,
+              source,
+            })),
+          ),
+      );
   }
 
   /**
-   * Ouvre le formulaire pour la création d'une nouvelle source au sein du projet sélectionné.
+   * Ouvre le formulaire pour la création d'une nouvelle source au sein des filtres Groupe/Projet actuellement
+   * sélectionnés.
    */
   public ouvrirCreation(): void {
-    this.sourceEnEdition = null;
+    this.ligneEnEdition = null;
+    this.groupeIdFormulaire = this.groupeSelectionneId;
+    this.projetIdFormulaire = this.projetSelectionneId;
     this.formulaireVisible = true;
   }
 
   /**
    * Ouvre le formulaire pré-rempli pour la modification d'une source existante.
-   * @param sourceId - Identifiant de la source à modifier.
+   * @param ligne - Ligne de la source à modifier, portant ses groupe et projet de rattachement réels.
    */
-  public ouvrirEdition(sourceId: string): void {
-    const source = this.sources().find((candidat) => candidat.id === sourceId);
-    if (!source) {
-      return;
-    }
-    this.sourceEnEdition = source;
+  public ouvrirEdition(ligne: LigneSource): void {
+    this.ligneEnEdition = ligne;
+    this.groupeIdFormulaire = ligne.groupeId;
+    this.projetIdFormulaire = ligne.projetId;
     this.formulaireVisible = true;
   }
 
@@ -131,38 +210,38 @@ export class SqmSourcesAdminComponent {
    */
   public onSourceEnregistree(): void {
     this.notification.succes(
-      this.sourceEnEdition ? 'La source a été modifiée.' : 'La source a été créée.',
+      this.ligneEnEdition ? 'La source a été modifiée.' : 'La source a été créée.',
     );
     this.fermerFormulaire();
   }
 
   /**
    * Demande la confirmation de suppression d'une source (US-008).
-   * @param sourceId - Identifiant de la source à supprimer.
+   * @param ligne - Ligne de la source à supprimer, portant ses groupe et projet de rattachement réels.
    */
-  public demanderSuppression(sourceId: string): void {
-    this.sourceASupprimerId = sourceId;
+  public demanderSuppression(ligne: LigneSource): void {
+    this.ligneASupprimer = ligne;
   }
 
   /**
    * Confirme la suppression de la source désignée par {@link demanderSuppression}.
    */
   public confirmerSuppression(): void {
-    if (this.groupeSelectionneId && this.projetSelectionneId && this.sourceASupprimerId) {
+    if (this.ligneASupprimer) {
       this.donneesApplication.supprimerSource(
-        this.groupeSelectionneId,
-        this.projetSelectionneId,
-        this.sourceASupprimerId,
+        this.ligneASupprimer.groupeId,
+        this.ligneASupprimer.projetId,
+        this.ligneASupprimer.source.id,
       );
       this.notification.succes('La source a été supprimée.');
     }
-    this.sourceASupprimerId = null;
+    this.ligneASupprimer = null;
   }
 
   /**
    * Annule la suppression demandée.
    */
   public annulerSuppression(): void {
-    this.sourceASupprimerId = null;
+    this.ligneASupprimer = null;
   }
 }

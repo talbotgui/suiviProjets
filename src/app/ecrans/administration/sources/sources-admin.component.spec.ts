@@ -3,8 +3,9 @@
 //
 // Depuis C11-01 (Phase 11), la saisie (création/modification, cascade Type→Instance, autocomplétions) est portée
 // par `SqmFormulaireSourceComponent` et testée dans `formulaire-source.component.spec.ts` : ce fichier se
-// recentre sur la cascade groupe/projet propre à cet écran, la liste, la suppression et le câblage vers le
-// composant enfant (visibilité du formulaire, source à modifier transmise, fermeture sur `enregistree`/`annulee`).
+// recentre sur les filtres groupe/projet propres à cet écran, la liste agrégée, la suppression et le câblage vers
+// le composant enfant (visibilité du formulaire, source à modifier transmise, fermeture sur
+// `enregistree`/`annulee`).
 import { TestBed } from '@angular/core/testing';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
@@ -92,10 +93,77 @@ describe('SqmSourcesAdminComponent', () => {
     });
   });
 
-  it("n'affiche aucune source tant qu'aucun projet n'est sélectionné", () => {
+  it("agrège les sources de tous les groupes et projets tant qu'aucun filtre n'est sélectionné", () => {
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '1234',
+      refAuditee: undefined,
+    });
+    const autreGroupeId = donneesApplication.creerGroupe({
+      nom: 'Socle Technique',
+      description: '',
+      instances: [
+        {
+          id: 'instance-gitlab-2',
+          type: TypeInstance.Gitlab,
+          nom: 'gitlab-tech',
+          urlBase: 'https://gitlab-tech.test',
+        },
+      ],
+    });
+    const autreProjetId = donneesApplication.creerProjet(autreGroupeId, {
+      nom: 'API Paiement',
+      description: '',
+    });
+    donneesApplication.creerSource(autreGroupeId, autreProjetId, {
+      instanceId: 'instance-gitlab-2',
+      type: TypeSource.DepotGitlab,
+      idExterne: '5678',
+      refAuditee: undefined,
+    });
 
-    expect(composant.sources()).toEqual([]);
+    const lignes = composant.lignesSources();
+
+    expect(lignes).toHaveLength(2);
+    const ligneFacturation = lignes.find((l) => l.source.idExterne === '1234');
+    expect(ligneFacturation?.groupeId).toBe(groupeId);
+    expect(ligneFacturation?.projetId).toBe(projetId);
+    expect(ligneFacturation?.projetNom).toBe('API Facturation');
+    const lignePaiement = lignes.find((l) => l.source.idExterne === '5678');
+    expect(lignePaiement?.groupeId).toBe(autreGroupeId);
+    expect(lignePaiement?.projetId).toBe(autreProjetId);
+  });
+
+  it('restreint les sources aux projets du groupe filtré quand aucun projet n’est sélectionné', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '1234',
+      refAuditee: undefined,
+    });
+    const autreGroupeId = donneesApplication.creerGroupe({
+      nom: 'Socle Technique',
+      description: '',
+      instances: [],
+    });
+    const autreProjetId = donneesApplication.creerProjet(autreGroupeId, {
+      nom: 'API Paiement',
+      description: '',
+    });
+    donneesApplication.creerSource(autreGroupeId, autreProjetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '5678',
+      refAuditee: undefined,
+    });
+
+    composant.selectionnerGroupe(groupeId);
+
+    expect(composant.lignesSources()).toHaveLength(1);
+    expect(composant.lignesSources()[0].source.idExterne).toBe('1234');
   });
 
   it('filtre les projets par groupe puis les sources par projet sélectionnés', () => {
@@ -111,7 +179,7 @@ describe('SqmSourcesAdminComponent', () => {
     composant.selectionnerProjet(projetId);
 
     expect(composant.projets()).toHaveLength(1);
-    expect(composant.sources()).toHaveLength(1);
+    expect(composant.lignesSources()).toHaveLength(1);
   });
 
   it('réinitialise le projet sélectionné et referme le formulaire au changement de groupe', () => {
@@ -126,7 +194,16 @@ describe('SqmSourcesAdminComponent', () => {
     expect(composant.formulaireVisible).toBe(false);
   });
 
-  it('ouvre le formulaire en édition avec la source correspondante', () => {
+  it('sélectionner un projet directement, sans groupe préalablement choisi, aligne automatiquement le filtre Groupe sur son groupe réel', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+
+    composant.selectionnerProjet(projetId);
+
+    expect(composant.groupeSelectionneId).toBe(groupeId);
+    expect(composant.projetSelectionneId).toBe(projetId);
+  });
+
+  it('ouvre le formulaire en édition avec la source correspondante, portant son groupe/projet réels', () => {
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
     const sourceId = donneesApplication.creerSource(groupeId, projetId, {
       instanceId: 'instance-gitlab',
@@ -136,14 +213,20 @@ describe('SqmSourcesAdminComponent', () => {
     });
     composant.selectionnerGroupe(groupeId);
     composant.selectionnerProjet(projetId);
+    const ligne = composant.lignesSources().find((l) => l.source.id === sourceId);
+    if (!ligne) {
+      throw new Error('ligne attendue pour ce test');
+    }
 
-    composant.ouvrirEdition(sourceId);
+    composant.ouvrirEdition(ligne);
 
     expect(composant.formulaireVisible).toBe(true);
-    expect(composant.sourceEnEdition?.id).toBe(sourceId);
+    expect(composant.ligneEnEdition?.source.id).toBe(sourceId);
+    expect(composant.groupeIdFormulaire).toBe(groupeId);
+    expect(composant.projetIdFormulaire).toBe(projetId);
   });
 
-  it('ouvre le formulaire en création (sourceEnEdition à null)', () => {
+  it('ouvre le formulaire en création (ligneEnEdition à null), en figeant les filtres courants pour le composant enfant', () => {
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
     composant.selectionnerGroupe(groupeId);
     composant.selectionnerProjet(projetId);
@@ -151,7 +234,9 @@ describe('SqmSourcesAdminComponent', () => {
     composant.ouvrirCreation();
 
     expect(composant.formulaireVisible).toBe(true);
-    expect(composant.sourceEnEdition).toBeNull();
+    expect(composant.ligneEnEdition).toBeNull();
+    expect(composant.groupeIdFormulaire).toBe(groupeId);
+    expect(composant.projetIdFormulaire).toBe(projetId);
   });
 
   it('referme le formulaire quand le composant enfant émet enregistree ou annulee', () => {
@@ -168,6 +253,22 @@ describe('SqmSourcesAdminComponent', () => {
     composant.fermerFormulaire();
 
     expect(composant.formulaireVisible).toBe(false);
+  });
+
+  it('n’affiche pas le composant enfant tant que groupe et projet ne sont pas tous deux sélectionnés', () => {
+    const fixture = TestBed.createComponent(SqmSourcesAdminComponent);
+    const composant = fixture.componentInstance;
+    composant.ouvrirCreation();
+    fixture.detectChanges();
+
+    const elementNatif = DomTestUtils.obtenirElementNatif(fixture);
+    expect(elementNatif.querySelector('app-formulaire-source')).toBeNull();
+
+    const boutonCreer = elementNatif.querySelector('#sources-admin-bouton-creer');
+    if (!(boutonCreer instanceof HTMLButtonElement)) {
+      throw new Error('bouton de création introuvable dans le gabarit sous test.');
+    }
+    expect(boutonCreer.disabled).toBe(true);
   });
 
   it('notifie le succès et referme le formulaire à la création (US-038)', () => {
@@ -194,7 +295,11 @@ describe('SqmSourcesAdminComponent', () => {
       idExterne: '1234',
       refAuditee: undefined,
     });
-    composant.ouvrirEdition(sourceId);
+    const ligne = composant.lignesSources().find((l) => l.source.id === sourceId);
+    if (!ligne) {
+      throw new Error('ligne attendue pour ce test');
+    }
+    composant.ouvrirEdition(ligne);
 
     composant.onSourceEnregistree();
 
@@ -213,14 +318,53 @@ describe('SqmSourcesAdminComponent', () => {
       idExterne: '1234',
       refAuditee: undefined,
     });
+    const ligne = composant.lignesSources().find((l) => l.source.id === sourceId);
+    if (!ligne) {
+      throw new Error('ligne attendue pour ce test');
+    }
 
-    composant.demanderSuppression(sourceId);
+    composant.demanderSuppression(ligne);
     composant.confirmerSuppression();
 
-    expect(composant.sources()).toEqual([]);
+    expect(composant.lignesSources()).toEqual([]);
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'succes', message: 'La source a été supprimée.' }),
     ]);
+  });
+
+  it('modifie une source à partir de la liste agrégée « Tous les groupes », en utilisant son groupe/projet réels plutôt que les filtres courants (nuls ici)', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '1234',
+      refAuditee: undefined,
+    });
+    const autreGroupeId = donneesApplication.creerGroupe({
+      nom: 'Socle Technique',
+      description: '',
+      instances: [],
+    });
+    const autreProjetId = donneesApplication.creerProjet(autreGroupeId, {
+      nom: 'API Paiement',
+      description: '',
+    });
+    const autreSourceId = donneesApplication.creerSource(autreGroupeId, autreProjetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '5678',
+      refAuditee: undefined,
+    });
+    const ligne = composant.lignesSources().find((l) => l.source.id === autreSourceId);
+    if (!ligne) {
+      throw new Error('ligne attendue pour ce test');
+    }
+
+    composant.demanderSuppression(ligne);
+    composant.confirmerSuppression();
+
+    expect(composant.lignesSources()).toHaveLength(1);
+    expect(composant.lignesSources()[0].source.idExterne).toBe('1234');
   });
 
   it('annule la suppression demandée', () => {
@@ -233,11 +377,15 @@ describe('SqmSourcesAdminComponent', () => {
       idExterne: '1234',
       refAuditee: undefined,
     });
+    const ligne = composant.lignesSources().find((l) => l.source.id === sourceId);
+    if (!ligne) {
+      throw new Error('ligne attendue pour ce test');
+    }
 
-    composant.demanderSuppression(sourceId);
+    composant.demanderSuppression(ligne);
     composant.annulerSuppression();
 
-    expect(composant.sourceASupprimerId).toBeNull();
-    expect(composant.sources()).toHaveLength(1);
+    expect(composant.ligneASupprimer).toBeNull();
+    expect(composant.lignesSources()).toHaveLength(1);
   });
 });

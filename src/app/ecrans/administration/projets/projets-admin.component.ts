@@ -25,6 +25,17 @@ import { NotificationService } from '../../../services/avecetat/etat/notificatio
 import type { Groupe, Projet } from '../../../services/avecetat/etat/types-donnees';
 
 /**
+ * Ligne agrégée de la liste des projets : porte le projet ainsi que l'identifiant et le nom de son groupe de
+ * rattachement réel, indépendamment du filtre Groupe actuellement sélectionné (le filtre Groupe restreint
+ * l'affichage sans être un préalable obligatoire).
+ */
+export interface LigneProjet {
+  readonly groupeId: string;
+  readonly groupeNom: string;
+  readonly projet: Projet;
+}
+
+/**
  * Onglet Projets de l'écran Administration : sélection d'un groupe puis CRUD complet de ses projets, avec
  * duplication (US-007), contrôle de la politique IA (US-024) et enchaînement guidé vers l'ajout de sources
  * (US-007, C11-01). L'origine consignée au journal (RG-023) pour la bascule de politique IA est fixée côté cœur
@@ -63,9 +74,10 @@ export class SqmProjetsAdminComponent {
   public formulaireVisible = false;
 
   /**
-   * Identifiant du projet en cours de modification, `null` en création.
+   * Ligne du projet en cours de modification, `null` en création. Porte le `groupeId` réel du projet, indépendant
+   * du filtre Groupe actuellement sélectionné.
    */
-  public projetEnEditionId: string | null = null;
+  public ligneEnEdition: LigneProjet | null = null;
 
   /**
    * Nom saisi dans le formulaire.
@@ -83,23 +95,24 @@ export class SqmProjetsAdminComponent {
   public messageErreur: string | null = null;
 
   /**
-   * Identifiant du projet dont la suppression est en cours de confirmation, `null` si aucune n'est en cours.
+   * Ligne du projet dont la suppression est en cours de confirmation, `null` si aucune n'est en cours. Porte le
+   * `groupeId` réel du projet, indépendant du filtre Groupe actuellement sélectionné.
    */
-  public projetASupprimerId: string | null = null;
+  public ligneASupprimer: LigneProjet | null = null;
 
   /**
-   * Identifiant du projet dont la bascule de politique IA attend la ressaisie du mot de passe du fichier
-   * (RG-002), `null` si aucune bascule n'est en cours. Porté par un signal (plutôt qu'une simple propriété) car
-   * mis à jour depuis la continuation asynchrone de {@link confirmerBasculePolitiqueIA}, cf. `cheminCreation` de
+   * Ligne du projet dont la bascule de politique IA attend la ressaisie du mot de passe du fichier (RG-002),
+   * `null` si aucune bascule n'est en cours. Porte le `groupeId` réel du projet, indépendant du filtre Groupe
+   * actuellement sélectionné. Porté par un signal (plutôt qu'une simple propriété) car mis à jour depuis la
+   * continuation asynchrone de {@link confirmerBasculePolitiqueIA}, cf. `cheminCreation` de
    * `demarrage.component.ts`.
    */
-  public readonly projetPolitiqueIAEnAttenteId: WritableSignal<string | null> = signal<
-    string | null
-  >(null);
+  public readonly lignePolitiqueIAEnAttente: WritableSignal<LigneProjet | null> =
+    signal<LigneProjet | null>(null);
 
   /**
    * Indique qu'une bascule de politique IA est en cours, pour désactiver les actions concurrentes. Signal pour le
-   * même motif que {@link projetPolitiqueIAEnAttenteId}.
+   * même motif que {@link lignePolitiqueIAEnAttente}.
    */
   public readonly politiqueIAEnCours: WritableSignal<boolean> = signal(false);
 
@@ -125,21 +138,29 @@ export class SqmProjetsAdminComponent {
   }
 
   /**
-   * Sélectionne le groupe dont les projets sont affichés et administrés.
-   * @param groupeId - Identifiant du groupe à sélectionner.
+   * Sélectionne le groupe filtrant la liste des projets affichés, `null` pour ne filtrer sur aucun groupe (tous
+   * les groupes confondus).
+   * @param groupeId - Identifiant du groupe à sélectionner, `null` pour « Tous les groupes ».
    */
-  public selectionnerGroupe(groupeId: string): void {
+  public selectionnerGroupe(groupeId: string | null): void {
     this.groupeSelectionneId = groupeId;
     this.formulaireVisible = false;
     this.projetPourSourcesId = null;
   }
 
   /**
-   * Projets du groupe actuellement sélectionné, tableau vide si aucun groupe n'est sélectionné.
-   * @returns Le tableau des projets du groupe sélectionné.
+   * Projets à afficher compte tenu du filtre Groupe actuellement sélectionné, chacun accompagné de l'identifiant
+   * et du nom de son groupe de rattachement réel. Sans filtre, agrège les projets de tous les groupes.
+   * @returns Le tableau des lignes de projets à afficher.
    */
-  public projets(): readonly Projet[] {
-    return this.groupes().find((groupe) => groupe.id === this.groupeSelectionneId)?.projets ?? [];
+  public lignesProjets(): readonly LigneProjet[] {
+    return this.groupes()
+      .filter(
+        (groupe) => this.groupeSelectionneId === null || groupe.id === this.groupeSelectionneId,
+      )
+      .flatMap((groupe) =>
+        groupe.projets.map((projet) => ({ groupeId: groupe.id, groupeNom: groupe.nom, projet })),
+      );
   }
 
   /**
@@ -147,7 +168,7 @@ export class SqmProjetsAdminComponent {
    * échéant, le mini-flux guidé d'ajout de sources en cours (C11-01).
    */
   public ouvrirCreation(): void {
-    this.projetEnEditionId = null;
+    this.ligneEnEdition = null;
     this.nom = '';
     this.description = '';
     this.messageErreur = null;
@@ -168,16 +189,12 @@ export class SqmProjetsAdminComponent {
   /**
    * Ouvre le formulaire pré-rempli pour la modification d'un projet existant. Referme, le cas échéant, le
    * mini-flux guidé d'ajout de sources en cours (C11-01).
-   * @param projetId - Identifiant du projet à modifier.
+   * @param ligne - Ligne du projet à modifier, portant son groupe de rattachement réel.
    */
-  public ouvrirEdition(projetId: string): void {
-    const projet = this.projets().find((candidat) => candidat.id === projetId);
-    if (!projet) {
-      return;
-    }
-    this.projetEnEditionId = projet.id;
-    this.nom = projet.nom;
-    this.description = projet.description;
+  public ouvrirEdition(ligne: LigneProjet): void {
+    this.ligneEnEdition = ligne;
+    this.nom = ligne.projet.nom;
+    this.description = ligne.projet.description;
     this.messageErreur = null;
     this.creationAvecSourcesDemandee = false;
     this.projetPourSourcesId = null;
@@ -197,9 +214,6 @@ export class SqmProjetsAdminComponent {
    * sources (US-007, C11-01) plutôt que de simplement fermer le formulaire.
    */
   public enregistrer(): void {
-    if (!this.groupeSelectionneId) {
-      return;
-    }
     if (this.nom.trim().length === 0) {
       this.messageErreur = 'Le nom du projet est obligatoire.';
       return;
@@ -207,10 +221,10 @@ export class SqmProjetsAdminComponent {
 
     const donnees: DonneesProjet = { nom: this.nom.trim(), description: this.description.trim() };
 
-    if (this.projetEnEditionId) {
+    if (this.ligneEnEdition) {
       this.donneesApplication.modifierProjet(
-        this.groupeSelectionneId,
-        this.projetEnEditionId,
+        this.ligneEnEdition.groupeId,
+        this.ligneEnEdition.projet.id,
         donnees,
       );
       this.formulaireVisible = false;
@@ -218,6 +232,9 @@ export class SqmProjetsAdminComponent {
       return;
     }
 
+    if (!this.groupeSelectionneId) {
+      return;
+    }
     const projetId = this.donneesApplication.creerProjet(this.groupeSelectionneId, donnees);
     this.formulaireVisible = false;
     this.notification.succes('Le projet a été créé.');
@@ -272,56 +289,56 @@ export class SqmProjetsAdminComponent {
   }
 
   /**
-   * Duplique un projet existant au sein du même groupe (US-007).
-   * @param projetId - Identifiant du projet à dupliquer.
+   * Duplique un projet existant au sein de son groupe de rattachement (US-007).
+   * @param ligne - Ligne du projet à dupliquer, portant son groupe de rattachement réel.
    */
-  public dupliquer(projetId: string): void {
-    if (!this.groupeSelectionneId) {
-      return;
-    }
-    this.donneesApplication.dupliquerProjet(this.groupeSelectionneId, projetId);
+  public dupliquer(ligne: LigneProjet): void {
+    this.donneesApplication.dupliquerProjet(ligne.groupeId, ligne.projet.id);
     this.notification.succes('Le projet a été dupliqué.');
   }
 
   /**
    * Demande la confirmation de suppression d'un projet (US-007 : suppression confirmée).
-   * @param projetId - Identifiant du projet à supprimer.
+   * @param ligne - Ligne du projet à supprimer, portant son groupe de rattachement réel.
    */
-  public demanderSuppression(projetId: string): void {
-    this.projetASupprimerId = projetId;
+  public demanderSuppression(ligne: LigneProjet): void {
+    this.ligneASupprimer = ligne;
   }
 
   /**
    * Confirme la suppression du projet désigné par {@link demanderSuppression}.
    */
   public confirmerSuppression(): void {
-    if (this.groupeSelectionneId && this.projetASupprimerId) {
-      this.donneesApplication.supprimerProjet(this.groupeSelectionneId, this.projetASupprimerId);
+    if (this.ligneASupprimer) {
+      this.donneesApplication.supprimerProjet(
+        this.ligneASupprimer.groupeId,
+        this.ligneASupprimer.projet.id,
+      );
       this.notification.succes('Le projet a été supprimé.');
     }
-    this.projetASupprimerId = null;
+    this.ligneASupprimer = null;
   }
 
   /**
    * Annule la suppression demandée.
    */
   public annulerSuppression(): void {
-    this.projetASupprimerId = null;
+    this.ligneASupprimer = null;
   }
 
   /**
    * Ouvre la ressaisie du mot de passe du fichier avant de basculer la politique IA d'un projet (US-024, RG-002).
-   * @param projetId - Identifiant du projet concerné.
+   * @param ligne - Ligne du projet concerné, portant son groupe de rattachement réel.
    */
-  public demanderBasculePolitiqueIA(projetId: string): void {
-    this.projetPolitiqueIAEnAttenteId.set(projetId);
+  public demanderBasculePolitiqueIA(ligne: LigneProjet): void {
+    this.lignePolitiqueIAEnAttente.set(ligne);
   }
 
   /**
    * Annule la bascule de politique IA demandée.
    */
   public annulerBasculePolitiqueIA(): void {
-    this.projetPolitiqueIAEnAttenteId.set(null);
+    this.lignePolitiqueIAEnAttente.set(null);
   }
 
   /**
@@ -330,26 +347,20 @@ export class SqmProjetsAdminComponent {
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerBasculePolitiqueIA(motDePasse: string): Promise<void> {
-    const projetId = this.projetPolitiqueIAEnAttenteId();
-    if (!this.groupeSelectionneId || !projetId) {
-      this.projetPolitiqueIAEnAttenteId.set(null);
-      return;
-    }
-    const projet = this.projets().find((candidat) => candidat.id === projetId);
-    if (!projet) {
-      this.projetPolitiqueIAEnAttenteId.set(null);
+    const ligne = this.lignePolitiqueIAEnAttente();
+    if (!ligne) {
       return;
     }
 
     this.politiqueIAEnCours.set(true);
     const resultat = await this.donneesApplication.definirPolitiqueIA(
-      this.groupeSelectionneId,
-      projetId,
-      !projet.iaAutorisee,
+      ligne.groupeId,
+      ligne.projet.id,
+      !ligne.projet.iaAutorisee,
       motDePasse,
     );
     this.politiqueIAEnCours.set(false);
-    this.projetPolitiqueIAEnAttenteId.set(null);
+    this.lignePolitiqueIAEnAttente.set(null);
 
     if (resultat.type === 'echec') {
       this.notification.erreur(
