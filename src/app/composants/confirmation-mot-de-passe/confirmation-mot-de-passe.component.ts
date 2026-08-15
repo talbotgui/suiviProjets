@@ -7,8 +7,17 @@
 // jamais mis en cache côté UI (RG-002, cf. `docs/02_documentation/15_normesSecurite.md#gestion-des-secrets-et-
 // données-sensibles`) : il est réellement redemandé à chaque sauvegarde plutôt que réutilisé silencieusement, y
 // compris pour deux sauvegardes consécutives au sein de la même session.
-import { Component, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
-import type { InputSignal, OutputEmitterRef, WritableSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Signal,
+  input,
+  output,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import type { AfterViewInit, InputSignal, OutputEmitterRef, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 /**
@@ -21,7 +30,10 @@ import { FormsModule } from '@angular/forms';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './confirmation-mot-de-passe.component.html',
 })
-export class SqmConfirmationMotDePasseComponent {
+export class SqmConfirmationMotDePasseComponent implements AfterViewInit {
+  private readonly champMotDePasse: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('champMotDePasse');
+
   /**
    * Message expliquant à l'utilisateur pourquoi le mot de passe est redemandé, propre au contexte appelant.
    */
@@ -41,6 +53,15 @@ export class SqmConfirmationMotDePasseComponent {
    * Mot de passe actuellement saisi dans le formulaire.
    */
   public readonly motDePasse: WritableSignal<string> = signal('');
+
+  /**
+   * Place le focus dans le champ de saisie du mot de passe dès l'affichage de la boîte, sans attendre une
+   * interaction de la souris (l'ordre de tabulation naturel ne place pas seul le focus initial à l'insertion du
+   * composant dans le DOM, à la différence d'un appui sur Tab).
+   */
+  public ngAfterViewInit(): void {
+    this.champMotDePasse()?.nativeElement.focus();
+  }
 
   /**
    * Gère la confirmation par l'utilisateur : n'émet rien si le champ est resté vide.

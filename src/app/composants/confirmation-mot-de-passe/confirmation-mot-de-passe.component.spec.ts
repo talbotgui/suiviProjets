@@ -1,6 +1,7 @@
 // Test du composant de ressaisie du mot de passe (cf. confirmation-mot-de-passe.component.ts), généré avec
 // l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmConfirmationMotDePasseComponent } from './confirmation-mot-de-passe.component';
 
 describe('SqmConfirmationMotDePasseComponent', () => {
@@ -48,6 +49,18 @@ describe('SqmConfirmationMotDePasseComponent', () => {
     composant.confirmer();
 
     expect(composant.motDePasse()).toBe('');
+  });
+
+  it('place le focus sur le champ de mot de passe à l’affichage', () => {
+    const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
+    fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
+    fixture.detectChanges();
+
+    const champ = DomTestUtils.obtenirElementNatif(fixture).querySelector(
+      '#confirmation-mot-de-passe-champ',
+    );
+
+    expect(document.activeElement).toBe(champ);
   });
 
   it('émet annulee et réinitialise le champ lors de l’annulation', () => {
