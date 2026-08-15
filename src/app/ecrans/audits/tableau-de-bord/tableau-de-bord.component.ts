@@ -11,7 +11,7 @@
 // modèle que Constitution de campagne (cf. commentaire d'en-tête de ce dernier) : même chemin d'URL, même
 // composant, seule la navigation englobante a changé.
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import type {
@@ -38,6 +38,7 @@ export class SqmTableauDeBordComponent {
   );
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly router: Router = inject(Router);
 
   /**
    * Progression réactive locale de la campagne en cours (ou de la dernière campagne exécutée), `null` si aucune
@@ -211,6 +212,20 @@ export class SqmTableauDeBordComponent {
       return false;
     }
     return this.nombreProjetsTraites() < progression.perimetre.length;
+  }
+
+  /**
+   * Navigue vers l'écran d'Audits pertinent une fois la campagne affichée terminée (bouton « Accéder aux
+   * brouillons de campagne », affiché uniquement quand {@link campagneEnCours} est faux, cf. gabarit), sur le
+   * modèle exact des deux branches non « Tableau de bord » de `SqmShellComponent.cibleAudits` (même entrée
+   * « Audits » de la sidebar) : Brouillon si un brouillon reste à traiter, sinon Constitution de campagne.
+   */
+  public allerVersAudits(): void {
+    const cible =
+      this.donneesApplication.racine()?.brouillon != null
+        ? '/audits/brouillon'
+        : '/audits/constitution-campagne';
+    void this.router.navigateByUrl(cible);
   }
 
   /**

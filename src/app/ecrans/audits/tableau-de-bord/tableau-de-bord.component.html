@@ -46,6 +46,17 @@
       }
     </header>
 
+    @if (!campagneEnCours()) {
+      <button
+        id="tableau-de-bord-bouton-brouillon"
+        type="button"
+        class="bouton bouton--principal exterieur-bas-4"
+        (click)="allerVersAudits()"
+      >
+        Accéder aux brouillons de campagne
+      </button>
+    }
+
     <div class="deborde-auto">
       <table id="tableau-de-bord-tableau" class="tableau-de-bord__tableau tableau">
         <thead>

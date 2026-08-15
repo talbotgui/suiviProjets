@@ -1,6 +1,7 @@
 // Test de l'écran Tableau de bord d'exécution (cf. tableau-de-bord.component.ts), généré avec l'assistance de
 // l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
@@ -62,15 +63,19 @@ class DonneesDeTest {
 
 describe('SqmTableauDeBordComponent', () => {
   let etatSession: EtatSessionService;
+  let donneesApplication: DonneesApplicationService;
+  let routerMock: { navigateByUrl: jest.Mock };
   let composant: SqmTableauDeBordComponent;
   let projetId: string;
 
   beforeEach(async () => {
     invokeSimule.mockReset();
+    routerMock = { navigateByUrl: jest.fn().mockResolvedValue(true) };
     await TestBed.configureTestingModule({
       imports: [SqmTableauDeBordComponent],
+      providers: [{ provide: Router, useValue: routerMock }],
     }).compileComponents();
-    const donneesApplication = TestBed.inject(DonneesApplicationService);
+    donneesApplication = TestBed.inject(DonneesApplicationService);
     donneesApplication.chargerRacine(DonneesDeTest.racineVide());
     const groupeId = donneesApplication.creerGroupe({
       nom: 'Socle Comptable',
@@ -222,6 +227,29 @@ describe('SqmTableauDeBordComponent', () => {
       etatSession.mettreAJourProgressionProjet('projet-2', { statut: 'echoue', dureeMs: 500 });
 
       expect(composant.campagneEnCours()).toBe(false);
+    });
+  });
+
+  describe('allerVersAudits (bouton « Accéder aux brouillons de campagne »)', () => {
+    it('doit naviguer vers Brouillon si un brouillon reste à traiter', () => {
+      donneesApplication.chargerRacine({
+        ...DonneesDeTest.racineVide(),
+        brouillon: {
+          campagneId: 'campagne-1',
+          creeLe: '2026-08-15T08:00:00Z',
+          resultatsParProjet: [],
+        },
+      });
+
+      composant.allerVersAudits();
+
+      expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/brouillon');
+    });
+
+    it("doit naviguer vers Constitution de campagne si aucun brouillon n'est en attente", () => {
+      composant.allerVersAudits();
+
+      expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/constitution-campagne');
     });
   });
 });
