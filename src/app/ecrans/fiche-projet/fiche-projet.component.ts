@@ -161,7 +161,8 @@ interface LigneMembre {
    * plutôt être orienté vers la liste des règles existantes du groupe (cf. gabarit), aucune création n'étant
    * pertinente par défaut dans ce cas.
    */
-  readonly critereParDefautQualification: { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
+  readonly critereParDefautQualification:
+    { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
 }
 
 /**
@@ -1051,7 +1052,9 @@ export class SqmFicheProjetComponent {
         ? StatutMembreUtils.calculerGraviteAlerteMembreInconnu(membre.niveauAcces)
         : undefined,
       critereParDefautQualification:
-        resolution.type === 'inconnu' ? this.calculerCritereParDefautQualification(membre) : undefined,
+        resolution.type === 'inconnu'
+          ? this.calculerCritereParDefautQualification(membre)
+          : undefined,
     };
   }
 

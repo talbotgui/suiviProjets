@@ -41,6 +41,7 @@ import {
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import type { Params } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
 import type {
@@ -56,7 +57,11 @@ import type {
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Groupe, TraitementAlerte } from '../../services/avecetat/etat/types-donnees';
-import { StatutTraitementAlerte } from '../../services/avecetat/etat/types-donnees';
+import {
+  StatutTraitementAlerte,
+  TypeCritereMembre,
+} from '../../services/avecetat/etat/types-donnees';
+import type { MembreGitlab } from '../../services/sansetat/commandes/types-facade';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 import type { GraviteAlerteMembreInconnu } from '../../services/sansetat/jugement/statut-membre.utils';
@@ -118,8 +123,19 @@ interface LigneAlerteTravail {
   readonly projetId: string;
   /** Nom du projet concerné. */
   readonly nomProjet: string;
+  /** Identifiant du groupe de rattachement. */
+  readonly groupeId: string;
   /** Nom du groupe de rattachement. */
   readonly nomGroupe: string;
+  /**
+   * Critère par défaut proposé pour pré-remplir le formulaire de création d'une règle de membre connu (bouton
+   * « Qualifier ce membre », cf. {@link SqmListeTravailComponent.qualifierMembre}), sur le modèle exact de
+   * `LigneMembre.critereParDefautQualification` (`fiche-projet.component.ts`) : présent uniquement pour une alerte
+   * de membre réellement `inconnu`, absent pour un `conflit` (liste des règles existantes à consulter plutôt
+   * qu'une création).
+   */
+  readonly critereParDefautQualification:
+    { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
   /** Statut de traitement courant, `null` si l'alerte n'a jamais été vue ni traitée. */
   readonly statut: StatutTraitementAlerte | null;
   /** Commentaire du dernier traitement, s'il en portait un. */
@@ -529,6 +545,48 @@ export class SqmListeTravailComponent {
   }
 
   /**
+   * Indique si l'alerte concerne la gestion d'un membre inconnu (seul cas où {@link qualifierMembre} est
+   * pertinent), sur le même critère que {@link comparerAlertes} (préparé pour d'autres types d'alerte, cf.
+   * commentaire de `PREFIXE_CLE_MEMBRE_INCONNU`).
+   * @param alerte - Ligne d'alerte concernée.
+   * @returns `true` si cette alerte est une alerte de membre inconnu.
+   */
+  public estAlerteMembreInconnu(alerte: LigneAlerteTravail): boolean {
+    return alerte.cleAlerte.startsWith(PREFIXE_CLE_MEMBRE_INCONNU);
+  }
+
+  /**
+   * Navigue vers l'écran Administration pour qualifier le membre de l'alerte sélectionnée (sous-onglet Membres
+   * connus du bon groupe, formulaire de création pré-rempli), sur le modèle exact du lien « Qualifier ce membre »
+   * de la Fiche projet (`fiche-projet.component.ts`).
+   */
+  public qualifierMembre(): void {
+    const alerte = this.alerteSelectionnee();
+    if (alerte === undefined) {
+      return;
+    }
+    void this.router.navigate(['/administration'], {
+      queryParams: this.queryParamsQualification(alerte),
+    });
+  }
+
+  /**
+   * Construit les paramètres de requête du bouton « Qualifier ce membre » (cf. {@link qualifierMembre}).
+   * @param alerte - Ligne d'alerte concernée.
+   * @returns Les paramètres de requête à transmettre à `Router.navigate`.
+   */
+  private queryParamsQualification(alerte: LigneAlerteTravail): Params {
+    if (alerte.critereParDefautQualification === undefined) {
+      return { groupeId: alerte.groupeId };
+    }
+    return {
+      groupeId: alerte.groupeId,
+      typeCritere: alerte.critereParDefautQualification.type,
+      critere: alerte.critereParDefautQualification.valeur,
+    };
+  }
+
+  /**
    * Restitue la cellule « Gravité » sous forme de badge (rouge pour élevée, orange pour modérée).
    * @param ligne - Ligne concernée.
    * @returns La cellule calculée.
@@ -618,7 +676,12 @@ export class SqmListeTravailComponent {
               gravite: StatutMembreUtils.calculerGraviteAlerteMembreInconnu(membre.niveauAcces),
               projetId: projet.id,
               nomProjet: projet.nom,
+              groupeId: groupe.id,
               nomGroupe: groupe.nom,
+              critereParDefautQualification:
+                resolution.type === 'inconnu'
+                  ? this.calculerCritereParDefautQualification(membre)
+                  : undefined,
               statut: dernierTraitement?.statut ?? null,
               commentaire: dernierTraitement?.commentaire,
               detecteeDepuis: this.premiereDetection(cleAlerte, traitements),
@@ -628,6 +691,26 @@ export class SqmListeTravailComponent {
       }
     }
     return lignes.sort((a, b) => this.comparerAlertes(a, b));
+  }
+
+  /**
+   * Calcule le critère par défaut à proposer pour qualifier un membre inconnu (bouton « Qualifier ce membre »),
+   * dupliqué depuis `SqmFicheProjetComponent.calculerCritereParDefautQualification` (aucune dépendance directe
+   * entre écrans) : domaine de son email public s'il en dispose (partie suivant le premier `@`), sinon son
+   * username.
+   * @param membre - Membre du dépôt constaté.
+   * @returns Le critère par défaut et son type.
+   */
+  private calculerCritereParDefautQualification(membre: MembreGitlab): {
+    type: TypeCritereMembre;
+    valeur: string;
+  } {
+    const email = membre.emailPublic;
+    const indexArobase = email !== undefined ? email.indexOf('@') : -1;
+    if (email !== undefined && indexArobase >= 0) {
+      return { type: TypeCritereMembre.DomaineEmail, valeur: email.slice(indexArobase + 1) };
+    }
+    return { type: TypeCritereMembre.Username, valeur: membre.username };
   }
 
   /**

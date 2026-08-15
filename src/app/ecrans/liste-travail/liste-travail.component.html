@@ -97,6 +97,17 @@
         >
           Ouvrir la fiche projet
         </button>
+        @if (estAlerteMembreInconnu(alerte)) {
+          <button
+            id="liste-travail-bouton-qualifier-membre"
+            type="button"
+            class="bouton"
+            [disabled]="enCours()"
+            (click)="qualifierMembre()"
+          >
+            Qualifier ce membre
+          </button>
+        }
         <button
           id="liste-travail-bouton-marquer-vue"
           type="button"

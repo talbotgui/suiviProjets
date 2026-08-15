@@ -1,6 +1,8 @@
 // Test de l'écran Liste de travail (cf. liste-travail.component.ts, US-020, RG-009, RG-010, RG-026), généré avec
 // l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
@@ -22,6 +24,13 @@ import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmListeTravailComponent } from './liste-travail.component';
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
+
+/**
+ * Composant factice utilisé comme cible des routes de test : seul son enregistrement importe, jamais son rendu
+ * (même patron que `shell.component.spec.ts`).
+ */
+@Component({ selector: 'app-composant-factice', template: '' })
+class ComposantFactice {}
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction
@@ -157,14 +166,17 @@ class DonneesDeTest {
 describe('SqmListeTravailComponent', () => {
   let donneesApplication: DonneesApplicationService;
   let notification: NotificationService;
+  let router: Router;
 
   beforeEach(async () => {
     jest.mocked(invoke).mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmListeTravailComponent],
+      providers: [provideRouter([{ path: '**', component: ComposantFactice }])],
     }).compileComponents();
     donneesApplication = TestBed.inject(DonneesApplicationService);
     notification = TestBed.inject(NotificationService);
+    router = TestBed.inject(Router);
   });
 
   it("affiche le message d'état vide lorsqu'aucune alerte n'est active", () => {
@@ -273,6 +285,116 @@ describe('SqmListeTravailComponent', () => {
     composant.fermerPanneau();
     expect(composant.alerteSelectionnee()).toBeUndefined();
   });
+
+  describe(
+    'bouton « Qualifier ce membre » (navigation vers Administration, sur le modèle du lien homonyme de ' +
+      'la Fiche projet)',
+    () => {
+      it(
+        'navigue vers Administration avec le groupe et le username en critère par défaut, faute ' +
+          'd’email public',
+        async () => {
+          const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('jdupont', 30)]);
+          const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+          donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+          const fixture = TestBed.createComponent(SqmListeTravailComponent);
+          fixture.detectChanges();
+          const composant = fixture.componentInstance;
+          composant.activerLigne(composant.toutesLesAlertes()[0]);
+          fixture.detectChanges();
+
+          expect(
+            DomTestUtils.obtenirElementNatif(fixture).querySelector(
+              '#liste-travail-bouton-qualifier-membre',
+            ),
+          ).not.toBeNull();
+          composant.qualifierMembre();
+          await fixture.whenStable();
+
+          const params = new URLSearchParams(router.url.split('?')[1]);
+          expect(params.get('groupeId')).toBe('groupe-1');
+          expect(params.get('typeCritere')).toBe('username');
+          expect(params.get('critere')).toBe('jdupont');
+        },
+      );
+
+      it('propose le domaine de l’email public en critère par défaut, quand le membre en dispose', async () => {
+        const audit = DonneesDeTest.auditAvecMembres([
+          { ...DonneesDeTest.membreGitlab('jdupont', 30), emailPublic: 'jdupont@exemple.fr' },
+        ]);
+        const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+        donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+        const fixture = TestBed.createComponent(SqmListeTravailComponent);
+        fixture.detectChanges();
+        const composant = fixture.componentInstance;
+        composant.activerLigne(composant.toutesLesAlertes()[0]);
+
+        composant.qualifierMembre();
+        await fixture.whenStable();
+
+        const params = new URLSearchParams(router.url.split('?')[1]);
+        expect(params.get('typeCritere')).toBe('domaineEmail');
+        expect(params.get('critere')).toBe('exemple.fr');
+      });
+
+      it(
+        'ne transmet que le groupe, sans critère, pour une alerte en conflit de règles (liste des ' +
+          'règles existantes plutôt qu’une création)',
+        async () => {
+          const audit = DonneesDeTest.auditAvecMembres([
+            { ...DonneesDeTest.membreGitlab('jdupont', 30), emailPublic: 'jdupont@exemple.fr' },
+          ]);
+          const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+          donneesApplication.chargerRacine(
+            DonneesDeTest.racine(
+              [projet],
+              [
+                {
+                  id: 'membre-connu-email',
+                  critere: 'jdupont@exemple.fr',
+                  typeCritere: TypeCritereMembre.Email,
+                  statut: StatutMembre.Interne,
+                },
+                {
+                  id: 'membre-connu-alias',
+                  critere: 'quelquun',
+                  typeCritere: TypeCritereMembre.Username,
+                  statut: StatutMembre.Client,
+                  aliasEmail: 'jdupont@exemple.fr',
+                },
+              ],
+            ),
+          );
+          const fixture = TestBed.createComponent(SqmListeTravailComponent);
+          fixture.detectChanges();
+          const composant = fixture.componentInstance;
+          composant.activerLigne(composant.toutesLesAlertes()[0]);
+
+          composant.qualifierMembre();
+          await fixture.whenStable();
+
+          const params = new URLSearchParams(router.url.split('?')[1]);
+          expect(params.get('groupeId')).toBe('groupe-1');
+          expect(params.has('critere')).toBe(false);
+          expect(params.has('typeCritere')).toBe(false);
+        },
+      );
+
+      it("n'affiche pas le bouton dans le gabarit tant qu'aucune alerte n'est sélectionnée", () => {
+        const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('jdupont', 30)]);
+        const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+        donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+        const fixture = TestBed.createComponent(SqmListeTravailComponent);
+        fixture.detectChanges();
+
+        expect(
+          DomTestUtils.obtenirElementNatif(fixture).querySelector(
+            '#liste-travail-bouton-qualifier-membre',
+          ),
+        ).toBeNull();
+      });
+    },
+  );
 
   it('qualifie une alerte comme traitée après confirmation du mot de passe (US-020)', async () => {
     const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('jdupont', 30)]);
