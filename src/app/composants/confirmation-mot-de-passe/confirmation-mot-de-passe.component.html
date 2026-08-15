@@ -10,40 +10,46 @@
     (ngSubmit)="confirmer()"
   >
     <p class="confirmation-mot-de-passe__message exterieur-0 texte-base">{{ message() }}</p>
-    <label
-      class="confirmation-mot-de-passe__champ d-flex direction-colonne ecart-1 texte-sm poids-moyen"
-    >
-      Mot de passe du fichier
-      <input
-        #champMotDePasse
-        id="confirmation-mot-de-passe-champ"
-        type="password"
-        name="motDePasse"
-        [ngModel]="motDePasse()"
-        (ngModelChange)="motDePasse.set($event)"
-        required
-        class="interieur-x-3 interieur-y-2 rayon-md bordure texte-base"
-      />
-    </label>
-    <!-- Bouton de validation jamais pré-sélectionné par défaut (charte d'ergonomie, Modale de confirmation) :
-         le focus initial est placé explicitement sur le champ de saisie (`ngAfterViewInit`), jamais sur ce
-         bouton. -->
-    <div class="confirmation-mot-de-passe__actions d-flex justifie-fin ecart-2">
-      <button
-        id="confirmation-mot-de-passe-bouton-annuler"
-        type="button"
-        class="bouton"
-        (click)="annuler()"
+    <!-- Groupement en `fieldset` plutôt qu'un `[disabled]` posé directement sur l'`input` lié par `ngModel` : ce
+         second motif est en conflit connu avec le `DefaultValueAccessor` de FormsModule, qui réécrase l'attribut
+         DOM `disabled` à chaque détection de changement tant que le `FormControl` sous-jacent n'est pas lui-même
+         marqué désactivé. Le `fieldset` désactive nativement tous ses descendants sans passer par ce mécanisme. -->
+    <fieldset [disabled]="enCours()" class="d-flex direction-colonne ecart-4">
+      <label
+        class="confirmation-mot-de-passe__champ d-flex direction-colonne ecart-1 texte-sm poids-moyen"
       >
-        Annuler
-      </button>
-      <button
-        id="confirmation-mot-de-passe-bouton-confirmer"
-        type="submit"
-        class="bouton bouton--principal"
-      >
-        Confirmer
-      </button>
-    </div>
+        Mot de passe du fichier
+        <input
+          #champMotDePasse
+          id="confirmation-mot-de-passe-champ"
+          type="password"
+          name="motDePasse"
+          [ngModel]="motDePasse()"
+          (ngModelChange)="motDePasse.set($event)"
+          required
+          class="interieur-x-3 interieur-y-2 rayon-md bordure texte-base"
+        />
+      </label>
+      <!-- Bouton de validation jamais pré-sélectionné par défaut (charte d'ergonomie, Modale de confirmation) :
+           le focus initial est placé explicitement sur le champ de saisie (`ngAfterViewInit`), jamais sur ce
+           bouton. -->
+      <div class="confirmation-mot-de-passe__actions d-flex justifie-fin ecart-2">
+        <button
+          id="confirmation-mot-de-passe-bouton-annuler"
+          type="button"
+          class="bouton"
+          (click)="annuler()"
+        >
+          Annuler
+        </button>
+        <button
+          id="confirmation-mot-de-passe-bouton-confirmer"
+          type="submit"
+          class="bouton bouton--principal"
+        >
+          Confirmer
+        </button>
+      </div>
+    </fieldset>
   </form>
 </div>

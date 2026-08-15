@@ -55,6 +55,14 @@ export class SqmConfirmationMotDePasseComponent implements AfterViewInit {
   public readonly motDePasse: WritableSignal<string> = signal('');
 
   /**
+   * `true` dès la confirmation par l'utilisateur et jusqu'au masquage de la boîte par le composant appelant : le
+   * traitement associé (commande native de sauvegarde) peut prendre plusieurs secondes, pendant lesquelles le
+   * formulaire doit rester figé (champ et boutons désactivés) plutôt que de laisser croire à une saisie encore
+   * possible.
+   */
+  public readonly enCours: WritableSignal<boolean> = signal(false);
+
+  /**
    * Place le focus dans le champ de saisie du mot de passe dès l'affichage de la boîte, sans attendre une
    * interaction de la souris (l'ordre de tabulation naturel ne place pas seul le focus initial à l'insertion du
    * composant dans le DOM, à la différence d'un appui sur Tab).
@@ -64,21 +72,30 @@ export class SqmConfirmationMotDePasseComponent implements AfterViewInit {
   }
 
   /**
-   * Gère la confirmation par l'utilisateur : n'émet rien si le champ est resté vide.
+   * Gère la confirmation par l'utilisateur : n'émet rien si le champ est resté vide ou si une confirmation est
+   * déjà en cours de traitement.
    */
   public confirmer(): void {
+    if (this.enCours()) {
+      return;
+    }
     const valeur = this.motDePasse();
     if (valeur.length === 0) {
       return;
     }
+    this.enCours.set(true);
     this.confirmee.emit(valeur);
     this.motDePasse.set('');
   }
 
   /**
-   * Gère l'annulation de la saisie par l'utilisateur.
+   * Gère l'annulation de la saisie par l'utilisateur. Sans effet pendant le traitement d'une confirmation
+   * (boutons désactivés à ce moment-là, cf. gabarit).
    */
   public annuler(): void {
+    if (this.enCours()) {
+      return;
+    }
     this.motDePasse.set('');
     this.annulee.emit();
   }

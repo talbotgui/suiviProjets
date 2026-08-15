@@ -63,6 +63,52 @@ describe('SqmConfirmationMotDePasseComponent', () => {
     expect(document.activeElement).toBe(champ);
   });
 
+  it('passe en état "en cours" à la confirmation et ignore une nouvelle confirmation ou annulation tant que le traitement dure', () => {
+    const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
+    fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
+    const composant = fixture.componentInstance;
+    let nombreConfirmations = 0;
+    let annulee = false;
+    composant.confirmee.subscribe(() => {
+      nombreConfirmations++;
+    });
+    composant.annulee.subscribe(() => {
+      annulee = true;
+    });
+
+    composant.motDePasse.set('secret-1234');
+    composant.confirmer();
+
+    expect(composant.enCours()).toBe(true);
+
+    composant.confirmer();
+    composant.annuler();
+
+    expect(nombreConfirmations).toBe(1);
+    expect(annulee).toBe(false);
+  });
+
+  it('désactive le groupement de formulaire (champ et boutons) pendant le traitement', () => {
+    // Assertion portée sur le `fieldset` englobant, seul point vérifiable sous jsdom : la cascade native de
+    // l'attribut `disabled` du `fieldset` vers ses descendants (`input`, `button`) n'est pas implémentée par
+    // jsdom (contrairement aux navigateurs réels), donc `input.disabled`/`button.disabled` resteraient `false`
+    // ici même en cas de comportement correct en production.
+    const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
+    fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
+    const composant = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const racine = DomTestUtils.obtenirElementNatif(fixture);
+    const groupement = racine.querySelector<HTMLFieldSetElement>('fieldset');
+    expect(groupement?.disabled).toBe(false);
+
+    composant.motDePasse.set('secret-1234');
+    composant.confirmer();
+    fixture.detectChanges();
+
+    expect(groupement?.disabled).toBe(true);
+  });
+
   it('émet annulee et réinitialise le champ lors de l’annulation', () => {
     const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
     fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
