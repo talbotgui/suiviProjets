@@ -47,29 +47,34 @@ pub(crate) fn creer_annotation(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    alertes::creer_annotation(
-        &mut donnees,
-        &groupe_id,
-        projet_id.as_deref(),
-        date,
-        libelle,
-        categorie,
-        description,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("creerAnnotation");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        alertes::creer_annotation(
+            &mut donnees,
+            &groupe_id,
+            projet_id.as_deref(),
+            date,
+            libelle,
+            categorie,
+            description,
+            horodatage,
+        )?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "creerAnnotation",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "creerAnnotation",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("creerAnnotation");
+    resultat
 }
 
 /// Supprime une annotation de portée groupe ou projet, sauvegarde le fichier et consigne la suppression au journal
@@ -91,26 +96,31 @@ pub(crate) fn supprimer_annotation(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    alertes::supprimer_annotation(
-        &mut donnees,
-        &groupe_id,
-        projet_id.as_deref(),
-        &annotation_id,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("supprimerAnnotation");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        alertes::supprimer_annotation(
+            &mut donnees,
+            &groupe_id,
+            projet_id.as_deref(),
+            &annotation_id,
+            horodatage,
+        )?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "supprimerAnnotation",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerAnnotation",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerAnnotation");
+    resultat
 }
 
 /// Qualifie une alerte (statut vu/traité, commentaire optionnel), sauvegarde le fichier (US-020, RG-002, RG-026).
@@ -133,18 +143,23 @@ pub(crate) fn qualifier_alerte(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    alertes::qualifier_alerte(&mut donnees, cle_alerte, statut, commentaire, horodatage);
+    crate::journalisation::consigner_debut_commande("qualifierAlerte");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        alertes::qualifier_alerte(&mut donnees, cle_alerte, statut, commentaire, horodatage);
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "qualifierAlerte",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "qualifierAlerte",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("qualifierAlerte");
+    resultat
 }

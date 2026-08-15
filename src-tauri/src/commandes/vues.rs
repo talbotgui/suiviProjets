@@ -45,23 +45,32 @@ pub(crate) fn definir_vue(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    vues::definir_vue(
-        &mut donnees,
-        id,
-        nom,
-        ecran,
-        version_filtres,
-        par_defaut,
-        filtres,
-    )?;
+    crate::journalisation::consigner_debut_commande("definirVue");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        vues::definir_vue(
+            &mut donnees,
+            id,
+            nom,
+            ecran,
+            version_filtres,
+            par_defaut,
+            filtres,
+        )?;
 
-    let cle =
-        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirVue")?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirVue",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirVue");
+    resultat
 }
 
 /// Supprime une vue enregistrée par identifiant, sauvegarde le fichier (US-028).
@@ -78,13 +87,22 @@ pub(crate) fn supprimer_vue(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    vues::supprimer_vue(&mut donnees, &id)?;
+    crate::journalisation::consigner_debut_commande("supprimerVue");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        vues::supprimer_vue(&mut donnees, &id)?;
 
-    let cle =
-        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "supprimerVue")?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerVue",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerVue");
+    resultat
 }

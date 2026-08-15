@@ -38,10 +38,15 @@ pub(crate) fn exporter_configuration(
     chemin: String,
     donnees: DonneesRacine,
 ) -> Result<(), ErreurFacade> {
-    let configuration: ConfigurationPartageable =
-        configuration_partageable::exporter_configuration(&donnees);
-    configuration_partageable::ecrire_configuration(Path::new(&chemin), &configuration)
-        .map_err(|_| ErreurFacade::ErreurInterne)
+    crate::journalisation::consigner_debut_commande("exporterConfiguration");
+    let resultat = (|| -> Result<(), ErreurFacade> {
+        let configuration: ConfigurationPartageable =
+            configuration_partageable::exporter_configuration(&donnees);
+        configuration_partageable::ecrire_configuration(Path::new(&chemin), &configuration)
+            .map_err(|_| ErreurFacade::ErreurInterne)
+    })();
+    crate::journalisation::consigner_fin_commande("exporterConfiguration");
+    resultat
 }
 
 /// Prévisualise l'import d'un fichier de configuration partageable désigné par `chemin` (US-030) : aucune
@@ -57,12 +62,17 @@ pub(crate) fn previsualiser_import_configuration(
     chemin: String,
     donnees: DonneesRacine,
 ) -> Result<DifferentielImportConfiguration, ErreurFacade> {
-    Ok(
-        configuration_partageable::previsualiser_import_configuration(
-            &donnees,
-            Path::new(&chemin),
-        )?,
-    )
+    crate::journalisation::consigner_debut_commande("previsualiserImportConfiguration");
+    let resultat = (|| -> Result<DifferentielImportConfiguration, ErreurFacade> {
+        Ok(
+            configuration_partageable::previsualiser_import_configuration(
+                &donnees,
+                Path::new(&chemin),
+            )?,
+        )
+    })();
+    crate::journalisation::consigner_fin_commande("previsualiserImportConfiguration");
+    resultat
 }
 
 /// Importe un fichier de configuration partageable (US-030, RG-029) : n'applique que les lignes de différentiel
@@ -83,23 +93,28 @@ pub(crate) fn importer_configuration(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    configuration_partageable::importer_configuration(
-        &mut donnees,
-        Path::new(&chemin_configuration),
-        &chemins_acceptes,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("importerConfiguration");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        configuration_partageable::importer_configuration(
+            &mut donnees,
+            Path::new(&chemin_configuration),
+            &chemins_acceptes,
+            horodatage,
+        )?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "importerConfiguration",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "importerConfiguration",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("importerConfiguration");
+    resultat
 }

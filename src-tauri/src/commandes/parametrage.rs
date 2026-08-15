@@ -37,16 +37,25 @@ pub(crate) fn definir_seuil(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_seuil(&mut donnees, &cle, valeur, horodatage)?;
+    crate::journalisation::consigner_debut_commande("definirSeuil");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_seuil(&mut donnees, &cle, valeur, horodatage)?;
 
-    let cle_session =
-        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirSeuil")?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirSeuil",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirSeuil");
+    resultat
 }
 
 /// Ajoute ou met à jour une entrée d'un référentiel, ou remplace le motif de nommage de branche, sauvegarde le
@@ -66,20 +75,25 @@ pub(crate) fn definir_referentiel(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_referentiel(&mut donnees, &type_referentiel, entree, horodatage)?;
+    crate::journalisation::consigner_debut_commande("definirReferentiel");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_referentiel(&mut donnees, &type_referentiel, entree, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "definirReferentiel",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirReferentiel",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirReferentiel");
+    resultat
 }
 
 /// Supprime une entrée du référentiel des règles de dépendances, sauvegarde le fichier et consigne la suppression
@@ -97,20 +111,25 @@ pub(crate) fn supprimer_regle_dependance(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::supprimer_regle_dependance(&mut donnees, &id, horodatage)?;
+    crate::journalisation::consigner_debut_commande("supprimerRegleDependance");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::supprimer_regle_dependance(&mut donnees, &id, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "supprimerRegleDependance",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerRegleDependance",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerRegleDependance");
+    resultat
 }
 
 /// Supprime une entrée du référentiel des règles de marqueurs IA, sauvegarde le fichier et consigne la suppression
@@ -127,20 +146,25 @@ pub(crate) fn supprimer_regle_marqueur_ia(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::supprimer_regle_marqueur_ia(&mut donnees, &id, horodatage)?;
+    crate::journalisation::consigner_debut_commande("supprimerRegleMarqueurIa");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::supprimer_regle_marqueur_ia(&mut donnees, &id, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "supprimerRegleMarqueurIA",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerRegleMarqueurIA",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerRegleMarqueurIa");
+    resultat
 }
 
 /// Modifie les réglages de verrouillage de session, sauvegarde le fichier et consigne la modification au journal
@@ -159,25 +183,30 @@ pub(crate) fn definir_verrouillage(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_verrouillage(
-        &mut donnees,
-        delai_inactivite_minutes,
-        echecs_avant_fermeture,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("definirVerrouillage");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_verrouillage(
+            &mut donnees,
+            delai_inactivite_minutes,
+            echecs_avant_fermeture,
+            horodatage,
+        )?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "definirVerrouillage",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirVerrouillage",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirVerrouillage");
+    resultat
 }
 
 /// Modifie la concurrence par défaut d'une campagne d'audit, sauvegarde le fichier et consigne la modification au
@@ -195,20 +224,25 @@ pub(crate) fn definir_concurrence_audit(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_concurrence_audit(&mut donnees, concurrence, horodatage)?;
+    crate::journalisation::consigner_debut_commande("definirConcurrenceAudit");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_concurrence_audit(&mut donnees, concurrence, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "definirConcurrenceAudit",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirConcurrenceAudit",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirConcurrenceAudit");
+    resultat
 }
 
 /// Modifie le réglage de proxy sortant, sauvegarde le fichier, consigne la modification au journal et met à jour
@@ -229,17 +263,26 @@ pub(crate) fn definir_proxy(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_proxy(&mut donnees, url, chemin_bundle_ca, horodatage)?;
+    crate::journalisation::consigner_debut_commande("definirProxy");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_proxy(&mut donnees, url, chemin_bundle_ca, horodatage)?;
 
-    let cle_session =
-        moteur::sauvegarder_fichier(Path::new(&chemin), &donnees, &mot_de_passe, "definirProxy")?;
-    etat.definir(PathBuf::from(chemin), cle_session);
-    etat.definir_proxy(donnees.parametres.proxy.clone());
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirProxy",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
+        etat.definir_proxy(donnees.parametres.proxy.clone());
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirProxy");
+    resultat
 }
 
 /// Modifie le nombre de sauvegardes de sécurité conservées avant rotation, sauvegarde le fichier et consigne la
@@ -257,20 +300,25 @@ pub(crate) fn definir_nombre_sauvegardes_securite(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_nombre_sauvegardes_securite(&mut donnees, nombre, horodatage)?;
+    crate::journalisation::consigner_debut_commande("definirNombreSauvegardesSecurite");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_nombre_sauvegardes_securite(&mut donnees, nombre, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "definirNombreSauvegardesSecurite",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirNombreSauvegardesSecurite",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirNombreSauvegardesSecurite");
+    resultat
 }
 
 /// Modifie le seuil de taille déclenchant l'avertissement contextuel de purge à la sauvegarde, sauvegarde le
@@ -288,18 +336,23 @@ pub(crate) fn definir_seuil_avertissement_taille(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    parametrage::definir_seuil_avertissement_taille(&mut donnees, seuil_octets, horodatage)?;
+    crate::journalisation::consigner_debut_commande("definirSeuilAvertissementTaille");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_seuil_avertissement_taille(&mut donnees, seuil_octets, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "definirSeuilAvertissementTaille",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirSeuilAvertissementTaille",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirSeuilAvertissementTaille");
+    resultat
 }

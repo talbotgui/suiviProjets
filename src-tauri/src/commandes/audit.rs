@@ -83,35 +83,41 @@ pub(crate) async fn interroger_vitalite(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabVitalite, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerVitalite",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_vitalite(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        // Défense en profondeur : cette commande n'a de sens que pour une instance GitLab.
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerVitalite",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerVitalite");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerVitalite",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_vitalite(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            // Défense en profondeur : cette commande n'a de sens que pour une instance GitLab.
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerVitalite",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerVitalite");
+    resultat
 }
 
 /// Interroge la taille d'un dépôt GitLab en octets (US-009, `gitlab.taille_depot`).
@@ -127,34 +133,40 @@ pub(crate) async fn interroger_taille_depot(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabTailleDepot, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerTailleDepot",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_taille_depot(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerTailleDepot",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerTailleDepot");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerTailleDepot",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_taille_depot(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerTailleDepot",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerTailleDepot");
+    resultat
 }
 
 /// Interroge les contributeurs distincts sur la fenêtre glissante d'un dépôt GitLab (US-009,
@@ -171,34 +183,40 @@ pub(crate) async fn interroger_contributeurs(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabContributeurs, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerContributeurs",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_contributeurs(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerContributeurs",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerContributeurs");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerContributeurs",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_contributeurs(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerContributeurs",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerContributeurs");
+    resultat
 }
 
 /// Interroge les demandes de fusion ouvertes d'un dépôt GitLab (US-009, `gitlab.merge_requests`).
@@ -214,34 +232,40 @@ pub(crate) async fn interroger_merge_requests(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMergeRequests, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerMergeRequests",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_merge_requests(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerMergeRequests",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerMergeRequests");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerMergeRequests",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_merge_requests(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerMergeRequests",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerMergeRequests");
+    resultat
 }
 
 /// Interroge les membres d'un dépôt GitLab (US-009, `gitlab.membres`).
@@ -257,34 +281,40 @@ pub(crate) async fn interroger_membres(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMembres, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerMembres",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_membres(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerMembres",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerMembres");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerMembres",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_membres(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerMembres",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerMembres");
+    resultat
 }
 
 /// Interroge la liste complète des branches d'un dépôt GitLab pour le catalogue figé des résultats d'audit
@@ -303,34 +333,40 @@ pub(crate) async fn interroger_branches_completes(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabBranches, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerBranchesCompletes",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_branches_completes(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerBranchesCompletes",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerBranchesCompletes");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerBranchesCompletes",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_branches_completes(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerBranchesCompletes",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerBranchesCompletes");
+    resultat
 }
 
 /// Interroge les dépendances déclarées par les manifestes du dépôt GitLab (US-009, `gitlab.dependances`), tous
@@ -348,34 +384,40 @@ pub(crate) async fn interroger_dependances(
     ref_auditee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabDependances, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerDependances",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_dependances(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerDependances",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerDependances");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerDependances",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_dependances(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerDependances",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerDependances");
+    resultat
 }
 
 /// Interroge les marqueurs d'outils IA détectés dans l'arborescence complète de la ref auditée d'un dépôt GitLab
@@ -397,35 +439,41 @@ pub(crate) async fn interroger_marqueurs_ia(
     regles_marqueurs_ia: Vec<RegleMarqueurIA>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMarqueursIa, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerMarqueursIa",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_marqueurs_ia(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                ref_auditee.as_deref(),
-                &regles_marqueurs_ia,
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerMarqueursIa",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerMarqueursIa");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerMarqueursIa",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_marqueurs_ia(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    ref_auditee.as_deref(),
+                    &regles_marqueurs_ia,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerMarqueursIa",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerMarqueursIa");
+    resultat
 }
 
 /// Interroge les violations Sonar par sévérité (US-009, `sonar.violations`).
@@ -441,34 +489,40 @@ pub(crate) async fn interroger_violations(
     id_externe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarViolations, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerViolations",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Sonar => {
-            sonar::interroger_violations(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                &etat.client_http(),
-            )
-            .await
-        }
-        // Défense en profondeur : cette commande n'a de sens que pour une instance Sonar.
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerViolations",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerViolations");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerViolations",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_violations(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            // Défense en profondeur : cette commande n'a de sens que pour une instance Sonar.
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerViolations",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerViolations");
+    resultat
 }
 
 /// Interroge la dette technique Sonar (US-009, `sonar.dette`).
@@ -483,33 +537,39 @@ pub(crate) async fn interroger_dette(
     id_externe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarDette, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerDette",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Sonar => {
-            sonar::interroger_dette(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerDette",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerDette");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerDette",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_dette(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerDette",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerDette");
+    resultat
 }
 
 /// Interroge la couverture de tests Sonar (US-009, `sonar.couverture`).
@@ -524,33 +584,39 @@ pub(crate) async fn interroger_couverture(
     id_externe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarCouverture, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerCouverture",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Sonar => {
-            sonar::interroger_couverture(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerCouverture",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerCouverture");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerCouverture",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_couverture(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerCouverture",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerCouverture");
+    resultat
 }
 
 /// Interroge les notes Sonar des quatre axes (US-009, `sonar.notes`).
@@ -565,33 +631,39 @@ pub(crate) async fn interroger_notes(
     id_externe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarNotes, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerNotes",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Sonar => {
-            sonar::interroger_notes(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerNotes",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerNotes");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerNotes",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_notes(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerNotes",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerNotes");
+    resultat
 }
 
 /// Interroge le volume de code Sonar (US-009, `sonar.ncloc`).
@@ -606,33 +678,39 @@ pub(crate) async fn interroger_ncloc(
     id_externe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarNcloc, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerNcloc",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Sonar => {
-            sonar::interroger_ncloc(
-                &instance.url_base,
-                &credential,
-                &source_id,
-                &id_externe,
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerNcloc",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerNcloc");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerNcloc",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_ncloc(
+                    &instance.url_base,
+                    &credential,
+                    &source_id,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerNcloc",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerNcloc");
+    resultat
 }
 
 /// Interroge la date de la dernière analyse Sonar d'un projet (Phase 5, incrément 3), donnée intermédiaire
@@ -652,32 +730,38 @@ pub(crate) async fn interroger_derniere_analyse(
     id_externe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<Option<String>, ErreurConnecteur> {
-    let credential = credential_instance(&instance, &etat)?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerDerniereAnalyse",
-        &instance.nom,
-        &id_externe,
-    );
-    let resultat = match instance.type_instance {
-        TypeInstance::Sonar => {
-            sonar::interroger_derniere_analyse(
-                &instance.url_base,
-                &credential,
-                &id_externe,
-                &etat.client_http(),
-            )
-            .await
-        }
-        TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerDerniereAnalyse",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerDerniereAnalyse");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerDerniereAnalyse",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_derniere_analyse(
+                    &instance.url_base,
+                    &credential,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerDerniereAnalyse",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerDerniereAnalyse");
+    resultat
 }
 
 /// Enregistre les résultats d'une campagne dans la zone de brouillon, sauvegarde le fichier (US-009, US-014,
@@ -710,28 +794,33 @@ pub(crate) fn enregistrer_brouillon(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    audit::enregistrer_brouillon(
-        &mut donnees,
-        campagne_id,
-        date,
-        perimetre,
-        verdicts,
-        resultats_par_projet,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("enregistrerBrouillon");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        audit::enregistrer_brouillon(
+            &mut donnees,
+            campagne_id,
+            date,
+            perimetre,
+            verdicts,
+            resultats_par_projet,
+            horodatage,
+        )?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "enregistrerBrouillon",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "enregistrerBrouillon",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("enregistrerBrouillon");
+    resultat
 }
 
 /// Intègre à l'historique des projets concernés tout ou partie des résultats en attente du brouillon courant,
@@ -754,19 +843,24 @@ pub(crate) fn integrer_brouillon(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    audit::integrer_brouillon(&mut donnees, selection.as_deref())?;
+    crate::journalisation::consigner_debut_commande("integrerBrouillon");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        audit::integrer_brouillon(&mut donnees, selection.as_deref())?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "integrerBrouillon",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "integrerBrouillon",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("integrerBrouillon");
+    resultat
 }
 
 /// Rejette tout ou partie des résultats en attente du brouillon courant, sans jamais les ajouter à l'historique du
@@ -788,17 +882,22 @@ pub(crate) fn rejeter_brouillon(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    audit::rejeter_brouillon(&mut donnees, selection.as_deref(), motif)?;
+    crate::journalisation::consigner_debut_commande("rejeterBrouillon");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        audit::rejeter_brouillon(&mut donnees, selection.as_deref(), motif)?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "rejeterBrouillon",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "rejeterBrouillon",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("rejeterBrouillon");
+    resultat
 }

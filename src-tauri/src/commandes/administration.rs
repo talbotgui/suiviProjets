@@ -81,34 +81,39 @@ pub(crate) fn qualifier_membre(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<ReponseQualificationMembre, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let membres_en_conflit = administration::qualifier_membre(
-        &mut donnees,
-        &groupe_id,
-        membre_id,
-        critere,
-        type_critere,
-        statut,
-        libelle,
-        alias_email,
-        origine,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("qualifierMembre");
+    let resultat = (|| -> Result<ReponseQualificationMembre, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let membres_en_conflit = administration::qualifier_membre(
+            &mut donnees,
+            &groupe_id,
+            membre_id,
+            critere,
+            type_critere,
+            statut,
+            libelle,
+            alias_email,
+            origine,
+            horodatage,
+        )?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "qualifierMembre",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "qualifierMembre",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(ReponseQualificationMembre {
-        donnees,
-        membres_en_conflit,
-    })
+        Ok(ReponseQualificationMembre {
+            donnees,
+            membres_en_conflit,
+        })
+    })();
+    crate::journalisation::consigner_fin_commande("qualifierMembre");
+    resultat
 }
 
 /// Définit la politique d'autorisation de l'IA d'un projet, sauvegarde le fichier et consigne la modification au
@@ -135,28 +140,33 @@ pub(crate) fn definir_politique_ia(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let a_change = administration::definir_politique_ia(
-        &mut donnees,
-        &groupe_id,
-        &projet_id,
-        ia_autorisee,
-        horodatage,
-    )?;
-
-    if a_change {
-        let cle = moteur::sauvegarder_fichier(
-            Path::new(&chemin),
-            &donnees,
-            &mot_de_passe,
-            "definirPolitiqueIA",
+    crate::journalisation::consigner_debut_commande("definirPolitiqueIa");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let a_change = administration::definir_politique_ia(
+            &mut donnees,
+            &groupe_id,
+            &projet_id,
+            ia_autorisee,
+            horodatage,
         )?;
-        etat.definir(PathBuf::from(chemin), cle);
-    }
 
-    Ok(donnees)
+        if a_change {
+            let cle = moteur::sauvegarder_fichier(
+                Path::new(&chemin),
+                &donnees,
+                &mot_de_passe,
+                "definirPolitiqueIA",
+            )?;
+            etat.definir(PathBuf::from(chemin), cle);
+        }
+
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirPolitiqueIa");
+    resultat
 }
 
 /// Supprime une règle de membre connu d'un groupe, sauvegarde le fichier et consigne la suppression au journal
@@ -181,24 +191,29 @@ pub(crate) fn supprimer_membre_connu(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    administration::supprimer_membre_connu(
-        &mut donnees,
-        &groupe_id,
-        &membre_id,
-        origine,
-        horodatage,
-    )?;
+    crate::journalisation::consigner_debut_commande("supprimerMembreConnu");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        administration::supprimer_membre_connu(
+            &mut donnees,
+            &groupe_id,
+            &membre_id,
+            origine,
+            horodatage,
+        )?;
 
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "supprimerMembreConnu",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerMembreConnu",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerMembreConnu");
+    resultat
 }

@@ -76,6 +76,22 @@ pub(crate) fn consigner_resultat_connecteur<T, E: std::fmt::Debug>(
     resultat
 }
 
+/// Consigne le début d'exécution de n'importe quelle commande de la Façade (R11-01c), y compris celles qui ne
+/// journalisent sinon rien d'autre (mutations de paramétrage, purge, etc.) : point d'entrée générique pour
+/// diagnostiquer un blocage dans une commande qui ne s'appuierait sur aucune autre trace avant sa fin, à la
+/// différence de [`consigner_appel_connecteur`] qui ne couvre que les appels aux connecteurs GitLab/Sonar (ajouté
+/// à la suite du diagnostic d'un blocage de campagne signalé par l'utilisateur, cf. rapport de développement).
+pub(crate) fn consigner_debut_commande(commande: &str) {
+    log::info!(target: CIBLE_ACTION_TRACEE, "{commande} : début");
+}
+
+/// Consigne la fin d'exécution de n'importe quelle commande de la Façade, symétrique de
+/// [`consigner_debut_commande`] : émise systématiquement (succès ou échec), à la différence de
+/// [`consigner_resultat_connecteur`] qui ne journalise que l'échec des appels aux connecteurs GitLab/Sonar.
+pub(crate) fn consigner_fin_commande(commande: &str) {
+    log::info!(target: CIBLE_ACTION_TRACEE, "{commande} : fin");
+}
+
 /// Consigne une écriture du fichier de données (R11-01b), au point de convergence unique
 /// `persistance::moteur::sauvegarder_fichier` : nom de la commande de la Façade à l'origine de cette écriture,
 /// jamais le contenu du fichier ni le mot de passe.

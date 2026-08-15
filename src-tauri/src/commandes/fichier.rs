@@ -265,16 +265,21 @@ pub(crate) fn creer_fichier(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let (racine, cle) = moteur::creer_fichier(
-        Path::new(&chemin),
-        &mot_de_passe,
-        &horodatage,
-        NOM_APPLICATION,
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
-    etat.definir_proxy(racine.parametres.proxy.clone());
-    Ok(racine)
+    crate::journalisation::consigner_debut_commande("creerFichier");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let (racine, cle) = moteur::creer_fichier(
+            Path::new(&chemin),
+            &mot_de_passe,
+            &horodatage,
+            NOM_APPLICATION,
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
+        etat.definir_proxy(racine.parametres.proxy.clone());
+        Ok(racine)
+    })();
+    crate::journalisation::consigner_fin_commande("creerFichier");
+    resultat
 }
 
 /// Charge un fichier de données existant (US-002).
@@ -284,10 +289,15 @@ pub(crate) fn charger_fichier(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    let (racine, cle) = moteur::charger_fichier(Path::new(&chemin), &mot_de_passe)?;
-    etat.definir(PathBuf::from(chemin), cle);
-    etat.definir_proxy(racine.parametres.proxy.clone());
-    Ok(racine)
+    crate::journalisation::consigner_debut_commande("chargerFichier");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        let (racine, cle) = moteur::charger_fichier(Path::new(&chemin), &mot_de_passe)?;
+        etat.definir(PathBuf::from(chemin), cle);
+        etat.definir_proxy(racine.parametres.proxy.clone());
+        Ok(racine)
+    })();
+    crate::journalisation::consigner_fin_commande("chargerFichier");
+    resultat
 }
 
 /// Sauvegarde le fichier de données actuellement ouvert.
@@ -298,22 +308,32 @@ pub(crate) fn sauvegarder_fichier(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<(), ErreurFacade> {
-    verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let cle = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "sauvegarderFichier",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle);
-    Ok(())
+    crate::journalisation::consigner_debut_commande("sauvegarderFichier");
+    let resultat = (|| -> Result<(), ErreurFacade> {
+        verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let cle = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "sauvegarderFichier",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
+        Ok(())
+    })();
+    crate::journalisation::consigner_fin_commande("sauvegarderFichier");
+    resultat
 }
 
 /// Verrouille la session courante : efface la clé dérivée détenue côté cœur natif (US-026, RG-004, RG-005).
 #[tauri::command]
 pub(crate) fn verrouiller_session(etat: State<'_, EtatSession>) -> Result<(), ErreurFacade> {
-    etat.purger();
-    Ok(())
+    crate::journalisation::consigner_debut_commande("verrouillerSession");
+    let resultat = (|| -> Result<(), ErreurFacade> {
+        etat.purger();
+        Ok(())
+    })();
+    crate::journalisation::consigner_fin_commande("verrouillerSession");
+    resultat
 }
 
 /// Déverrouille la session courante : revérifie le mot de passe par nouvelle dérivation de clé contre le fichier
@@ -325,13 +345,18 @@ pub(crate) fn deverrouiller_session(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<(), ErreurFacade> {
-    let chemin = etat
-        .chemin_fichier()
-        .ok_or(ErreurFacade::AucunFichierOuvert)?;
-    let (racine, cle) = moteur::charger_fichier(&chemin, &mot_de_passe)?;
-    etat.definir(chemin, cle);
-    etat.definir_proxy(racine.parametres.proxy);
-    Ok(())
+    crate::journalisation::consigner_debut_commande("deverrouillerSession");
+    let resultat = (|| -> Result<(), ErreurFacade> {
+        let chemin = etat
+            .chemin_fichier()
+            .ok_or(ErreurFacade::AucunFichierOuvert)?;
+        let (racine, cle) = moteur::charger_fichier(&chemin, &mot_de_passe)?;
+        etat.definir(chemin, cle);
+        etat.definir_proxy(racine.parametres.proxy);
+        Ok(())
+    })();
+    crate::journalisation::consigner_fin_commande("deverrouillerSession");
+    resultat
 }
 
 #[cfg(test)]

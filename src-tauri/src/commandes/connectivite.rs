@@ -31,27 +31,33 @@ pub(crate) async fn tester_connectivite(
     credential: String,
     etat: State<'_, EtatSession>,
 ) -> Result<VerdictConnectivite, ErreurConnecteur> {
-    crate::journalisation::consigner_appel_connecteur(
-        "testerConnectivite",
-        &instance.nom,
-        "test de connectivité",
-    );
-    let client = etat.client_http();
-    let client = &client;
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::tester_connectivite(&instance.url_base, &credential, client).await
-        }
-        TypeInstance::Sonar => {
-            sonar::tester_connectivite(&instance.url_base, &credential, client).await
-        }
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "testerConnectivite",
-        &instance.nom,
-        "test de connectivité",
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("testerConnectivite");
+    let resultat = async {
+        crate::journalisation::consigner_appel_connecteur(
+            "testerConnectivite",
+            &instance.nom,
+            "test de connectivité",
+        );
+        let client = etat.client_http();
+        let client = &client;
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::tester_connectivite(&instance.url_base, &credential, client).await
+            }
+            TypeInstance::Sonar => {
+                sonar::tester_connectivite(&instance.url_base, &credential, client).await
+            }
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "testerConnectivite",
+            &instance.nom,
+            "test de connectivité",
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("testerConnectivite");
+    resultat
 }
 
 /// Enregistre les credentials de la session courante en mémoire côté cœur natif (US-003), en miroir du Store
@@ -70,11 +76,16 @@ pub(crate) fn definir_credentials(
     credentials: HashMap<String, String>,
     etat: State<'_, EtatSession>,
 ) -> Result<(), ErreurFacade> {
-    if etat.definir_credentials(credentials) {
-        Ok(())
-    } else {
-        Err(ErreurFacade::CredentialInvalide)
-    }
+    crate::journalisation::consigner_debut_commande("definirCredentials");
+    let resultat = (|| -> Result<(), ErreurFacade> {
+        if etat.definir_credentials(credentials) {
+            Ok(())
+        } else {
+            Err(ErreurFacade::CredentialInvalide)
+        }
+    })();
+    crate::journalisation::consigner_fin_commande("definirCredentials");
+    resultat
 }
 
 /// Interroge les branches d'un dépôt GitLab pour l'autocomplétion de la ref auditée d'une source (US-008,
@@ -92,40 +103,46 @@ pub(crate) async fn interroger_branches(
     recherche: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<Vec<String>, ErreurConnecteur> {
-    let credential =
-        etat.credential(&instance.id)
-            .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
-                message: "Aucun credential en mémoire pour cette instance".to_string(),
-            })?;
-    crate::journalisation::consigner_appel_connecteur(
-        "interrogerBranches",
-        &instance.nom,
-        &id_externe,
-    );
-    let client = etat.client_http();
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::interroger_branches(
-                &instance.url_base,
-                &credential,
-                &id_externe,
-                recherche.as_deref(),
-                &client,
-            )
-            .await
-        }
-        // Défense en profondeur : une source `projetSonar` n'a pas de branches, l'UI ne devrait jamais invoquer
-        // cette commande pour une instance Sonar.
-        TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
-            message: "Type de source incompatible avec cette opération".to_string(),
-        }),
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "interrogerBranches",
-        &instance.nom,
-        &id_externe,
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("interrogerBranches");
+    let resultat = async {
+        let credential =
+            etat.credential(&instance.id)
+                .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
+                    message: "Aucun credential en mémoire pour cette instance".to_string(),
+                })?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerBranches",
+            &instance.nom,
+            &id_externe,
+        );
+        let client = etat.client_http();
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::interroger_branches(
+                    &instance.url_base,
+                    &credential,
+                    &id_externe,
+                    recherche.as_deref(),
+                    &client,
+                )
+                .await
+            }
+            // Défense en profondeur : une source `projetSonar` n'a pas de branches, l'UI ne devrait jamais invoquer
+            // cette commande pour une instance Sonar.
+            TypeInstance::Sonar => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerBranches",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerBranches");
+    resultat
 }
 
 /// Liste les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une Instance, pour
@@ -144,29 +161,35 @@ pub(crate) async fn lister_sources_disponibles(
     instance: Instance,
     etat: State<'_, EtatSession>,
 ) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
-    let credential =
-        etat.credential(&instance.id)
-            .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
-                message: "Aucun credential en mémoire pour cette instance".to_string(),
-            })?;
-    crate::journalisation::consigner_appel_connecteur(
-        "listerSourcesDisponibles",
-        &instance.nom,
-        "toutes les sources accessibles",
-    );
-    let client = etat.client_http();
-    let resultat = match instance.type_instance {
-        TypeInstance::Gitlab => {
-            gitlab::lister_projets(&instance.url_base, &credential, &client).await
-        }
-        TypeInstance::Sonar => {
-            sonar::rechercher_projets(&instance.url_base, &credential, &client).await
-        }
-    };
-    crate::journalisation::consigner_resultat_connecteur(
-        "listerSourcesDisponibles",
-        &instance.nom,
-        "toutes les sources accessibles",
-        resultat,
-    )
+    crate::journalisation::consigner_debut_commande("listerSourcesDisponibles");
+    let resultat = async {
+        let credential =
+            etat.credential(&instance.id)
+                .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
+                    message: "Aucun credential en mémoire pour cette instance".to_string(),
+                })?;
+        crate::journalisation::consigner_appel_connecteur(
+            "listerSourcesDisponibles",
+            &instance.nom,
+            "toutes les sources accessibles",
+        );
+        let client = etat.client_http();
+        let resultat = match instance.type_instance {
+            TypeInstance::Gitlab => {
+                gitlab::lister_projets(&instance.url_base, &credential, &client).await
+            }
+            TypeInstance::Sonar => {
+                sonar::rechercher_projets(&instance.url_base, &credential, &client).await
+            }
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "listerSourcesDisponibles",
+            &instance.nom,
+            "toutes les sources accessibles",
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("listerSourcesDisponibles");
+    resultat
 }

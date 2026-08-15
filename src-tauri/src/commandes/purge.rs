@@ -25,7 +25,12 @@ use tauri::State;
 pub(crate) fn previsualiser_purge_densite(
     donnees: DonneesRacine,
 ) -> Result<PrevisualisationPurge, ErreurFacade> {
-    Ok(purge::previsualiser_purge_densite(&donnees))
+    crate::journalisation::consigner_debut_commande("previsualiserPurgeDensite");
+    let resultat = (|| -> Result<PrevisualisationPurge, ErreurFacade> {
+        Ok(purge::previsualiser_purge_densite(&donnees))
+    })();
+    crate::journalisation::consigner_fin_commande("previsualiserPurgeDensite");
+    resultat
 }
 
 /// Exécute une purge par densité, sauvegarde le fichier (US-025, RG-024).
@@ -36,20 +41,25 @@ pub(crate) fn executer_purge_densite(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    purge::executer_purge_densite(&mut donnees, horodatage);
+    crate::journalisation::consigner_debut_commande("executerPurgeDensite");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        purge::executer_purge_densite(&mut donnees, horodatage);
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "executerPurgeDensite",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "executerPurgeDensite",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("executerPurgeDensite");
+    resultat
 }
 
 /// Prévisualise une purge du journal des modifications lui-même (US-036, RG-034, Phase 10 incrément 8), limite
@@ -58,8 +68,13 @@ pub(crate) fn executer_purge_densite(
 pub(crate) fn previsualiser_purge_journal(
     donnees: DonneesRacine,
 ) -> Result<PrevisualisationPurgeJournal, ErreurFacade> {
-    let aujourdhui = Utc::now().date_naive();
-    Ok(purge::previsualiser_purge_journal(&donnees, aujourdhui))
+    crate::journalisation::consigner_debut_commande("previsualiserPurgeJournal");
+    let resultat = (|| -> Result<PrevisualisationPurgeJournal, ErreurFacade> {
+        let aujourdhui = Utc::now().date_naive();
+        Ok(purge::previsualiser_purge_journal(&donnees, aujourdhui))
+    })();
+    crate::journalisation::consigner_fin_commande("previsualiserPurgeJournal");
+    resultat
 }
 
 /// Exécute une purge du journal des modifications lui-même, sauvegarde le fichier (US-036, RG-034, Phase 10
@@ -71,21 +86,26 @@ pub(crate) fn executer_purge_journal(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let aujourdhui = Utc::now().date_naive();
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    purge::executer_purge_journal(&mut donnees, aujourdhui, horodatage);
+    crate::journalisation::consigner_debut_commande("executerPurgeJournal");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let aujourdhui = Utc::now().date_naive();
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        purge::executer_purge_journal(&mut donnees, aujourdhui, horodatage);
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "executerPurgeJournal",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "executerPurgeJournal",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("executerPurgeJournal");
+    resultat
 }
 
 /// Prévisualise une purge par âge (US-025, RG-025) pour le mode désigné (`"suppression"` ou
@@ -99,9 +119,14 @@ pub(crate) fn previsualiser_purge_age(
     donnees: DonneesRacine,
     mode: String,
 ) -> Result<PrevisualisationPurge, ErreurFacade> {
-    let aujourdhui = Utc::now().date_naive();
-    let resume = purge::previsualiser_purge_age(&donnees, aujourdhui, &mode)?;
-    Ok(resume)
+    crate::journalisation::consigner_debut_commande("previsualiserPurgeAge");
+    let resultat = (|| -> Result<PrevisualisationPurge, ErreurFacade> {
+        let aujourdhui = Utc::now().date_naive();
+        let resume = purge::previsualiser_purge_age(&donnees, aujourdhui, &mode)?;
+        Ok(resume)
+    })();
+    crate::journalisation::consigner_fin_commande("previsualiserPurgeAge");
+    resultat
 }
 
 /// Exécute une purge par âge pour le mode désigné, sauvegarde le fichier (US-025, RG-025).
@@ -117,19 +142,24 @@ pub(crate) fn executer_purge_age(
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
-    super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
-    let mut donnees = donnees;
-    let aujourdhui = Utc::now().date_naive();
-    let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    purge::executer_purge_age(&mut donnees, aujourdhui, &mode, horodatage)?;
+    crate::journalisation::consigner_debut_commande("executerPurgeAge");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let aujourdhui = Utc::now().date_naive();
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        purge::executer_purge_age(&mut donnees, aujourdhui, &mode, horodatage)?;
 
-    let cle_session = moteur::sauvegarder_fichier(
-        Path::new(&chemin),
-        &donnees,
-        &mot_de_passe,
-        "executerPurgeAge",
-    )?;
-    etat.definir(PathBuf::from(chemin), cle_session);
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "executerPurgeAge",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
 
-    Ok(donnees)
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("executerPurgeAge");
+    resultat
 }
