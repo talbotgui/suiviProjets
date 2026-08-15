@@ -11,6 +11,7 @@
 4. [Usage courant](#usage-courant)
    1. [Commandes de démarrage en mode développement](#commandes-de-démarrage-en-mode-développement)
    2. [Commandes de build](#commandes-de-build)
+   3. [Commandes de documentation technique](#commandes-de-documentation-technique)
 5. [Résolution des problèmes courants](#résolution-des-problèmes-courants)
 
 ## Prérequis matériels et logiciels
@@ -89,6 +90,12 @@ Sa mise en place effective (déclaration du hook, création du répertoire `.cla
 - `npm run tauri build` produit le build de production complet : compilation Rust en mode optimisé et empaquetage de l'installeur natif du poste courant (cf. [stratégie de build, empaquetage et publication, étape 12](./19_environnementProduction.md#stratégie-de-build-empaquetage-et-publication)). Le build multiplateforme (Windows/macOS/Linux) reste produit par la matrice d'exécuteurs de la [PIC](./18_pic.md#mise-en-place-du-pipeline), un poste de développement ne pouvant empaqueter nativement que pour son propre système d'exploitation.
 - `cargo build --locked` (ou `cargo check --locked` pour une vérification plus rapide sans lien final) permet de vérifier la seule compilation du cœur natif, sans empaquetage complet ni front Angular.
 - Un build signé (validant localement le mécanisme du updater) nécessite les [variables d'environnement de signature](#variables-denvironnement) ; il reste optionnel en développement courant.
+
+### Commandes de documentation technique
+
+- `npm run doc` génère la documentation technique de l'interface Angular/TypeScript avec [Compodoc](https://compodoc.app/) (`compodoc -p tsconfig.app.json -d documentation`), à partir des commentaires TSDoc déjà obligatoires sur toute classe/méthode (cf. [rigueur du typage et de la documentation, étape 9](./14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--typescript)) ; le résultat, exclu du suivi de version, s'ouvre localement via `documentation/index.html`.
+- `cargo doc --locked --no-deps --open` (depuis `src-tauri/`) génère et ouvre la documentation technique du cœur natif Rust avec [rustdoc](https://doc.rust-lang.org/rustdoc/), outil standard livré avec la toolchain Rust : aucun équivalent tiers de Compodoc n'est nécessaire côté Rust. Générée à partir des commentaires Rustdoc (`///`) déjà obligatoires sur tout élément public (cf. [rigueur du typage et de la documentation, étape 9](./14_normesDeveloppement.md#rigueur-du-typage-et-de-la-documentation--rust)) ; `--no-deps` exclut la documentation des dépendances, limitant le résultat au seul code de ce dépôt.
+- Ces deux rapports sont régénérés et publiés sur GitHub Pages à chaque exécution du workflow de publication, aux côtés des rapports de couverture de code (cf. [mise en place du pipeline, étape 12](./18_pic.md#mise-en-place-du-pipeline)).
 
 ## Résolution des problèmes courants
 

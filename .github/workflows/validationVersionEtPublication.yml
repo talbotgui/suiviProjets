@@ -8,7 +8,8 @@
 # existantes (analyse statique, tests et couverture, tests de bout en bout, analyse des dépendances vulnérables),
 # la montée de version applicative committée directement sur `master` (sans Pull Request dans les deux cas), le
 # build multiplateforme, la création du tag et la publication de la GitHub Release, ainsi que la publication de la
-# couverture de code sur GitHub Pages (cf. docs/02_documentation/18_pic.md#mise-en-place-du-pipeline).
+# couverture de code et de la documentation technique (Compodoc/rustdoc) sur GitHub Pages (cf.
+# docs/02_documentation/18_pic.md#mise-en-place-du-pipeline).
 #
 # Le build multiplateforme exige des runners d'OS distincts (Windows/macOS/Linux) : il reste donc un job à part
 # (matrice), tout comme la publication de la couverture et de la Release, mais toujours au sein de ce seul et
@@ -114,7 +115,7 @@ jobs:
         working-directory: src-tauri
         run: |
           cargo llvm-cov --locked --workspace --html \
-            --output-dir "$GITHUB_WORKSPACE/site-couverture/rust" \
+            --output-dir "$GITHUB_WORKSPACE/site-rapports/couverture/rust" \
             --fail-under-lines 80
 
       # Seuils par périmètre déjà configurés dans jest.config.js (90 % Moteur de jugement, 80 % reste de la logique
@@ -123,29 +124,50 @@ jobs:
       - name: Tests unitaires Angular/TypeScript avec couverture (Jest/Istanbul)
         run: npm run test:coverage
 
-      - name: Assemblage du site de couverture combiné (page de renvoi Rust/TypeScript)
+      # Rustdoc (`cargo doc`), outil standard livré avec la toolchain Rust (aucune dépendance supplémentaire) : pas
+      # d'équivalent tiers de Compodoc à installer côté Rust, `missing_docs = "warn"` (cf. src-tauri/Cargo.toml)
+      # imposant déjà la Rustdoc (`///`) sur tout élément public consommée par cette génération. `--no-deps` exclut
+      # la documentation des dépendances du site publié (périmètre : uniquement le code de ce dépôt).
+      - name: Génération de la documentation technique Rust (rustdoc)
+        working-directory: src-tauri
+        run: cargo doc --locked --no-deps
+
+      # Compodoc lit tsconfig.app.json (périmètre du code applicatif `src/`, à l'exclusion des specs), à la
+      # différence de tsconfig.json (racine « solution », sans fichier direct) utilisé par ailleurs pour le
+      # typecheck global.
+      - name: Génération de la documentation technique Angular/TypeScript (Compodoc)
+        run: npm run doc
+
+      - name: Assemblage du site de rapports combiné (couverture de code et documentation technique, Rust/TypeScript)
         run: |
-          mkdir -p site-couverture
-          cp -r coverage site-couverture/ts
-          cat > site-couverture/index.html <<'EOF'
+          mkdir -p site-rapports/documentation
+          cp -r coverage site-rapports/couverture/ts
+          cp -r documentation site-rapports/documentation/ts
+          cp -r src-tauri/target/doc site-rapports/documentation/rust
+          cat > site-rapports/index.html <<'EOF'
           <!doctype html>
           <html lang="fr">
-          <head><meta charset="utf-8"><title>Couverture de code — Suivi Qualimétrie</title></head>
+          <head><meta charset="utf-8"><title>Rapports — Suivi Qualimétrie</title></head>
           <body>
-            <h1>Rapports de couverture de code</h1>
+            <h1>Couverture de code</h1>
             <ul>
-              <li><a href="rust/html/index.html">Cœur natif (Rust, cargo-llvm-cov)</a></li>
-              <li><a href="ts/index.html">Interface (Angular/TypeScript, Jest/Istanbul)</a></li>
+              <li><a href="couverture/rust/html/index.html">Cœur natif (Rust, cargo-llvm-cov)</a></li>
+              <li><a href="couverture/ts/index.html">Interface (Angular/TypeScript, Jest/Istanbul)</a></li>
+            </ul>
+            <h1>Documentation technique</h1>
+            <ul>
+              <li><a href="documentation/rust/suivi_qualimetrie_lib/index.html">Cœur natif (Rust, rustdoc)</a></li>
+              <li><a href="documentation/ts/index.html">Interface (Angular/TypeScript, Compodoc)</a></li>
             </ul>
           </body>
           </html>
           EOF
 
-      - name: Archivage du site de couverture (consommé par le job de publication de la couverture)
+      - name: Archivage du site de rapports (consommé par le job de publication sur GitHub Pages)
         uses: actions/upload-artifact@v4
         with:
-          name: site-couverture
-          path: site-couverture/
+          name: site-rapports
+          path: site-rapports/
           retention-days: 14
 
       - name: Installation des navigateurs Playwright
@@ -303,8 +325,8 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 7
 
-  couverture-pages:
-    name: Publication de la couverture de code (GitHub Pages)
+  publication-pages:
+    name: Publication de la couverture de code et de la documentation technique (GitHub Pages)
     needs: validation-et-montee-version
     runs-on: ubuntu-latest
     environment:
@@ -316,16 +338,16 @@ jobs:
     outputs:
       lien: ${{ steps.deploiement.outputs.page_url }}
     steps:
-      - name: Récupération du site de couverture généré par le job de validation
+      - name: Récupération du site de rapports généré par le job de validation
         uses: actions/download-artifact@v4
         with:
-          name: site-couverture
-          path: site-couverture
+          name: site-rapports
+          path: site-rapports
 
       - name: Préparation de l'artefact Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site-couverture
+          path: site-rapports
 
       - name: Déploiement sur GitHub Pages
         id: deploiement
@@ -333,7 +355,7 @@ jobs:
 
   publication-release:
     name: Création du tag et publication de la GitHub Release
-    needs: [validation-et-montee-version, build, couverture-pages]
+    needs: [validation-et-montee-version, build, publication-pages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -388,13 +410,14 @@ jobs:
             livrables/deb/*.deb \
             livrables/appimage/*.AppImage
 
-      # `gh release create --notes`/`--generate-notes` sont mutuellement exclusifs : le lien vers le rapport de
-      # couverture est donc ajouté séparément, en tête des notes déjà générées à partir des Conventional Commits.
-      - name: Ajout du lien vers le rapport de couverture de code aux notes de la Release
+      # `gh release create --notes`/`--generate-notes` sont mutuellement exclusifs : le lien vers le site de rapports
+      # (couverture de code et documentation technique) est donc ajouté séparément, en tête des notes déjà générées
+      # à partir des Conventional Commits.
+      - name: Ajout du lien vers les rapports (couverture de code, documentation technique) aux notes de la Release
         env:
           GH_TOKEN: ${{ github.token }}
-          LIEN_COUVERTURE: ${{ needs.couverture-pages.outputs.lien }}
+          LIEN_RAPPORTS: ${{ needs.publication-pages.outputs.lien }}
         run: |
           notes_existantes=$(gh release view "v${{ inputs.version }}" --json body -q .body)
-          printf 'Rapport de couverture de code (Rust + TypeScript) : %s\n\n%s' "$LIEN_COUVERTURE" "$notes_existantes" \
+          printf 'Rapports (couverture de code et documentation technique, Rust + TypeScript) : %s\n\n%s' "$LIEN_RAPPORTS" "$notes_existantes" \
             | gh release edit "v${{ inputs.version }}" --notes-file -

@@ -23,6 +23,7 @@ module.exports = defineConfig([
       'dist/**',
       '.angular/**',
       'coverage/**',
+      'documentation/**',
       'src-tauri/**',
       'node_modules/**',
       'docs/**',
