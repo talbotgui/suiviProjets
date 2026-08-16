@@ -36,71 +36,6 @@
       </button>
     </header>
 
-    <ul
-      id="annotations-groupe-admin-liste"
-      class="annotations-groupe-admin__liste sans-liste d-flex direction-colonne ecart-2"
-    >
-      @for (annotation of annotations(); track annotation.id) {
-        <li
-          class="annotations-groupe-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
-        >
-          <span class="annotations-groupe-admin__date texte-discret texte-sm police-mono">{{
-            annotation.date
-          }}</span>
-          <span class="annotations-groupe-admin__libelle poids-demi-gras">{{
-            annotation.libelle
-          }}</span>
-          <span class="annotations-groupe-admin__categorie texte-discret texte-sm">{{
-            annotation.categorie
-          }}</span>
-          @if (!annotation.systeme) {
-            <button
-              type="button"
-              class="bouton bouton--discret"
-              [disabled]="enCours()"
-              (click)="demanderSuppression(annotation.id)"
-            >
-              Supprimer
-            </button>
-          }
-        </li>
-      } @empty {
-        <li class="annotations-groupe-admin__vide texte-discret">
-          Aucune annotation n'est encore définie pour ce groupe.
-        </li>
-      }
-    </ul>
-
-    @if (messageErreur) {
-      <p class="annotations-groupe-admin__erreur texte-rouge exterieur-haut-3" role="alert">
-        {{ messageErreur }}
-      </p>
-    }
-
-    @if (annotationASupprimerId() && actionEnAttenteMotDePasse() === null) {
-      <app-confirmation-suppression
-        message="La suppression d'une annotation est immédiate et irréversible."
-        (confirmee)="confirmerSuppression()"
-        (annulee)="annulerSuppression()"
-      />
-    }
-
-    @if (actionEnAttenteMotDePasse() === 'creation') {
-      <app-confirmation-mot-de-passe
-        message="Ressaisissez le mot de passe du fichier pour créer cette annotation."
-        (confirmee)="confirmerCreation($event)"
-        (annulee)="annulerMotDePasse()"
-      />
-    }
-
-    @if (actionEnAttenteMotDePasse() === 'suppression') {
-      <app-confirmation-mot-de-passe
-        message="Ressaisissez le mot de passe du fichier pour supprimer cette annotation."
-        (confirmee)="confirmerSuppressionMotDePasse($event)"
-        (annulee)="annulerMotDePasse()"
-      />
-    }
-
     @if (formulaireVisible()) {
       <form
         class="annotations-groupe-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
@@ -174,6 +109,71 @@
           </button>
         </div>
       </form>
+    }
+
+    @if (annotationASupprimerId() && actionEnAttenteMotDePasse() === null) {
+      <app-confirmation-suppression
+        message="La suppression d'une annotation est immédiate et irréversible."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'creation') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour créer cette annotation."
+        (confirmee)="confirmerCreation($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'suppression') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette annotation."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    <ul
+      id="annotations-groupe-admin-liste"
+      class="annotations-groupe-admin__liste sans-liste d-flex direction-colonne ecart-2"
+    >
+      @for (annotation of annotations(); track annotation.id) {
+        <li
+          class="annotations-groupe-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+        >
+          <span class="annotations-groupe-admin__date texte-discret texte-sm police-mono">{{
+            annotation.date
+          }}</span>
+          <span class="annotations-groupe-admin__libelle poids-demi-gras">{{
+            annotation.libelle
+          }}</span>
+          <span class="annotations-groupe-admin__categorie texte-discret texte-sm">{{
+            annotation.categorie
+          }}</span>
+          @if (!annotation.systeme) {
+            <button
+              type="button"
+              class="bouton bouton--discret"
+              [disabled]="enCours()"
+              (click)="demanderSuppression(annotation.id)"
+            >
+              Supprimer
+            </button>
+          }
+        </li>
+      } @empty {
+        <li class="annotations-groupe-admin__vide texte-discret">
+          Aucune annotation n'est encore définie pour ce groupe.
+        </li>
+      }
+    </ul>
+
+    @if (messageErreur) {
+      <p class="annotations-groupe-admin__erreur texte-rouge exterieur-haut-3" role="alert">
+        {{ messageErreur }}
+      </p>
     }
   }
 </section>

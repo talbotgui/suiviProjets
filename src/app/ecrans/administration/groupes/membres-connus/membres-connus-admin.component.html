@@ -36,81 +36,6 @@
       </button>
     </header>
 
-    <ul
-      id="membres-connus-admin-liste"
-      class="membres-connus-admin__liste sans-liste d-flex direction-colonne ecart-2"
-    >
-      @for (regle of membresConnus(); track regle.id) {
-        <li
-          class="membres-connus-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
-          [class.membres-connus-admin__ligne--conflit]="estEnConflit(regle.id)"
-        >
-          <span class="membres-connus-admin__critere poids-demi-gras">{{ regle.critere }}</span>
-          <span class="membres-connus-admin__type texte-discret texte-sm">{{
-            regle.typeCritere
-          }}</span>
-          <span class="membres-connus-admin__statut texte-discret texte-sm">{{
-            regle.statut
-          }}</span>
-          @if (estEnConflit(regle.id)) {
-            <span class="membres-connus-admin__badge-conflit texte-orange poids-gras" role="alert"
-              >Conflit de règles</span
-            >
-          }
-          <button
-            type="button"
-            class="bouton bouton--discret"
-            [disabled]="enCours()"
-            (click)="ouvrirEdition(regle.id)"
-          >
-            Modifier
-          </button>
-          <button
-            type="button"
-            class="bouton bouton--discret"
-            [disabled]="enCours()"
-            (click)="demanderSuppression(regle.id)"
-          >
-            Supprimer
-          </button>
-        </li>
-      } @empty {
-        <li class="membres-connus-admin__vide texte-discret">
-          Aucune règle n'est encore définie pour ce groupe.
-        </li>
-      }
-    </ul>
-
-    @if (messageErreur) {
-      <p class="membres-connus-admin__erreur texte-rouge exterieur-haut-3" role="alert">
-        {{ messageErreur }}
-      </p>
-    }
-
-    @if (membreASupprimerId() && actionEnAttenteMotDePasse() === null) {
-      <app-confirmation-suppression
-        message="La suppression d'une règle de membre connu est immédiate et irréversible."
-        (confirmee)="confirmerSuppression()"
-        (annulee)="annulerSuppression()"
-      />
-    }
-
-    @if (actionEnAttenteMotDePasse() === 'enregistrement') {
-      <app-confirmation-mot-de-passe
-        message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle."
-        (confirmee)="confirmerEnregistrement($event)"
-        (annulee)="annulerMotDePasse()"
-      />
-    }
-
-    @if (actionEnAttenteMotDePasse() === 'suppression') {
-      <app-confirmation-mot-de-passe
-        message="Ressaisissez le mot de passe du fichier pour supprimer cette règle."
-        (confirmee)="confirmerSuppressionMotDePasse($event)"
-        (annulee)="annulerMotDePasse()"
-      />
-    }
-
     @if (formulaireVisible()) {
       <form
         class="membres-connus-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
@@ -227,6 +152,81 @@
           </button>
         </div>
       </form>
+    }
+
+    @if (membreASupprimerId() && actionEnAttenteMotDePasse() === null) {
+      <app-confirmation-suppression
+        message="La suppression d'une règle de membre connu est immédiate et irréversible."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'enregistrement') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle."
+        (confirmee)="confirmerEnregistrement($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'suppression') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette règle."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    <ul
+      id="membres-connus-admin-liste"
+      class="membres-connus-admin__liste sans-liste d-flex direction-colonne ecart-2"
+    >
+      @for (regle of membresConnus(); track regle.id) {
+        <li
+          class="membres-connus-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+          [class.membres-connus-admin__ligne--conflit]="estEnConflit(regle.id)"
+        >
+          <span class="membres-connus-admin__critere poids-demi-gras">{{ regle.critere }}</span>
+          <span class="membres-connus-admin__type texte-discret texte-sm">{{
+            regle.typeCritere
+          }}</span>
+          <span class="membres-connus-admin__statut texte-discret texte-sm">{{
+            regle.statut
+          }}</span>
+          @if (estEnConflit(regle.id)) {
+            <span class="membres-connus-admin__badge-conflit texte-orange poids-gras" role="alert"
+              >Conflit de règles</span
+            >
+          }
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours()"
+            (click)="ouvrirEdition(regle.id)"
+          >
+            Modifier
+          </button>
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours()"
+            (click)="demanderSuppression(regle.id)"
+          >
+            Supprimer
+          </button>
+        </li>
+      } @empty {
+        <li class="membres-connus-admin__vide texte-discret">
+          Aucune règle n'est encore définie pour ce groupe.
+        </li>
+      }
+    </ul>
+
+    @if (messageErreur) {
+      <p class="membres-connus-admin__erreur texte-rouge exterieur-haut-3" role="alert">
+        {{ messageErreur }}
+      </p>
     }
   }
 </section>

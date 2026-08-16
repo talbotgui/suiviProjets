@@ -16,6 +16,7 @@
 - Toute action destructive ou irréversible (suppression, rejet d'un brouillon, purge d'audits, écrasement à l'import) fait l'objet d'une confirmation explicite rappelant la conséquence concrète.
 - L'ensemble de l'application est utilisable au clavier, sans dépendre de la souris, avec un ordre de tabulation cohérent avec l'ordre de lecture visuel.
 - La densité d'information privilégie les tableaux pour les listes volumineuses (synthèse, liste de travail) et les cartes pour les regroupements synthétiques (accueil, en-tête de fiche projet), avec une typographie dédiée aux valeurs brutes (police à chasse fixe) distincte du texte courant.
+- Sur tout écran CRUD combinant une liste et un formulaire de création/modification, le formulaire (et les blocs de confirmation associés, suppression ou ressaisie du mot de passe) s'affiche avant la liste des entrées existantes, jamais après, afin de rester atteignable sans défilement dès que la liste s'allonge ([US-039](./04_casUsage.md#cas-dusage--user-stories), besoin identifié en Phase 15 (C15-01), absent de `Specification.md`).
 
 ## Composants d'interface réutilisables
 

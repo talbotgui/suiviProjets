@@ -51,6 +51,29 @@
     </button>
   </header>
 
+  @if (formulaireVisible && groupeIdFormulaire && projetIdFormulaire) {
+    <div
+      class="sources-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
+    >
+      <app-formulaire-source
+        #formulaireSource
+        [groupeId]="groupeIdFormulaire"
+        [projetId]="projetIdFormulaire"
+        [sourceAModifier]="ligneEnEdition?.source ?? null"
+        (enregistree)="onSourceEnregistree()"
+        (annulee)="fermerFormulaire()"
+      />
+    </div>
+  }
+
+  @if (ligneASupprimer) {
+    <app-confirmation-suppression
+      message="Cette suppression est irréversible."
+      (confirmee)="confirmerSuppression()"
+      (annulee)="annulerSuppression()"
+    />
+  }
+
   <ul
     id="sources-admin-liste"
     class="sources-admin__liste sans-liste d-flex direction-colonne ecart-2"
@@ -77,27 +100,4 @@
       <li class="sources-admin__vide texte-discret">Aucune source ne correspond à ces filtres.</li>
     }
   </ul>
-
-  @if (ligneASupprimer) {
-    <app-confirmation-suppression
-      message="Cette suppression est irréversible."
-      (confirmee)="confirmerSuppression()"
-      (annulee)="annulerSuppression()"
-    />
-  }
-
-  @if (formulaireVisible && groupeIdFormulaire && projetIdFormulaire) {
-    <div
-      class="sources-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
-    >
-      <app-formulaire-source
-        #formulaireSource
-        [groupeId]="groupeIdFormulaire"
-        [projetId]="projetIdFormulaire"
-        [sourceAModifier]="ligneEnEdition?.source ?? null"
-        (enregistree)="onSourceEnregistree()"
-        (annulee)="fermerFormulaire()"
-      />
-    </div>
-  }
 </section>

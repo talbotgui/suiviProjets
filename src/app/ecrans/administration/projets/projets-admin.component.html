@@ -45,64 +45,6 @@
     </div>
   </header>
 
-  <ul
-    id="projets-admin-liste"
-    class="projets-admin__liste sans-liste d-flex direction-colonne ecart-2"
-  >
-    @for (ligne of lignesProjets(); track ligne.projet.id) {
-      <li
-        class="projets-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
-      >
-        <span class="projets-admin__groupe texte-discret texte-sm">{{ ligne.groupeNom }}</span>
-        <span class="projets-admin__nom poids-demi-gras">{{ ligne.projet.nom }}</span>
-        <span class="projets-admin__description texte-discret texte-sm">{{
-          ligne.projet.description
-        }}</span>
-        <span class="projets-admin__nombre-sources texte-discret texte-sm"
-          >{{ ligne.projet.sources.length }} source(s)</span
-        >
-        <span class="projets-admin__politique-ia texte-discret texte-sm italique">
-          {{ ligne.projet.iaAutorisee ? 'IA autorisée' : 'IA interdite' }}
-        </span>
-        <button
-          type="button"
-          class="bouton bouton--discret"
-          [disabled]="politiqueIAEnCours()"
-          (click)="demanderBasculePolitiqueIA(ligne)"
-        >
-          {{ ligne.projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
-        </button>
-        <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(ligne)">
-          Modifier
-        </button>
-        <button type="button" class="bouton bouton--discret" (click)="dupliquer(ligne)">
-          Dupliquer
-        </button>
-        <button type="button" class="bouton bouton--discret" (click)="demanderSuppression(ligne)">
-          Supprimer
-        </button>
-      </li>
-    } @empty {
-      <li class="projets-admin__vide texte-discret">Aucun projet ne correspond à ce filtre.</li>
-    }
-  </ul>
-
-  @if (lignePolitiqueIAEnAttente()) {
-    <app-confirmation-mot-de-passe
-      message="Ressaisissez le mot de passe du fichier pour modifier la politique IA de ce projet."
-      (confirmee)="confirmerBasculePolitiqueIA($event)"
-      (annulee)="annulerBasculePolitiqueIA()"
-    />
-  }
-
-  @if (ligneASupprimer) {
-    <app-confirmation-suppression
-      message="La suppression d'un projet entraîne la perte de son historique d'audits. Cette action est irréversible."
-      (confirmee)="confirmerSuppression()"
-      (annulee)="annulerSuppression()"
-    />
-  }
-
   @if (formulaireVisible) {
     <form
       class="projets-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
@@ -164,6 +106,64 @@
       </div>
     </form>
   }
+
+  @if (lignePolitiqueIAEnAttente()) {
+    <app-confirmation-mot-de-passe
+      message="Ressaisissez le mot de passe du fichier pour modifier la politique IA de ce projet."
+      (confirmee)="confirmerBasculePolitiqueIA($event)"
+      (annulee)="annulerBasculePolitiqueIA()"
+    />
+  }
+
+  @if (ligneASupprimer) {
+    <app-confirmation-suppression
+      message="La suppression d'un projet entraîne la perte de son historique d'audits. Cette action est irréversible."
+      (confirmee)="confirmerSuppression()"
+      (annulee)="annulerSuppression()"
+    />
+  }
+
+  <ul
+    id="projets-admin-liste"
+    class="projets-admin__liste sans-liste d-flex direction-colonne ecart-2"
+  >
+    @for (ligne of lignesProjets(); track ligne.projet.id) {
+      <li
+        class="projets-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+      >
+        <span class="projets-admin__groupe texte-discret texte-sm">{{ ligne.groupeNom }}</span>
+        <span class="projets-admin__nom poids-demi-gras">{{ ligne.projet.nom }}</span>
+        <span class="projets-admin__description texte-discret texte-sm">{{
+          ligne.projet.description
+        }}</span>
+        <span class="projets-admin__nombre-sources texte-discret texte-sm"
+          >{{ ligne.projet.sources.length }} source(s)</span
+        >
+        <span class="projets-admin__politique-ia texte-discret texte-sm italique">
+          {{ ligne.projet.iaAutorisee ? 'IA autorisée' : 'IA interdite' }}
+        </span>
+        <button
+          type="button"
+          class="bouton bouton--discret"
+          [disabled]="politiqueIAEnCours()"
+          (click)="demanderBasculePolitiqueIA(ligne)"
+        >
+          {{ ligne.projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(ligne)">
+          Modifier
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="dupliquer(ligne)">
+          Dupliquer
+        </button>
+        <button type="button" class="bouton bouton--discret" (click)="demanderSuppression(ligne)">
+          Supprimer
+        </button>
+      </li>
+    } @empty {
+      <li class="projets-admin__vide texte-discret">Aucun projet ne correspond à ce filtre.</li>
+    }
+  </ul>
 
   @if (projetPourSourcesId && groupeSelectionneId) {
     <section

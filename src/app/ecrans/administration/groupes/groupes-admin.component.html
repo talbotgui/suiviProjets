@@ -45,45 +45,6 @@
         </button>
       </header>
 
-      <ul
-        id="groupes-admin-liste"
-        class="groupes-admin__liste sans-liste d-flex direction-colonne ecart-2"
-      >
-        @for (groupe of groupes(); track groupe.id) {
-          <li
-            class="groupes-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
-          >
-            <span class="groupes-admin__nom poids-demi-gras">{{ groupe.nom }}</span>
-            <span class="groupes-admin__description texte-discret texte-sm">{{
-              groupe.description
-            }}</span>
-            <span class="groupes-admin__nombre-instances texte-discret texte-sm"
-              >{{ groupe.instances.length }} instance(s)</span
-            >
-            <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(groupe.id)">
-              Modifier
-            </button>
-            <button
-              type="button"
-              class="bouton bouton--discret"
-              (click)="demanderSuppression(groupe.id)"
-            >
-              Supprimer
-            </button>
-          </li>
-        } @empty {
-          <li class="groupes-admin__vide texte-discret">Aucun groupe n'est encore défini.</li>
-        }
-      </ul>
-
-      @if (groupeASupprimerId) {
-        <app-confirmation-suppression
-          message="La suppression d'un groupe entraîne la perte de l'historique d'audits de tous ses projets. Cette action est irréversible."
-          (confirmee)="confirmerSuppression()"
-          (annulee)="annulerSuppression()"
-        />
-      }
-
       @if (formulaireVisible) {
         <form
           class="groupes-admin__formulaire carte interieur-4 d-flex direction-colonne ecart-3 exterieur-haut-4"
@@ -193,6 +154,45 @@
           </div>
         </form>
       }
+
+      @if (groupeASupprimerId) {
+        <app-confirmation-suppression
+          message="La suppression d'un groupe entraîne la perte de l'historique d'audits de tous ses projets. Cette action est irréversible."
+          (confirmee)="confirmerSuppression()"
+          (annulee)="annulerSuppression()"
+        />
+      }
+
+      <ul
+        id="groupes-admin-liste"
+        class="groupes-admin__liste sans-liste d-flex direction-colonne ecart-2"
+      >
+        @for (groupe of groupes(); track groupe.id) {
+          <li
+            class="groupes-admin__ligne d-flex retour-ligne aligne-centre ecart-4 interieur-y-2 bordure-bas"
+          >
+            <span class="groupes-admin__nom poids-demi-gras">{{ groupe.nom }}</span>
+            <span class="groupes-admin__description texte-discret texte-sm">{{
+              groupe.description
+            }}</span>
+            <span class="groupes-admin__nombre-instances texte-discret texte-sm"
+              >{{ groupe.instances.length }} instance(s)</span
+            >
+            <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(groupe.id)">
+              Modifier
+            </button>
+            <button
+              type="button"
+              class="bouton bouton--discret"
+              (click)="demanderSuppression(groupe.id)"
+            >
+              Supprimer
+            </button>
+          </li>
+        } @empty {
+          <li class="groupes-admin__vide texte-discret">Aucun groupe n'est encore défini.</li>
+        }
+      </ul>
     }
     @case ('membresConnus') {
       <app-membres-connus-admin
