@@ -442,7 +442,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     const lienQualifier = page.getByRole('link', { name: 'Qualifier ce membre' }).first();
     if (await lienQualifier.count()) {
       await lienQualifier.click();
-      await expect(page).toHaveURL(/\/administration$/);
+      // Le lien « Qualifier ce membre » porte toujours au moins `?groupeId=...`
+      // (`queryParamsQualification`, jamais un objet vide) : `$` seul ne peut donc jamais correspondre ici,
+      // à la différence des navigations sans paramètre de requête vers ce même écran (ex. ligne 149) — défaut
+      // préexistant détecté en relecture isolée de l'incrément R15-01 à R15-06, indépendant de cet incrément
+      // (cf. `docs/04_rapports/rapportDeDeveloppement.md`, Étape 15 incrément 1).
+      await expect(page).toHaveURL(/\/administration(\?|$)/);
       await page.locator('#administration-onglet-groupes').click();
       await page.locator('#groupes-admin-sous-onglet-membres-connus').click();
       await page

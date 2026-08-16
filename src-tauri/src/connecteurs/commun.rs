@@ -6,13 +6,22 @@
 
 use std::time::Duration;
 
-/// Délai maximal accordé à un appel de test de connectivité avant anomalie « délai dépassé ».
+/// Délai maximal accordé à tout appel GitLab/Sonar (test de connectivité, autocomplétion, indicateurs d'audit)
+/// avant anomalie « délai dépassé ».
 ///
 /// Décision arbitraire (cf. rapport de développement de cette phase) : aucune valeur n'est fixée par la
 /// documentation pour ce point d'entrée précis. `parametres.audit` ne porte à ce stade qu'un réglage de
 /// concurrence, sans délai, et concerne de toute façon les futurs appels d'audit du Moteur d'audit (Phase 5), pas
 /// ce test ponctuel de credential.
-const DELAI_REQUETE: Duration = Duration::from_secs(10);
+///
+/// Portée à 30 secondes (contre 10 auparavant) pour corriger R15-05 (Phase 15, recette du 2026-08-16) : une
+/// anomalie `DelaiDepasse` a été constatée sur `listerSourcesDisponibles` contre une instance GitLab réelle,
+/// probablement trop juste pour une liste paginée de projets (`membership=true&simple=true&per_page=100`) sur une
+/// instance distante potentiellement chargée. Ce relèvement ne couvre que l'hypothèse d'un délai réseau trop court
+/// parmi les trois envisagées à l'analyse de R15-05 (les deux autres, un proxy sortant requis mais non configuré ou
+/// une instance réellement injoignable depuis le poste, restent hors du contrôle de ce seul réglage et doivent être
+/// écartées séparément si l'anomalie persiste) ; valeur à confirmer par un humain plutôt que présumée définitive.
+const DELAI_REQUETE: Duration = Duration::from_secs(30);
 
 /// Catégorie d'anomalie pouvant survenir lors d'un appel à une instance GitLab ou Sonar, alignée sur le catalogue
 /// figé RG-021 (`docs/02_documentation/05_reglesGestion.md#audits-et-campagnes`).

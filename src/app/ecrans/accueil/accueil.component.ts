@@ -202,10 +202,14 @@ export class SqmAccueilComponent {
   /**
    * Détecte les causes de membre inconnu actuellement actives (RG-006 à RG-009), à partir du dernier audit intégré
    * de chaque projet (`Resultat.GitlabMembres`) confronté aux membres connus de son groupe de rattachement.
-   * @returns Les causes actives détectées, une par membre inconnu ou en conflit d'un dernier audit.
+   * Dédoublonnée par clé d'alerte (`cleAlerte`, une par couple projet/username) : un projet à plusieurs sources
+   * GitLab (ex. un dépôt back et un dépôt front, cf. R15-06) produit un résultat `gitlab.membres` par source, si
+   * bien qu'un même membre inconnu des deux dépôts y apparaîtrait sinon deux fois, gonflant artificiellement le
+   * nombre d'alertes actives (corrige R15-02, Phase 15, recette du 2026-08-16).
+   * @returns Les causes actives détectées, une par membre inconnu ou en conflit distinct d'un dernier audit.
    */
   private causesMembreInconnu(): readonly CauseAlerteActive[] {
-    const causes: CauseAlerteActive[] = [];
+    const causesParCle = new Map<string, CauseAlerteActive>();
     for (const groupe of this.donneesApplication.groupes()) {
       for (const projet of groupe.projets) {
         const dernierAudit = projet.audits.at(-1);
@@ -222,15 +226,19 @@ export class SqmAccueilComponent {
               groupe.membresConnus,
             );
             if (resolution.type === 'inconnu' || resolution.type === 'conflit') {
-              causes.push(
-                this.construireCauseMembreInconnu(projet.id, projet.nom, groupe, membre.username),
+              const cause = this.construireCauseMembreInconnu(
+                projet.id,
+                projet.nom,
+                groupe,
+                membre.username,
               );
+              causesParCle.set(cause.cleAlerte, cause);
             }
           }
         }
       }
     }
-    return causes;
+    return [...causesParCle.values()];
   }
 
   /**

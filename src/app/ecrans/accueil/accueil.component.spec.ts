@@ -195,6 +195,60 @@ describe('SqmAccueilComponent', () => {
     expect(element.querySelector('[role="alert"]')).toBeNull();
   });
 
+  it(
+    "ne compte qu'une seule alerte pour un même membre inconnu constaté sur deux sources GitLab du même " +
+      'projet, plutôt que de le compter deux fois (R15-02)',
+    () => {
+      const audit: Audit = {
+        id: 'audit-1',
+        date: '2026-07-20T00:00:00Z',
+        campagneId: 'campagne-1',
+        resultats: [
+          {
+            type: 'gitlab.membres',
+            sourceId: 'source-back',
+            refEffective: 'main',
+            shaTete: 'abc123',
+            membres: [{ username: 'inconnu1', nom: 'inconnu1', niveauAcces: 30, herite: false }],
+          },
+          {
+            type: 'gitlab.membres',
+            sourceId: 'source-front',
+            refEffective: 'main',
+            shaTete: 'def456',
+            membres: [{ username: 'inconnu1', nom: 'inconnu1', niveauAcces: 30, herite: false }],
+          },
+        ],
+      };
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      expect(composant.alertesActives()).toHaveLength(1);
+      expect(composant.nombreProjetsAvecMembreInconnu()).toBe(1);
+    },
+  );
+
+  it(
+    'libelle la carte statistique en « Projets avec membre inconnu », jamais « Membres inconnus » (nombre de ' +
+      'projets concernés, pas de membres, R15-02)',
+    () => {
+      const audit = DonneesDeTest.auditAvecMembres('2026-07-20T00:00:00Z', ['jdupont']);
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(element.textContent).toContain('Projets avec membre inconnu');
+      expect(element.textContent).not.toContain('Membres inconnus');
+    },
+  );
+
   it('fait réapparaître, avec la mention de son traitement antérieur, une alerte membre inconnu dont la cause persiste (RG-026)', () => {
     const audit = DonneesDeTest.auditAvecMembres('2026-07-20T00:00:00Z', ['jdupont']);
     const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);

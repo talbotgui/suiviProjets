@@ -1,5 +1,6 @@
 // Résidu propre à ce composant (Phase 10, incrément 12) : grille statistique à 4 colonnes (repliée à 2 puis 1 sous
-// 992px/576px, RNF-030), variante d'alerte de la carte « Membres inconnus » (RG-009) et couleur/dimension du point
+// 992px/576px, RNF-030), variante d'alerte de la carte « Projets avec membre inconnu » (RG-009, libellé corrigé
+// R15-02) et couleur/dimension du point
 // d'alerte de chaque ligne. Le reste (bordures, couleurs neutres, typographie, disposition en carte) est porté par
 // les classes utilitaires et motifs partagés (`.carte`, `.bordure-bas`, `.sans-liste`, etc.) appliqués directement
 // dans le gabarit (cf. accueil.component.html), remplaçant l'ancienne feuille de style entièrement propre à ce

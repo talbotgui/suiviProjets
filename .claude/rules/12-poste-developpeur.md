@@ -33,4 +33,4 @@ Synthèse actionnable de [17_posteDeveloppeur.md](../../docs/02_documentation/17
 
 ## Résolution de problèmes courants
 
-Échec de compilation Rust inattendu → vérifier `rust-toolchain.toml` ; échec de lancement lié au webview → installer la dépendance système (WebView2/WebKitGTK) ; dépendance verrouillée différente → relancer avec `--locked`/`npm ci` ([source](../../docs/02_documentation/17_posteDeveloppeur.md#résolution-des-problèmes-courants)).
+Échec de compilation Rust inattendu → vérifier `rust-toolchain.toml` ; échec de lancement lié au webview → installer la dépendance système (WebView2/WebKitGTK) ; dépendance verrouillée différente → relancer avec `--locked`/`npm ci` ; rafraîchissement (F5) en échec dans la fenêtre Tauri hors de la route racine → piège connu Tauri/Angular en `PathLocationStrategy`, déjà résolu par `withHashLocation()` dans `app.config.ts` (Phase 15, R15-01) ([source](../../docs/02_documentation/17_posteDeveloppeur.md#résolution-des-problèmes-courants)).

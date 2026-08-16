@@ -276,7 +276,7 @@
                 </p>
               }
               <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
-                @for (mr of donnees.mrOuvertes; track mr.iid) {
+                @for (mr of donnees.mrOuvertes; track mr.webUrl) {
                   <li>
                     <a [href]="mr.webUrl" target="_blank" rel="noopener noreferrer"
                       >!{{ mr.iid }}</a
@@ -300,8 +300,12 @@
               <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
                 @for (membre of donnees.membres; track membre.username) {
                   <li [class.fiche-projet__ligne--inconnu]="membre.inconnu">
-                    <span>{{ membre.nom }} ({{ membre.username }})</span>
-                    <span>{{ membre.niveauAccesLabel }}</span>
+                    <span>{{
+                      membre.nom === membre.username
+                        ? membre.nom
+                        : membre.nom + ' (' + membre.username + ')'
+                    }}</span
+                    >{{ ' ' }}<span>{{ membre.niveauAccesLabel }}</span>
                     <app-badge
                       [couleur]="membre.statut.couleur ?? 'rouge'"
                       [libelle]="membre.statut.label"
@@ -331,7 +335,7 @@
               <p>Aucun marqueur d'outil IA détecté.</p>
             } @else {
               <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
-                @for (marqueur of donnees.marqueursIa; track marqueur.chemin) {
+                @for (marqueur of donnees.marqueursIa; track marqueur.chemin + marqueur.outil) {
                   <li>{{ marqueur.chemin }} ({{ marqueur.nature }}, {{ marqueur.outil }})</li>
                 }
               </ul>

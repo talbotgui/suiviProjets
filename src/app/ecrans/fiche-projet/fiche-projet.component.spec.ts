@@ -622,6 +622,73 @@ describe('SqmFicheProjetComponent', () => {
     expect(element.textContent).toContain('Ajout fonctionnalité');
   });
 
+  it(
+    'cumule les merge requests ouvertes de toutes les sources GitLab du projet, plutôt que de ne retenir que ' +
+      'la première (R15-06)',
+    () => {
+      const audit = DonneesDeTest.auditComplet({});
+      const projet = DonneesDeTest.projet('projet-1', [
+        {
+          ...audit,
+          resultats: [
+            ...audit.resultats,
+            {
+              type: 'gitlab.merge_requests',
+              sourceId: 'source-gitlab-front',
+              refEffective: 'develop',
+              shaTete: 'def456',
+              mrOuvertes: [
+                {
+                  iid: 1,
+                  titre: 'Correction front',
+                  creeLe: DonneesDeTest.ilYA(-3),
+                  enConflit: false,
+                  webUrl: 'https://gitlab.exemple.test/groupe/projet-front/-/merge_requests/1',
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.textContent).toContain('Ajout fonctionnalité');
+      expect(element.textContent).toContain('Correction front');
+      expect(element.textContent).toContain('2 · ok');
+    },
+  );
+
+  it(
+    "n'affiche pas le nom d'utilisateur entre parenthèses quand il est identique au nom affiché, et trie les " +
+      'membres par ordre alphabétique de leur nom (R15-03)',
+    () => {
+      const audit = DonneesDeTest.auditComplet({});
+      const projet = DonneesDeTest.projet('projet-1', [
+        {
+          ...audit,
+          resultats: audit.resultats.map((resultat) =>
+            resultat.type === 'gitlab.membres'
+              ? {
+                  ...resultat,
+                  membres: [
+                    { username: 'zdupont', nom: 'zdupont', niveauAcces: 30, herite: false },
+                    { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
+                  ],
+                }
+              : resultat,
+          ),
+        },
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const lignes = Array.from(
+        element.querySelectorAll('.fiche-projet__colonne li > span:first-child'),
+      ).map((span) => span.textContent?.trim());
+      expect(lignes[0]).toBe('Jean Dupont (jdupont)');
+      expect(lignes[1]).toBe('zdupont');
+    },
+  );
+
   it('exporterPng déclenche toPng sur le conteneur et provoque un téléchargement', async () => {
     jest.mocked(toPng).mockResolvedValue('data:image/png;base64,test');
     const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);

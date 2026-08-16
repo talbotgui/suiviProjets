@@ -129,6 +129,163 @@ describe('AgregationThemeFicheProjetUtils', () => {
       expect(resultat.marqueursIa[0].outil).toBe('cursor');
     });
 
+    it('fusionne les dépendances de plusieurs sources GitLab sans perdre celles de la seconde (R15-06)', () => {
+      const resultats: readonly ResultatThemeFicheProjet[] = [
+        {
+          type: 'gitlab.dependances',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          dependances: [
+            {
+              reference: 'org.springframework:spring-core',
+              version: '5.3.30',
+              manifeste: 'pom.xml',
+            },
+          ],
+        },
+        {
+          type: 'gitlab.dependances',
+          sourceId: 'front',
+          refEffective: 'main',
+          shaTete: 'def',
+          dependances: [
+            { reference: '@angular/core', version: '18.0.0', manifeste: 'package.json' },
+          ],
+        },
+      ];
+
+      const resultat = AgregationThemeFicheProjetUtils.regrouper(resultats);
+
+      expect(resultat.dependances).toHaveLength(2);
+      expect(resultat.dependances.map((dependance) => dependance.reference)).toEqual(
+        expect.arrayContaining(['org.springframework:spring-core', '@angular/core']),
+      );
+    });
+
+    it('fusionne en une seule ligne les dépendances de couple référence/manifeste identique entre deux sources (R15-04)', () => {
+      const dependance = {
+        reference: 'org.projectlombok:lombok',
+        version: '1.18.30',
+        manifeste: 'pom.xml',
+      };
+      const resultats: readonly ResultatThemeFicheProjet[] = [
+        {
+          type: 'gitlab.dependances',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          dependances: [dependance],
+        },
+        {
+          type: 'gitlab.dependances',
+          sourceId: 'front',
+          refEffective: 'main',
+          shaTete: 'def',
+          dependances: [{ ...dependance, version: '1.18.28' }],
+        },
+      ];
+
+      const resultat = AgregationThemeFicheProjetUtils.regrouper(resultats);
+
+      expect(resultat.dependances).toHaveLength(1);
+      expect(resultat.dependances[0].version).toBe('1.18.30');
+    });
+
+    it('fusionne les membres de plusieurs sources GitLab sans perdre ceux de la seconde (R15-06)', () => {
+      const resultats: readonly ResultatThemeFicheProjet[] = [
+        {
+          type: 'gitlab.membres',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          membres: [{ username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false }],
+        },
+        {
+          type: 'gitlab.membres',
+          sourceId: 'front',
+          refEffective: 'main',
+          shaTete: 'def',
+          membres: [{ username: 'mmartin', nom: 'Marie Martin', niveauAcces: 40, herite: true }],
+        },
+      ];
+
+      const resultat = AgregationThemeFicheProjetUtils.regrouper(resultats);
+
+      expect(resultat.membres).toHaveLength(2);
+      expect(resultat.membres.map((membre) => membre.username)).toEqual(
+        expect.arrayContaining(['jdupont', 'mmartin']),
+      );
+    });
+
+    it('fusionne en une seule ligne un même membre présent sur deux sources, avec le niveau d’accès le plus élevé et herite=false si direct sur au moins une source (R15-04)', () => {
+      const resultats: readonly ResultatThemeFicheProjet[] = [
+        {
+          type: 'gitlab.membres',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          membres: [
+            {
+              username: 'guillaume.talbot',
+              nom: 'Guillaume Talbot',
+              niveauAcces: 30,
+              herite: true,
+            },
+          ],
+        },
+        {
+          type: 'gitlab.membres',
+          sourceId: 'front',
+          refEffective: 'main',
+          shaTete: 'def',
+          membres: [
+            {
+              username: 'guillaume.talbot',
+              nom: 'Guillaume Talbot',
+              niveauAcces: 40,
+              herite: false,
+            },
+          ],
+        },
+      ];
+
+      const resultat = AgregationThemeFicheProjetUtils.regrouper(resultats);
+
+      expect(resultat.membres).toHaveLength(1);
+      expect(resultat.membres[0].niveauAcces).toBe(40);
+      expect(resultat.membres[0].herite).toBe(false);
+    });
+
+    it('fusionne les marqueurs IA de plusieurs sources GitLab, sans doublon de couple chemin/outil (R15-06/R15-04)', () => {
+      const resultats: readonly ResultatThemeFicheProjet[] = [
+        {
+          type: 'gitlab.marqueurs_ia',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          marqueurs: [{ chemin: '.cursorrules', nature: 'fichier', outil: 'cursor' }],
+        },
+        {
+          type: 'gitlab.marqueurs_ia',
+          sourceId: 'front',
+          refEffective: 'main',
+          shaTete: 'def',
+          marqueurs: [
+            { chemin: '.cursorrules', nature: 'fichier', outil: 'cursor' },
+            { chemin: '.github/copilot-instructions.md', nature: 'fichier', outil: 'copilot' },
+          ],
+        },
+      ];
+
+      const resultat = AgregationThemeFicheProjetUtils.regrouper(resultats);
+
+      expect(resultat.marqueursIa).toHaveLength(2);
+      expect(resultat.marqueursIa.map((marqueur) => marqueur.chemin)).toEqual(
+        expect.arrayContaining(['.cursorrules', '.github/copilot-instructions.md']),
+      );
+    });
+
     it('ignore les variantes non consommées (gitlab.merge_requests, croise.*) sans lever d’erreur', () => {
       const resultats: readonly ResultatThemeFicheProjet[] = [
         { type: 'gitlab.merge_requests' },

@@ -629,18 +629,28 @@ export class SqmFicheProjetComponent {
       dernierAudit === undefined
         ? undefined
         : this.trouverResultat(dernierAudit.resultats, 'gitlab.taille_depot');
-    const resultatMr =
-      dernierAudit === undefined
-        ? undefined
-        : this.trouverResultat(dernierAudit.resultats, 'gitlab.merge_requests');
+    // `trouverTousResultats`, pas `trouverResultat` : un projet à plusieurs sources GitLab (ex. un dépôt back et un
+    // dépôt front) produit un résultat `gitlab.merge_requests` par source dans `Audit.resultats` — ne retenir que le
+    // premier en perdrait silencieusement les MR des sources suivantes (corrige R15-06, Phase 15, recette du
+    // 2026-08-16, aux côtés de `AgregationThemeFicheProjetUtils.regrouper` pour les dépendances/membres/marqueurs).
+    // Les MR de deux dépôts distincts ne pouvant se recouvrir (chaque `webUrl` reste unique), une simple
+    // concaténation suffit ici, sans fusion par clé métier comme pour les dépendances/membres.
+    const mrOuvertesToutesSources = (dernierAudit === undefined ? [] : dernierAudit.resultats)
+      .filter(
+        (resultat): resultat is Extract<Resultat, { type: 'gitlab.merge_requests' }> =>
+          resultat.type === 'gitlab.merge_requests',
+      )
+      .flatMap((resultat) => resultat.mrOuvertes);
 
     const sonarKo = !themes.pasDeSonar
       ? this.calculerSonarKo(resultatFraicheurSonar, seuilsFraicheurSonar)
       : false;
 
-    const membres = themes.membres.map((membre) =>
-      this.construireLigneMembre(membre, groupe.membresConnus),
-    );
+    // Tri alphabétique (R15-03, Phase 15, recette du 2026-08-16) : sur le nom affiché, jamais sur le nom
+    // d'utilisateur technique, cohérent avec le libellé effectivement lu par l'utilisateur.
+    const membres = themes.membres
+      .map((membre) => this.construireLigneMembre(membre, groupe.membresConnus))
+      .sort((a, b) => a.nom.localeCompare(b.nom));
 
     const refAuditeeSource = projet.sources.find(
       (source) => source.type === TypeSource.DepotGitlab,
@@ -702,10 +712,8 @@ export class SqmFicheProjetComponent {
       dependances: themes.dependances.map((dependance) =>
         this.construireLigneDependance(dependance, reglesDependances),
       ),
-      mrResume: this.construireResumeMr(resultatMr?.mrOuvertes ?? [], seuilsMrOuvertes, maintenant),
-      mrOuvertes: (resultatMr?.mrOuvertes ?? []).map((mr) =>
-        this.construireLigneMr(mr, maintenant),
-      ),
+      mrResume: this.construireResumeMr(mrOuvertesToutesSources, seuilsMrOuvertes, maintenant),
+      mrOuvertes: mrOuvertesToutesSources.map((mr) => this.construireLigneMr(mr, maintenant)),
       membres,
       marqueursIa: themes.marqueursIa,
       annotations: [...projet.annotations].sort((a, b) => (a.date < b.date ? 1 : -1)),
