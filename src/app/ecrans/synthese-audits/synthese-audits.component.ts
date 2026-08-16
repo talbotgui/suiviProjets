@@ -7,6 +7,14 @@
 // constats bruts du dernier audit intégré de chaque projet et les seuils/référentiels courants (RG-011, RG-022) —
 // aucun verdict n'est jamais stocké.
 //
+// Ajout d'une 13e colonne « Dépendances » (Phase 15, recette du 2026-08-16, demande directe de l'utilisateur), hors
+// des 12 colonnes documentées par la maquette d'origine : compteurs de dépendances par statut d'obsolescence
+// (RG-011), fusionnées entre toutes les sources GitLab du projet sur le même modèle que la Fiche projet
+// (`AgregationThemeFicheProjetUtils.regrouper`, cf. R15-06) — sans cette fusion, cette nouvelle colonne aurait
+// reproduit sur elle-même le défaut multi-sources déjà corrigé ailleurs. `docs/02_documentation/09_maquettes.md`
+// mis à jour en conséquence ; formalisation US/RG de cette évolution laissée à un humain (cf. .claude/rules/
+// 01-usage-ia-et-conventions.md#discernement : arbitrage fonctionnel).
+//
 // Décision d'architecture (à valider par un humain, cf. rapport de développement de cet incrément) : chaque ligne
 // est entièrement pré-calculée en un objet `LigneSyntheseAudit` (couleurs et libellés déjà résolus) lors de la
 // construction de `toutesLesLignes`, plutôt que recalculée à la volée par chaque fonction d'extraction de cellule de
@@ -62,12 +70,14 @@ import type {
 } from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import type { ResultatCroiseFraicheurSonar } from '../../services/avecetat/campagne/connecteur-croise.utils';
 import type {
+  Dependance,
   Marqueur,
   MergeRequestOuverte,
   ResultatGitlabTailleDepot,
   ResultatSonarCouverture,
   ResultatSonarNotes,
 } from '../../services/sansetat/commandes/types-facade';
+import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
 import { BadgeAuditAncienUtils } from '../../services/sansetat/jugement/badge-audit-ancien.utils';
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
@@ -76,6 +86,7 @@ import type { ResultatNoteSonar } from '../../services/sansetat/jugement/note-so
 import {
   ParametresJugementUtils,
   type LectureDefensive,
+  type RegleDependance,
   type SeuilsCouleursViolations,
   type SeuilsCouverture,
   type SeuilsFraicheurSonar,
@@ -89,6 +100,7 @@ import {
 } from '../../services/sansetat/jugement/seuils-couleur.utils';
 import { StatutIaUtils } from '../../services/sansetat/jugement/statut-ia.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
+import { StatutObsolescenceUtils } from '../../services/sansetat/jugement/statut-obsolescence.utils';
 
 const MILLISECONDES_PAR_JOUR = 24 * 60 * 60 * 1000;
 
@@ -145,6 +157,25 @@ interface EtiquetteCouleur {
 }
 
 /**
+ * Compteurs de dépendances par statut d'obsolescence (RG-011), colonne « Dépendances » de la Synthèse des audits.
+ * Dépendances fusionnées entre toutes les sources GitLab du projet (`AgregationThemeFicheProjetUtils.regrouper`,
+ * cf. R15-06) avant classification via {@link StatutObsolescenceUtils.calculerStatutObsolescence}. `maintenues`
+ * regroupe, par simplification volontaire de cette seule colonne de synthèse (les statuts détaillés restant
+ * consultables sur la Fiche projet), toute dépendance référencée et non obsolète (`maintenu`, `aJourM1`, `aJourM3`
+ * ou toute autre valeur libre du référentiel, cf. `docs/02_documentation/14_normesDeveloppement.md#rigueur-du-
+ * typage-et-de-la-documentation--typescript` sur `referentiels.reglesDependances[].versions[].statut`, texte libre
+ * non énuméré par le modèle de données).
+ */
+interface CompteursDependances {
+  /** Nombre de dépendances constatées sans règle de référentiel correspondante (motif ou version). */
+  readonly inconnues: number;
+  /** Nombre de dépendances dont le statut référencé est `obsolete`. */
+  readonly obsoletes: number;
+  /** Nombre de dépendances référencées dont le statut n'est pas `obsolete` (cf. commentaire d'en-tête). */
+  readonly maintenues: number;
+}
+
+/**
  * Lignes du tableau dense de la Synthèse des audits, entièrement pré-calculée (cf. commentaire d'en-tête : RG-022,
  * une seule lecture des seuils par construction de ligne).
  */
@@ -189,6 +220,8 @@ interface LigneSyntheseAudit {
   readonly membresLabel: string;
   /** Statut IA du projet (RG-016), absent si non calculable (aucun audit intégré). */
   readonly ia: EtiquetteCouleur | undefined;
+  /** Compteurs de dépendances par statut d'obsolescence (cf. {@link CompteursDependances}). */
+  readonly dependances: CompteursDependances;
 }
 
 /**
@@ -211,9 +244,9 @@ interface SeuilsResolus {
 }
 
 /**
- * Écran Synthèse des audits (US-015) : tableau dense des 12 colonnes du catalogue figé, filtres groupe/indicateur/
- * recherche, badge AUDIT ANCIEN, grisage SONAR_KO (RG-013), export PNG (alerte membre inconnu conservée sur
- * l'export).
+ * Écran Synthèse des audits (US-015) : tableau dense des 12 colonnes du catalogue figé plus la colonne Dépendances
+ * (Phase 15), filtres groupe/indicateur/recherche, badge AUDIT ANCIEN, grisage SONAR_KO (RG-013), export PNG
+ * (alerte membre inconnu conservée sur l'export).
  */
 @Component({
   selector: 'app-synthese-audits',
@@ -611,17 +644,19 @@ export class SqmSyntheseAuditsComponent {
   }
 
   /**
-   * Construit les 12 colonnes du tableau dense (cf. `docs/02_documentation/09_maquettes.md#synthèse-des-audits`).
-   * La colonne « Projet » (indice 0) est la colonne fixe au défilement horizontal.
+   * Construit les 12 colonnes documentées par `docs/02_documentation/09_maquettes.md#synthèse-des-audits`, plus la
+   * 13e colonne « Dépendances » ajoutée en Phase 15 (cf. commentaire d'en-tête de ce fichier). La colonne « Projet »
+   * (indice 0) est la colonne fixe au défilement horizontal.
    *
-   * Cinq colonnes portent un déclencheur `explication` (charte d'ergonomie, correction de relecture Phase 6
+   * Six colonnes portent un déclencheur `explication` (charte d'ergonomie, correction de relecture Phase 6
    * incrément 4) : Vitalité, Couverture, Violations et MR ouvertes (seuils de `parametres.seuils`) ainsi qu'IA
-   * (référentiel `referentiels.reglesMarqueursIA`). Les colonnes Taille et Notes Sonar en sont volontairement
-   * dépourvues : Taille dépend bien d'un seuil (`parametres.seuils.tailleDepot`) mais sa cellule ne restitue jamais
-   * de couleur (texte brut seul, cf. maquette) — décision arbitraire de ne pas y accrocher d'explication faute de
-   * jugement visuellement porté à expliquer ; Notes Sonar restitue la note A–E propre à SonarQube lui-même
-   * (`NoteSonarUtils`), une convention fixe non paramétrable et non lue depuis `parametres`/`referentiels` — il n'y
-   * a donc structurellement rien à expliquer via ce mécanisme pour cette colonne (cf. rapport de développement).
+   * (référentiel `referentiels.reglesMarqueursIA`) et Dépendances (référentiel `referentiels.reglesDependances`).
+   * Les colonnes Taille et Notes Sonar en sont volontairement dépourvues : Taille dépend bien d'un seuil
+   * (`parametres.seuils.tailleDepot`) mais sa cellule ne restitue jamais de couleur (texte brut seul, cf. maquette)
+   * — décision arbitraire de ne pas y accrocher d'explication faute de jugement visuellement porté à expliquer ;
+   * Notes Sonar restitue la note A–E propre à SonarQube lui-même (`NoteSonarUtils`), une convention fixe non
+   * paramétrable et non lue depuis `parametres`/`referentiels` — il n'y a donc structurellement rien à expliquer
+   * via ce mécanisme pour cette colonne (cf. rapport de développement).
    * @param seuilsBruts - Valeur brute de `parametres.seuils`, transmise telle quelle aux déclencheurs d'explication
    * concernés (non interprétée ici, RG-022 : un seul point de lecture, `ParametresJugementUtils`).
    * @param referentielsBruts - Valeur brute de `referentiels`, transmise telle quelle au déclencheur d'explication
@@ -723,6 +758,13 @@ export class SqmSyntheseAuditsComponent {
         extraireTexteBrut: (ligne) =>
           ligne.pasDeSonar ? 'aucune source' : ligne.sonarKo ? 'SONAR_KO' : 'à jour',
         extraireCellule: (ligne) => this.extraireCelluleSonar(ligne),
+      },
+      {
+        cle: 'dependances',
+        libelle: 'Dépendances',
+        extraireTexteBrut: (ligne) => this.texteBrutDependances(ligne.dependances),
+        extraireCellule: (ligne) => this.extraireCelluleDependances(ligne),
+        explication: { cle: 'reglesDependances', referentielsBruts },
       },
     ];
   }
@@ -836,6 +878,88 @@ export class SqmSyntheseAuditsComponent {
   }
 
   /**
+   * Restitue la représentation texte brute des compteurs de dépendances, pour le filtre de recherche du tableau
+   * dense (`ColonneTableauDense.extraireTexteBrut`).
+   * @param compteurs - Compteurs de dépendances de la ligne concernée.
+   * @returns Le texte brut, `—` si aucune dépendance n'a été constatée.
+   */
+  private texteBrutDependances(compteurs: CompteursDependances): string {
+    const total = compteurs.inconnues + compteurs.obsoletes + compteurs.maintenues;
+    if (total === 0) {
+      return '—';
+    }
+    return (
+      `${compteurs.inconnues} inconnue(s), ${compteurs.obsoletes} obsolète(s), ` +
+      `${compteurs.maintenues} maintenue(s)`
+    );
+  }
+
+  /**
+   * Restitue la cellule « Dépendances » : trois compteurs (inconnues, obsolètes, maintenues, cf.
+   * {@link CompteursDependances}), couleur fixe par statut (jamais un seuil, RG-011 : la classification
+   * d'obsolescence elle-même ne dépend d'aucune valeur de `parametres.seuils`), sur le même parti pris de couleur
+   * que la Fiche projet (`SqmFicheProjetComponent.libelleEtCouleurObsolescence` : obsolète en rouge, statut
+   * référencé non obsolète en vert, non référencé sans couleur).
+   * @param ligne - Ligne concernée.
+   * @returns La cellule calculée.
+   */
+  private extraireCelluleDependances(ligne: LigneSyntheseAudit): CelluleTableauDense {
+    const { inconnues, obsoletes, maintenues } = ligne.dependances;
+    if (inconnues + obsoletes + maintenues === 0) {
+      return { segments: [{ type: 'texte', valeur: '—' }] };
+    }
+    return {
+      segments: [
+        { type: 'texte', valeur: `${inconnues} inconnue${inconnues > 1 ? 's' : ''}` },
+        { type: 'texte', valeur: ' / ' },
+        {
+          type: 'texteCouleur',
+          valeur: `${obsoletes} obsolète${obsoletes > 1 ? 's' : ''}`,
+          couleur: 'rouge',
+        },
+        { type: 'texte', valeur: ' / ' },
+        {
+          type: 'texteCouleur',
+          valeur: `${maintenues} maintenue${maintenues > 1 ? 's' : ''}`,
+          couleur: 'vert',
+        },
+      ],
+    };
+  }
+
+  /**
+   * Calcule les compteurs de dépendances par statut d'obsolescence d'un projet (cf. {@link CompteursDependances}),
+   * à partir des dépendances déjà fusionnées entre toutes ses sources GitLab.
+   * @param dependances - Dépendances fusionnées du dernier audit intégré (`AgregationThemeFicheProjetUtils.
+   * regrouper`).
+   * @param regles - Règles de dépendances courantes (`referentiels.reglesDependances`), lues une seule fois par
+   * {@link construireLignes} (RG-022).
+   * @returns Les compteurs calculés.
+   */
+  private calculerCompteursDependances(
+    dependances: readonly Dependance[],
+    regles: LectureDefensive<readonly RegleDependance[]>,
+  ): CompteursDependances {
+    let inconnues = 0;
+    let obsoletes = 0;
+    let maintenues = 0;
+    for (const dependance of dependances) {
+      const resultat =
+        regles.type === 'absent'
+          ? { type: 'nonReference' as const }
+          : StatutObsolescenceUtils.calculerStatutObsolescence(dependance, regles.valeur);
+      if (resultat.type === 'nonReference') {
+        inconnues += 1;
+      } else if (resultat.statut === 'obsolete') {
+        obsoletes += 1;
+      } else {
+        maintenues += 1;
+      }
+    }
+    return { inconnues, obsoletes, maintenues };
+  }
+
+  /**
    * Restitue la cellule « Sonar » (statut de fraîcheur global, distinct des métriques Couverture/Notes/Violations).
    * @param ligne - Ligne concernée.
    * @returns La cellule calculée.
@@ -871,12 +995,21 @@ export class SqmSyntheseAuditsComponent {
       couleursViolations: ParametresJugementUtils.lireSeuilsCouleursViolations(seuilsBruts),
     };
     const ancienJours = ParametresJugementUtils.lireAncienJoursAvecRepli(seuilsBruts);
+    const reglesDependances = ParametresJugementUtils.lireReglesDependances(racine.referentiels);
 
     const lignes: LigneSyntheseAudit[] = [];
     for (const groupe of racine.groupes) {
       for (const projet of groupe.projets) {
         lignes.push(
-          this.construireLigne(groupe, projet, racine.campagnes, maintenant, ancienJours, seuils),
+          this.construireLigne(
+            groupe,
+            projet,
+            racine.campagnes,
+            maintenant,
+            ancienJours,
+            seuils,
+            reglesDependances,
+          ),
         );
       }
     }
@@ -892,6 +1025,8 @@ export class SqmSyntheseAuditsComponent {
    * @param ancienJours - Seuil de fraîcheur d'audit résolu (cf. {@link ParametresJugementUtils.
    * lireAncienJoursAvecRepli}).
    * @param seuils - Seuils courants résolus une seule fois (cf. {@link construireLignes}).
+   * @param reglesDependances - Règles de dépendances courantes, résolues une seule fois (cf.
+   * {@link construireLignes}).
    * @returns La ligne construite.
    */
   private construireLigne(
@@ -901,6 +1036,7 @@ export class SqmSyntheseAuditsComponent {
     maintenant: Date,
     ancienJours: number,
     seuils: SeuilsResolus,
+    reglesDependances: LectureDefensive<readonly RegleDependance[]>,
   ): LigneSyntheseAudit {
     const campagneEnEchec = this.campagneEnEchecPourProjet(campagnes, projet.id);
     const dernierAudit = projet.audits.at(-1);
@@ -926,6 +1062,7 @@ export class SqmSyntheseAuditsComponent {
         membreInconnuDetecte: false,
         membresLabel: '—',
         ia: undefined,
+        dependances: { inconnues: 0, obsoletes: 0, maintenues: 0 },
       };
     }
 
@@ -946,6 +1083,8 @@ export class SqmSyntheseAuditsComponent {
     const membres = this.calculerMembres(resultatMembres?.membres, groupe.membresConnus);
     const violationsSeuils =
       seuils.couleursViolations.type === 'valeur' ? seuils.couleursViolations.valeur : undefined;
+    const dependancesFusionnees = AgregationThemeFicheProjetUtils.regrouper(resultats).dependances;
+    const dependances = this.calculerCompteursDependances(dependancesFusionnees, reglesDependances);
 
     return {
       projetId: projet.id,
@@ -990,6 +1129,7 @@ export class SqmSyntheseAuditsComponent {
       membreInconnuDetecte: membres.inconnu,
       membresLabel: membres.label,
       ia: this.calculerEtiquetteIa(projet.iaAutorisee, resultatMarqueurs?.marqueurs ?? []),
+      dependances,
     };
   }
 

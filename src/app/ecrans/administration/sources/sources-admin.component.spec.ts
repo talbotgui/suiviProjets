@@ -226,6 +226,47 @@ describe('SqmSourcesAdminComponent', () => {
     expect(composant.projetIdFormulaire).toBe(projetId);
   });
 
+  it('repose le focus sur le champ Type en basculant directement d’une édition à une autre, sans fermeture préalable (C15-02, anomalie n°2)', async () => {
+    const fixture = TestBed.createComponent(SqmSourcesAdminComponent);
+    const composant = fixture.componentInstance;
+    const sourceAId = donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: 'projet-a',
+      refAuditee: undefined,
+    });
+    const sourceBId = donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: 'projet-b',
+      refAuditee: undefined,
+    });
+    fixture.detectChanges();
+    composant.selectionnerGroupe(groupeId);
+    composant.selectionnerProjet(projetId);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const ligneA = composant.lignesSources().find((l) => l.source.id === sourceAId);
+    const ligneB = composant.lignesSources().find((l) => l.source.id === sourceBId);
+    if (!ligneA || !ligneB) {
+      throw new Error('lignes attendues pour ce test');
+    }
+
+    composant.ouvrirEdition(ligneA);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const champType = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLElement>(
+      '#formulaire-source-champ-type',
+    );
+    champType?.blur();
+
+    composant.ouvrirEdition(ligneB);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(document.activeElement).toBe(champType);
+  });
+
   it('ouvre le formulaire en création (ligneEnEdition à null), en figeant les filtres courants pour le composant enfant', () => {
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
     composant.selectionnerGroupe(groupeId);

@@ -28,8 +28,19 @@
 // effet (constructeur) ouvre une fois pour toutes le formulaire de création d'une règle de dépendances pré-rempli
 // avec le motif reçu et, si présente, une première borne de version dont seul le motif de version est renseigné (le
 // statut restant à la charge de l'utilisateur), sur le même patron que `SqmMembresConnusAdminComponent` (Phase 4).
-import { Component, effect, inject, signal, ChangeDetectionStrategy, input } from '@angular/core';
-import type { InputSignal, WritableSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+  input,
+} from '@angular/core';
+import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -84,6 +95,37 @@ export class SqmReferentielsParametrageComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
+
+  /**
+   * Premier champ du formulaire de règle de dépendances, résolu une fois ce champ effectivement rendu dans le DOM
+   * (cf. {@link ouvrirCreationDependance}, {@link ouvrirEditionDependance}, C15-02).
+   */
+  private readonly premierChampDependance: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampDependance');
+
+  /**
+   * Premier champ du formulaire de règle de marqueur IA (cf. {@link ouvrirCreationMarqueurIa},
+   * {@link ouvrirEditionMarqueurIa}, C15-02).
+   */
+  private readonly premierChampMarqueurIa: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampMarqueurIa');
+
+  /**
+   * Premier champ du formulaire du motif de nommage des branches (cf. {@link ouvrirEditionMotifNommage}, C15-02).
+   */
+  private readonly premierChampMotifNommage: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampMotifNommage');
+
+  /**
+   * Pose le focus sur le champ désigné dès son rendu effectif (C15-02) : un appel direct à `.focus()` échouerait
+   * ici, le champ n'existant pas encore dans le DOM au moment de l'appel (`@if` conditionnel pas encore réévalué) ;
+   * `afterNextRender` diffère l'appel après le rendu réel du DOM (cf. `exemple-reference.component.ts`).
+   * @param champ - Référence du champ à focaliser, résolue par `viewChild()`.
+   */
+  private focusApresRendu(champ: Signal<ElementRef<HTMLInputElement> | undefined>): void {
+    afterNextRender(() => champ()?.nativeElement.focus(), { injector: this.injector });
+  }
 
   /**
    * Motif à présélectionner dans le formulaire de création d'une règle de dépendances (cf. commentaire d'en-tête).
@@ -182,6 +224,7 @@ export class SqmReferentielsParametrageComponent {
     this.versionsDependanceTexte = '';
     this.messageErreur = null;
     this.formulaireDependanceVisible.set(true);
+    this.focusApresRendu(this.premierChampDependance);
   }
 
   /**
@@ -200,6 +243,7 @@ export class SqmReferentielsParametrageComponent {
       .join('\n');
     this.messageErreur = null;
     this.formulaireDependanceVisible.set(true);
+    this.focusApresRendu(this.premierChampDependance);
   }
 
   /**
@@ -319,6 +363,7 @@ export class SqmReferentielsParametrageComponent {
     this.outilMarqueurIa = '';
     this.messageErreur = null;
     this.formulaireMarqueurIaVisible.set(true);
+    this.focusApresRendu(this.premierChampMarqueurIa);
   }
 
   /**
@@ -338,6 +383,7 @@ export class SqmReferentielsParametrageComponent {
     this.outilMarqueurIa = regle.outil;
     this.messageErreur = null;
     this.formulaireMarqueurIaVisible.set(true);
+    this.focusApresRendu(this.premierChampMarqueurIa);
   }
 
   /**
@@ -420,6 +466,7 @@ export class SqmReferentielsParametrageComponent {
     this.motifNommageBranchesFormulaire = this.motifNommageBranchesActuel();
     this.messageErreur = null;
     this.formulaireMotifNommageVisible.set(true);
+    this.focusApresRendu(this.premierChampMotifNommage);
   }
 
   /**

@@ -1,2 +1,10 @@
 <!-- Gabarit de référence : interpolation Angular systématique, jamais d'injection HTML dynamique ([innerHTML]). -->
 <button type="button" (click)="gererActivation()">{{ libelle() }}</button>
+
+<!-- Patron de focus initial (C15-02) pour tout formulaire conditionnellement affiché : le template ref
+     #premierChampFormulaire n'est résolu par viewChild() dans le composant qu'une fois ce <input> réellement
+     rendu, d'où l'appel à ouvrirFormulaire() (afterNextRender) plutôt qu'un focus posé au clic lui-même. -->
+<button type="button" (click)="ouvrirFormulaire()">Ouvrir le formulaire</button>
+@if (formulaireVisible()) {
+  <input #premierChampFormulaire type="text" class="champ__controle" />
+}

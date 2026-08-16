@@ -112,6 +112,32 @@ pub(crate) fn consigner_erreur_ui(nom: &str, message: &str, pile: Option<&str>) 
     }
 }
 
+/// Consigne, en fin d'analyse d'une SOURCE d'un projet (une entrée par source d'un projet à plusieurs sources
+/// GitLab/Sonar, jamais un total par projet), le nombre d'items obtenus par type d'indicateur, remonté depuis
+/// l'Orchestrateur de campagne (UI, `OrchestrateurCampagneService.auditerProjet`) via la commande
+/// `consignerResumeSource` (`commandes::diagnostic`). Ajoutée en diagnostic du bug R15-06 (un projet à deux sources
+/// GitLab n'affichant les dépendances que d'un seul des deux dépôts) : permet de confirmer, avant toute nouvelle
+/// hypothèse, si chaque source produit bien ses propres résultats côté cœur natif, ou si le défaut se situe déjà à
+/// ce niveau plutôt que dans une agrégation ultérieure côté interface. Ne reçoit que des compteurs entiers par nom
+/// de type (`gitlab.membres`, `gitlab.dependances`, etc.), jamais le contenu des résultats eux-mêmes.
+pub(crate) fn consigner_resume_source(
+    source_id: &str,
+    id_externe: &str,
+    compteurs: &std::collections::HashMap<String, u32>,
+) {
+    let mut entrees: Vec<(&String, &u32)> = compteurs.iter().collect();
+    entrees.sort_by_key(|(type_indicateur, _)| type_indicateur.as_str());
+    let detail = entrees
+        .iter()
+        .map(|(type_indicateur, nombre)| format!("{type_indicateur}={nombre}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    log::info!(
+        target: CIBLE_ACTION_TRACEE,
+        "resumeSource : sourceId={source_id}, idExterne={id_externe}, {detail}"
+    );
+}
+
 /// Consigne une écriture du fichier de données (R11-01b), au point de convergence unique
 /// `persistance::moteur::sauvegarder_fichier` : nom de la commande de la Façade à l'origine de cette écriture,
 /// jamais le contenu du fichier ni le mot de passe.

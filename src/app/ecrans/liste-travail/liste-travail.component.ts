@@ -62,6 +62,7 @@ import {
   TypeCritereMembre,
 } from '../../services/avecetat/etat/types-donnees';
 import type { MembreGitlab } from '../../services/sansetat/commandes/types-facade';
+import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 import type { GraviteAlerteMembreInconnu } from '../../services/sansetat/jugement/statut-membre.utils';
@@ -641,6 +642,14 @@ export class SqmListeTravailComponent {
   /**
    * Construit l'ensemble des alertes actives (RG-006 à RG-009, RG-010, RG-026), triées membres inconnus en tête
    * puis par gravité décroissante (US-020).
+   *
+   * Membres fusionnés entre toutes les sources GitLab d'un même projet via `AgregationThemeFicheProjetUtils.
+   * regrouper` (au lieu d'une traversée directe de `dernierAudit.resultats`) : un projet à plusieurs sources GitLab
+   * produit un résultat `gitlab.membres` par source (`OrchestrateurCampagneService.auditerProjet`) ; sans cette
+   * fusion, un même membre inconnu des deux dépôts générait deux lignes de clé d'alerte identique
+   * (`membreInconnu|{projetId}|{username}`), provoquant l'avertissement Angular NG0955 (clé de suivi `@for`/`track`
+   * dupliquée) constaté en recette de la Phase 15 sur cet écran — même cause racine que R15-04/R15-06, déjà
+   * corrigée sur la Fiche projet mais pas ici.
    * @returns Les alertes actives triées, tableau vide si aucun fichier n'est chargé.
    */
   private construireAlertes(): readonly LigneAlerteTravail[] {
@@ -656,37 +665,33 @@ export class SqmListeTravailComponent {
         if (dernierAudit === undefined) {
           continue;
         }
-        for (const resultat of dernierAudit.resultats) {
-          if (resultat.type !== 'gitlab.membres') {
+        const membres = AgregationThemeFicheProjetUtils.regrouper(dernierAudit.resultats).membres;
+        for (const membre of membres) {
+          const resolution = StatutMembreUtils.calculerStatutMembre(
+            { username: membre.username, email: membre.emailPublic },
+            groupe.membresConnus,
+          );
+          if (resolution.type !== 'inconnu' && resolution.type !== 'conflit') {
             continue;
           }
-          for (const membre of resultat.membres) {
-            const resolution = StatutMembreUtils.calculerStatutMembre(
-              { username: membre.username, email: membre.emailPublic },
-              groupe.membresConnus,
-            );
-            if (resolution.type !== 'inconnu' && resolution.type !== 'conflit') {
-              continue;
-            }
-            const cleAlerte = `${PREFIXE_CLE_MEMBRE_INCONNU}${projet.id}|${membre.username}`;
-            const dernierTraitement = this.dernierTraitement(cleAlerte, traitements);
-            lignes.push({
-              cleAlerte,
-              libelle: `Membre inconnu « ${membre.username} »`,
-              gravite: StatutMembreUtils.calculerGraviteAlerteMembreInconnu(membre.niveauAcces),
-              projetId: projet.id,
-              nomProjet: projet.nom,
-              groupeId: groupe.id,
-              nomGroupe: groupe.nom,
-              critereParDefautQualification:
-                resolution.type === 'inconnu'
-                  ? this.calculerCritereParDefautQualification(membre)
-                  : undefined,
-              statut: dernierTraitement?.statut ?? null,
-              commentaire: dernierTraitement?.commentaire,
-              detecteeDepuis: this.premiereDetection(cleAlerte, traitements),
-            });
-          }
+          const cleAlerte = `${PREFIXE_CLE_MEMBRE_INCONNU}${projet.id}|${membre.username}`;
+          const dernierTraitement = this.dernierTraitement(cleAlerte, traitements);
+          lignes.push({
+            cleAlerte,
+            libelle: `Membre inconnu « ${membre.username} »`,
+            gravite: StatutMembreUtils.calculerGraviteAlerteMembreInconnu(membre.niveauAcces),
+            projetId: projet.id,
+            nomProjet: projet.nom,
+            groupeId: groupe.id,
+            nomGroupe: groupe.nom,
+            critereParDefautQualification:
+              resolution.type === 'inconnu'
+                ? this.calculerCritereParDefautQualification(membre)
+                : undefined,
+            statut: dernierTraitement?.statut ?? null,
+            commentaire: dernierTraitement?.commentaire,
+            detecteeDepuis: this.premiereDetection(cleAlerte, traitements),
+          });
         }
       }
     }

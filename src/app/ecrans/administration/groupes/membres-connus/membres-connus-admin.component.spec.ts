@@ -2,6 +2,7 @@
 // avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { DomTestUtils } from '../../../../testing/dom-test.utils';
 import { DonneesApplicationService } from '../../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../../services/avecetat/etat/notification.service';
@@ -147,6 +148,25 @@ describe('SqmMembresConnusAdminComponent', () => {
 
     expect(composant.messageErreur).toBe('Le critère est obligatoire.');
     expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+  });
+
+  it('pose le focus sur le champ Critère à l’ouverture du formulaire de création (C15-02)', async () => {
+    const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+    const instance = fixture.componentInstance;
+    fixture.detectChanges();
+    instance.selectionnerGroupe(groupeId);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    instance.ouvrirCreation();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const champCritere: HTMLInputElement | null = DomTestUtils.obtenirElementNatif(
+      fixture,
+    ).querySelector('#membres-connus-admin-champ-critere');
+    expect(champCritere).not.toBeNull();
+    expect(document.activeElement).toBe(champCritere);
   });
 
   it('ouvre la ressaisie du mot de passe pour un formulaire valide', () => {

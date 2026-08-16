@@ -3,13 +3,25 @@
 // Ce composant n'est utilisé par aucun écran réel : il sert uniquement de modèle à reproduire, notamment lors
 // d'une génération de code assistée par IA. Généré avec l'assistance de l'IA (Claude Code), conformément à la
 // mention d'origine requise par .claude/rules/01-usage-ia-et-conventions.md.
-import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
-import type { OutputEmitterRef, InputSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import type { OutputEmitterRef, InputSignal, Signal, WritableSignal } from '@angular/core';
 
 /**
  * Composant de référence illustrant les conventions attendues pour tout composant Angular réutilisable du projet :
  * visibilité explicite sur chaque membre, documentation JSDoc systématique, entrées et sorties typées via les
- * Signals Angular, aucune interpolation non échappée de contenu externe.
+ * Signals Angular, aucune interpolation non échappée de contenu externe, patron de focus initial pour tout
+ * formulaire conditionnellement affiché (cf. {@link ouvrirFormulaire}, C15-02).
  * Ce composant est un gabarit : il n'est utilisé par aucun écran réel de l'application.
  */
 @Component({
@@ -19,6 +31,15 @@ import type { OutputEmitterRef, InputSignal } from '@angular/core';
   styleUrl: './exemple-reference.component.scss',
 })
 export class SqmExempleReferenceComponent {
+  private readonly injector: Injector = inject(Injector);
+
+  /**
+   * Premier champ du formulaire conditionnellement affiché (cf. {@link formulaireVisible}), résolu une fois ce
+   * champ effectivement rendu dans le DOM.
+   */
+  private readonly premierChampFormulaire: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampFormulaire');
+
   /**
    * Libellé affiché par le composant, fourni obligatoirement par le composant appelant.
    */
@@ -30,9 +51,27 @@ export class SqmExempleReferenceComponent {
   public readonly activation: OutputEmitterRef<string> = output<string>();
 
   /**
+   * Indique si le formulaire secondaire, conditionnellement affiché (`@if`), est actuellement visible.
+   */
+  public readonly formulaireVisible: WritableSignal<boolean> = signal(false);
+
+  /**
    * Gère l'activation du composant par l'utilisateur et émet l'événement `activation` correspondant.
    */
   public gererActivation(): void {
     this.activation.emit(this.libelle());
+  }
+
+  /**
+   * Affiche le formulaire et pose le focus sur son premier champ dès son rendu effectif (C15-02) : un simple appel
+   * à `.focus()` ici échouerait, le champ n'existant pas encore dans le DOM au moment de cet appel (`@if`
+   * conditionnel n'ayant pas encore été réévalué) ; `afterNextRender` diffère l'appel après le rendu réel du DOM,
+   * sans nécessiter un `effect()` qui devrait suivre {@link formulaireVisible} en continu pour le même résultat.
+   */
+  public ouvrirFormulaire(): void {
+    this.formulaireVisible.set(true);
+    afterNextRender(() => this.premierChampFormulaire()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 }

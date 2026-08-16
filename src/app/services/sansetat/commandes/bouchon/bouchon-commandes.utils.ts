@@ -220,6 +220,7 @@ export class BouchonCommandesUtils {
       case 'interroger_derniere_analyse':
         return BouchonCommandesUtils.derniereAnalyse(parametres);
       case 'consigner_erreur_ui':
+      case 'consigner_resume_source':
         return undefined;
       default:
         throw new Error(`BouchonCommandesUtils : commande « ${commande} » non bouchonnée.`);

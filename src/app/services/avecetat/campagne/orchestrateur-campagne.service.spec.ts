@@ -426,6 +426,41 @@ describe('OrchestrateurCampagneService', () => {
       },
     );
 
+    it(
+      'doit consigner, en fin d’analyse de CHAQUE source d’un projet à deux sources GitLab, le nombre de ' +
+        'dépendances/membres obtenus par cette seule source (diagnostic R15-06)',
+      async () => {
+        const projet = DonneesDeTest.projet('projet-1', [
+          DonneesDeTest.sourceGitlab('source-back'),
+          DonneesDeTest.sourceGitlab('source-front'),
+        ]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        const compteursAttendus = {
+          'gitlab.vitalite': 1,
+          'gitlab.taille_depot': 1,
+          'gitlab.contributeurs': 1,
+          'gitlab.merge_requests': 0,
+          'gitlab.membres': 0,
+          'gitlab.branches': 1,
+          'gitlab.dependances': 1,
+          'gitlab.marqueurs_ia': 0,
+        };
+        expect(invokeSimule).toHaveBeenCalledWith('consigner_resume_source', {
+          sourceId: 'source-back',
+          idExterne: 'source-back-externe',
+          compteurs: compteursAttendus,
+        });
+        expect(invokeSimule).toHaveBeenCalledWith('consigner_resume_source', {
+          sourceId: 'source-front',
+          idExterne: 'source-front-externe',
+          compteurs: compteursAttendus,
+        });
+      },
+    );
+
     it('doit transmettre le référentiel de marqueurs IA à interroger_marqueurs_ia et calculer le constat croisé', async () => {
       const projet = DonneesDeTest.projet('projet-1', [
         DonneesDeTest.sourceGitlab('source-1'),

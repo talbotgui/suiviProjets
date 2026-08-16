@@ -6,7 +6,14 @@
 // est déléguée à `SqmFormulaireSourceComponent` (`composants/formulaire-source/`) depuis C11-01 (Phase 11),
 // extrait de ce composant pour être également consommé par le mini-flux guidé de `SqmProjetsAdminComponent` sans
 // dupliquer cette logique.
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  Injector,
+  afterNextRender,
+  inject,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
@@ -41,6 +48,12 @@ export class SqmSourcesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
+
+  /**
+   * Référence au formulaire de source affiché, `undefined` tant qu'il n'est pas ouvert.
+   */
+  private readonly formulaireSource = viewChild<SqmFormulaireSourceComponent>('formulaireSource');
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -184,6 +197,7 @@ export class SqmSourcesAdminComponent {
     this.groupeIdFormulaire = this.groupeSelectionneId;
     this.projetIdFormulaire = this.projetSelectionneId;
     this.formulaireVisible = true;
+    this.focusPremierChampApresRendu();
   }
 
   /**
@@ -195,6 +209,20 @@ export class SqmSourcesAdminComponent {
     this.groupeIdFormulaire = ligne.groupeId;
     this.projetIdFormulaire = ligne.projetId;
     this.formulaireVisible = true;
+    this.focusPremierChampApresRendu();
+  }
+
+  /**
+   * Pose le focus sur le premier champ de `SqmFormulaireSourceComponent` dès son rendu effectif (C15-02). Réinvoqué
+   * explicitement ici plutôt que de dépendre uniquement du `ngAfterViewInit` interne du composant enfant : la liste
+   * des sources reste cliquable pendant que le formulaire est ouvert, si bien qu'une bascule directe d'une édition
+   * à une autre (sans fermeture préalable) ne fait pas transiter le `@if` englobant de `false` à `true` et ne
+   * recrée donc pas ce composant enfant (anomalie n°2 relevée en relecture de l'Étape 15 incrément 2).
+   */
+  private focusPremierChampApresRendu(): void {
+    afterNextRender(() => this.formulaireSource()?.focusPremierChamp(), {
+      injector: this.injector,
+    });
   }
 
   /**

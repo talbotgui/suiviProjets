@@ -213,6 +213,45 @@ describe('SqmListeTravailComponent', () => {
     expect(alertes[1].gravite).toBe('moderee');
   });
 
+  it(
+    "n'affiche qu'une seule ligne pour un même membre inconnu constaté sur deux sources GitLab du " +
+      'même projet, plutôt que de produire une clé de suivi `@for`/`track` dupliquée (NG0955, cf. R15-04/' +
+      'R15-06)',
+    () => {
+      const audit: Audit = {
+        id: 'audit-1',
+        date: '2026-07-20T00:00:00Z',
+        campagneId: 'campagne-1',
+        resultats: [
+          {
+            type: 'gitlab.membres',
+            sourceId: 'source-back',
+            refEffective: 'main',
+            shaTete: 'abc123',
+            membres: [DonneesDeTest.membreGitlab('inconnu1', 30)],
+          },
+          {
+            type: 'gitlab.membres',
+            sourceId: 'source-front',
+            refEffective: 'main',
+            shaTete: 'def456',
+            membres: [DonneesDeTest.membreGitlab('inconnu1', 30)],
+          },
+        ],
+      };
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      const alertes = composant.toutesLesAlertes();
+      expect(alertes).toHaveLength(1);
+      expect(alertes[0].cleAlerte).toBe('membreInconnu|projet-1|inconnu1');
+    },
+  );
+
   it('restitue le statut courant (dernière entrée) et le commentaire associé (RG-026)', () => {
     const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('jdupont', 30)]);
     const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);

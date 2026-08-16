@@ -15,6 +15,8 @@
 import {
   Component,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -316,6 +318,7 @@ export class SqmFicheProjetComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
 
   /**
    * Identifiant du projet affiché, lié au segment de route `fiche-projet/:projetId` (`withComponentInputBinding()`,
@@ -327,6 +330,13 @@ export class SqmFicheProjetComponent {
    * Élément conteneur exporté en PNG (pattern déjà établi par `SqmSyntheseAuditsComponent`, incrément 4).
    */
   private readonly conteneurExport = viewChild<ElementRef<HTMLElement>>('conteneurExport');
+
+  /**
+   * Premier champ du formulaire de création d'annotation, résolu une fois ce champ effectivement rendu dans le DOM
+   * (cf. {@link ouvrirCreationAnnotation}, C15-02).
+   */
+  private readonly premierChampAnnotation: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampAnnotation');
 
   /**
    * État complet de l'écran, recalculé à chaque changement de {@link projetId} ou de la racine courante.
@@ -387,6 +397,9 @@ export class SqmFicheProjetComponent {
     this.descriptionAnnotation = '';
     this.messageErreurAnnotation = null;
     this.formulaireAnnotationVisible.set(true);
+    afterNextRender(() => this.premierChampAnnotation()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 
   /**

@@ -704,6 +704,22 @@ describe('SqmFicheProjetComponent', () => {
     clicSpy.mockRestore();
   });
 
+  it('pose le focus sur le champ Date à l’ouverture du formulaire de création d’annotation (C15-02)', async () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const composant = fixture.componentInstance;
+
+    composant.ouvrirCreationAnnotation();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const champDate: HTMLInputElement | null = DomTestUtils.obtenirElementNatif(
+      fixture,
+    ).querySelector('input[name="dateAnnotation"]');
+    expect(champDate).not.toBeNull();
+    expect(document.activeElement).toBe(champDate);
+  });
+
   it("refuse la demande de création d'annotation quand le libellé est vide (US-019)", () => {
     const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
     const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));

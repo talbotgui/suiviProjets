@@ -405,6 +405,21 @@ export class OrchestrateurCampagneService {
         dernierMotifEchec =
           this.integrer(reponseMarqueursIa, resultats, anomalies) ?? dernierMotifEchec;
         marqueursIa = reponseMarqueursIa.resultatBrut;
+
+        // Diagnostic de R15-06 (un projet à deux sources GitLab n'affichant les dépendances que d'un seul des deux
+        // dépôts) : consigne, dans le journal technique local, le nombre d'items obtenus par type pour CETTE seule
+        // source (jamais un total par projet), afin de confirmer si chaque source produit bien ses propres
+        // résultats côté cœur natif avant toute nouvelle hypothèse d'agrégation.
+        await this.facadeCommandes.consignerResumeSource(source.id, source.idExterne, {
+          'gitlab.vitalite': reponseVitalite.resultatBrut === undefined ? 0 : 1,
+          'gitlab.taille_depot': reponseTaille.resultatBrut === undefined ? 0 : 1,
+          'gitlab.contributeurs': reponseContributeurs.resultatBrut?.contributeurs.length ?? 0,
+          'gitlab.merge_requests': reponseMergeRequests.resultatBrut?.mrOuvertes.length ?? 0,
+          'gitlab.membres': reponseMembres.resultatBrut?.membres.length ?? 0,
+          'gitlab.branches': reponseBranches.resultatBrut?.branches.length ?? 0,
+          'gitlab.dependances': reponseDependances.resultatBrut?.dependances.length ?? 0,
+          'gitlab.marqueurs_ia': reponseMarqueursIa.resultatBrut?.marqueurs.length ?? 0,
+        });
       } else {
         const reponseViolations = await this.executerIndicateur(
           'sonar.violations',
@@ -451,6 +466,7 @@ export class OrchestrateurCampagneService {
         dernierMotifEchec = this.integrer(reponseNcloc, resultats, anomalies) ?? dernierMotifEchec;
         ncloc = reponseNcloc.resultatBrut;
 
+        let derniereAnalyseObtenueCetteSource = false;
         if (!resolution.groupe.indicateursDesactives.includes('croise.fraicheur_sonar')) {
           const reponseDerniereAnalyse = await this.facadeCommandes.interrogerDerniereAnalyse(
             instance,
@@ -458,6 +474,7 @@ export class OrchestrateurCampagneService {
           );
           if (reponseDerniereAnalyse.type === 'succes') {
             derniereAnalyse = reponseDerniereAnalyse.resultat;
+            derniereAnalyseObtenueCetteSource = true;
           } else {
             anomalies.push({
               indicateur: 'croise.fraicheur_sonar',
@@ -467,6 +484,17 @@ export class OrchestrateurCampagneService {
             dernierMotifEchec = `croise.fraicheur_sonar : ${reponseDerniereAnalyse.anomalie.type}`;
           }
         }
+
+        // Diagnostic de R15-06 (cf. commentaire symétrique de la branche GitLab ci-dessus) : résumé de fin
+        // d'analyse de cette seule source Sonar.
+        await this.facadeCommandes.consignerResumeSource(source.id, source.idExterne, {
+          'sonar.violations': reponseViolations.resultatBrut === undefined ? 0 : 1,
+          'sonar.dette': reponseDette.resultatBrut === undefined ? 0 : 1,
+          'sonar.couverture': reponseCouverture.resultatBrut === undefined ? 0 : 1,
+          'sonar.notes': reponseNotes.resultatBrut === undefined ? 0 : 1,
+          'sonar.ncloc': reponseNcloc.resultatBrut === undefined ? 0 : 1,
+          'croise.fraicheur_sonar': derniereAnalyseObtenueCetteSource ? 1 : 0,
+        });
       }
     }
 

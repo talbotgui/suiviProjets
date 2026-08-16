@@ -127,6 +127,35 @@ export class FacadeCommandesService {
   }
 
   /**
+   * Consigne, dans le journal technique local du cœur natif, le résumé du nombre d'items obtenus par type
+   * d'indicateur en fin d'analyse d'une SOURCE (jamais un total par projet), ajouté en diagnostic de R15-06 (un
+   * projet à deux sources GitLab n'affichant les dépendances que d'un seul des deux dépôts) : permet de confirmer
+   * si chaque source produit bien ses propres résultats côté cœur natif. Best-effort, sur le même modèle que
+   * {@link consignerErreurUi} : jamais de nouvelle source d'exception non gérée pour l'Orchestrateur de campagne
+   * appelant.
+   * @param sourceId - Identifiant interne de la source concernée (`Source.id`).
+   * @param idExterne - Identifiant externe de la source côté instance (`Source.idExterne`), plus lisible que
+   * `sourceId` pour rapprocher la ligne de journal d'un dépôt/projet réel.
+   * @param compteurs - Nombre d'items obtenus par type d'indicateur (`gitlab.membres`, `gitlab.dependances`, etc.),
+   * jamais le contenu des résultats eux-mêmes.
+   */
+  public async consignerResumeSource(
+    sourceId: string,
+    idExterne: string,
+    compteurs: Readonly<Record<string, number>>,
+  ): Promise<void> {
+    try {
+      await InvocationCommandeUtils.invoquer<void>('consigner_resume_source', {
+        sourceId,
+        idExterne,
+        compteurs,
+      });
+    } catch {
+      // Volontairement ignoré : cf. commentaire de consignerErreurUi.
+    }
+  }
+
+  /**
    * Interroge les branches d'un dépôt GitLab pour l'autocomplétion de la ref auditée d'une source (US-008). Le
    * credential utilisé est celui déjà mémorisé côté cœur natif pour cette instance (`definirCredentials`) : il
    * n'est jamais retransmis par cette méthode.

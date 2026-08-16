@@ -12,8 +12,19 @@
 // une fois pour toutes le groupe visé puis, si `critere`/`typeCritere` sont tous deux présents et reconnus, ouvre
 // directement le formulaire de création pré-rempli (membre `inconnu`) ; sinon (absents : membre en `conflit`), le
 // groupe est simplement présélectionné et sa liste de règles existantes reste affichée sans ouvrir de formulaire.
-import { Component, effect, inject, signal, ChangeDetectionStrategy, input } from '@angular/core';
-import type { InputSignal, WritableSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+  input,
+} from '@angular/core';
+import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -50,6 +61,14 @@ export class SqmMembresConnusAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
+
+  /**
+   * Premier champ du formulaire de création/modification, résolu une fois ce champ effectivement rendu dans le DOM
+   * (cf. {@link ouvrirCreation}, {@link ouvrirEdition}, C15-02).
+   */
+  private readonly premierChampFormulaire: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampFormulaire');
 
   /**
    * Identifiant du groupe à présélectionner (cf. commentaire d'en-tête).
@@ -249,6 +268,7 @@ export class SqmMembresConnusAdminComponent {
     this.aliasEmail = '';
     this.messageErreur = null;
     this.formulaireVisible.set(true);
+    this.focusPremierChampApresRendu();
   }
 
   /**
@@ -268,6 +288,7 @@ export class SqmMembresConnusAdminComponent {
     this.aliasEmail = regle.aliasEmail ?? '';
     this.messageErreur = null;
     this.formulaireVisible.set(true);
+    this.focusPremierChampApresRendu();
   }
 
   /**
@@ -275,6 +296,17 @@ export class SqmMembresConnusAdminComponent {
    */
   public fermerFormulaire(): void {
     this.formulaireVisible.set(false);
+  }
+
+  /**
+   * Pose le focus sur le premier champ du formulaire dès son rendu effectif (C15-02) : un appel direct à `.focus()`
+   * échouerait ici, le champ n'existant pas encore dans le DOM au moment de l'appel (`@if` conditionnel pas encore
+   * réévalué) ; `afterNextRender` diffère l'appel après le rendu réel du DOM (cf. `exemple-reference.component.ts`).
+   */
+  private focusPremierChampApresRendu(): void {
+    afterNextRender(() => this.premierChampFormulaire()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 
   /**

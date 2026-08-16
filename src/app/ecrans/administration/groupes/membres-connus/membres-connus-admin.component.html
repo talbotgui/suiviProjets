@@ -123,6 +123,7 @@
         <label class="champ">
           Critère
           <input
+            #premierChampFormulaire
             id="membres-connus-admin-champ-critere"
             type="text"
             class="champ__controle"
@@ -151,8 +152,8 @@
             }
           </select>
           <span id="membres-connus-admin-champ-type-critere-aide" class="champ__aide">
-            Niveau de précédence de la règle : username exact, puis email exact, puis domaine
-            email ; en cas de correspondance à plusieurs niveaux, le plus précis l'emporte.
+            Niveau de précédence de la règle : username exact, puis email exact, puis domaine email
+            ; en cas de correspondance à plusieurs niveaux, le plus précis l'emporte.
           </span>
         </label>
 
@@ -202,7 +203,8 @@
           />
           <span id="membres-connus-admin-champ-alias-email-aide" class="champ__aide">
             Facultatif, utile uniquement pour une règle de type username : adresse email associée,
-            afin de reconnaître ce membre par son adresse de commit. Ex. marie.durand&#64;entreprise.fr.
+            afin de reconnaître ce membre par son adresse de commit. Ex.
+            marie.durand&#64;entreprise.fr.
           </span>
         </label>
 

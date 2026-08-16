@@ -378,10 +378,10 @@ describe('SqmSyntheseAuditsComponent', () => {
     return fixture;
   }
 
-  it('affiche les 12 colonnes attendues de la maquette de référence', () => {
+  it('affiche les 12 colonnes de la maquette de référence, plus la colonne Dépendances (Phase 15)', () => {
     const fixture = creerFixture(DonneesDeTest.racineDeBase());
 
-    expect(fixture.componentInstance.colonnes()).toHaveLength(12);
+    expect(fixture.componentInstance.colonnes()).toHaveLength(13);
     const libelles = fixture.componentInstance.colonnes().map((colonne) => colonne.libelle);
     expect(libelles).toEqual([
       'Projet',
@@ -396,6 +396,7 @@ describe('SqmSyntheseAuditsComponent', () => {
       'Membres',
       'IA',
       'Sonar',
+      'Dépendances',
     ]);
 
     const entetes = Array.from(
@@ -405,6 +406,95 @@ describe('SqmSyntheseAuditsComponent', () => {
       expect(entetes.some((texte) => texte?.includes(libelle))).toBe(true);
     }
   });
+
+  it(
+    'compte les dépendances par statut (inconnue/obsolète/maintenue, RG-011), fusionnées entre plusieurs ' +
+      'sources GitLab du même projet plutôt que de ne retenir que la première (R15-06)',
+    () => {
+      const audit: Audit = {
+        ...DonneesDeTest.auditComplet({}),
+        resultats: [
+          ...DonneesDeTest.auditComplet({}).resultats,
+          {
+            type: 'gitlab.dependances',
+            sourceId: 'source-back',
+            refEffective: 'main',
+            shaTete: 'abc123',
+            dependances: [
+              {
+                reference: 'org.springframework:spring-core',
+                version: '4.3.0',
+                manifeste: 'pom.xml',
+              },
+              { reference: 'moment', version: '2.29.0', manifeste: 'package.json' },
+            ],
+          },
+          {
+            type: 'gitlab.dependances',
+            sourceId: 'source-front',
+            refEffective: 'main',
+            shaTete: 'def456',
+            dependances: [
+              {
+                reference: 'org.springframework:spring-core',
+                version: '6.1.0',
+                manifeste: 'build.gradle',
+              },
+              { reference: 'paquet-inconnu', version: '1.0.0', manifeste: 'package.json' },
+            ],
+          },
+        ],
+      };
+      const projet = DonneesDeTest.projet('projet-1', 'Projet Multi-sources', [audit]);
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe',
+        description: '',
+        instances: [],
+        membresConnus: [DonneesDeTest.membreConnu('jdupont')],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projet],
+      };
+      const racine = DonneesDeTest.racine([groupe]);
+      const racineAvecReferentiel: DonneesRacine = {
+        ...racine,
+        referentiels: {
+          ...racine.referentiels,
+          reglesDependances: [
+            {
+              id: 'regle-spring',
+              motif: 'org.springframework:*',
+              versions: [
+                { motifVersion: '4.*', statut: 'obsolete' },
+                { motifVersion: '6.*', statut: 'aJourM1' },
+              ],
+            },
+            {
+              id: 'regle-moment',
+              motif: 'moment',
+              versions: [{ motifVersion: '*', statut: 'obsolete' }],
+            },
+          ],
+        },
+      };
+
+      const fixture = creerFixture(racineAvecReferentiel);
+      const ligne = fixture.componentInstance.toutesLesLignes()[0];
+
+      // spring-core : une occurrence obsolète (4.3.0, source back) et une maintenue (6.1.0, source front) —
+      // les DEUX occurrences sont comptées (jamais fusionnées en une seule ligne comme dans la Fiche projet, cette
+      // synthèse ne portant pas de tableau détaillé par dépendance). moment : obsolète. paquet-inconnu : inconnue.
+      expect(ligne.dependances).toEqual({ inconnues: 1, obsoletes: 2, maintenues: 1 });
+
+      const colonneDependances = fixture.componentInstance
+        .colonnes()
+        .find((colonne) => colonne.cle === 'dependances');
+      expect(colonneDependances?.extraireTexteBrut(ligne)).toBe(
+        '1 inconnue(s), 2 obsolète(s), 1 maintenue(s)',
+      );
+    },
+  );
 
   it('grise la ligne « jamais audité » sans lui appliquer aucun seuil de couleur (état particulier)', () => {
     const fixture = creerFixture(DonneesDeTest.racineDeBase());
@@ -660,8 +750,8 @@ describe('SqmSyntheseAuditsComponent', () => {
       DomTestUtils.obtenirElementNatif(fixture).querySelectorAll('thead tr:first-child th'),
     );
     // Ordre des colonnes : Projet(0) Groupe(1) DernierAudit(2) Vitalité(3) Taille(4) Couverture(5) Notes(6)
-    // Violations(7) MR(8) Membres(9) IA(10) Sonar(11).
-    const colonnesAvecExplication = new Set([3, 5, 7, 8, 10]);
+    // Violations(7) MR(8) Membres(9) IA(10) Sonar(11) Dépendances(12).
+    const colonnesAvecExplication = new Set([3, 5, 7, 8, 10, 12]);
     entetes.forEach((entete, index) => {
       const declencheur = entete.querySelector('app-explication-jugement');
       if (colonnesAvecExplication.has(index)) {

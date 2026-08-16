@@ -12,8 +12,18 @@
 // (paramètres de requête portés par le lien « Qualifier ce membre » de la Fiche projet) : un simple effet
 // (constructeur) bascule une fois pour toutes sur le sous-onglet Membres connus dès que `groupeIdPreselectionne`
 // est renseigné, sur le modèle de `vueParDefautDejaAppliquee` (`SqmListeTravailComponent`).
-import { Component, effect, inject, ChangeDetectionStrategy, input } from '@angular/core';
-import type { InputSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  effect,
+  inject,
+  viewChild,
+  ChangeDetectionStrategy,
+  input,
+} from '@angular/core';
+import type { InputSignal, Signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -63,6 +73,14 @@ export class SqmGroupesAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
+
+  /**
+   * Premier champ du formulaire de création/modification, résolu une fois ce champ effectivement rendu dans le DOM
+   * (cf. {@link ouvrirCreation}, {@link ouvrirEdition}, C15-02).
+   */
+  private readonly premierChampFormulaire: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampFormulaire');
 
   /**
    * Identifiant du groupe à présélectionner dans le sous-onglet Membres connus (cf. commentaire d'en-tête).
@@ -169,6 +187,7 @@ export class SqmGroupesAdminComponent {
     this.instances = [];
     this.messageErreur = null;
     this.formulaireVisible = true;
+    this.focusPremierChampApresRendu();
   }
 
   /**
@@ -186,6 +205,7 @@ export class SqmGroupesAdminComponent {
     this.instances = groupe.instances.map((instance) => ({ ...instance }));
     this.messageErreur = null;
     this.formulaireVisible = true;
+    this.focusPremierChampApresRendu();
   }
 
   /**
@@ -193,6 +213,17 @@ export class SqmGroupesAdminComponent {
    */
   public fermerFormulaire(): void {
     this.formulaireVisible = false;
+  }
+
+  /**
+   * Pose le focus sur le premier champ du formulaire dès son rendu effectif (C15-02) : un appel direct à `.focus()`
+   * échouerait ici, le champ n'existant pas encore dans le DOM au moment de l'appel (`@if` conditionnel pas encore
+   * réévalué) ; `afterNextRender` diffère l'appel après le rendu réel du DOM (cf. `exemple-reference.component.ts`).
+   */
+  private focusPremierChampApresRendu(): void {
+    afterNextRender(() => this.premierChampFormulaire()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 
   /**

@@ -19,15 +19,23 @@ import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
   DestroyRef,
+  ElementRef,
   computed,
   effect,
   inject,
   input,
   output,
   signal,
+  viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
+import type {
+  AfterViewInit,
+  InputSignal,
+  OutputEmitterRef,
+  Signal,
+  WritableSignal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Subject, from, of } from 'rxjs';
@@ -65,12 +73,19 @@ const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './formulaire-source.component.html',
 })
-export class SqmFormulaireSourceComponent {
+export class SqmFormulaireSourceComponent implements AfterViewInit {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly facadeCommandes: FacadeCommandesService = inject(FacadeCommandesService);
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
   private readonly rechercheBranche$: Subject<string> = new Subject<string>();
+
+  /**
+   * Premier champ du formulaire (Type), résolu une fois ce champ effectivement rendu dans le DOM (cf.
+   * {@link ngAfterViewInit}, C15-02).
+   */
+  private readonly premierChampFormulaire: Signal<ElementRef<HTMLSelectElement> | undefined> =
+    viewChild<ElementRef<HTMLSelectElement>>('premierChampFormulaire');
 
   /**
    * Dépôts GitLab ou projets Sonar disponibles déjà chargés, indexés par `Instance.id` (US-008, RG-036) : un seul
@@ -204,6 +219,27 @@ export class SqmFormulaireSourceComponent {
       .subscribe((resultat) => {
         this.appliquerResultatBranches(resultat);
       });
+  }
+
+  /**
+   * Pose le focus sur le premier champ du formulaire dès son rendu (C15-02) : ce composant étant recréé à chaque
+   * affichage conditionnel (`@if`) par les deux écrans appelants (`SqmSourcesAdminComponent`,
+   * `SqmProjetsAdminComponent`), `ngAfterViewInit` s'exécute déjà après le rendu réel du DOM, sur le modèle de
+   * `SqmConfirmationMotDePasseComponent`.
+   */
+  public ngAfterViewInit(): void {
+    this.focusPremierChamp();
+  }
+
+  /**
+   * Pose le focus sur le premier champ du formulaire (Type). Exposé publiquement, en complément de
+   * {@link ngAfterViewInit}, pour les cas où ce composant n'est pas recréé alors qu'un nouveau formulaire est
+   * présenté (bascule directe entre deux éditions sans fermeture préalable côté `SqmSourcesAdminComponent`, ou
+   * réinitialisation entre deux sources du mini-flux guidé de `SqmProjetsAdminComponent`, C15-02, anomalie n°2 de
+   * la relecture de l'Étape 15 incrément 2) : l'écran appelant doit alors réinvoquer explicitement cette méthode.
+   */
+  public focusPremierChamp(): void {
+    this.premierChampFormulaire()?.nativeElement.focus();
   }
 
   /**

@@ -14,8 +14,17 @@
 // (`supprimerAnnotation`) est ajoutée à cette même occasion, décision arbitraire élargie aux deux portées (groupe
 // et projet) plutôt qu'à la seule portée groupe nouvellement construite (cf. `SqmFicheProjetComponent`, qui en
 // bénéficie donc également).
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import type { WritableSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -42,6 +51,14 @@ export class SqmAnnotationsGroupeAdminComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
+
+  /**
+   * Premier champ du formulaire de création, résolu une fois ce champ effectivement rendu dans le DOM (cf.
+   * {@link ouvrirCreation}, C15-02).
+   */
+  private readonly premierChampFormulaire: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampFormulaire');
 
   /**
    * Identifiant du groupe actuellement sélectionné, `null` si aucun groupe n'existe encore.
@@ -144,6 +161,7 @@ export class SqmAnnotationsGroupeAdminComponent {
     this.description = '';
     this.messageErreur = null;
     this.formulaireVisible.set(true);
+    this.focusPremierChampApresRendu();
   }
 
   /**
@@ -151,6 +169,17 @@ export class SqmAnnotationsGroupeAdminComponent {
    */
   public fermerFormulaire(): void {
     this.formulaireVisible.set(false);
+  }
+
+  /**
+   * Pose le focus sur le premier champ du formulaire dès son rendu effectif (C15-02) : un appel direct à `.focus()`
+   * échouerait ici, le champ n'existant pas encore dans le DOM au moment de l'appel (`@if` conditionnel pas encore
+   * réévalué) ; `afterNextRender` diffère l'appel après le rendu réel du DOM (cf. `exemple-reference.component.ts`).
+   */
+  private focusPremierChampApresRendu(): void {
+    afterNextRender(() => this.premierChampFormulaire()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 
   /**

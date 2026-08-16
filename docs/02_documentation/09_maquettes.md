@@ -68,7 +68,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 |---|---|---|
 | Synthèse des audits | Barre de filtres | Sélecteur de groupe, sélecteur d'indicateurs, champ de recherche, compteur de projets |
 | Synthèse des audits | Bandeau d'alerte | Bandeau membres inconnus, toujours au-dessus du tableau si applicable |
-| Synthèse des audits | Tableau dense | Douze colonnes (Projet, Groupe, Dernier audit, Vitalité, Taille, Couverture, Notes Sonar, Violations, MR ouvertes, Membres, IA, Sonar) ; première colonne fixe au défilement horizontal ; badges « AUDIT ANCIEN » et pictogramme de campagne en échec ; ligne teintée si membre inconnu |
+| Synthèse des audits | Tableau dense | Treize colonnes (Projet, Groupe, Dernier audit, Vitalité, Taille, Couverture, Notes Sonar, Violations, MR ouvertes, Membres, IA, Sonar, Dépendances) ; première colonne fixe au défilement horizontal ; badges « AUDIT ANCIEN » et pictogramme de campagne en échec ; ligne teintée si membre inconnu. Colonne Dépendances ajoutée en Phase 15 (demande directe de l'utilisateur, hors périmètre initial de cette maquette) : trois compteurs (dépendances inconnues du référentiel, obsolètes, maintenues), fusionnés entre toutes les sources GitLab du projet (RG-011, cf. R15-06) |
 | Synthèse des audits | Export | Export de la vue en image PNG, alerte membre inconnu conservée |
 
 ### Synthèse graphique
