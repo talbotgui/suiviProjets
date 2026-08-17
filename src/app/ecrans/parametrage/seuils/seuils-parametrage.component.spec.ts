@@ -6,6 +6,7 @@ import { DonneesApplicationService } from '../../../services/avecetat/etat/donne
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmSeuilsParametrageComponent } from './seuils-parametrage.component';
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
@@ -114,6 +115,17 @@ describe('SqmSeuilsParametrageComponent', () => {
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'erreur', message: messageAttendu }),
     ]);
+  });
+
+  it('affiche une indication du moment de prise en compte d’une modification (US-040)', () => {
+    donneesApplication.chargerRacine(DonneesDeTest.racineVide());
+    const fixture = TestBed.createComponent(SqmSeuilsParametrageComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain(
+      "s'applique instantanément à l'ensemble de l'historique déjà intégré",
+    );
   });
 
   it('initialise le formulaire depuis les seuils chargés', () => {

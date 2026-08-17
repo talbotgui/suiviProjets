@@ -6,6 +6,7 @@ import { DonneesApplicationService } from '../../../services/avecetat/etat/donne
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmReferentielsParametrageComponent } from './referentiels-parametrage.component';
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
@@ -101,6 +102,17 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.reglesDependances()).toHaveLength(1);
     expect(composant.reglesMarqueursIA()).toHaveLength(1);
     expect(composant.motifNommageBranchesActuel()).toBe('^(main|develop)$');
+  });
+
+  it('distingue le moment de prise en compte des dépendances et des marqueurs IA (US-040)', () => {
+    const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain(
+      "s'applique instantanément à l'ensemble de l'historique déjà intégré",
+    );
+    expect(element.textContent).toContain("S'applique uniquement aux prochains audits collectés");
   });
 
   it('ouvre le formulaire de dépendances pré-rempli en édition, ignore un identifiant introuvable', () => {

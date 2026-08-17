@@ -7,6 +7,7 @@ import { DonneesApplicationService } from '../../../services/avecetat/etat/donne
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmReglagesApplicatifsParametrageComponent } from './reglages-applicatifs-parametrage.component';
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
@@ -70,6 +71,17 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
     }).compileComponents();
     TestBed.inject(DonneesApplicationService).chargerRacine(DonneesDeTest.racine());
     TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+  });
+
+  it('signale que la concurrence d’audit fait exception à l’application immédiate (US-040)', () => {
+    const fixture = TestBed.createComponent(SqmReglagesApplicatifsParametrageComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain("à l'exception de la concurrence d'audit par défaut");
+    expect(element.textContent).toContain(
+      "S'applique aux campagnes lancées après cette modification",
+    );
   });
 
   it('pré-remplit le formulaire de verrouillage avec les valeurs actuelles', () => {

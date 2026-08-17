@@ -1,5 +1,9 @@
 <section class="reglages-applicatifs-parametrage">
-  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Réglages applicatifs</h2>
+  <h2 class="texte-lg poids-gras exterieur-bas-2 exterieur-haut-0">Réglages applicatifs</h2>
+  <p class="texte-discret texte-sm exterieur-bas-3">
+    Chaque réglage s'applique immédiatement, sans redémarrage de l'application, à l'exception de la
+    concurrence d'audit par défaut (voir ci-dessous).
+  </p>
 
   @if (messageErreur) {
     <p class="reglages-applicatifs-parametrage__erreur texte-rouge" role="alert">
@@ -99,6 +103,10 @@
         Modifier
       </button>
     </header>
+    <p class="texte-discret texte-sm exterieur-bas-3">
+      S'applique aux campagnes lancées après cette modification ; sans effet sur une campagne déjà
+      en cours.
+    </p>
 
     @if (concurrenceEditVisible()) {
       <form

@@ -22,6 +22,10 @@
         Ajouter une règle
       </button>
     </header>
+    <p class="texte-discret texte-sm exterieur-bas-3">
+      Toute modification s'applique instantanément à l'ensemble de l'historique déjà intégré, sans
+      nouvel audit.
+    </p>
 
     @if (formulaireDependanceVisible()) {
       <form
@@ -170,6 +174,10 @@
         Ajouter une règle
       </button>
     </header>
+    <p class="texte-discret texte-sm exterieur-bas-3">
+      S'applique uniquement aux prochains audits collectés : les audits déjà intégrés conservent les
+      marqueurs détectés au moment de leur collecte, sans requalification rétroactive.
+    </p>
 
     @if (formulaireMarqueurIaVisible()) {
       <form
