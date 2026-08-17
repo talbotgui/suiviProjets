@@ -60,7 +60,7 @@ export class InvocationCommandeUtils {
         return invoke<TReponse>(commande, parametres);
       }
       if (BouchonFichierUtils.COMMANDES.has(commande)) {
-        return BouchonFichierUtils.invoquer<TReponse>(commande);
+        return BouchonFichierUtils.invoquer<TReponse>(commande, parametres ?? {});
       }
       if (BouchonAdministrationUtils.COMMANDES.has(commande)) {
         return BouchonAdministrationUtils.invoquer<TReponse>(commande, parametres ?? {});

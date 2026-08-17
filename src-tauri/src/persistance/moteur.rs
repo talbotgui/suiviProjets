@@ -1,9 +1,10 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 
-//! Moteur de persistance : création, chargement et sauvegarde du fichier de données chiffré (US-001, US-002 ;
-//! RG-001 à RG-003), avec sauvegardes de sécurité horodatées, détection de fichier verrouillé par un autre
-//! processus et nettoyage d'un fichier temporaire orphelin après une écriture interrompue (cf.
+//! Moteur de persistance : création, chargement, sauvegarde et changement de mot de passe du fichier de données
+//! chiffré (US-001, US-002, US-040 ; RG-001 à RG-003, RG-038), avec sauvegardes de sécurité horodatées, détection
+//! de fichier verrouillé par un autre processus et nettoyage d'un fichier temporaire orphelin après une écriture
+//! interrompue (cf.
 //! `docs/02_documentation/13_conceptionDetaillee.md#gestion-des-erreurs-et-cas-limites-au-niveau-technique`).
 
 use super::enveloppe::{Enveloppe, TAILLE_IV, TAILLE_SEL, VERSION_ENVELOPPE_COURANTE};
@@ -106,6 +107,31 @@ pub(crate) fn sauvegarder_fichier(
     Ok(cle)
 }
 
+/// Change le mot de passe du fichier de données déjà créé (RG-038) : réécrit immédiatement le fichier avec le
+/// nouveau mot de passe (nouveau sel et nouvel IV, RNF-012), sans constituer de nouvelle sauvegarde de sécurité de
+/// l'ancien contenu (par exception à la rotation normale de RG-003), puis supprime l'ensemble des sauvegardes de
+/// sécurité déjà présentes sur disque pour ce fichier, restées chiffrées avec l'ancien mot de passe. La
+/// revérification de l'ancien mot de passe (RG-002/R10-01) reste de la responsabilité de l'appelant, via
+/// [`crate::commandes::fichier::verifier_avant_ecriture`], avant tout appel à cette fonction.
+///
+/// # Erreurs
+///
+/// [`ErreurPersistance::FichierVerrouille`] si le fichier cible est verrouillé par un autre processus.
+pub(crate) fn changer_mot_de_passe(
+    chemin: &Path,
+    donnees: &DonneesRacine,
+    nouveau_mot_de_passe: &str,
+    commande_origine: &str,
+) -> Result<[u8; TAILLE_CLE], ErreurPersistance> {
+    if chemin.exists() {
+        verifier_fichier_non_verrouille(chemin)?;
+    }
+    let cle = chiffrer_et_ecrire(chemin, donnees, nouveau_mot_de_passe)?;
+    supprimer_toutes_sauvegardes(chemin)?;
+    crate::journalisation::consigner_ecriture_fichier(commande_origine);
+    Ok(cle)
+}
+
 /// Dérive la clé correspondant au mot de passe fourni à partir du sel actuellement inscrit dans l'enveloppe sur
 /// disque, sans déchiffrer le contenu du fichier (R10-01) : utilisé pour revérifier, avant toute réécriture, qu'un
 /// mot de passe fourni à une commande de mutation correspond bien à la clé de session déjà authentifiée, à moindre
@@ -186,7 +212,18 @@ fn ecrire_fichier_chiffre(
             donnees.parametres.sauvegarde.nombre_sauvegardes_securite,
         )?;
     }
+    chiffrer_et_ecrire(chemin, donnees, mot_de_passe)
+}
 
+/// Sérialise, compresse, chiffre (nouveau sel et nouvel IV) puis écrit `donnees` de façon atomique au chemin donné.
+/// Ne vérifie aucun verrou et ne constitue aucune sauvegarde de sécurité au préalable : ces deux aspects restent à
+/// la charge de l'appelant, différents selon qu'il s'agit d'une sauvegarde normale ([`ecrire_fichier_chiffre`]) ou
+/// d'un changement de mot de passe ([`changer_mot_de_passe`], RG-038).
+fn chiffrer_et_ecrire(
+    chemin: &Path,
+    donnees: &DonneesRacine,
+    mot_de_passe: &str,
+) -> Result<[u8; TAILLE_CLE], ErreurPersistance> {
     let mut sel = [0u8; TAILLE_SEL];
     rand::rng().fill_bytes(&mut sel);
     let mut iv = [0u8; TAILLE_IV];
@@ -318,6 +355,30 @@ fn supprimer_sauvegardes_excedentaires(
     while sauvegardes.len() > nombre_max {
         let plus_ancienne = sauvegardes.remove(0);
         fs::remove_file(&plus_ancienne)?;
+    }
+    Ok(())
+}
+
+/// Supprime l'ensemble des sauvegardes de sécurité déjà présentes sur disque pour ce fichier principal, quel que
+/// soit leur âge (RG-038) : utilisé lors d'un changement de mot de passe, ces sauvegardes restant chiffrées avec
+/// l'ancien mot de passe et donc rendues obsolètes par le nouveau, à la différence de
+/// [`supprimer_sauvegardes_excedentaires`] qui ne purge que l'excédent au-delà du nombre paramétré conservé.
+fn supprimer_toutes_sauvegardes(chemin: &Path) -> Result<(), ErreurPersistance> {
+    let dossier = chemin.parent().unwrap_or_else(|| Path::new("."));
+    if !dossier.is_dir() {
+        return Ok(());
+    }
+    let prefixe = prefixe_sauvegarde(chemin);
+
+    for entree in fs::read_dir(dossier)?.filter_map(std::result::Result::ok) {
+        let chemin_candidat = entree.path();
+        let correspond = chemin_candidat
+            .file_name()
+            .and_then(|nom| nom.to_str())
+            .is_some_and(|nom| nom.starts_with(&prefixe));
+        if correspond {
+            fs::remove_file(&chemin_candidat)?;
+        }
     }
     Ok(())
 }
@@ -665,6 +726,78 @@ mod tests {
             resultat,
             Err(ErreurPersistance::FichierIntrouvable(_))
         ));
+    }
+
+    #[test]
+    fn changer_mot_de_passe_permet_de_recharger_avec_le_nouveau_et_rejette_lancien()
+    -> Result<(), ErreurPersistance> {
+        let dossier = DossierTemporaire::nouveau("changer-mdp");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        let (racine, _cle) = creer_fichier(
+            &chemin,
+            "ancien-mot-de-passe",
+            "2026-08-17T08:00:00Z",
+            "Test",
+        )?;
+
+        changer_mot_de_passe(&chemin, &racine, "nouveau-mot-de-passe", "test")?;
+
+        let (relue, _cle) = charger_fichier(&chemin, "nouveau-mot-de-passe")?;
+        assert_eq!(relue, racine);
+
+        let resultat_ancien = charger_fichier(&chemin, "ancien-mot-de-passe");
+        assert!(matches!(
+            resultat_ancien,
+            Err(ErreurPersistance::MotDePasseOuFichierInvalide)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn changer_mot_de_passe_supprime_les_sauvegardes_de_securite_existantes()
+    -> Result<(), ErreurPersistance> {
+        let dossier = DossierTemporaire::nouveau("changer-mdp-sauvegardes");
+        let chemin = dossier.chemin_fichier("donnees.sqm");
+        let (mut racine, _cle) = creer_fichier(
+            &chemin,
+            "ancien-mot-de-passe",
+            "2026-08-17T08:00:00Z",
+            "Test",
+        )?;
+        racine.parametres.sauvegarde.nombre_sauvegardes_securite = 5;
+
+        // Trois sauvegardes normales, chiffrées avec l'ancien mot de passe, doivent exister avant le changement.
+        for _ in 0..3 {
+            sauvegarder_fichier(&chemin, &racine, "ancien-mot-de-passe", "test")?;
+        }
+        let prefixe = prefixe_sauvegarde(&chemin);
+        let nombre_avant = fs::read_dir(&dossier.chemin)?
+            .filter_map(std::result::Result::ok)
+            .filter(|entree| {
+                entree
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|nom| nom.starts_with(&prefixe))
+            })
+            .count();
+        assert_eq!(nombre_avant, 3);
+
+        changer_mot_de_passe(&chemin, &racine, "nouveau-mot-de-passe", "test")?;
+
+        let nombre_apres = fs::read_dir(&dossier.chemin)?
+            .filter_map(std::result::Result::ok)
+            .filter(|entree| {
+                entree
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|nom| nom.starts_with(&prefixe))
+            })
+            .count();
+        assert_eq!(
+            nombre_apres, 0,
+            "aucune sauvegarde chiffrée avec l'ancien mot de passe ne doit subsister"
+        );
+        Ok(())
     }
 
     #[test]

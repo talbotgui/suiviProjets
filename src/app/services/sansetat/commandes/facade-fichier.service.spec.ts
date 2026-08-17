@@ -57,6 +57,25 @@ describe('FacadeFichierService', () => {
     });
   });
 
+  it('invoque changer_mot_de_passe_fichier avec le chemin, les données et les deux mots de passe fournis', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 3 });
+
+    const resultat = await service.changerMotDePasseFichier(
+      '/tmp/donnees-test.sqm',
+      { versionSchema: 3 },
+      'ancien-mot-de-passe',
+      'nouveau-mot-de-passe',
+    );
+
+    expect(invokeSimule).toHaveBeenCalledWith('changer_mot_de_passe_fichier', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 3 },
+      ancienMotDePasse: 'ancien-mot-de-passe',
+      nouveauMotDePasse: 'nouveau-mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 3 });
+  });
+
   it('invoque verrouiller_session sans paramètre', async () => {
     invokeSimule.mockResolvedValue(undefined);
 

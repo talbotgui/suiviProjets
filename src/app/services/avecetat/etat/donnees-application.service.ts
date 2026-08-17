@@ -271,6 +271,36 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Change le mot de passe du fichier actuellement ouvert (US-040, RG-038) : invoque la commande native
+   * `changerMotDePasseFichier`, qui revérifie l'ancien mot de passe contre la clé de session déjà authentifiée,
+   * réécrit immédiatement le fichier avec le nouveau et supprime les sauvegardes de sécurité déjà chiffrées avec
+   * l'ancien, avant de renvoyer la racine mise à jour (journal des modifications inclus), substituée à l'état
+   * courant de ce Store. La clé de session détenue côté cœur natif est également rafraîchie par la commande elle-
+   * même : aucune action supplémentaire n'est requise ici sur `EtatSessionService`.
+   * @param ancienMotDePasse - Mot de passe actuel, ressaisi par l'utilisateur (RG-002).
+   * @param nouveauMotDePasse - Nouveau mot de passe, déjà demandé et confirmé par l'écran appelant.
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async changerMotDePasseFichier(
+    ancienMotDePasse: string,
+    nouveauMotDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeFichier.changerMotDePasseFichier<
+        DonneesRacine,
+        DonneesRacine
+      >(chemin, racine, ancienMotDePasse, nouveauMotDePasse);
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Verrouille la session courante (US-026, RG-004, RG-005) : invoque la commande native `verrouillerSession`, qui
    * efface la clé dérivée détenue côté cœur natif, puis purge en miroir les données sensibles détenues côté
    * interface (`EtatSessionService.verrouiller`). La racine des données reste en mémoire (seule sa consultation est

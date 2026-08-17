@@ -40,13 +40,44 @@ describe('BouchonFichierUtils', () => {
     );
   });
 
-  it('doit exposer les cinq commandes de FacadeFichierService dans COMMANDES', () => {
+  it('doit exposer les six commandes de FacadeFichierService dans COMMANDES', () => {
     expect([...BouchonFichierUtils.COMMANDES]).toEqual([
       'creer_fichier',
       'charger_fichier',
       'sauvegarder_fichier',
+      'changer_mot_de_passe_fichier',
       'verrouiller_session',
       'deverrouiller_session',
     ]);
+  });
+
+  describe('changer_mot_de_passe_fichier', () => {
+    it("doit ajouter une entrée de journal à la racine transmise, sans exposer l'un ou l'autre mot de passe", async () => {
+      const donnees = { groupes: [], journal: [{ id: 'entree-existante' }] };
+
+      const resultat = await BouchonFichierUtils.invoquer<{
+        readonly groupes: readonly unknown[];
+        readonly journal: readonly Record<string, unknown>[];
+      }>('changer_mot_de_passe_fichier', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees,
+        ancienMotDePasse: 'ancien-mot-de-passe',
+        nouveauMotDePasse: 'nouveau-mot-de-passe',
+      });
+
+      expect(resultat.groupes).toEqual([]);
+      expect(resultat.journal).toHaveLength(2);
+      const nouvelleEntree = resultat.journal[1];
+      expect(nouvelleEntree?.['objet']).toBe('securite.motDePasseFichier');
+      expect(JSON.stringify(resultat)).not.toContain('mot-de-passe');
+    });
+
+    it('doit fonctionner même sans racine transmise', async () => {
+      const resultat = await BouchonFichierUtils.invoquer<{
+        readonly journal: readonly unknown[];
+      }>('changer_mot_de_passe_fichier', {});
+
+      expect(resultat.journal).toHaveLength(1);
+    });
   });
 });

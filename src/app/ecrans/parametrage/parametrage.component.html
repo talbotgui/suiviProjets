@@ -38,6 +38,15 @@
     >
       Export / Import
     </button>
+    <button
+      id="parametrage-onglet-securite"
+      type="button"
+      class="parametrage__onglet bouton bouton--discret"
+      [class.parametrage__onglet--actif]="ongletActif === 'securite'"
+      (click)="selectionnerOnglet('securite')"
+    >
+      Sécurité
+    </button>
   </nav>
 
   @switch (ongletActif) {
@@ -59,6 +68,9 @@
     }
     @case ('exportImport') {
       <app-export-import-parametrage />
+    }
+    @case ('securite') {
+      <app-securite-parametrage />
     }
   }
 </section>

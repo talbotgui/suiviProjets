@@ -477,6 +477,7 @@ export class SqmBrouillonComponent {
       case 'entreeReferentielIntrouvable':
       case 'annotationIntrouvable':
       case 'annotationSystemeNonSupprimable':
+      case 'nouveauMotDePasseInvalide':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

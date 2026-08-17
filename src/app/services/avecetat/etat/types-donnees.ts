@@ -686,10 +686,11 @@ export interface ReponseQualificationMembre {
 /**
  * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (Phase 4), par
  * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2), par
- * `definirSeuil`/`definirReferentiel` (Phase 7, incrément 1) et par `definirVue`/`supprimerVue` (Phase 9,
- * incrément 1), mirroir de `ErreurFacade` côté cœur natif, étendu des seules catégories métier propres à ces
- * commandes ; les catégories techniques héritées des commandes de fichier de la Phase 1 y figurent également, ces
- * commandes pouvant en hériter via la sauvegarde qu'elles déclenchent.
+ * `definirSeuil`/`definirReferentiel` (Phase 7, incrément 1), par `definirVue`/`supprimerVue` (Phase 9,
+ * incrément 1) et par `changerMotDePasseFichier` (Phase 15, C15-03, US-040), mirroir de `ErreurFacade` côté cœur
+ * natif, étendu des seules catégories métier propres à ces commandes ; les catégories techniques héritées des
+ * commandes de fichier de la Phase 1 y figurent également, ces commandes pouvant en hériter via la sauvegarde
+ * qu'elles déclenchent.
  */
 export type CategorieErreurAdministration =
   | 'groupeIntrouvable'
@@ -723,6 +724,7 @@ export type CategorieErreurAdministration =
   | 'credentialInvalide'
   | 'sessionVerrouillee'
   | 'motDePasseSessionDivergent'
+  | 'nouveauMotDePasseInvalide'
   | 'erreurInterne';
 
 /**

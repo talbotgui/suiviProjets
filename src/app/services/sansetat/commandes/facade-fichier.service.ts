@@ -5,7 +5,8 @@
 // chargement et sauvegarde du fichier de données chiffré, verrouillage et déverrouillage de la session. Ces
 // commandes existent côté cœur natif (`src-tauri/src/commandes/fichier.rs`) et sont enregistrées dans
 // `src-tauri/src/lib.rs` depuis l'origine du projet, mais n'avaient jusqu'ici aucun appelant côté interface : ce
-// service comble ce trou (cf. rapport de diagnostic ayant motivé cette tâche).
+// service comble ce trou (cf. rapport de diagnostic ayant motivé cette tâche). Étendu en Phase 15 (C15-03, US-040,
+// RG-038) au changement du mot de passe du fichier en cours de session (`changerMotDePasseFichier`).
 //
 // Sur le modèle strict de `facade-administration.service.ts` (générique sur le type concret de la racine échangée,
 // aucun `try`/`catch`) plutôt que sur celui de `facade-commandes.service.ts` : `creerFichier`/`chargerFichier`
@@ -17,17 +18,18 @@
 // déjà documentés comme couvrant les catégories techniques héritées des commandes de fichier de cette même phase.
 //
 // Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis le 2026-07-28 : point de
-// passage unique permettant le bouchon TS des cinq commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
+// passage unique permettant le bouchon TS des six commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
 // `invocation-commande.utils.ts` et `bouchon/bouchon-fichier.utils.ts`.
 import { Injectable } from '@angular/core';
 import { InvocationCommandeUtils } from './invocation-commande.utils';
 
 /**
  * Client typé de la Façade de commandes, dédié au cycle de vie du fichier de données chiffré et de la session
- * (US-001, US-002, US-026). Chaque méthode invoque une commande Tauri identique côté cœur natif (`creer_fichier`,
- * `charger_fichier`, `sauvegarder_fichier`, `verrouiller_session`, `deverrouiller_session`) et reste générique sur
- * le type concret de la racine échangée (cf. commentaire d'en-tête de ce fichier) : c'est l'appelant
- * (`DonneesApplicationService`) qui porte la connaissance du type `DonneesRacine`.
+ * (US-001, US-002, US-026, US-040). Chaque méthode invoque une commande Tauri identique côté cœur natif
+ * (`creer_fichier`, `charger_fichier`, `sauvegarder_fichier`, `changer_mot_de_passe_fichier`, `verrouiller_session`,
+ * `deverrouiller_session`) et reste générique sur le type concret de la racine échangée (cf. commentaire d'en-tête
+ * de ce fichier) : c'est l'appelant (`DonneesApplicationService`) qui porte la connaissance du type
+ * `DonneesRacine`.
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeFichierService {
@@ -69,6 +71,30 @@ export class FacadeFichierService {
       chemin,
       donnees,
       motDePasse,
+    });
+  }
+
+  /**
+   * Change le mot de passe du fichier de données actuellement ouvert : réécriture immédiate du fichier avec le
+   * nouveau mot de passe et suppression des sauvegardes de sécurité existantes, chiffrées avec l'ancien (US-040,
+   * RG-038).
+   * @param chemin - Chemin du fichier actuellement ouvert.
+   * @param donnees - Racine des données courante, générique sur `TDonnees` pour ne jamais importer `DonneesRacine`.
+   * @param ancienMotDePasse - Mot de passe actuel, revérifié contre la clé de session (RG-002).
+   * @param nouveauMotDePasse - Nouveau mot de passe, déjà demandé et confirmé côté interface.
+   * @returns La racine mise à jour (journal des modifications inclus), typée par l'appelant via `TReponse`.
+   */
+  public async changerMotDePasseFichier<TDonnees, TReponse>(
+    chemin: string,
+    donnees: TDonnees,
+    ancienMotDePasse: string,
+    nouveauMotDePasse: string,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('changer_mot_de_passe_fichier', {
+      chemin,
+      donnees,
+      ancienMotDePasse,
+      nouveauMotDePasse,
     });
   }
 

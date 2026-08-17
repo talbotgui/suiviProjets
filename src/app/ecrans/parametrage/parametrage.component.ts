@@ -21,16 +21,17 @@ import { SqmJournalParametrageComponent } from './journal/journal-parametrage.co
 import { SqmPurgeParametrageComponent } from './purge/purge-parametrage.component';
 import { SqmReferentielsParametrageComponent } from './referentiels/referentiels-parametrage.component';
 import { SqmReglagesApplicatifsParametrageComponent } from './reglages-applicatifs/reglages-applicatifs-parametrage.component';
+import { SqmSecuriteParametrageComponent } from './securite/securite-parametrage.component';
 import { SqmSeuilsParametrageComponent } from './seuils/seuils-parametrage.component';
 
 /**
  * Identifiant d'un onglet de l'écran Paramétrage.
  */
-type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImport';
+type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImport' | 'securite';
 
 /**
- * Écran Paramétrage : coquille à quatre onglets (US-033, US-027, US-025, US-028 à US-030), tous construits depuis
- * la Phase 9, incrément 3.
+ * Écran Paramétrage : coquille à cinq onglets (US-033, US-027, US-025, US-028 à US-030, US-040), tous construits
+ * depuis la Phase 9, incrément 3, hormis « Sécurité » (Phase 15, C15-03).
  */
 @Component({
   selector: 'app-parametrage',
@@ -41,6 +42,7 @@ type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImp
     SqmJournalParametrageComponent,
     SqmPurgeParametrageComponent,
     SqmExportImportParametrageComponent,
+    SqmSecuriteParametrageComponent,
   ],
   templateUrl: './parametrage.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

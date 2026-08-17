@@ -63,6 +63,7 @@ pub fn run() {
             commandes::fichier::creer_fichier,
             commandes::fichier::charger_fichier,
             commandes::fichier::sauvegarder_fichier,
+            commandes::fichier::changer_mot_de_passe_fichier,
             commandes::fichier::verrouiller_session,
             commandes::fichier::deverrouiller_session,
             commandes::connectivite::tester_connectivite,

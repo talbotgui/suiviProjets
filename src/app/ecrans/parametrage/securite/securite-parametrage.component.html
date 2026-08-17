@@ -1,0 +1,67 @@
+<section class="securite-parametrage">
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Sécurité</h2>
+
+  @if (!fichierOuvert()) {
+    <p class="texte-sm texte-discret">
+      Aucun fichier n'est actuellement ouvert et déverrouillé : le changement de mot de passe est
+      indisponible.
+    </p>
+  } @else {
+    <section class="securite-parametrage__bloc carte interieur-4">
+      <h3 class="texte-md poids-gras exterieur-bas-3 exterieur-haut-0">
+        Changer le mot de passe du fichier
+      </h3>
+
+      @if (messageErreur) {
+        <p class="securite-parametrage__erreur texte-rouge" role="alert">
+          {{ messageErreur }}
+        </p>
+      }
+
+      <form
+        class="securite-parametrage__formulaire d-flex direction-colonne ecart-3"
+        (ngSubmit)="demanderChangement()"
+      >
+        <label class="champ">
+          Nouveau mot de passe
+          <input
+            type="password"
+            class="champ__controle"
+            name="nouveauMotDePasseFormulaire"
+            [(ngModel)]="nouveauMotDePasseFormulaire"
+            required
+            [disabled]="enCours() || confirmationMotDePasseVisible()"
+          />
+        </label>
+        <label class="champ">
+          Confirmation du nouveau mot de passe
+          <input
+            type="password"
+            class="champ__controle"
+            name="confirmationNouveauMotDePasseFormulaire"
+            [(ngModel)]="confirmationNouveauMotDePasseFormulaire"
+            required
+            [disabled]="enCours() || confirmationMotDePasseVisible()"
+          />
+        </label>
+        <div class="securite-parametrage__actions-formulaire d-flex justifie-fin">
+          <button
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours() || confirmationMotDePasseVisible()"
+          >
+            Changer le mot de passe
+          </button>
+        </div>
+      </form>
+
+      @if (confirmationMotDePasseVisible()) {
+        <app-confirmation-mot-de-passe
+          message="Confirmez votre mot de passe actuel pour changer le mot de passe du fichier."
+          (confirmee)="confirmerChangement($event)"
+          (annulee)="annulerMotDePasse()"
+        />
+      }
+    </section>
+  }
+</section>

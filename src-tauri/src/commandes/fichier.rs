@@ -2,7 +2,8 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 
 //! Commandes de la Façade dédiées au fichier de données chiffré et au verrouillage de session (US-001, US-002,
-//! US-026). Chaque commande délègue au Moteur de persistance et met à jour l'état de session en conséquence ; voir
+//! US-026, US-040). Chaque commande délègue au Moteur de persistance et met à jour l'état de session en
+//! conséquence ; voir
 //! `docs/02_documentation/13_conceptionDetaillee.md#séquences-des-scénarios-fonctionnels-principaux`.
 //!
 //! Nom de commande non fourni littéralement par la documentation source (décision, cf. compte-rendu de
@@ -116,6 +117,9 @@ pub(crate) enum ErreurFacade {
     /// la session courante (Phase 10, R10-01, RG-002) : empêche un changement silencieux du mot de passe du
     /// fichier.
     MotDePasseSessionDivergent,
+    /// Le nouveau mot de passe soumis à `changerMotDePasseFichier` est vide (Phase 15, C15-03, US-040, RG-038) :
+    /// revalidation côté cœur natif de la validation déjà effectuée côté interface.
+    NouveauMotDePasseInvalide,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
 }
@@ -148,6 +152,20 @@ pub(crate) fn verifier_avant_ecriture(
         if !etat.correspond_a(&cle_candidate) {
             return Err(ErreurFacade::MotDePasseSessionDivergent);
         }
+    }
+    Ok(())
+}
+
+/// Revalide côté cœur natif que le nouveau mot de passe soumis à `changerMotDePasseFichier` n'est pas vide
+/// (US-040, RG-038), en complément de la validation déjà effectuée côté interface. Fonction ordinaire (pas une
+/// commande Tauri), testable directement, sur le même principe que [`verifier_avant_ecriture`].
+///
+/// # Erreurs
+///
+/// [`ErreurFacade::NouveauMotDePasseInvalide`] si `nouveau_mot_de_passe` est vide ou ne contient que des espaces.
+pub(crate) fn valider_nouveau_mot_de_passe(nouveau_mot_de_passe: &str) -> Result<(), ErreurFacade> {
+    if nouveau_mot_de_passe.trim().is_empty() {
+        return Err(ErreurFacade::NouveauMotDePasseInvalide);
     }
     Ok(())
 }
@@ -324,6 +342,56 @@ pub(crate) fn sauvegarder_fichier(
     resultat
 }
 
+/// Change le mot de passe du fichier de données actuellement ouvert (US-040, RG-038) : revérifie l'ancien mot de
+/// passe contre la clé de session déjà authentifiée, selon la même garde que toute commande de mutation
+/// (`verifier_avant_ecriture`, R10-01/RG-002), puis réécrit immédiatement le fichier avec le nouveau mot de passe
+/// et supprime l'ensemble des sauvegardes de sécurité déjà présentes sur disque (chiffrées avec l'ancien mot de
+/// passe, donc rendues obsolètes, RG-038). Consigne l'événement au journal des modifications sans jamais y exposer
+/// l'un ou l'autre mot de passe, conformément à
+/// `docs/02_documentation/15_normesSecurite.md#journalisation-des-événements-sensibles`.
+///
+/// # Erreurs
+///
+/// [`ErreurFacade::SessionVerrouillee`]/[`ErreurFacade::MotDePasseSessionDivergent`] si l'ancien mot de passe fourni
+/// ne correspond pas à la session courante ; [`ErreurFacade::NouveauMotDePasseInvalide`] si le nouveau mot de passe
+/// soumis est vide.
+#[tauri::command]
+pub(crate) fn changer_mot_de_passe_fichier(
+    chemin: String,
+    donnees: DonneesRacine,
+    ancien_mot_de_passe: String,
+    nouveau_mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    crate::journalisation::consigner_debut_commande("changerMotDePasseFichier");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        verifier_avant_ecriture(Path::new(&chemin), &ancien_mot_de_passe, &etat)?;
+        valider_nouveau_mot_de_passe(&nouveau_mot_de_passe)?;
+
+        let mut donnees = donnees;
+        donnees.journal.push(crate::modele::racine::EntreeJournal {
+            id: uuid::Uuid::new_v4().to_string(),
+            horodatage: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+            objet: "securite.motDePasseFichier".to_string(),
+            avant: serde_json::Value::Null,
+            apres: serde_json::Value::Null,
+            origine: "Paramétrage".to_string(),
+            detail_origine: Some("Changement du mot de passe du fichier".to_string()),
+        });
+
+        let cle = moteur::changer_mot_de_passe(
+            Path::new(&chemin),
+            &donnees,
+            &nouveau_mot_de_passe,
+            "changerMotDePasseFichier",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle);
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("changerMotDePasseFichier");
+    resultat
+}
+
 /// Verrouille la session courante : efface la clé dérivée détenue côté cœur natif (US-026, RG-004, RG-005).
 #[tauri::command]
 pub(crate) fn verrouiller_session(etat: State<'_, EtatSession>) -> Result<(), ErreurFacade> {
@@ -483,6 +551,23 @@ mod tests {
 
         assert_eq!(resultat, Ok(()));
         Ok(())
+    }
+
+    #[test]
+    fn valider_nouveau_mot_de_passe_rejette_une_chaine_vide_ou_uniquement_des_espaces() {
+        assert_eq!(
+            valider_nouveau_mot_de_passe(""),
+            Err(ErreurFacade::NouveauMotDePasseInvalide)
+        );
+        assert_eq!(
+            valider_nouveau_mot_de_passe("   "),
+            Err(ErreurFacade::NouveauMotDePasseInvalide)
+        );
+    }
+
+    #[test]
+    fn valider_nouveau_mot_de_passe_accepte_une_chaine_non_vide() {
+        assert_eq!(valider_nouveau_mot_de_passe("nouveau-mot-de-passe"), Ok(()));
     }
 
     #[test]

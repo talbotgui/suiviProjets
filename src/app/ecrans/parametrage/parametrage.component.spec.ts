@@ -19,7 +19,7 @@ describe('SqmParametrageComponent', () => {
     expect(composant.ongletActif).toBe('seuilsReferentiels');
   });
 
-  it.each(['seuilsReferentiels', 'journal', 'purge', 'exportImport'] as const)(
+  it.each(['seuilsReferentiels', 'journal', 'purge', 'exportImport', 'securite'] as const)(
     'sélectionne l’onglet « %s »',
     (onglet) => {
       const composant = TestBed.createComponent(SqmParametrageComponent).componentInstance;
@@ -58,5 +58,14 @@ describe('SqmParametrageComponent', () => {
 
     expect(element.textContent).not.toContain('Onglet à venir');
     expect(element.textContent).toContain('Purge des audits');
+  });
+
+  it("affiche l'onglet Sécurité, construit en Phase 15 (C15-03, US-040)", () => {
+    const fixture = TestBed.createComponent(SqmParametrageComponent);
+    fixture.componentInstance.selectionnerOnglet('securite');
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain('Sécurité');
   });
 });
