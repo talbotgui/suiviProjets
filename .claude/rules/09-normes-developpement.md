@@ -17,7 +17,7 @@ Synthèse actionnable de [14_normesDeveloppement.md](../../docs/02_documentation
 
 ## Git et commits
 
-- Trunk-based simplifié : développement direct sur la branche principale, par incréments réduits (idéalement un US ou une RG à la fois) ; branche courte réservée aux changements risqués/expérimentaux ([source](../../docs/02_documentation/14_normesDeveloppement.md#stratégie-de-branches-et-de-contribution-git)). Rappel : l'IA elle-même n'exécute jamais ces commandes ([01-usage-ia-et-conventions.md#actions-interdites-à-lia](./01-usage-ia-et-conventions.md#actions-interdites-à-lia)).
+- Trunk-based simplifié : développement direct sur la branche principale, par incréments réduits (idéalement un US ou une RG à la fois) ; branche courte réservée aux changements risqués/expérimentaux ([source](../../docs/02_documentation/14_normesDeveloppement.md#stratégie-de-branches-et-de-contribution-git)). Rappel : l'IA peut désormais exécuter ces commandes elle-même, à l'exception de `git push` qui reste réservée à l'exécution humaine ([01-usage-ia-et-conventions.md#actions-interdites-à-lia](./01-usage-ia-et-conventions.md#actions-interdites-à-lia)).
 - Messages de commit au format [Conventional Commits](https://www.conventionalcommits.org/) (`type(scope): description`), types `feat`/`fix`/`refactor`/`test`/`docs`/`chore`/`security`, `scope` = module concerné, corps référençant l'US/RG concerné, mention de l'origine IA si applicable.
 
 ## Dépendances

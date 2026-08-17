@@ -19,7 +19,6 @@
       "Bash(node -e ' *)"
     ],
     "deny": [
-      "Bash(git *)",
       "Bash(rm -rf *)",
       "Bash(curl *)",
       "Bash(wget *)",

@@ -42,8 +42,8 @@ Les règles suivantes s'appliquent à tous les documents Markdown produits dans 
 ## Rappel des règles générales de collaboration
 
 Ces règles, valables pour toute la discussion, sont rappelées ici pour mémoire :
-- l'IA n'exécute jamais de commande git, quelle qu'elle soit ;
-- chaque étape se termine par un commit exécuté humainement, marquant un point de retour arrière fiable ;
+- l'IA peut exécuter des commandes git, à l'exception de `git push` qui reste réservée à l'exécution humaine (réautorisation du 2026-08-17, notamment pour la manipulation des worktree) ;
+- chaque étape se termine par un commit, marquant un point de retour arrière fiable ;
 - le passage à l'étape N+1 n'a lieu qu'après validation humaine explicite de l'étape N ; une relecture seule n'y suffit pas ;
 - la relecture de chaque étape a lieu dans un contexte isolé de celui du Codeur : nouvelle conversation, ou sous-agent dédié disposant de son propre contexte (par exemple l'outil Agent d'un assistant IA orchestrant un binôme Codeur/Relecteur), l'objectif étant d'éviter que les biais et angles morts du Codeur ne se propagent tels quels à la relecture ;
 - chaque exigence fonctionnelle ou non fonctionnelle porte un identifiant stable, réutilisé sans être renommé dans toutes les étapes suivantes ;
@@ -61,9 +61,9 @@ L'IA peut rédiger les documents de cadrage et produire du code, avec une superv
 
 #### Actions à exécution strictement humaine
 
-L'IA n'exécute jamais elle-même : les commandes git (cf. règles générales), le déploiement en production, l'envoi de communications externes, la suppression de données, et plus généralement toute opération irréversible ou affectant des systèmes partagés. Ces opérations restent de la seule responsabilité humaine, même lorsque l'IA a préparé ou proposé le contenu de l'action.
+L'IA n'exécute jamais elle-même : la commande `git push` (cf. règles générales), le déploiement en production, l'envoi de communications externes, la suppression de données, et plus généralement toute opération irréversible ou affectant des systèmes partagés. Ces opérations restent de la seule responsabilité humaine, même lorsque l'IA a préparé ou proposé le contenu de l'action.
 
-Le garde-fou technique de configuration bloquant les commandes git pour l'IA ne filtre que les commandes dont le premier mot est `git` ; une commande composée où `git` apparaît de façon non initiale (par exemple une substitution de processus au sein d'une commande `diff`) n'est pas interceptée par ce seul motif de refus et s'exécute malgré l'interdiction. Tant que ce motif n'est pas renforcé, la relecture de toute commande shell avant soumission reste nécessaire pour l'absence de tout appel git imbriqué (ajouté le 2026-07-26 : contournement constaté en relecture de la Phase 6 incrément 7, une commande combinant `diff` et un appel git imbriqué exécutée par erreur par le Relecteur malgré l'interdiction explicite et malgré le garde-fou déjà en place).
+Le garde-fou technique de configuration bloquant, jusqu'au 2026-08-17, toute commande dont le premier mot était `git` a été retiré pour réautoriser l'usage de git par l'IA, notamment pour la manipulation des worktree ; seule `git push` reste interdite à l'IA. Cette exclusion n'est portée par aucune règle technique dédiée dans la configuration actuelle (aucune entrée de refus spécifique à `push`) : elle repose sur la présente règle et sur la relecture de chaque commande git proposée par l'IA avant exécution, en particulier pour toute commande composée où `push` apparaîtrait de façon non initiale (ex. sous-shell, chaînage) — le même angle mort que celui déjà documenté pour l'ancien garde-fou générique sur `git` (ajouté le 2026-08-17, en remplacement de la note du 2026-07-26 relative au garde-fou désormais retiré).
 
 ### Description
 
