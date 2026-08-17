@@ -32,7 +32,7 @@
           {{ dependanceEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}
         </h4>
         <label class="champ">
-          Motif (glob, ex. <code class="police-mono">org.springframework:*</code>)
+          Motif
           <input
             #premierChampDependance
             id="referentiels-parametrage-champ-motif-dependance"
@@ -41,18 +41,35 @@
             name="motifDependance"
             [(ngModel)]="motifDependance"
             required
+            aria-describedby="referentiels-parametrage-champ-motif-dependance-aide"
           />
+          <span id="referentiels-parametrage-champ-motif-dependance-aide" class="champ__aide">
+            Motif glob sur la référence de la dépendance (seul
+            <code class="police-mono">*</code> est spécial). Ex.
+            <code class="police-mono">org.springframework:*</code>.
+          </span>
         </label>
         <label class="champ">
-          Bornes de version (une par ligne, format
-          <code class="police-mono">motifVersion=statut</code>)
+          Bornes de version
           <textarea
             id="referentiels-parametrage-champ-versions-dependance"
             class="champ__controle"
             name="versionsDependanceTexte"
             rows="4"
             [(ngModel)]="versionsDependanceTexte"
+            aria-describedby="referentiels-parametrage-champ-versions-dependance-aide"
           ></textarea>
+          <span id="referentiels-parametrage-champ-versions-dependance-aide" class="champ__aide">
+            Une ligne par borne, au format
+            <code class="police-mono">motifVersion=statut</code>, ex.
+            <code class="police-mono">5.*=maintenu</code>. Le motif de version accepte
+            <code class="police-mono">*</code> ; le statut est une valeur libre — quatre valeurs
+            sont reconnues avec une couleur dédiée à l'affichage (<code class="police-mono"
+              >obsolete</code
+            >, <code class="police-mono">maintenu</code>, <code class="police-mono">aJourM1</code>,
+            <code class="police-mono">aJourM3</code>), tout autre texte est accepté et affiché tel
+            quel.
+          </span>
         </label>
         <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
           <button
@@ -172,7 +189,12 @@
             name="motifMarqueurIa"
             [(ngModel)]="motifMarqueurIa"
             required
+            aria-describedby="referentiels-parametrage-champ-motif-marqueur-ia-aide"
           />
+          <span id="referentiels-parametrage-champ-motif-marqueur-ia-aide" class="champ__aide">
+            Nom de fichier ou de répertoire recherché dans l'arborescence du dépôt. Ex.
+            <code class="police-mono">CLAUDE.md</code>.
+          </span>
         </label>
         <label class="champ">
           Type de correspondance
@@ -181,11 +203,19 @@
             class="champ__controle"
             name="typeCorrespondanceMarqueurIa"
             [(ngModel)]="typeCorrespondanceMarqueurIa"
+            aria-describedby="referentiels-parametrage-champ-type-correspondance-marqueur-ia-aide"
           >
             @for (type of typesCorrespondance; track type) {
               <option [ngValue]="type">{{ type }}</option>
             }
           </select>
+          <span
+            id="referentiels-parametrage-champ-type-correspondance-marqueur-ia-aide"
+            class="champ__aide"
+          >
+            exact : égalité stricte du nom ; motif : glob simple sur le nom (seul
+            <code class="police-mono">*</code> est spécial).
+          </span>
         </label>
         <label class="champ">
           Portée
@@ -194,11 +224,16 @@
             class="champ__controle"
             name="porteeMarqueurIa"
             [(ngModel)]="porteeMarqueurIa"
+            aria-describedby="referentiels-parametrage-champ-portee-marqueur-ia-aide"
           >
             @for (portee of portees; track portee) {
               <option [ngValue]="portee">{{ portee }}</option>
             }
           </select>
+          <span id="referentiels-parametrage-champ-portee-marqueur-ia-aide" class="champ__aide">
+            racine : uniquement à la racine du dépôt ; partout : à toute profondeur de
+            l'arborescence.
+          </span>
         </label>
         <label class="champ">
           Nature
@@ -207,11 +242,15 @@
             class="champ__controle"
             name="natureMarqueurIa"
             [(ngModel)]="natureMarqueurIa"
+            aria-describedby="referentiels-parametrage-champ-nature-marqueur-ia-aide"
           >
             @for (nature of natures; track nature) {
               <option [ngValue]="nature">{{ nature }}</option>
             }
           </select>
+          <span id="referentiels-parametrage-champ-nature-marqueur-ia-aide" class="champ__aide">
+            fichier (blob GitLab) ou répertoire (tree).
+          </span>
         </label>
         <label class="champ">
           Outil
@@ -222,7 +261,11 @@
             name="outilMarqueurIa"
             [(ngModel)]="outilMarqueurIa"
             required
+            aria-describedby="referentiels-parametrage-champ-outil-marqueur-ia-aide"
           />
+          <span id="referentiels-parametrage-champ-outil-marqueur-ia-aide" class="champ__aide">
+            Nom de l'outil IA associé à ce marqueur. Ex. GitHub Copilot.
+          </span>
         </label>
         <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
           <button
@@ -337,7 +380,12 @@
             name="motifNommageBranchesFormulaire"
             [(ngModel)]="motifNommageBranchesFormulaire"
             required
+            aria-describedby="referentiels-parametrage-champ-motif-nommage-aide"
           />
+          <span id="referentiels-parametrage-champ-motif-nommage-aide" class="champ__aide">
+            Ex.
+            <code class="police-mono">^(main|master|develop|feature/.+|release/.+|hotfix/.+)$</code>
+          </span>
         </label>
         <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
           <button type="button" class="bouton" (click)="fermerFormulaireMotifNommage()">

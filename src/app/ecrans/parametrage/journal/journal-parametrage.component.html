@@ -16,12 +16,17 @@
           class="champ__controle"
           [ngModel]="valeurFiltreOrigine()"
           (ngModelChange)="definirFiltreOrigine($event)"
+          aria-describedby="journal-parametrage-filtre-origine-aide"
         >
           <option value="">Toutes</option>
           @for (origine of origines(); track origine) {
             <option [value]="origine">{{ origine }}</option>
           }
         </select>
+        <span id="journal-parametrage-filtre-origine-aide" class="champ__aide">
+          Source de la modification (saisie manuelle, import de configuration, qualification depuis
+          une alerte…).
+        </span>
       </div>
       <div class="journal-parametrage__champ-filtre champ">
         <label for="journal-parametrage-filtre-date-debut">Du</label>
@@ -31,7 +36,11 @@
           class="champ__controle"
           [ngModel]="valeurFiltreDateDebut()"
           (ngModelChange)="definirFiltreDateDebut($event)"
+          aria-describedby="journal-parametrage-filtre-date-debut-aide"
         />
+        <span id="journal-parametrage-filtre-date-debut-aide" class="champ__aide"
+          >Date de début incluse.</span
+        >
       </div>
       <div class="journal-parametrage__champ-filtre champ">
         <label for="journal-parametrage-filtre-date-fin">Au</label>
@@ -41,7 +50,11 @@
           class="champ__controle"
           [ngModel]="valeurFiltreDateFin()"
           (ngModelChange)="definirFiltreDateFin($event)"
+          aria-describedby="journal-parametrage-filtre-date-fin-aide"
         />
+        <span id="journal-parametrage-filtre-date-fin-aide" class="champ__aide"
+          >Date de fin incluse.</span
+        >
       </div>
       @if (auMoinsUnFiltreActif()) {
         <button type="button" class="bouton bouton--discret" (click)="reinitialiserFiltres()">

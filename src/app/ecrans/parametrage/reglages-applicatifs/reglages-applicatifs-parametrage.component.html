@@ -41,7 +41,9 @@
             name="delaiInactiviteMinutesFormulaire"
             [(ngModel)]="delaiInactiviteMinutesFormulaire"
             required
+            aria-describedby="reglages-applicatifs-delai-inactivite-aide"
           />
+          <span id="reglages-applicatifs-delai-inactivite-aide" class="champ__aide">Ex. 15</span>
         </label>
         <label class="champ">
           Échecs de déverrouillage avant fermeture
@@ -52,7 +54,11 @@
             name="echecsAvantFermetureFormulaire"
             [(ngModel)]="echecsAvantFermetureFormulaire"
             required
+            aria-describedby="reglages-applicatifs-echecs-avant-fermeture-aide"
           />
+          <span id="reglages-applicatifs-echecs-avant-fermeture-aide" class="champ__aide"
+            >Ex. 5</span
+          >
         </label>
         <div
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
@@ -109,7 +115,9 @@
             name="concurrenceFormulaire"
             [(ngModel)]="concurrenceFormulaire"
             required
+            aria-describedby="reglages-applicatifs-champ-concurrence-aide"
           />
+          <span id="reglages-applicatifs-champ-concurrence-aide" class="champ__aide">Ex. 4</span>
         </label>
         <div
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
@@ -235,7 +243,9 @@
             name="nombreSauvegardesFormulaire"
             [(ngModel)]="nombreSauvegardesFormulaire"
             required
+            aria-describedby="reglages-applicatifs-nombre-sauvegardes-aide"
           />
+          <span id="reglages-applicatifs-nombre-sauvegardes-aide" class="champ__aide">Ex. 5</span>
         </label>
         <div
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
@@ -292,7 +302,9 @@
             name="seuilAvertissementMoFormulaire"
             [(ngModel)]="seuilAvertissementMoFormulaire"
             required
+            aria-describedby="reglages-applicatifs-seuil-avertissement-aide"
           />
+          <span id="reglages-applicatifs-seuil-avertissement-aide" class="champ__aide">Ex. 10</span>
         </label>
         <div
           class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"

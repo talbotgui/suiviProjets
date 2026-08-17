@@ -18,7 +18,11 @@
             name="vitaliteMourantJours"
             [ngModel]="vitaliteMourantJours()"
             (ngModelChange)="vitaliteMourantJours.set($event)"
+            aria-describedby="seuils-parametrage-vitalite-mourant-jours-aide"
           />
+          <span id="seuils-parametrage-vitalite-mourant-jours-aide" class="champ__aide"
+            >Ex. 180</span
+          >
         </label>
         <label class="champ">
           Jours sans commit avant « mort »
@@ -29,7 +33,9 @@
             name="vitaliteMortJours"
             [ngModel]="vitaliteMortJours()"
             (ngModelChange)="vitaliteMortJours.set($event)"
+            aria-describedby="seuils-parametrage-vitalite-mort-jours-aide"
           />
+          <span id="seuils-parametrage-vitalite-mort-jours-aide" class="champ__aide">Ex. 365</span>
         </label>
       </fieldset>
 
@@ -45,7 +51,11 @@
             name="tailleDepotBorneS"
             [ngModel]="tailleDepotBorneS()"
             (ngModelChange)="tailleDepotBorneS.set($event)"
+            aria-describedby="seuils-parametrage-taille-depot-borne-s-aide"
           />
+          <span id="seuils-parametrage-taille-depot-borne-s-aide" class="champ__aide"
+            >Ex. 20000000 (soit 20 Mo)</span
+          >
         </label>
         <label class="champ">
           Borne L
@@ -55,7 +65,11 @@
             name="tailleDepotBorneL"
             [ngModel]="tailleDepotBorneL()"
             (ngModelChange)="tailleDepotBorneL.set($event)"
+            aria-describedby="seuils-parametrage-taille-depot-borne-l-aide"
           />
+          <span id="seuils-parametrage-taille-depot-borne-l-aide" class="champ__aide"
+            >Ex. 100000000 (soit 100 Mo)</span
+          >
         </label>
         <label class="champ">
           Borne XL
@@ -65,7 +79,11 @@
             name="tailleDepotBorneXL"
             [ngModel]="tailleDepotBorneXL()"
             (ngModelChange)="tailleDepotBorneXL.set($event)"
+            aria-describedby="seuils-parametrage-taille-depot-borne-xl-aide"
           />
+          <span id="seuils-parametrage-taille-depot-borne-xl-aide" class="champ__aide"
+            >Ex. 500000000 (soit 500 Mo)</span
+          >
         </label>
       </fieldset>
 
@@ -79,7 +97,11 @@
             name="couvertureSeuilRouge"
             [ngModel]="couvertureSeuilRouge()"
             (ngModelChange)="couvertureSeuilRouge.set($event)"
+            aria-describedby="seuils-parametrage-couverture-seuil-rouge-aide"
           />
+          <span id="seuils-parametrage-couverture-seuil-rouge-aide" class="champ__aide"
+            >Ex. 40</span
+          >
         </label>
         <label class="champ">
           Seuil orange
@@ -89,7 +111,11 @@
             name="couvertureSeuilOrange"
             [ngModel]="couvertureSeuilOrange()"
             (ngModelChange)="couvertureSeuilOrange.set($event)"
+            aria-describedby="seuils-parametrage-couverture-seuil-orange-aide"
           />
+          <span id="seuils-parametrage-couverture-seuil-orange-aide" class="champ__aide"
+            >Ex. 60</span
+          >
         </label>
       </fieldset>
 
@@ -103,7 +129,11 @@
             name="fraicheurSonarToleranceJours"
             [ngModel]="fraicheurSonarToleranceJours()"
             (ngModelChange)="fraicheurSonarToleranceJours.set($event)"
+            aria-describedby="seuils-parametrage-fraicheur-sonar-tolerance-jours-aide"
           />
+          <span id="seuils-parametrage-fraicheur-sonar-tolerance-jours-aide" class="champ__aide"
+            >Ex. 7</span
+          >
         </label>
       </fieldset>
 
@@ -117,7 +147,11 @@
             name="activiteSansQualiteMinCommits"
             [ngModel]="activiteSansQualiteMinCommits()"
             (ngModelChange)="activiteSansQualiteMinCommits.set($event)"
+            aria-describedby="seuils-parametrage-activite-sans-qualite-min-commits-aide"
           />
+          <span id="seuils-parametrage-activite-sans-qualite-min-commits-aide" class="champ__aide"
+            >Ex. 20</span
+          >
         </label>
         <label class="champ">
           Nombre minimal de nouvelles violations
@@ -127,7 +161,13 @@
             name="activiteSansQualiteMinNouvellesViolations"
             [ngModel]="activiteSansQualiteMinNouvellesViolations()"
             (ngModelChange)="activiteSansQualiteMinNouvellesViolations.set($event)"
+            aria-describedby="seuils-parametrage-activite-sans-qualite-min-nouvelles-violations-aide"
           />
+          <span
+            id="seuils-parametrage-activite-sans-qualite-min-nouvelles-violations-aide"
+            class="champ__aide"
+            >Ex. 10</span
+          >
         </label>
       </fieldset>
 
@@ -141,7 +181,11 @@
             name="fraicheurAuditAncienJours"
             [ngModel]="fraicheurAuditAncienJours()"
             (ngModelChange)="fraicheurAuditAncienJours.set($event)"
+            aria-describedby="seuils-parametrage-fraicheur-audit-ancien-jours-aide"
           />
+          <span id="seuils-parametrage-fraicheur-audit-ancien-jours-aide" class="champ__aide"
+            >Ex. 30</span
+          >
         </label>
       </fieldset>
 
@@ -157,7 +201,11 @@
             name="mrOuvertesAgeOrangeJours"
             [ngModel]="mrOuvertesAgeOrangeJours()"
             (ngModelChange)="mrOuvertesAgeOrangeJours.set($event)"
+            aria-describedby="seuils-parametrage-mr-ouvertes-age-orange-jours-aide"
           />
+          <span id="seuils-parametrage-mr-ouvertes-age-orange-jours-aide" class="champ__aide"
+            >Ex. 30</span
+          >
         </label>
         <label class="champ">
           Âge rouge (jours)
@@ -167,7 +215,11 @@
             name="mrOuvertesAgeRougeJours"
             [ngModel]="mrOuvertesAgeRougeJours()"
             (ngModelChange)="mrOuvertesAgeRougeJours.set($event)"
+            aria-describedby="seuils-parametrage-mr-ouvertes-age-rouge-jours-aide"
           />
+          <span id="seuils-parametrage-mr-ouvertes-age-rouge-jours-aide" class="champ__aide"
+            >Ex. 90</span
+          >
         </label>
         <label class="champ">
           Pourcentage de conflit rouge
@@ -177,7 +229,13 @@
             name="mrOuvertesPourcentageConflitRouge"
             [ngModel]="mrOuvertesPourcentageConflitRouge()"
             (ngModelChange)="mrOuvertesPourcentageConflitRouge.set($event)"
+            aria-describedby="seuils-parametrage-mr-ouvertes-pourcentage-conflit-rouge-aide"
           />
+          <span
+            id="seuils-parametrage-mr-ouvertes-pourcentage-conflit-rouge-aide"
+            class="champ__aide"
+            >Ex. 50</span
+          >
         </label>
       </fieldset>
 
@@ -193,7 +251,11 @@
             name="couleursViolationsBloquantSeuilOrange"
             [ngModel]="couleursViolationsBloquantSeuilOrange()"
             (ngModelChange)="couleursViolationsBloquantSeuilOrange.set($event)"
+            aria-describedby="seuils-parametrage-violations-bloquant-seuil-orange-aide"
           />
+          <span id="seuils-parametrage-violations-bloquant-seuil-orange-aide" class="champ__aide"
+            >Ex. 1 violation bloquante</span
+          >
         </label>
         <label class="champ">
           Seuil rouge
@@ -203,7 +265,11 @@
             name="couleursViolationsBloquantSeuilRouge"
             [ngModel]="couleursViolationsBloquantSeuilRouge()"
             (ngModelChange)="couleursViolationsBloquantSeuilRouge.set($event)"
+            aria-describedby="seuils-parametrage-violations-bloquant-seuil-rouge-aide"
           />
+          <span id="seuils-parametrage-violations-bloquant-seuil-rouge-aide" class="champ__aide"
+            >Ex. 3 violations bloquantes</span
+          >
         </label>
       </fieldset>
 
@@ -219,7 +285,11 @@
             name="couleursViolationsCritiqueSeuilOrange"
             [ngModel]="couleursViolationsCritiqueSeuilOrange()"
             (ngModelChange)="couleursViolationsCritiqueSeuilOrange.set($event)"
+            aria-describedby="seuils-parametrage-violations-critique-seuil-orange-aide"
           />
+          <span id="seuils-parametrage-violations-critique-seuil-orange-aide" class="champ__aide"
+            >Ex. 10 violations critiques</span
+          >
         </label>
         <label class="champ">
           Seuil rouge
@@ -229,7 +299,11 @@
             name="couleursViolationsCritiqueSeuilRouge"
             [ngModel]="couleursViolationsCritiqueSeuilRouge()"
             (ngModelChange)="couleursViolationsCritiqueSeuilRouge.set($event)"
+            aria-describedby="seuils-parametrage-violations-critique-seuil-rouge-aide"
           />
+          <span id="seuils-parametrage-violations-critique-seuil-rouge-aide" class="champ__aide"
+            >Ex. 25 violations critiques</span
+          >
         </label>
       </fieldset>
 
@@ -246,7 +320,11 @@
             name="materialiteBrouillonVariationRelative"
             [ngModel]="materialiteBrouillonVariationRelative()"
             (ngModelChange)="materialiteBrouillonVariationRelative.set($event)"
+            aria-describedby="seuils-parametrage-materialite-variation-relative-aide"
           />
+          <span id="seuils-parametrage-materialite-variation-relative-aide" class="champ__aide"
+            >Ex. 0.1 (soit une variation de 10 %)</span
+          >
         </label>
       </fieldset>
 

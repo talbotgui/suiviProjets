@@ -81,7 +81,15 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   // `e2e/` ajouté à la Phase 12 : Jest scanne par défaut tout `*.spec.ts` du dépôt, y compris hors `src/`, et
   // entrerait sinon en conflit avec les globals de `@playwright/test` (`test`/`expect` distincts de ceux de Jest).
-  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/src-tauri/', '<rootDir>/e2e/'],
+  // `.claude/worktrees/` ajouté à l'Étape 15 incrément 4 : un motif de chemin non ancré (ex.
+  // `src/app/ecrans/parametrage/`) capte sinon aussi les worktrees de sessions concurrentes sur le même dépôt,
+  // faussant le décompte de tests d'une exécution ciblée sans qu'aucune erreur ne le signale.
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/src-tauri/',
+    '<rootDir>/e2e/',
+    '<rootDir>/.claude/worktrees/',
+  ],
   collectCoverage: false,
   collectCoverageFrom: [
     'src/app/**/*.ts',
