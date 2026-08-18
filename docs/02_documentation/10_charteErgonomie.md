@@ -17,6 +17,7 @@
 - L'ensemble de l'application est utilisable au clavier, sans dépendre de la souris, avec un ordre de tabulation cohérent avec l'ordre de lecture visuel.
 - La densité d'information privilégie les tableaux pour les listes volumineuses (synthèse, liste de travail) et les cartes pour les regroupements synthétiques (accueil, en-tête de fiche projet), avec une typographie dédiée aux valeurs brutes (police à chasse fixe) distincte du texte courant.
 - Sur tout écran CRUD combinant une liste et un formulaire de création/modification, le formulaire (et les blocs de confirmation associés, suppression ou ressaisie du mot de passe) s'affiche avant la liste des entrées existantes, jamais après, afin de rester atteignable sans défilement dès que la liste s'allonge ([US-039](./04_casUsage.md#cas-dusage--user-stories), besoin identifié en Phase 15 (C15-01), absent de `Specification.md`).
+- Un contenu qui s'affiche dynamiquement à la suite d'une action utilisateur (panneau de traitement, formulaire de détail) et qui pourrait rester hors du champ visuel sur un écran de contenu long fait l'objet d'un défilement automatique vers son premier champ de saisie, immédiatement suivi du focus sur ce champ ; ce défilement s'appuie sur le même mécanisme technique que le focus initial déjà appliqué aux formulaires liste+formulaire (`afterNextRender` après affichage conditionnel du contenu, cf. gabarit `exemple-reference.component.ts`), plutôt qu'un simple appel synchrone qui échouerait avant le rendu réel du DOM (besoin identifié en Phase 15 [C15-09](../03_plan/plan_13_developpement.md#phase-15--recette-et-durcissement-avant-première-version-utilisable), absent de `Specification.md`).
 
 ## Composants d'interface réutilisables
 
@@ -31,6 +32,8 @@
 | Modale de confirmation | Rappelle explicitement l'action et sa conséquence, bouton de validation jamais pré-sélectionné par défaut pour une action destructive |
 | Indicateur de sauvegarde | Affichage discret et permanent dans la barre supérieure, sans notification intrusive pour une sauvegarde réussie |
 | Recherche globale | Superposition modale ouverte par raccourci clavier, résultats groupés par nature, fermeture par Échap |
+| Bouton de copie rapide | Action de copie d'un identifiant technique (identifiant de dépendance, motif, etc.) dans le presse-papiers (`navigator.clipboard`), avec confirmation visuelle explicite du succès de la copie ; composant transverse, destiné à être réutilisé tel quel pour tout futur identifiant technique affiché ailleurs dans l'application ([US-042](./04_casUsage.md#cas-dusage--user-stories), besoin identifié en Phase 15 (C15-06), absent de `Specification.md`) |
+| Modale de saisie en masse | Superposition avec zone de texte collé (une ligne par entrée), boutons Annuler/Valider, affichage des erreurs ligne par ligne sans bloquer la validation des lignes correctes ; squelette transverse partagé entre plusieurs entités (règles de dépendances, membres connus), chaque appelant fournissant sa propre logique de parsing et de validation ([US-043](./04_casUsage.md#cas-dusage--user-stories), [US-044](./04_casUsage.md#cas-dusage--user-stories), besoin identifié en Phase 15 (C15-07, C15-08), absent de `Specification.md`) |
 
 ## Messages utilisateurs
 
