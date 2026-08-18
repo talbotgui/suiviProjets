@@ -81,6 +81,7 @@ import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugemen
 import { BadgeAuditAncienUtils } from '../../services/sansetat/jugement/badge-audit-ancien.utils';
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
+import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
 import type { ResultatNoteSonar } from '../../services/sansetat/jugement/note-sonar.utils';
 import {
@@ -598,10 +599,14 @@ export class SqmSyntheseAuditsComponent {
    * @param dataUrl - URL de données PNG produite par `toPng`.
    */
   private declencherTelechargementPng(dataUrl: string): void {
+    const nomFichier = `synthese-audits-${ExportImageUtils.construireHorodatage(new Date())}.png`;
     const lien = document.createElement('a');
     lien.href = dataUrl;
-    lien.download = `synthese-audits-${new Date().toISOString().slice(0, 10)}.png`;
+    lien.download = nomFichier;
     lien.click();
+    this.notification.succes(
+      `L'image ${nomFichier} a été téléchargée dans le dossier de téléchargements de votre navigateur/système.`,
+    );
   }
 
   /**

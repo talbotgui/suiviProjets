@@ -7,6 +7,7 @@ import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import {
   StatutMembre,
   TypeCritereMembre,
@@ -606,26 +607,41 @@ describe('SqmComparaisonAuditsComponent', () => {
       expect(element.textContent).not.toContain('Jalon hors intervalle');
     });
 
-    it('déclenche l’export PNG au clic sur le bouton dédié (conteneur complet)', async () => {
-      const toPngSimule = jest.mocked(toPng);
-      toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
-      const clicAncre = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
-        // Neutralisé : jsdom ne doit pas tenter de naviguer vers l'URL de données générée.
-      });
+    it(
+      'déclenche l’export PNG au clic sur le bouton dédié (conteneur complet), nomme le fichier téléchargé ' +
+        'comparaison-audits-<nomProjet normalisé>-<horodatage complet>.png (sans nom de groupe, C15-15/RG-047) ' +
+        "et confirme l'export",
+      async () => {
+        const toPngSimule = jest.mocked(toPng);
+        toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
+        let nomFichierTelecharge = '';
+        const clicAncre = jest
+          .spyOn(HTMLAnchorElement.prototype, 'click')
+          .mockImplementation(function (this: HTMLAnchorElement) {
+            nomFichierTelecharge = this.download;
+          });
 
-      const fixture = creerFixture('projet-1', racineDeuxAudits());
-      const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
-        '.comparaison-audits__export',
-      );
-      expect(bouton).not.toBeNull();
-      bouton?.click();
-      await fixture.whenStable();
+        const fixture = creerFixture('projet-1', racineDeuxAudits());
+        const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
+          '.comparaison-audits__export',
+        );
+        expect(bouton).not.toBeNull();
+        bouton?.click();
+        await fixture.whenStable();
 
-      expect(toPngSimule).toHaveBeenCalledTimes(1);
-      const [elementExporte] = toPngSimule.mock.calls[0];
-      expect(elementExporte.classList.contains('comparaison-audits')).toBe(true);
-      clicAncre.mockRestore();
-    });
+        expect(toPngSimule).toHaveBeenCalledTimes(1);
+        const [elementExporte] = toPngSimule.mock.calls[0];
+        expect(elementExporte.classList.contains('comparaison-audits')).toBe(true);
+        expect(nomFichierTelecharge).toMatch(
+          /^comparaison-audits-Projet-Test-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.png$/,
+        );
+        const notifications = TestBed.inject(NotificationService).liste();
+        expect(notifications.length).toBe(1);
+        expect(notifications[0]?.type).toBe('succes');
+        expect(notifications[0]?.message).toContain(nomFichierTelecharge);
+        clicAncre.mockRestore();
+      },
+    );
 
     it(
       'affiche, dans la catégorie « changement de statut », un membre présent aux deux bords dont la ' +

@@ -43,6 +43,7 @@ import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { ChangementSeuilUtils } from '../../services/sansetat/jugement/changement-seuil.utils';
+import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import type {
   ResultatFiltrageVues,
@@ -505,10 +506,14 @@ export class SqmSyntheseGraphiqueComponent {
    * @param dataUrl - URL de données PNG produite par `toPng`.
    */
   private declencherTelechargementPng(dataUrl: string): void {
+    const nomFichier = `synthese-graphique-${ExportImageUtils.construireHorodatage(new Date())}.png`;
     const lien = document.createElement('a');
     lien.href = dataUrl;
-    lien.download = `synthese-graphique-${new Date().toISOString().slice(0, 10)}.png`;
+    lien.download = nomFichier;
     lien.click();
+    this.notification.succes(
+      `L'image ${nomFichier} a été téléchargée dans le dossier de téléchargements de votre navigateur/système.`,
+    );
   }
 
   /**

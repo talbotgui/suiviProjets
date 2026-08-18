@@ -806,20 +806,34 @@ describe('SqmFicheProjetComponent', () => {
     },
   );
 
-  it('exporterPng déclenche toPng sur le conteneur et provoque un téléchargement', async () => {
-    jest.mocked(toPng).mockResolvedValue('data:image/png;base64,test');
-    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
-    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
-    const clicSpy = jest
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+  it(
+    'exporterPng déclenche toPng sur le conteneur, provoque un téléchargement nommé ' +
+      "fiche-projet-<nomProjet normalisé>-<horodatage complet>.png et confirme l'export (C15-15, RG-047)",
+    async () => {
+      jest.mocked(toPng).mockResolvedValue('data:image/png;base64,test');
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      let nomFichierTelecharge = '';
+      const clicSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        nomFichierTelecharge = this.download;
+      });
 
-    await fixture.componentInstance.exporterPng();
+      await fixture.componentInstance.exporterPng();
 
-    expect(toPng).toHaveBeenCalled();
-    expect(clicSpy).toHaveBeenCalled();
-    clicSpy.mockRestore();
-  });
+      expect(toPng).toHaveBeenCalled();
+      expect(clicSpy).toHaveBeenCalled();
+      expect(nomFichierTelecharge).toMatch(
+        /^fiche-projet-Projet-Test-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.png$/,
+      );
+      const notifications = TestBed.inject(NotificationService).liste();
+      expect(notifications.length).toBe(1);
+      expect(notifications[0]?.type).toBe('succes');
+      expect(notifications[0]?.message).toContain(nomFichierTelecharge);
+      clicSpy.mockRestore();
+    },
+  );
 
   it('pose le focus sur le champ Date à l’ouverture du formulaire de création d’annotation (C15-02)', async () => {
     const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);

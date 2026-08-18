@@ -617,28 +617,43 @@ describe('SqmSyntheseAuditsComponent', () => {
     expect(fixture.componentInstance.compteurProjets()).toBe(0);
   });
 
-  it('déclenche l’export PNG au clic sur le bouton dédié (appel de la fonction d’export vérifié, pas le rendu réel)', async () => {
-    const toPngSimule = jest.mocked(toPng);
-    toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
-    const clicAncre = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
-      // Neutralisé : jsdom ne doit pas tenter de naviguer vers l'URL de données générée.
-    });
+  it(
+    'déclenche l’export PNG au clic sur le bouton dédié, nomme le fichier téléchargé ' +
+      'synthese-audits-<horodatage complet>.png (sans nom de projet, écran multi-projets, C15-15/RG-047) et ' +
+      "confirme l'export",
+    async () => {
+      const toPngSimule = jest.mocked(toPng);
+      toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
+      let nomFichierTelecharge = '';
+      const clicAncre = jest
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          nomFichierTelecharge = this.download;
+        });
 
-    const fixture = creerFixture(DonneesDeTest.racineDeBase());
-    const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
-      '.synthese-audits__export',
-    );
-    expect(bouton).not.toBeNull();
-    bouton?.click();
-    await fixture.whenStable();
+      const fixture = creerFixture(DonneesDeTest.racineDeBase());
+      const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
+        '.synthese-audits__export',
+      );
+      expect(bouton).not.toBeNull();
+      bouton?.click();
+      await fixture.whenStable();
 
-    expect(toPngSimule).toHaveBeenCalledTimes(1);
-    const [elementExporte] = toPngSimule.mock.calls[0];
-    expect(elementExporte.classList.contains('synthese-audits')).toBe(true);
-    expect(clicAncre).toHaveBeenCalledTimes(1);
+      expect(toPngSimule).toHaveBeenCalledTimes(1);
+      const [elementExporte] = toPngSimule.mock.calls[0];
+      expect(elementExporte.classList.contains('synthese-audits')).toBe(true);
+      expect(clicAncre).toHaveBeenCalledTimes(1);
+      expect(nomFichierTelecharge).toMatch(
+        /^synthese-audits-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.png$/,
+      );
+      const notifications = TestBed.inject(NotificationService).liste();
+      expect(notifications.length).toBe(1);
+      expect(notifications[0]?.type).toBe('succes');
+      expect(notifications[0]?.message).toContain(nomFichierTelecharge);
 
-    clicAncre.mockRestore();
-  });
+      clicAncre.mockRestore();
+    },
+  );
 
   it('calcule correctement les cas avancés : AUDIT ANCIEN, campagne en échec, vitalité rouge, IA en violation', () => {
     const fixture = creerFixture(DonneesDeTest.racineCasAvances());

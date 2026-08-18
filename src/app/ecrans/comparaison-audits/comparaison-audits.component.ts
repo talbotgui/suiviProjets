@@ -34,6 +34,7 @@ import { RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBadgeComponent } from '../../composants/badge/badge.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { StatutMembre } from '../../services/avecetat/etat/types-donnees';
 import type { Annotation, Audit, Groupe, Projet } from '../../services/avecetat/etat/types-donnees';
 import type { Marqueur } from '../../services/sansetat/commandes/types-facade';
@@ -44,6 +45,7 @@ import type {
   MembreDifferentiel,
 } from '../../services/sansetat/jugement/differentiel-audits.utils';
 import { DifferentielAuditsUtils } from '../../services/sansetat/jugement/differentiel-audits.utils';
+import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
 import {
   ParametresJugementUtils,
@@ -209,6 +211,7 @@ export type RaccourciComparaisonAudits = 'dernierPrecedent' | 'unMois' | 'troisM
 export class SqmComparaisonAuditsComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly notification: NotificationService = inject(NotificationService);
 
   /**
    * Identifiant du projet affiché, lié au segment de route `comparaison-audits/:projetId`
@@ -281,22 +284,30 @@ export class SqmComparaisonAuditsComponent {
    */
   public async exporterPng(): Promise<void> {
     const conteneur = this.conteneurExport()?.nativeElement;
-    if (conteneur === undefined) {
+    const etatCourant = this.etat();
+    if (conteneur === undefined || etatCourant.type !== 'pret') {
       return;
     }
     const dataUrl = await toPng(conteneur);
-    this.declencherTelechargementPng(dataUrl);
+    this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
   }
 
   /**
-   * Déclenche le téléchargement d'une image PNG encodée en URL de données.
+   * Déclenche le téléchargement d'une image PNG encodée en URL de données, puis confirme l'export à l'utilisateur
+   * (RG-047, C15-15), sur le même principe que `SqmFicheProjetComponent.declencherTelechargementPng`.
    * @param dataUrl - URL de données PNG produite par `toPng`.
+   * @param nomProjet - Nom du projet comparé (`DonneesComparaisonAudits.nomProjet`), inséré normalisé dans le nom
+   * de fichier suggéré (RG-047 : sans nom de groupe, décision arbitraire).
    */
-  private declencherTelechargementPng(dataUrl: string): void {
+  private declencherTelechargementPng(dataUrl: string, nomProjet: string): void {
+    const nomFichier = `comparaison-audits-${ExportImageUtils.normaliserNomProjet(nomProjet)}-${ExportImageUtils.construireHorodatage(new Date())}.png`;
     const lien = document.createElement('a');
     lien.href = dataUrl;
-    lien.download = `comparaison-audits-${new Date().toISOString().slice(0, 10)}.png`;
+    lien.download = nomFichier;
     lien.click();
+    this.notification.succes(
+      `L'image ${nomFichier} a été téléchargée dans le dossier de téléchargements de votre navigateur/système.`,
+    );
   }
 
   /**

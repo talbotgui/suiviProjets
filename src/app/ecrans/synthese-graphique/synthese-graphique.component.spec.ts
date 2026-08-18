@@ -444,26 +444,41 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     expect(lignesApres.map((ligne) => ligne.id)).toEqual(['a1']);
   });
 
-  it('déclenche l’export PNG au clic sur le bouton dédié (conteneur complet, filtres inclus)', async () => {
-    const toPngSimule = jest.mocked(toPng);
-    toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
-    const clicAncre = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {
-      // Neutralisé : jsdom ne doit pas tenter de naviguer vers l'URL de données générée.
-    });
+  it(
+    'déclenche l’export PNG au clic sur le bouton dédié (conteneur complet, filtres inclus), nomme le fichier ' +
+      'téléchargé synthese-graphique-<horodatage complet>.png (sans nom de projet, écran multi-projets, ' +
+      "C15-15/RG-047) et confirme l'export",
+    async () => {
+      const toPngSimule = jest.mocked(toPng);
+      toPngSimule.mockResolvedValue('data:image/png;base64,xxx');
+      let nomFichierTelecharge = '';
+      const clicAncre = jest
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(function (this: HTMLAnchorElement) {
+          nomFichierTelecharge = this.download;
+        });
 
-    const fixture = creerFixture(DonneesDeTest.racine([]));
-    const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
-      '.synthese-graphique__export',
-    );
-    expect(bouton).not.toBeNull();
-    bouton?.click();
-    await fixture.whenStable();
+      const fixture = creerFixture(DonneesDeTest.racine([]));
+      const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
+        '.synthese-graphique__export',
+      );
+      expect(bouton).not.toBeNull();
+      bouton?.click();
+      await fixture.whenStable();
 
-    expect(toPngSimule).toHaveBeenCalledTimes(1);
-    const [elementExporte] = toPngSimule.mock.calls[0];
-    expect(elementExporte.classList.contains('synthese-graphique')).toBe(true);
-    clicAncre.mockRestore();
-  });
+      expect(toPngSimule).toHaveBeenCalledTimes(1);
+      const [elementExporte] = toPngSimule.mock.calls[0];
+      expect(elementExporte.classList.contains('synthese-graphique')).toBe(true);
+      expect(nomFichierTelecharge).toMatch(
+        /^synthese-graphique-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.png$/,
+      );
+      const notifications = TestBed.inject(NotificationService).liste();
+      expect(notifications.length).toBe(1);
+      expect(notifications[0]?.type).toBe('succes');
+      expect(notifications[0]?.message).toContain(nomFichierTelecharge);
+      clicAncre.mockRestore();
+    },
+  );
 
   it('affiche des valeurs neutres en l’absence de tout fichier chargé', () => {
     const fixture = creerFixture();

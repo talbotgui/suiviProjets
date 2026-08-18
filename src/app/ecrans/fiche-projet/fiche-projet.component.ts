@@ -67,6 +67,7 @@ import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugemen
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
 import { DerniereCampagneUtils } from '../../services/sansetat/jugement/derniere-campagne.utils';
+import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
 import type { ResultatNoteSonar } from '../../services/sansetat/jugement/note-sonar.utils';
 import {
@@ -573,22 +574,33 @@ export class SqmFicheProjetComponent {
    */
   public async exporterPng(): Promise<void> {
     const conteneur = this.conteneurExport()?.nativeElement;
-    if (conteneur === undefined) {
+    const etatCourant = this.etat();
+    if (conteneur === undefined || etatCourant.type !== 'trouve') {
       return;
     }
     const dataUrl = await toPng(conteneur);
-    this.declencherTelechargementPng(dataUrl);
+    this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
   }
 
   /**
-   * Déclenche le téléchargement d'une image PNG encodée en URL de données.
+   * Déclenche le téléchargement d'une image PNG encodée en URL de données, puis confirme l'export à l'utilisateur
+   * (RG-047, C15-15) : le nom de fichier suggéré est connu du code (il le construit lui-même), mais l'emplacement
+   * réel d'enregistrement reste hors de portée de l'application (mécanisme d'ancre de téléchargement, cf. analyse
+   * `docs/03_plan/analyse_C15-15.md#23-emplacement-de-sauvegarde`) — la formulation reste donc volontairement
+   * générique sur ce point, sans chemin absolu.
    * @param dataUrl - URL de données PNG produite par `toPng`.
+   * @param nomProjet - Nom du projet affiché (`DonneesFicheProjet.nomProjet`), inséré normalisé dans le nom de
+   * fichier suggéré (RG-047 : sans nom de groupe, décision arbitraire).
    */
-  private declencherTelechargementPng(dataUrl: string): void {
+  private declencherTelechargementPng(dataUrl: string, nomProjet: string): void {
+    const nomFichier = `fiche-projet-${ExportImageUtils.normaliserNomProjet(nomProjet)}-${ExportImageUtils.construireHorodatage(new Date())}.png`;
     const lien = document.createElement('a');
     lien.href = dataUrl;
-    lien.download = `fiche-projet-${new Date().toISOString().slice(0, 10)}.png`;
+    lien.download = nomFichier;
     lien.click();
+    this.notification.succes(
+      `L'image ${nomFichier} a été téléchargée dans le dossier de téléchargements de votre navigateur/système.`,
+    );
   }
 
   /**
