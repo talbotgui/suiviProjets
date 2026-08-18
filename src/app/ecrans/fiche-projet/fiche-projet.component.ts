@@ -1185,6 +1185,11 @@ export class SqmFicheProjetComponent {
    * Compte les dépendances du projet actuellement affiché au statut « non référencé » (cf.
    * {@link LigneDependance.nonReference}), sans dédoublonnage : chaque ligne du tableau des dépendances compte
    * pour une unité, y compris deux occurrences de la même référence issues de deux manifestes distincts.
+   * Décision arbitraire assumée, relevée en relecture isolée du 2026-08-18 et confirmée par un humain plutôt que
+   * corrigée : ce compte brut peut donc dépasser le seuil de déclenchement du lien « Créer des règles en masse »
+   * alors que le pré-remplissage de la modale ({@link texteInitialSaisieMasseDependances}) affiche moins de lignes,
+   * celui-ci dédoublonnant par couple (référence, version). Comportement jugé acceptable : aucune perte de donnée,
+   * cas limite rare, RG-040 ne précisant pas explicitement le mode de comptage attendu.
    * @param dependances - Lignes d'affichage des dépendances du projet.
    * @returns Le nombre de dépendances non référencées.
    */
@@ -1333,7 +1338,10 @@ export class SqmFicheProjetComponent {
    * un humain), faute de précision documentaire tranchant explicitement ce point — `LigneMembre.
    * critereParDefautQualification` n'est renseigné que pour une résolution `inconnu` (cf.
    * {@link construireLigneMembre}), jamais pour une résolution `conflit`, ce qui en fait un indicateur fiable de ce
-   * dénombrement sans recalculer la résolution de statut.
+   * dénombrement sans recalculer la résolution de statut. Ce compte est également sans dédoublonnage, comme pour
+   * {@link nombreDependancesNonReferencees} : décision arbitraire assumée, relevée en relecture isolée du
+   * 2026-08-18 et confirmée par un humain plutôt que corrigée, le seuil pouvant donc dépasser le nombre de lignes
+   * réellement pré-remplies par {@link texteInitialSaisieMasseMembres} (dédoublonnage par couple critère/type).
    * @param membres - Lignes d'affichage des membres du projet.
    * @returns Le nombre de membres strictement `inconnu`.
    */

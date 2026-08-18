@@ -1,5 +1,5 @@
 // Test de l'onglet Sécurité de l'écran Paramétrage (cf. securite-parametrage.component.ts, Phase 15, C15-03,
-// US-040, RG-038), généré avec l'assistance de l'IA (Claude Code), conformément à
+// US-041, RG-038), généré avec l'assistance de l'IA (Claude Code), conformément à
 // .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
@@ -118,7 +118,7 @@ describe('SqmSecuriteParametrageComponent', () => {
     expect(composant.confirmationMotDePasseVisible()).toBe(true);
   });
 
-  it('change le mot de passe après confirmation de l’ancien (US-040, RG-038)', async () => {
+  it('change le mot de passe après confirmation de l’ancien (US-041, RG-038)', async () => {
     TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
     invokeSimule.mockResolvedValue(DonneesDeTest.racine());
     const composant = TestBed.createComponent(SqmSecuriteParametrageComponent).componentInstance;

@@ -271,7 +271,7 @@ export class DonneesApplicationService {
   }
 
   /**
-   * Change le mot de passe du fichier actuellement ouvert (US-040, RG-038) : invoque la commande native
+   * Change le mot de passe du fichier actuellement ouvert (US-041, RG-038) : invoque la commande native
    * `changerMotDePasseFichier`, qui revérifie l'ancien mot de passe contre la clé de session déjà authentifiée,
    * réécrit immédiatement le fichier avec le nouveau et supprime les sauvegardes de sécurité déjà chiffrées avec
    * l'ancien, avant de renvoyer la racine mise à jour (journal des modifications inclus), substituée à l'état

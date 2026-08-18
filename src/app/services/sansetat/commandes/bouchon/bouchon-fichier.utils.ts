@@ -8,7 +8,7 @@
 // sources sont les mêmes identifiants que ceux connus de ce dernier (cf. `donnees-racine-bouchon.ts`), pour que
 // les écrans d'audit affichent des constats cohérents une fois le fichier bouchonné « chargé ».
 //
-// Étendu en Phase 15 (C15-03, US-040, RG-038) à `changer_mot_de_passe_fichier` : seule commande de ce bouchon à
+// Étendu en Phase 15 (C15-03, US-041, RG-038) à `changer_mot_de_passe_fichier` : seule commande de ce bouchon à
 // recevoir des `parametres` (la racine courante, pour y consigner une entrée de journal simulée), d'où la signature
 // de `invoquer` désormais alignée sur celle de `BouchonParametrageUtils.invoquer`, RG-023 non alimenté avec le même
 // luxe de détail que le cœur natif (mêmes limites déjà assumées par `BouchonParametrageUtils`, cf. son commentaire
@@ -57,7 +57,7 @@ export class BouchonFichierUtils {
   }
 
   /**
-   * Consigne une entrée de journal simulée du changement de mot de passe (US-040, RG-038), sans jamais y exposer
+   * Consigne une entrée de journal simulée du changement de mot de passe (US-041, RG-038), sans jamais y exposer
    * l'un ou l'autre mot de passe reçu, sur le même principe que le cœur natif.
    * @param parametres - Paramètres reçus, portant `donnees` (la racine courante).
    * @returns La racine mise à jour avec la nouvelle entrée de journal.

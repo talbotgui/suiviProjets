@@ -1,7 +1,7 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Onglet « Sécurité » de l'écran Paramétrage (Phase 15, C15-03, US-040, RG-038) : changement du mot de passe du
+// Onglet « Sécurité » de l'écran Paramétrage (Phase 15, C15-03, US-041, RG-038) : changement du mot de passe du
 // fichier de données en cours de session, jusqu'ici impossible sans recréer intégralement le fichier. Onglet dédié
 // plutôt que noyé dans « Réglages applicatifs » (arbitrage utilisateur du 2026-08-17). Sur le même patron que
 // `SqmReglagesApplicatifsParametrageComponent` : formulaire local (ici, nouveau mot de passe et confirmation), puis
@@ -21,7 +21,7 @@ import { NotificationService } from '../../../services/avecetat/etat/notificatio
 import type { ErreurAdministration } from '../../../services/avecetat/etat/types-donnees';
 
 /**
- * Onglet « Sécurité » : changement du mot de passe du fichier de données actuellement ouvert (US-040, RG-038).
+ * Onglet « Sécurité » : changement du mot de passe du fichier de données actuellement ouvert (US-041, RG-038).
  * L'action reste masquée tant qu'aucun fichier n'est chargé et déverrouillé (décision arbitrée le 2026-08-17,
  * cohérente avec la seule condition sous laquelle une commande de mutation de ce type est acceptée côté cœur natif,
  * cf. `verifier_avant_ecriture`).
@@ -89,7 +89,7 @@ export class SqmSecuriteParametrageComponent {
   }
 
   /**
-   * Change effectivement le mot de passe après confirmation de l'ancien (US-040, RG-002, RG-038).
+   * Change effectivement le mot de passe après confirmation de l'ancien (US-041, RG-002, RG-038).
    * @param ancienMotDePasse - Mot de passe actuel, ressaisi par l'utilisateur.
    */
   public async confirmerChangement(ancienMotDePasse: string): Promise<void> {
