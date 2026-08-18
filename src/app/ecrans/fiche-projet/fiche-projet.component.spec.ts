@@ -6,6 +6,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
+import { SqmModaleSaisieMasseComponent } from '../../composants/modale-saisie-masse/modale-saisie-masse.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
@@ -311,6 +312,50 @@ describe('SqmFicheProjetComponent', () => {
     fixture.componentRef.setInput('projetId', projetId);
     fixture.detectChanges();
     return fixture;
+  }
+
+  /**
+   * Construit un audit dérivé de `DonneesDeTest.auditComplet`, avec la liste de dépendances du résultat
+   * `gitlab.dependances` remplacée par celle fournie (US-043 : jeux de test nécessitant davantage de dépendances
+   * non référencées que le jeu de test par défaut).
+   * @param dependances - Dépendances à substituer au résultat `gitlab.dependances` par défaut.
+   * @returns L'audit de test avec ses dépendances remplacées, tous les autres résultats inchangés.
+   */
+  function auditAvecDependances(
+    dependances: readonly {
+      readonly reference: string;
+      readonly version: string;
+      readonly manifeste: string;
+    }[],
+  ): Audit {
+    const audit = DonneesDeTest.auditComplet({});
+    return {
+      ...audit,
+      resultats: audit.resultats.map((resultat) =>
+        resultat.type === 'gitlab.dependances' ? { ...resultat, dependances } : resultat,
+      ),
+    };
+  }
+
+  /**
+   * Construit six dépendances distinctes, non couvertes par aucune règle du référentiel de test
+   * (`DonneesDeTest.racine`), pour les tests du seuil de déclenchement du lien « Créer des règles en masse »
+   * (RG-040 : plus de cinq).
+   * @param nombre - Nombre de dépendances distinctes à construire.
+   * @returns Les dépendances construites (`pkg1`, `pkg2`, ...).
+   */
+  function dependancesNonReferencees(
+    nombre: number,
+  ): readonly {
+    readonly reference: string;
+    readonly version: string;
+    readonly manifeste: string;
+  }[] {
+    return Array.from({ length: nombre }, (_, index) => ({
+      reference: `pkg${index + 1}`,
+      version: '1.0.0',
+      manifeste: 'package.json',
+    }));
   }
 
   it("affiche un message explicite quand aucun fichier n'est chargé (jamais un écran vide silencieux)", () => {
@@ -853,5 +898,183 @@ describe('SqmFicheProjetComponent', () => {
     expect(TestBed.inject(NotificationService).liste()).toEqual([
       expect.objectContaining({ type: 'erreur' }),
     ]);
+  });
+
+  describe('saisie en masse de règles de dépendances (US-043, RG-040, C15-07)', () => {
+    it("n'affiche pas le lien « Créer des règles en masse » à exactement cinq dépendances non référencées", () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances(dependancesNonReferencees(5)),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.querySelector('#fiche-projet-bouton-saisie-masse-dependances')).toBeNull();
+    });
+
+    it('affiche le lien « Créer des règles en masse » dès plus de cinq dépendances non référencées (RG-040)', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances(dependancesNonReferencees(6)),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const bouton = element.querySelector('#fiche-projet-bouton-saisie-masse-dependances');
+      expect(bouton).not.toBeNull();
+    });
+
+    it('pré-remplit la modale, à l’ouverture, d’une ligne par dépendance non référencée distincte, statut vide', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances(dependancesNonReferencees(6)),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const composant = fixture.componentInstance;
+
+      composant.ouvrirSaisieMasseDependances();
+      fixture.detectChanges();
+
+      const modale = DomTestUtils.obtenirComposantEnfant(fixture, SqmModaleSaisieMasseComponent);
+      const lignesAttendues = dependancesNonReferencees(6).map(
+        (dependance) => `${dependance.reference};${dependance.version}=`,
+      );
+      expect(modale.texte().split('\n').sort()).toEqual([...lignesAttendues].sort());
+    });
+
+    it('enregistre chaque règle regroupée par un appel indépendant à definirReferentiel, notifie le succès total et referme la modale', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockResolvedValue(racine);
+      const composant = fixture.componentInstance;
+
+      composant.ouvrirSaisieMasseDependances();
+
+      const resultat = await composant.traiterSaisieMasseDependances(
+        'pkg1;4.*=obsolete\npkg1;5.*=maintenu\npkg2;1.0.0=maintenu',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 2 });
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_referentiel',
+        expect.objectContaining({
+          typeReferentiel: 'reglesDependances',
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      const appels = jest.mocked(invoke).mock.calls;
+      const motifsAppeles = appels.map((appel) => {
+        const parametres = appel[1];
+        if (
+          parametres === undefined ||
+          typeof parametres !== 'object' ||
+          !('entree' in parametres)
+        ) {
+          throw new Error('Paramètres de commande inattendus dans ce test.');
+        }
+        const entree = parametres['entree'];
+        if (
+          entree === undefined ||
+          typeof entree !== 'object' ||
+          entree === null ||
+          !('motif' in entree)
+        ) {
+          throw new Error('Entrée de commande inattendue dans ce test.');
+        }
+        return entree.motif;
+      });
+      expect(motifsAppeles).toEqual(['pkg1', 'pkg2']);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({
+          type: 'succes',
+          message: '2 règles de dépendances enregistrées.',
+        }),
+      ]);
+
+      composant.gererResultatSaisieMasseDependances(resultat);
+      expect(composant.modaleSaisieMasseDependancesVisible()).toBe(false);
+    });
+
+    it('rejette une ligne dont le motif correspond à une règle déjà existante avant tout enregistrement, sans bloquer les autres lignes (additivité stricte, RG-040)', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockResolvedValue(racine);
+      const composant = fixture.componentInstance;
+
+      const resultat = await composant.traiterSaisieMasseDependances(
+        'moment;*=maintenu\npkg1;1.0.0=maintenu',
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_referentiel',
+        expect.objectContaining({ typeReferentiel: 'reglesDependances' }),
+      );
+      expect(resultat.nombreReussies).toBe(1);
+      expect(resultat.erreurs).toEqual([
+        {
+          ligne: 'moment;*=maintenu',
+          message:
+            'Une règle existe déjà pour le motif « moment » : ligne rejetée (saisie en masse strictement additive).',
+        },
+      ]);
+      expect(resultat.texteRestant).toBe('moment;*=maintenu');
+    });
+
+    it('échec partiel : conserve les règles déjà enregistrées avec succès, ne laisse que les lignes en échec dans le texte restant, et ne referme pas la modale (RG-040)', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest
+        .mocked(invoke)
+        .mockResolvedValueOnce(racine)
+        .mockRejectedValueOnce({ type: 'motDePasseOuFichierInvalide' });
+      const composant = fixture.componentInstance;
+      composant.ouvrirSaisieMasseDependances();
+
+      const resultat = await composant.traiterSaisieMasseDependances(
+        'pkg1;1.0.0=maintenu\npkg2;1.0.0=maintenu',
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(resultat.nombreReussies).toBe(1);
+      expect(resultat.erreurs).toEqual([
+        {
+          ligne: 'pkg2;1.0.0=maintenu',
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        },
+      ]);
+      expect(resultat.texteRestant).toBe('pkg2;1.0.0=maintenu');
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({
+          type: 'succes',
+          message: '1 règle de dépendances enregistrée.',
+        }),
+      ]);
+
+      composant.gererResultatSaisieMasseDependances(resultat);
+      expect(composant.modaleSaisieMasseDependancesVisible()).toBe(true);
+
+      // Nouvelle tentative, uniquement sur la ligne restée en échec (pkg1 n'est jamais re-soumise, cf. RG-040).
+      jest.mocked(invoke).mockReset();
+      jest.mocked(invoke).mockResolvedValue(racine);
+      const secondeTentative = await composant.traiterSaisieMasseDependances(
+        resultat.texteRestant,
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_referentiel',
+        expect.objectContaining({ typeReferentiel: 'reglesDependances' }),
+      );
+      expect(secondeTentative).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 1 });
+    });
   });
 });

@@ -123,6 +123,12 @@
   }
 }
 
+// Variante large du panneau de superposition (modale de saisie en masse, US-043/C15-07, réutilisée telle quelle par
+// C15-08) : la saisie tabulaire par texte collé nécessite davantage de largeur qu'une simple confirmation.
+.superposition__panneau--large {
+  max-width: 720px;
+}
+
 // ===== Champ de formulaire =====
 // Groupe « libellé + contrôle de saisie » : le plus souvent un `<label>` englobant son texte et un
 // `<input>`/`<select>`/`<textarea>` enfant, mais aussi, quand un `id`/`for` explicite est déjà nécessaire (ex. un

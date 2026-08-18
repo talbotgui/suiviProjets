@@ -1,0 +1,93 @@
+<!-- Superposition modale pleine largeur (motif partagé `.superposition`, cf. src/styles/_motifs.scss), variante
+     large (`.superposition__panneau--large`) : la saisie tabulaire par texte collé nécessite davantage de largeur
+     qu'une simple confirmation. -->
+<div class="superposition">
+  <div
+    class="modale-saisie-masse superposition__panneau superposition__panneau--large carte d-flex direction-colonne ecart-4"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="modale-saisie-masse-titre"
+  >
+    <h2 id="modale-saisie-masse-titre" class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+      {{ titre() }}
+    </h2>
+
+    <!-- Texte d'aide propre à l'entité appelante, projeté (jamais une chaîne liée en `[innerHTML]`, cf. commentaire
+         d'en-tête du composant). -->
+    <ng-content select="[slotAide]" />
+
+    <form
+      class="modale-saisie-masse__formulaire d-flex direction-colonne ecart-4"
+      (ngSubmit)="valider()"
+    >
+      <fieldset [disabled]="enCours()" class="d-flex direction-colonne ecart-4">
+        <label class="champ">
+          Saisie (une ligne par entrée)
+          <textarea
+            #champTexte
+            id="modale-saisie-masse-champ-texte"
+            class="champ__controle police-mono"
+            name="texteSaisieMasse"
+            rows="10"
+            required
+            [ngModel]="texte()"
+            (ngModelChange)="texte.set($event)"
+          ></textarea>
+        </label>
+
+        <label class="champ">
+          Mot de passe du fichier
+          <input
+            id="modale-saisie-masse-champ-mot-de-passe"
+            type="password"
+            class="champ__controle"
+            name="motDePasseSaisieMasse"
+            required
+            [ngModel]="motDePasse()"
+            (ngModelChange)="motDePasse.set($event)"
+          />
+        </label>
+
+        @if (erreurGlobale()) {
+          <p class="modale-saisie-masse__erreur texte-rouge" role="alert">{{ erreurGlobale() }}</p>
+        }
+
+        @if (erreurs().length > 0) {
+          <div aria-live="polite">
+            <p class="texte-sm poids-demi-gras exterieur-bas-1">
+              {{ erreurs().length }} ligne(s) en erreur, à corriger avant nouvelle tentative :
+            </p>
+            <ul class="modale-saisie-masse__erreurs d-flex direction-colonne ecart-1">
+              @for (erreur of erreurs(); track erreur.ligne + erreur.message) {
+                <li class="texte-sm texte-rouge">
+                  <code class="police-mono">{{ erreur.ligne }}</code> — {{ erreur.message }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <!-- Bouton de validation jamais pré-sélectionné par défaut (charte d'ergonomie, Modale de confirmation) :
+             le focus initial est placé explicitement sur la zone de texte (`ngAfterViewInit`), jamais sur ce
+             bouton. -->
+        <div class="modale-saisie-masse__actions d-flex justifie-fin ecart-2">
+          <button
+            id="modale-saisie-masse-bouton-annuler"
+            type="button"
+            class="bouton"
+            (click)="annuler()"
+          >
+            Annuler
+          </button>
+          <button
+            id="modale-saisie-masse-bouton-valider"
+            type="submit"
+            class="bouton bouton--principal"
+          >
+            Valider
+          </button>
+        </div>
+      </fieldset>
+    </form>
+  </div>
+</div>

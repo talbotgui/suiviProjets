@@ -203,6 +203,18 @@
             }
 
             <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Dépendances</h2>
+            @if (afficherLienSaisieMasseDependances(donnees.dependances)) {
+              <p class="exterieur-bas-2">
+                <button
+                  id="fiche-projet-bouton-saisie-masse-dependances"
+                  type="button"
+                  class="bouton bouton--discret texte-sm"
+                  (click)="ouvrirSaisieMasseDependances()"
+                >
+                  Créer des règles en masse
+                </button>
+              </p>
+            }
             @if (!donnees.dependancesDisponibles) {
               <p>Aucune donnée de dépendances pour ce dernier audit.</p>
             } @else if (donnees.dependances.length === 0) {
@@ -265,6 +277,25 @@
                   </tbody>
                 </table>
               </div>
+            }
+
+            @if (modaleSaisieMasseDependancesVisible()) {
+              <app-modale-saisie-masse
+                titre="Créer des règles de dépendances en masse"
+                [texteInitial]="texteInitialSaisieMasseDependances(donnees.dependances)"
+                [traiter]="traiterSaisieMasseDependances"
+                (resultatTraite)="gererResultatSaisieMasseDependances($event)"
+                (annulee)="fermerSaisieMasseDependances()"
+              >
+                <p slotAide class="champ__aide">
+                  Une ligne par borne de version, au format
+                  <code class="police-mono">motif;motifVersion=statut</code>, ex.
+                  <code class="police-mono">lodash;4.*=obsolete</code>. Plusieurs lignes partageant
+                  le même motif sont regroupées en une seule règle multi-bornes. Une ligne dont le
+                  motif correspond à une règle déjà existante est rejetée (saisie strictement
+                  additive).
+                </p>
+              </app-modale-saisie-masse>
             }
 
             <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">

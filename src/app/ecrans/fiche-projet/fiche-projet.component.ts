@@ -34,6 +34,12 @@ import { SqmBoutonCopieComponent } from '../../composants/bouton-copie/bouton-co
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
+import { SqmModaleSaisieMasseComponent } from '../../composants/modale-saisie-masse/modale-saisie-masse.component';
+import type {
+  ErreurLigneSaisieMasse,
+  ResultatTraitementSaisieMasse,
+  StrategieTraitementSaisieMasse,
+} from '../../composants/modale-saisie-masse/modale-saisie-masse.component';
 import { RapportAnomaliesUtils } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { AnomalieResolue } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { ResultatCroiseFraicheurSonar } from '../../services/avecetat/campagne/connecteur-croise.utils';
@@ -43,6 +49,7 @@ import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/ty
 import type {
   Annotation,
   EntreeJournal,
+  EntreeReglesDependances,
   Groupe,
   Projet,
   Resultat,
@@ -70,6 +77,7 @@ import {
   type SeuilsMrOuvertes,
   type SeuilsTailleDepot,
 } from '../../services/sansetat/jugement/parametres-jugement.utils';
+import { SaisieMasseDependancesUtils } from '../../services/sansetat/jugement/saisie-masse-dependances.utils';
 import {
   SeuilsCouleurUtils,
   type Couleur,
@@ -311,12 +319,20 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmExplicationJugementComponent,
     SqmConfirmationMotDePasseComponent,
     SqmConfirmationSuppressionComponent,
+    SqmModaleSaisieMasseComponent,
   ],
   templateUrl: './fiche-projet.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './fiche-projet.component.scss',
 })
 export class SqmFicheProjetComponent {
+  /**
+   * Seuil strict de dépendances « non référencées » au-delà duquel le lien contextuel « Créer des règles en
+   * masse » est proposé (RG-040) : valeur figée en dur par décision d'arbitrage humaine du 2026-08-18 (cf. plan de
+   * développement C15-07), volontairement pas un réglage applicatif.
+   */
+  private static readonly SEUIL_LIEN_SAISIE_MASSE_DEPENDANCES = 5;
+
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
@@ -1138,6 +1154,152 @@ export class SqmFicheProjetComponent {
    */
   public queryParamsReferentielDependance(dependance: LigneDependance): Params {
     return { motifDependance: dependance.reference, versionDependance: dependance.version };
+  }
+
+  // --- Saisie en masse de règles de dépendances (US-043, RG-040, C15-07) ---
+
+  /**
+   * Compte les dépendances du projet actuellement affiché au statut « non référencé » (cf.
+   * {@link LigneDependance.nonReference}), sans dédoublonnage : chaque ligne du tableau des dépendances compte
+   * pour une unité, y compris deux occurrences de la même référence issues de deux manifestes distincts.
+   * @param dependances - Lignes d'affichage des dépendances du projet.
+   * @returns Le nombre de dépendances non référencées.
+   */
+  public nombreDependancesNonReferencees(dependances: readonly LigneDependance[]): number {
+    return dependances.filter((dependance) => dependance.nonReference).length;
+  }
+
+  /**
+   * Indique si le lien contextuel « Créer des règles en masse » doit être affiché (RG-040 : dès plus de cinq
+   * dépendances « non référencé »).
+   * @param dependances - Lignes d'affichage des dépendances du projet.
+   * @returns `true` si le lien doit être affiché.
+   */
+  public afficherLienSaisieMasseDependances(dependances: readonly LigneDependance[]): boolean {
+    return (
+      this.nombreDependancesNonReferencees(dependances) >
+      SqmFicheProjetComponent.SEUIL_LIEN_SAISIE_MASSE_DEPENDANCES
+    );
+  }
+
+  /**
+   * Visibilité de la modale de saisie en masse de règles de dépendances.
+   */
+  public readonly modaleSaisieMasseDependancesVisible: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Ouvre la modale de saisie en masse de règles de dépendances.
+   */
+  public ouvrirSaisieMasseDependances(): void {
+    this.modaleSaisieMasseDependancesVisible.set(true);
+  }
+
+  /**
+   * Referme la modale de saisie en masse de règles de dépendances, sans effet sur les règles déjà enregistrées.
+   */
+  public fermerSaisieMasseDependances(): void {
+    this.modaleSaisieMasseDependancesVisible.set(false);
+  }
+
+  /**
+   * Construit le texte pré-rempli de la modale de saisie en masse de règles de dépendances, à partir des
+   * dépendances non référencées actuellement constatées sur le projet affiché : une ligne par couple
+   * (référence, version) distinct, statut laissé vide pour saisie explicite par l'utilisateur. Décision arbitraire
+   * de ce développement (à valider par un humain, faute de précision documentaire sur le pré-remplissage exact
+   * attendu) : pré-remplissage cohérent avec le lien unitaire « Créer une règle » déjà existant (US-033, cf.
+   * {@link queryParamsReferentielDependance}), qui pré-remplit de la même façon le motif et le motif de version
+   * sans jamais présumer du statut.
+   * @param dependances - Lignes d'affichage des dépendances du projet.
+   * @returns Le texte pré-rempli, une ligne par dépendance non référencée distincte, au format
+   * `motif;motifVersion=` de la grammaire retenue par {@link SaisieMasseDependancesUtils}.
+   */
+  public texteInitialSaisieMasseDependances(dependances: readonly LigneDependance[]): string {
+    const lignes = new Set<string>();
+    for (const dependance of dependances) {
+      if (dependance.nonReference) {
+        lignes.add(`${dependance.reference};${dependance.version}=`);
+      }
+    }
+    return Array.from(lignes).join('\n');
+  }
+
+  /**
+   * Stratégie de traitement injectée dans la modale de saisie en masse de règles de dépendances (US-043, RG-040) :
+   * analyse et regroupe le texte collé via {@link SaisieMasseDependancesUtils.analyser} (rejet des lignes
+   * malformées ou en conflit avec une règle déjà existante, sans bloquer les autres lignes valides), puis
+   * enregistre chaque règle regroupée résultante par un appel indépendant à la commande native `definirReferentiel`
+   * (une fois par motif regroupé, jamais une fois par ligne brute), chaque appel produisant sa propre entrée de
+   * journal (RG-023). En cas d'échec sur un groupe, les groupes déjà enregistrés avec succès le restent (jamais
+   * re-soumis) : seules les lignes originales du ou des groupes en échec sont restituées dans le texte restant,
+   * pour correction ou nouvelle tentative par l'utilisateur (RG-040).
+   * @param texte - Texte collé courant de la modale.
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur pour cette soumission (RG-002).
+   * @returns Le résultat du traitement, consommé par la modale pour mettre à jour son affichage.
+   */
+  public readonly traiterSaisieMasseDependances: StrategieTraitementSaisieMasse = async (
+    texte: string,
+    motDePasse: string,
+  ): Promise<ResultatTraitementSaisieMasse> => {
+    const motifsExistants = (
+      this.donneesApplication.racine()?.referentiels.reglesDependances ?? []
+    ).map((regle) => regle.motif);
+    const analyse = SaisieMasseDependancesUtils.analyser(texte, motifsExistants);
+
+    const erreurs: ErreurLigneSaisieMasse[] = [...analyse.erreurs];
+    const lignesEnEchec: string[] = [];
+    let nombreReussies = 0;
+
+    for (const groupe of analyse.groupes) {
+      const entree: EntreeReglesDependances = {
+        id: crypto.randomUUID(),
+        motif: groupe.motif,
+        versions: groupe.versions,
+      };
+      // Boucle séquentielle intentionnelle : chaque règle regroupée doit être enregistrée par un appel indépendant
+      // à `definirReferentiel` (RG-040), un échec sur un groupe ne devant jamais empêcher la tentative des groupes
+      // suivants (échec partiel, RG-040 point 5) ; `donneesApplication.definirReferentiel` relit par ailleurs la
+      // racine courante à chaque appel (`racineActuelle()`), qui doit donc déjà refléter le résultat de l'appel
+      // précédent avant le suivant.
+      const resultat = await this.donneesApplication.definirReferentiel(
+        'reglesDependances',
+        entree,
+        motDePasse,
+      );
+      if (resultat.type === 'succes') {
+        nombreReussies += 1;
+      } else {
+        for (const ligne of groupe.lignesOriginales) {
+          erreurs.push({
+            ligne,
+            message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+          });
+          lignesEnEchec.push(ligne);
+        }
+      }
+    }
+
+    if (nombreReussies > 0) {
+      this.notification.succes(
+        `${nombreReussies} règle${nombreReussies > 1 ? 's' : ''} de dépendances enregistrée${nombreReussies > 1 ? 's' : ''}.`,
+      );
+    }
+
+    const texteRestant = [...analyse.erreurs.map((erreur) => erreur.ligne), ...lignesEnEchec].join(
+      '\n',
+    );
+    return { texteRestant, erreurs, nombreReussies };
+  };
+
+  /**
+   * Gère le résultat d'une tentative de traitement de la modale de saisie en masse de règles de dépendances :
+   * referme la modale uniquement si la soumission a été intégralement enregistrée avec succès (aucune erreur
+   * restante), la laisse ouverte sinon (erreurs déjà reflétées par l'affichage interne de la modale).
+   * @param resultat - Résultat du traitement, émis par la modale.
+   */
+  public gererResultatSaisieMasseDependances(resultat: ResultatTraitementSaisieMasse): void {
+    if (resultat.erreurs.length === 0) {
+      this.fermerSaisieMasseDependances();
+    }
   }
 
   /**
