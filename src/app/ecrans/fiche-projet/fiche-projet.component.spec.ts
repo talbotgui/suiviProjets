@@ -412,6 +412,35 @@ describe('SqmFicheProjetComponent', () => {
   });
 
   it(
+    'propose, pour chaque dépendance, une action de copie rapide de sa référence dans le presse-papiers, avec ' +
+      'confirmation visuelle explicite du succès de la copie (US-042)',
+    async () => {
+      const ecrireDansPressePapiers = jest
+        .fn<Promise<void>, [string]>()
+        .mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: ecrireDansPressePapiers },
+        configurable: true,
+      });
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const boutonCopie = element.querySelector<HTMLButtonElement>(
+        'button[aria-label="Copier la référence org.springframework:spring-core"]',
+      );
+      expect(boutonCopie).not.toBeNull();
+
+      boutonCopie?.click();
+      await Promise.resolve();
+      fixture.detectChanges();
+
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith('org.springframework:spring-core');
+      expect(element.textContent).toContain('Copié');
+    },
+  );
+
+  it(
     'affiche un encart d’anomalie technique quand la dernière campagne a échoué, en conservant les ' +
       'indicateurs du dernier audit intégré (état particulier)',
     () => {

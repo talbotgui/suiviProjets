@@ -30,6 +30,7 @@ import { RouterLink } from '@angular/router';
 import type { Params } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBadgeComponent } from '../../composants/badge/badge.component';
+import { SqmBoutonCopieComponent } from '../../composants/bouton-copie/bouton-copie.component';
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
@@ -306,6 +307,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     RouterLink,
     FormsModule,
     SqmBadgeComponent,
+    SqmBoutonCopieComponent,
     SqmExplicationJugementComponent,
     SqmConfirmationMotDePasseComponent,
     SqmConfirmationSuppressionComponent,

@@ -233,7 +233,15 @@
                       track dependance.reference + dependance.manifeste
                     ) {
                       <tr>
-                        <td>{{ dependance.reference }}</td>
+                        <td>
+                          <span class="d-inline-flex aligne-centre ecart-2">
+                            {{ dependance.reference }}
+                            <app-bouton-copie
+                              [valeur]="dependance.reference"
+                              [libelleAccessible]="'Copier la référence ' + dependance.reference"
+                            />
+                          </span>
+                        </td>
                         <td>{{ dependance.version }}</td>
                         <td>{{ dependance.manifeste }}</td>
                         <td>
