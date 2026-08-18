@@ -30,7 +30,7 @@ import { SqmSeuilsParametrageComponent } from './seuils/seuils-parametrage.compo
 type OngletParametrage = 'seuilsReferentiels' | 'journal' | 'purge' | 'exportImport' | 'securite';
 
 /**
- * Écran Paramétrage : coquille à cinq onglets (US-033, US-027, US-025, US-028 à US-030, US-040), tous construits
+ * Écran Paramétrage : coquille à cinq onglets (US-033, US-027, US-025, US-028 à US-030, US-041), tous construits
  * depuis la Phase 9, incrément 3, hormis « Sécurité » (Phase 15, C15-03).
  */
 @Component({

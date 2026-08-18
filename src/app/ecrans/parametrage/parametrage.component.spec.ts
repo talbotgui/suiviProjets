@@ -60,7 +60,7 @@ describe('SqmParametrageComponent', () => {
     expect(element.textContent).toContain('Purge des audits');
   });
 
-  it("affiche l'onglet Sécurité, construit en Phase 15 (C15-03, US-040)", () => {
+  it("affiche l'onglet Sécurité, construit en Phase 15 (C15-03, US-041)", () => {
     const fixture = TestBed.createComponent(SqmParametrageComponent);
     fixture.componentInstance.selectionnerOnglet('securite');
     fixture.detectChanges();
