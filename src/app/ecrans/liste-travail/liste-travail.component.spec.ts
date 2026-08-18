@@ -325,6 +325,33 @@ describe('SqmListeTravailComponent', () => {
     expect(composant.alerteSelectionnee()).toBeUndefined();
   });
 
+  it(
+    'ramène la vue vers le premier champ de saisie du panneau puis y pose le focus à l’activation ' +
+      'd’une ligne (C15-09)',
+    async () => {
+      const scrollIntoViewSimule = jest.fn();
+      Element.prototype.scrollIntoView = scrollIntoViewSimule;
+      const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('jdupont', 30)]);
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.activerLigne(composant.toutesLesAlertes()[0]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const champCommentaire: HTMLTextAreaElement | null = DomTestUtils.obtenirElementNatif(
+        fixture,
+      ).querySelector('#liste-travail-champ-commentaire');
+      expect(champCommentaire).not.toBeNull();
+      expect(scrollIntoViewSimule).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(champCommentaire);
+    },
+  );
+
   describe(
     'bouton « Qualifier ce membre » (navigation vers Administration, sur le modèle du lien homonyme de ' +
       'la Fiche projet)',

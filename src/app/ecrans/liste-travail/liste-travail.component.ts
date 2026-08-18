@@ -32,10 +32,14 @@
 // pour ne pas faire disparaître silencieusement le panneau de traitement à chaque simple consultation.
 import {
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
@@ -172,6 +176,7 @@ export class SqmListeTravailComponent {
 
   private readonly router: Router = inject(Router);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
 
   /**
    * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne
@@ -179,6 +184,13 @@ export class SqmListeTravailComponent {
    * (ex. après la création d'une nouvelle vue).
    */
   private vueParDefautDejaAppliquee = false;
+
+  /**
+   * Premier champ de saisie du panneau de traitement de l'alerte sélectionnée (cf. {@link alerteSelectionnee}),
+   * résolu une fois ce champ effectivement rendu dans le DOM.
+   */
+  private readonly premierChampPanneau: Signal<ElementRef<HTMLTextAreaElement> | undefined> =
+    viewChild<ElementRef<HTMLTextAreaElement>>('premierChampPanneau');
 
   public constructor() {
     effect(() => {
@@ -455,12 +467,25 @@ export class SqmListeTravailComponent {
   }
 
   /**
-   * Ouvre le panneau de traitement de l'alerte activée (clic ou touche Entrée sur la ligne).
+   * Ouvre le panneau de traitement de l'alerte activée (clic ou touche Entrée sur la ligne), puis ramène la vue
+   * vers son premier champ de saisie (C15-09) : le panneau peut sinon rester hors du champ visuel sur un tableau
+   * long. Un simple appel synchrone à `scrollIntoView`/`.focus()` échouerait ici, le champ n'existant pas encore
+   * dans le DOM au moment de cet appel (`@if` conditionnel pas encore réévalué) ; `afterNextRender` diffère
+   * l'appel après le rendu réel du DOM, sur le même patron que le focus initial des formulaires liste+formulaire
+   * (C15-02, cf. `exemple-reference.component.ts`).
    * @param ligne - Ligne activée par l'utilisateur.
    */
   public activerLigne(ligne: LigneAlerteTravail): void {
     this.alerteSelectionneeCle.set(ligne.cleAlerte);
     this.commentaire = '';
+    afterNextRender(
+      () => {
+        const champ = this.premierChampPanneau()?.nativeElement;
+        champ?.scrollIntoView();
+        champ?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   /**
