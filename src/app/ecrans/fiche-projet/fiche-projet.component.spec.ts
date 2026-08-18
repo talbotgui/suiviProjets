@@ -344,9 +344,7 @@ describe('SqmFicheProjetComponent', () => {
    * @param nombre - Nombre de dépendances distinctes à construire.
    * @returns Les dépendances construites (`pkg1`, `pkg2`, ...).
    */
-  function dependancesNonReferencees(
-    nombre: number,
-  ): readonly {
+  function dependancesNonReferencees(nombre: number): readonly {
     readonly reference: string;
     readonly version: string;
     readonly manifeste: string;
@@ -355,6 +353,51 @@ describe('SqmFicheProjetComponent', () => {
       reference: `pkg${index + 1}`,
       version: '1.0.0',
       manifeste: 'package.json',
+    }));
+  }
+
+  /**
+   * Construit un audit dérivé de `DonneesDeTest.auditComplet`, avec la liste de membres du résultat
+   * `gitlab.membres` remplacée par celle fournie (US-044 : jeux de test nécessitant davantage de membres
+   * `inconnu` que le jeu de test par défaut).
+   * @param membres - Membres à substituer au résultat `gitlab.membres` par défaut.
+   * @returns L'audit de test avec ses membres remplacés, tous les autres résultats inchangés.
+   */
+  function auditAvecMembres(
+    membres: readonly {
+      readonly username: string;
+      readonly nom: string;
+      readonly niveauAcces: number;
+      readonly herite: boolean;
+    }[],
+  ): Audit {
+    const audit = DonneesDeTest.auditComplet({});
+    return {
+      ...audit,
+      resultats: audit.resultats.map((resultat) =>
+        resultat.type === 'gitlab.membres' ? { ...resultat, membres } : resultat,
+      ),
+    };
+  }
+
+  /**
+   * Construit un nombre donné de membres distincts, strictement `inconnu` (aucune règle de membre connu du
+   * groupe de test ne les couvre), pour les tests du seuil de déclenchement du lien « Créer des règles en masse »
+   * (RG-041 : plus de cinq).
+   * @param nombre - Nombre de membres distincts à construire.
+   * @returns Les membres construits (`inconnu1`, `inconnu2`, ...).
+   */
+  function membresInconnus(nombre: number): readonly {
+    readonly username: string;
+    readonly nom: string;
+    readonly niveauAcces: number;
+    readonly herite: boolean;
+  }[] {
+    return Array.from({ length: nombre }, (_, index) => ({
+      username: `inconnu${index + 1}`,
+      nom: `Inconnu ${index + 1}`,
+      niveauAcces: 30,
+      herite: false,
     }));
   }
 
@@ -1075,6 +1118,188 @@ describe('SqmFicheProjetComponent', () => {
         expect.objectContaining({ typeReferentiel: 'reglesDependances' }),
       );
       expect(secondeTentative).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 1 });
+    });
+  });
+
+  describe('saisie en masse de qualifications de membres connus (US-044, RG-041, C15-08)', () => {
+    it("n'affiche pas le lien « Créer des règles en masse » à exactement cinq membres inconnu", () => {
+      const projet = DonneesDeTest.projet('projet-1', [auditAvecMembres(membresInconnus(5))]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.querySelector('#fiche-projet-bouton-saisie-masse-membres')).toBeNull();
+    });
+
+    it('affiche le lien « Créer des règles en masse » dès plus de cinq membres inconnu (RG-041)', () => {
+      const projet = DonneesDeTest.projet('projet-1', [auditAvecMembres(membresInconnus(6))]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const bouton = element.querySelector('#fiche-projet-bouton-saisie-masse-membres');
+      expect(bouton).not.toBeNull();
+    });
+
+    it('pré-remplit la modale, à l’ouverture, d’une ligne par membre inconnu distinct, statut jamais pré-rempli (RG-041, point 3)', () => {
+      const projet = DonneesDeTest.projet('projet-1', [auditAvecMembres(membresInconnus(6))]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const composant = fixture.componentInstance;
+
+      composant.ouvrirSaisieMasseMembres();
+      fixture.detectChanges();
+
+      const modale = DomTestUtils.obtenirComposantEnfant(fixture, SqmModaleSaisieMasseComponent);
+      const lignesAttendues = membresInconnus(6).map((membre) => `${membre.username};username=`);
+      expect(modale.texte().split('\n').sort()).toEqual([...lignesAttendues].sort());
+      // Aucune ligne ne porte de statut pré-rempli après le séparateur « = » (RG-041, point 3).
+      for (const ligne of modale.texte().split('\n')) {
+        expect(ligne.endsWith('=')).toBe(true);
+      }
+    });
+
+    it('enregistre chaque ligne par un appel indépendant à qualifierMembre (sans regroupement, RG-041 point 4), notifie le succès total et referme la modale', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, membresEnConflit: [] });
+      const composant = fixture.componentInstance;
+
+      composant.ouvrirSaisieMasseMembres();
+
+      const resultat = await composant.traiterSaisieMasseMembres(
+        'mnovak;username=interne\ninconnu1;email=client',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 2 });
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledWith(
+        'qualifier_membre',
+        expect.objectContaining({
+          groupeId: 'groupe-1',
+          origine: 'Saisie en masse (Fiche projet)',
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      const appels = jest.mocked(invoke).mock.calls;
+      const parametresAppeles = appels.map((appel) => appel[1]);
+      expect(parametresAppeles).toEqual([
+        expect.objectContaining({
+          membreId: undefined,
+          critere: 'mnovak',
+          typeCritere: 'username',
+          statut: 'interne',
+        }),
+        expect.objectContaining({
+          membreId: undefined,
+          critere: 'inconnu1',
+          typeCritere: 'email',
+          statut: 'client',
+        }),
+      ]);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'succes', message: '2 membres qualifiés.' }),
+      ]);
+
+      composant.gererResultatSaisieMasseMembres(resultat);
+      expect(composant.modaleSaisieMasseMembresVisible()).toBe(false);
+    });
+
+    it('rejette une ligne dont le critère correspond à une règle déjà existante avant tout enregistrement, sans bloquer les autres lignes (additivité stricte, RG-041 point 1)', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, membresEnConflit: [] });
+      const composant = fixture.componentInstance;
+
+      // « jdupont;username » figure déjà parmi les membres connus du groupe de test (DonneesDeTest.racine).
+      const resultat = await composant.traiterSaisieMasseMembres(
+        'jdupont;username=client\ninconnu1;username=interne',
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke).toHaveBeenCalledWith(
+        'qualifier_membre',
+        expect.objectContaining({ critere: 'inconnu1' }),
+      );
+      expect(resultat.nombreReussies).toBe(1);
+      expect(resultat.erreurs).toEqual([
+        {
+          ligne: 'jdupont;username=client',
+          message:
+            'Une règle existe déjà pour le critère « jdupont » (username) : ligne rejetée (saisie en masse strictement additive).',
+        },
+      ]);
+      expect(resultat.texteRestant).toBe('jdupont;username=client');
+    });
+
+    it('échec partiel : conserve les qualifications déjà enregistrées avec succès, ne laisse que la ligne en échec dans le texte restant, et ne referme pas la modale (RG-041 point 5)', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest
+        .mocked(invoke)
+        .mockResolvedValueOnce({ donnees: racine, membresEnConflit: [] })
+        .mockRejectedValueOnce({ type: 'motDePasseOuFichierInvalide' });
+      const composant = fixture.componentInstance;
+      composant.ouvrirSaisieMasseMembres();
+
+      const resultat = await composant.traiterSaisieMasseMembres(
+        'inconnu1;username=interne\ninconnu2;username=client',
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(resultat.nombreReussies).toBe(1);
+      expect(resultat.erreurs).toEqual([
+        {
+          ligne: 'inconnu2;username=client',
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        },
+      ]);
+      expect(resultat.texteRestant).toBe('inconnu2;username=client');
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'succes', message: '1 membre qualifié.' }),
+      ]);
+
+      composant.gererResultatSaisieMasseMembres(resultat);
+      expect(composant.modaleSaisieMasseMembresVisible()).toBe(true);
+
+      // Nouvelle tentative, uniquement sur la ligne restée en échec (inconnu1 n'est jamais re-soumis, RG-041).
+      jest.mocked(invoke).mockReset();
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, membresEnConflit: [] });
+      const secondeTentative = await composant.traiterSaisieMasseMembres(
+        resultat.texteRestant,
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(invoke).toHaveBeenCalledWith(
+        'qualifier_membre',
+        expect.objectContaining({ critere: 'inconnu2' }),
+      );
+      expect(secondeTentative).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 1 });
+    });
+
+    it("rejette une ligne dont le statut n'est pas explicitement saisi, sans jamais lui attribuer de valeur par défaut (RG-041, point 3)", async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const composant = fixture.componentInstance;
+
+      const resultat = await composant.traiterSaisieMasseMembres(
+        'inconnu1;username=',
+        'mot-de-passe',
+      );
+
+      expect(invoke).not.toHaveBeenCalled();
+      expect(resultat.nombreReussies).toBe(0);
+      expect(resultat.erreurs).toHaveLength(1);
+      expect(resultat.texteRestant).toBe('inconnu1;username=');
     });
   });
 });

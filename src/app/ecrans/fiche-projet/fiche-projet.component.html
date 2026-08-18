@@ -333,6 +333,18 @@
           <!-- Colonne droite : membres et statuts, marqueurs IA détectés, annotations et journal (lecture seule). -->
           <section class="fiche-projet__colonne d-flex direction-colonne ecart-2">
             <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Membres et statuts</h2>
+            @if (afficherLienSaisieMasseMembres(donnees.membres)) {
+              <p class="exterieur-bas-2">
+                <button
+                  id="fiche-projet-bouton-saisie-masse-membres"
+                  type="button"
+                  class="bouton bouton--discret texte-sm"
+                  (click)="ouvrirSaisieMasseMembres()"
+                >
+                  Créer des règles en masse
+                </button>
+              </p>
+            }
             @if (donnees.membres.length === 0) {
               <p>Aucun membre constaté sur ce dernier audit.</p>
             } @else {
@@ -365,6 +377,29 @@
                   </li>
                 }
               </ul>
+            }
+
+            @if (modaleSaisieMasseMembresVisible()) {
+              <app-modale-saisie-masse
+                titre="Qualifier des membres en masse"
+                [texteInitial]="texteInitialSaisieMasseMembres(donnees.membres)"
+                [traiter]="traiterSaisieMasseMembres"
+                (resultatTraite)="gererResultatSaisieMasseMembres($event)"
+                (annulee)="fermerSaisieMasseMembres()"
+              >
+                <p slotAide class="champ__aide">
+                  Une ligne par membre, au format
+                  <code class="police-mono">critere;typeCritere=statut</code>, ex.
+                  <code class="police-mono">jdupont;username=interne</code>. Types de critère
+                  valides : <code class="police-mono">username</code>,
+                  <code class="police-mono">email</code>,
+                  <code class="police-mono">domaineEmail</code>. Statuts valides :
+                  <code class="police-mono">interne</code>, <code class="police-mono">client</code>,
+                  <code class="police-mono">partenaire</code> — jamais pré-rempli, une valeur
+                  explicite est exigée sur chaque ligne. Une ligne dont le critère correspond à une
+                  règle déjà existante est rejetée (saisie strictement additive).
+                </p>
+              </app-modale-saisie-masse>
             }
 
             <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">

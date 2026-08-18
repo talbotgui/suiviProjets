@@ -43,6 +43,7 @@ import type {
 import { RapportAnomaliesUtils } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { AnomalieResolue } from '../../services/avecetat/campagne/rapport-anomalies.utils';
 import type { ResultatCroiseFraicheurSonar } from '../../services/avecetat/campagne/connecteur-croise.utils';
+import type { DonneesMembreConnu } from '../../services/avecetat/etat/donnees-application.service';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/types-donnees';
@@ -78,6 +79,11 @@ import {
   type SeuilsTailleDepot,
 } from '../../services/sansetat/jugement/parametres-jugement.utils';
 import { SaisieMasseDependancesUtils } from '../../services/sansetat/jugement/saisie-masse-dependances.utils';
+import { SaisieMasseMembresUtils } from '../../services/sansetat/jugement/saisie-masse-membres.utils';
+import type {
+  StatutMembreSaisieMasse,
+  TypeCritereMembreSaisieMasse,
+} from '../../services/sansetat/jugement/saisie-masse-membres.utils';
 import {
   SeuilsCouleurUtils,
   type Couleur,
@@ -92,6 +98,15 @@ import { StatutObsolescenceUtils } from '../../services/sansetat/jugement/statut
 import type { ResultatObsolescence } from '../../services/sansetat/jugement/statut-obsolescence.utils';
 
 const MILLISECONDES_PAR_JOUR = 24 * 60 * 60 * 1000;
+
+/**
+ * Origine consignée au journal des modifications (RG-023) pour toute qualification de membre issue de la saisie
+ * en masse depuis cet écran (US-044, RG-041) : décision arbitraire de ce développement (à valider par un humain),
+ * faute de convention documentée pour ce libellé — distincte de `'Administration'` (constante propre à
+ * `SqmMembresConnusAdminComponent`), pour ne jamais laisser croire dans le journal qu'une qualification en masse
+ * réalisée depuis la Fiche projet provient du sous-onglet Membres connus.
+ */
+const ORIGINE_SAISIE_MASSE_MEMBRES = 'Saisie en masse (Fiche projet)';
 
 /**
  * Étiquette d'un jugement calculé (libellé + couleur sémantique, absente si non calculable, RG-022 : jamais de
@@ -332,6 +347,14 @@ export class SqmFicheProjetComponent {
    * développement C15-07), volontairement pas un réglage applicatif.
    */
   private static readonly SEUIL_LIEN_SAISIE_MASSE_DEPENDANCES = 5;
+
+  /**
+   * Seuil strict de membres au statut `inconnu` au-delà duquel le lien contextuel « Créer des règles en masse »
+   * est proposé (RG-041) : valeur figée en dur par décision d'arbitrage humaine du 2026-08-18 (cf. plan de
+   * développement C15-08), volontairement pas un réglage applicatif — même décision que
+   * {@link SEUIL_LIEN_SAISIE_MASSE_DEPENDANCES}.
+   */
+  private static readonly SEUIL_LIEN_SAISIE_MASSE_MEMBRES = 5;
 
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
@@ -1299,6 +1322,209 @@ export class SqmFicheProjetComponent {
   public gererResultatSaisieMasseDependances(resultat: ResultatTraitementSaisieMasse): void {
     if (resultat.erreurs.length === 0) {
       this.fermerSaisieMasseDependances();
+    }
+  }
+
+  // --- Saisie en masse de qualifications de membres connus (US-044, RG-041, C15-08) ---
+
+  /**
+   * Compte les membres du projet actuellement affiché strictement au statut `inconnu` (RG-041), à l'exclusion des
+   * membres en `conflit` (statut distinct, RG-008) : décision d'interprétation de ce développement (à valider par
+   * un humain), faute de précision documentaire tranchant explicitement ce point — `LigneMembre.
+   * critereParDefautQualification` n'est renseigné que pour une résolution `inconnu` (cf.
+   * {@link construireLigneMembre}), jamais pour une résolution `conflit`, ce qui en fait un indicateur fiable de ce
+   * dénombrement sans recalculer la résolution de statut.
+   * @param membres - Lignes d'affichage des membres du projet.
+   * @returns Le nombre de membres strictement `inconnu`.
+   */
+  public nombreMembresInconnus(membres: readonly LigneMembre[]): number {
+    return membres.filter((membre) => membre.critereParDefautQualification !== undefined).length;
+  }
+
+  /**
+   * Indique si le lien contextuel « Créer des règles en masse » doit être affiché (RG-041 : dès plus de cinq
+   * membres au statut `inconnu`).
+   * @param membres - Lignes d'affichage des membres du projet.
+   * @returns `true` si le lien doit être affiché.
+   */
+  public afficherLienSaisieMasseMembres(membres: readonly LigneMembre[]): boolean {
+    return (
+      this.nombreMembresInconnus(membres) > SqmFicheProjetComponent.SEUIL_LIEN_SAISIE_MASSE_MEMBRES
+    );
+  }
+
+  /**
+   * Visibilité de la modale de saisie en masse de qualifications de membres.
+   */
+  public readonly modaleSaisieMasseMembresVisible: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Ouvre la modale de saisie en masse de qualifications de membres.
+   */
+  public ouvrirSaisieMasseMembres(): void {
+    this.modaleSaisieMasseMembresVisible.set(true);
+  }
+
+  /**
+   * Referme la modale de saisie en masse de qualifications de membres, sans effet sur les règles déjà enregistrées.
+   */
+  public fermerSaisieMasseMembres(): void {
+    this.modaleSaisieMasseMembresVisible.set(false);
+  }
+
+  /**
+   * Construit le texte pré-rempli de la modale de saisie en masse de membres, à partir des membres strictement
+   * `inconnu` actuellement constatés sur le projet affiché : une ligne par critère par défaut distinct (cf.
+   * {@link calculerCritereParDefautQualification}), statut laissé vide pour saisie explicite par l'utilisateur
+   * (RG-041, point 3). Décision arbitraire de ce développement (à valider par un humain, faute de précision
+   * documentaire sur le pré-remplissage exact attendu) : même patron que
+   * {@link texteInitialSaisieMasseDependances}, cohérent avec le critère par défaut déjà proposé par le lien
+   * unitaire « Qualifier ce membre » (cf. {@link queryParamsQualification}).
+   * @param membres - Lignes d'affichage des membres du projet.
+   * @returns Le texte pré-rempli, une ligne par critère par défaut distinct, au format `critere;typeCritere=` de
+   * la grammaire retenue par {@link SaisieMasseMembresUtils}.
+   */
+  public texteInitialSaisieMasseMembres(membres: readonly LigneMembre[]): string {
+    const lignes = new Set<string>();
+    for (const membre of membres) {
+      const critereParDefaut = membre.critereParDefautQualification;
+      if (critereParDefaut !== undefined) {
+        lignes.add(`${critereParDefaut.valeur};${critereParDefaut.type}=`);
+      }
+    }
+    return Array.from(lignes).join('\n');
+  }
+
+  /**
+   * Convertit le type de critère littéral produit par {@link SaisieMasseMembresUtils} en valeur de l'enum
+   * `TypeCritereMembre` attendue par `DonneesApplicationService.qualifierMembre` (cf. commentaire d'en-tête de
+   * `saisie-masse-membres.utils.ts` sur l'absence de dépendance de `services/sansetat/` vers `services/avecetat/`) :
+   * switch exhaustif plutôt qu'une assertion `as` non justifiée.
+   * @param typeCritere - Type de critère littéral analysé.
+   * @returns La valeur d'enum correspondante.
+   */
+  private convertirTypeCritereSaisieMasse(
+    typeCritere: TypeCritereMembreSaisieMasse,
+  ): TypeCritereMembre {
+    switch (typeCritere) {
+      case 'username':
+        return TypeCritereMembre.Username;
+      case 'email':
+        return TypeCritereMembre.Email;
+      case 'domaineEmail':
+        return TypeCritereMembre.DomaineEmail;
+    }
+  }
+
+  /**
+   * Convertit le statut littéral produit par {@link SaisieMasseMembresUtils} en valeur de l'enum `StatutMembre`
+   * attendue par `DonneesApplicationService.qualifierMembre` (cf. {@link convertirTypeCritereSaisieMasse}).
+   * @param statut - Statut littéral analysé.
+   * @returns La valeur d'enum correspondante.
+   */
+  private convertirStatutSaisieMasse(statut: StatutMembreSaisieMasse): StatutMembre {
+    switch (statut) {
+      case 'interne':
+        return StatutMembre.Interne;
+      case 'client':
+        return StatutMembre.Client;
+      case 'partenaire':
+        return StatutMembre.Partenaire;
+    }
+  }
+
+  /**
+   * Stratégie de traitement injectée dans la modale de saisie en masse de qualifications de membres (US-044,
+   * RG-041) : analyse le texte collé via {@link SaisieMasseMembresUtils.analyser} (rejet des lignes malformées, de
+   * type de critère ou de statut non reconnu, en conflit avec une règle déjà existante du groupe ou en doublon
+   * interne au lot, sans bloquer les autres lignes valides), puis enregistre chaque qualification valide par un
+   * appel indépendant à la commande native `qualifierMembre` (une fois par ligne, jamais de regroupement — RG-041,
+   * point 4, à la différence de la saisie en masse de règles de dépendances). Le champ `membreId` n'est jamais
+   * transmis (toujours `undefined`) : il ne s'agit ici que de créations, jamais de modifications d'une règle
+   * existante (rejetées en amont par {@link SaisieMasseMembresUtils.analyser}), et l'identifiant d'une règle
+   * nouvellement créée est généré côté cœur natif, jamais côté interface (asymétrie avec `definirReferentiel`,
+   * documentée dans `referentiels-parametrage.component.ts`, vérifiée dans le code de
+   * `DonneesApplicationService.qualifierMembre` avant ce développement). Chaque appel produit sa propre entrée de
+   * journal (RG-023). En cas d'échec sur une ligne, les lignes déjà enregistrées avec succès le restent (jamais
+   * re-soumises) : seule la ligne originale en échec est restituée dans le texte restant, pour correction ou
+   * nouvelle tentative par l'utilisateur (RG-041, point 5).
+   * @param texte - Texte collé courant de la modale.
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur pour cette soumission (RG-002, une seule
+   * ressaisie pour tout le lot).
+   * @returns Le résultat du traitement, consommé par la modale pour mettre à jour son affichage.
+   */
+  public readonly traiterSaisieMasseMembres: StrategieTraitementSaisieMasse = async (
+    texte: string,
+    motDePasse: string,
+  ): Promise<ResultatTraitementSaisieMasse> => {
+    const etatCourant = this.etat();
+    if (etatCourant.type !== 'trouve') {
+      return { texteRestant: texte, erreurs: [], nombreReussies: 0 };
+    }
+    const groupeId = etatCourant.donnees.groupeId;
+    const groupe = this.donneesApplication
+      .racine()
+      ?.groupes.find((candidat) => candidat.id === groupeId);
+    const reglesExistantes = (groupe?.membresConnus ?? []).map((regle) => ({
+      critere: regle.critere,
+      typeCritere: regle.typeCritere,
+    }));
+    const analyse = SaisieMasseMembresUtils.analyser(texte, reglesExistantes);
+
+    const erreurs: ErreurLigneSaisieMasse[] = [...analyse.erreurs];
+    const lignesEnEchec: string[] = [];
+    let nombreReussies = 0;
+
+    for (const entree of analyse.entrees) {
+      const donnees: DonneesMembreConnu = {
+        membreId: undefined,
+        critere: entree.critere,
+        typeCritere: this.convertirTypeCritereSaisieMasse(entree.typeCritere),
+        statut: this.convertirStatutSaisieMasse(entree.statut),
+      };
+      // Boucle séquentielle intentionnelle : chaque ligne doit être enregistrée par un appel indépendant à
+      // `qualifierMembre` (RG-041), un échec sur une ligne ne devant jamais empêcher la tentative des lignes
+      // suivantes (échec partiel, RG-041 point 5) ; `donneesApplication.qualifierMembre` relit par ailleurs la
+      // racine courante à chaque appel, qui doit donc déjà refléter le résultat de l'appel précédent avant le
+      // suivant.
+      const resultat = await this.donneesApplication.qualifierMembre(
+        groupeId,
+        donnees,
+        ORIGINE_SAISIE_MASSE_MEMBRES,
+        motDePasse,
+      );
+      if (resultat.type === 'succes') {
+        nombreReussies += 1;
+      } else {
+        erreurs.push({
+          ligne: entree.ligneOriginale,
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        });
+        lignesEnEchec.push(entree.ligneOriginale);
+      }
+    }
+
+    if (nombreReussies > 0) {
+      this.notification.succes(
+        `${nombreReussies} membre${nombreReussies > 1 ? 's' : ''} qualifié${nombreReussies > 1 ? 's' : ''}.`,
+      );
+    }
+
+    const texteRestant = [...analyse.erreurs.map((erreur) => erreur.ligne), ...lignesEnEchec].join(
+      '\n',
+    );
+    return { texteRestant, erreurs, nombreReussies };
+  };
+
+  /**
+   * Gère le résultat d'une tentative de traitement de la modale de saisie en masse de qualifications de membres :
+   * referme la modale uniquement si la soumission a été intégralement enregistrée avec succès (aucune erreur
+   * restante), la laisse ouverte sinon (erreurs déjà reflétées par l'affichage interne de la modale).
+   * @param resultat - Résultat du traitement, émis par la modale.
+   */
+  public gererResultatSaisieMasseMembres(resultat: ResultatTraitementSaisieMasse): void {
+    if (resultat.erreurs.length === 0) {
+      this.fermerSaisieMasseMembres();
     }
   }
 
