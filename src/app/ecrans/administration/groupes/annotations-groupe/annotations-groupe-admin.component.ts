@@ -316,6 +316,7 @@ export class SqmAnnotationsGroupeAdminComponent {
       case 'projetAbsentDuBrouillon':
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
+      case 'motifDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'entreeReferentielIntrouvable':
       case 'motifNommageBranchesInvalide':

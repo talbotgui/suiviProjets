@@ -19,7 +19,25 @@
 // ambiguïté de séparation). Plusieurs lignes partageant le même motif sont regroupées en une seule règle
 // multi-bornes (RG-040, point 3) ; une ligne dont le motif correspond à une règle déjà existante (paramètre
 // `motifsExistants`) est rejetée sans bloquer la validation des autres lignes (RG-040, point 2).
+//
+// Complément RG-044 (Phase 15, C15-12, arbitrage humain du 2026-08-18, périmètre étendu à cette saisie en masse,
+// cf. `docs/03_plan/analyse_C15-12.md`) : chaque groupe résultant du regroupement par motif, s'il ne porte encore
+// aucune borne de motif `*`, se voit compléter automatiquement d'une borne de repli `*=obsolete` en dernière
+// position de son tableau `versions`. Ce complément n'entre pas en contradiction avec l'additivité stricte de
+// RG-040 (aucune règle déjà existante avant l'ouverture de la modale n'est jamais modifiée ni fusionnée) : il ne
+// s'applique qu'à une règle nouvellement créée par la soumission en cours, jamais à une règle préexistante. La
+// borne synthétique n'est jamais ajoutée à `lignesOriginales`, qui doit rester le texte réellement saisi par
+// l'utilisateur (restitution fidèle du texte en cas d'échec partiel d'enregistrement d'un groupe).
 import type { VersionDependance } from './parametres-jugement.utils';
+
+/**
+ * Borne de repli injectée automatiquement dans un groupe nouvellement créé dépourvu de borne `*` (RG-044).
+ * Décision arbitraire déjà validée par l'arbitrage humain du 2026-08-18 (cf. `docs/03_plan/analyse_C15-12.md`),
+ * identique à celle retenue pour le formulaire unitaire (`SqmReferentielsParametrageComponent`), sur le modèle des
+ * autres valeurs par défaut arbitraires déjà documentées dans ce projet (cf.
+ * `.claude/rules/09-normes-developpement.md#structure-et-nommage`, nombre de sauvegardes de sécurité).
+ */
+const BORNE_DE_REPLI_PAR_DEFAUT: VersionDependance = { motifVersion: '*', statut: 'obsolete' };
 
 /**
  * Erreur associée à une ligne précise de la saisie en masse de règles de dépendances (échec de validation ou
@@ -66,7 +84,10 @@ export class SaisieMasseDependancesUtils {
   /**
    * Analyse le texte collé d'une soumission de saisie en masse de règles de dépendances : ignore les lignes vides,
    * rejette les lignes malformées ou en conflit avec une règle déjà existante (sans bloquer les autres lignes),
-   * puis regroupe les lignes valides restantes par motif (RG-040).
+   * puis regroupe les lignes valides restantes par motif (RG-040). Complète ensuite chaque groupe résultant d'une
+   * borne de repli `*=obsolete` en dernière position s'il n'en porte encore aucune (RG-044, cf. commentaire
+   * d'en-tête de ce fichier) : ce complément ne s'applique qu'à une règle nouvellement créée par cette soumission,
+   * jamais à une règle déjà existante, et n'est jamais reflété dans `lignesOriginales`.
    * @param texte - Texte collé, une ligne par borne au format `motif;motifVersion=statut`.
    * @param motifsExistants - Motifs des règles de dépendances déjà enregistrées avant cette soumission (RG-040 :
    * additivité stricte, jamais modifiées ni fusionnées par cette saisie en masse).
@@ -115,7 +136,18 @@ export class SaisieMasseDependancesUtils {
     }
 
     const groupes: GroupeReglesDependances[] = Array.from(groupesParMotif.entries()).map(
-      ([motif, { versions, lignesOriginales }]) => ({ motif, versions, lignesOriginales }),
+      ([motif, { versions, lignesOriginales }]) => {
+        const contientDejaUneBorneDeRepli = versions.some(
+          (version) => version.motifVersion === '*',
+        );
+        return {
+          motif,
+          versions: contientDejaUneBorneDeRepli
+            ? versions
+            : [...versions, BORNE_DE_REPLI_PAR_DEFAUT],
+          lignesOriginales,
+        };
+      },
     );
 
     return { groupes, erreurs };

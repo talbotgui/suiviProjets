@@ -13,14 +13,17 @@ describe('SaisieMasseDependancesUtils', () => {
       });
     });
 
-    it('analyse une ligne valide unique en un groupe portant une seule borne de version', () => {
+    it('analyse une ligne valide unique en un groupe portant une seule borne de version, complétée de la borne de repli (RG-044)', () => {
       const resultat = SaisieMasseDependancesUtils.analyser('lodash;4.17.0=maintenu', []);
 
       expect(resultat.erreurs).toEqual([]);
       expect(resultat.groupes).toEqual([
         {
           motif: 'lodash',
-          versions: [{ motifVersion: '4.17.0', statut: 'maintenu' }],
+          versions: [
+            { motifVersion: '4.17.0', statut: 'maintenu' },
+            { motifVersion: '*', statut: 'obsolete' },
+          ],
           lignesOriginales: ['lodash;4.17.0=maintenu'],
         },
       ]);
@@ -32,13 +35,16 @@ describe('SaisieMasseDependancesUtils', () => {
       expect(resultat.groupes).toEqual([
         {
           motif: 'lodash',
-          versions: [{ motifVersion: '4.17.0', statut: 'maintenu' }],
+          versions: [
+            { motifVersion: '4.17.0', statut: 'maintenu' },
+            { motifVersion: '*', statut: 'obsolete' },
+          ],
           lignesOriginales: ['lodash ; 4.17.0 = maintenu'],
         },
       ]);
     });
 
-    it('regroupe plusieurs lignes de la même soumission partageant le même motif en une seule règle multi-bornes (RG-040)', () => {
+    it('regroupe plusieurs lignes de la même soumission partageant le même motif en une seule règle multi-bornes (RG-040), complétée de la borne de repli (RG-044)', () => {
       const resultat = SaisieMasseDependancesUtils.analyser(
         'lodash;4.*=obsolete\nlodash;5.*=maintenu',
         [],
@@ -51,10 +57,42 @@ describe('SaisieMasseDependancesUtils', () => {
           versions: [
             { motifVersion: '4.*', statut: 'obsolete' },
             { motifVersion: '5.*', statut: 'maintenu' },
+            { motifVersion: '*', statut: 'obsolete' },
           ],
           lignesOriginales: ['lodash;4.*=obsolete', 'lodash;5.*=maintenu'],
         },
       ]);
+    });
+
+    it('n’ajoute aucune borne de repli supplémentaire si le groupe porte déjà une borne « *=obsolete » saisie par l’utilisateur (RG-044)', () => {
+      const resultat = SaisieMasseDependancesUtils.analyser('lodash;*=obsolete', []);
+
+      expect(resultat.groupes).toEqual([
+        {
+          motif: 'lodash',
+          versions: [{ motifVersion: '*', statut: 'obsolete' }],
+          lignesOriginales: ['lodash;*=obsolete'],
+        },
+      ]);
+    });
+
+    it('n’ajoute aucune borne de repli supplémentaire si le groupe porte déjà une borne « * » avec un statut différent (RG-044, détection par motif seul)', () => {
+      const resultat = SaisieMasseDependancesUtils.analyser('lodash;*=maintenu', []);
+
+      expect(resultat.groupes).toEqual([
+        {
+          motif: 'lodash',
+          versions: [{ motifVersion: '*', statut: 'maintenu' }],
+          lignesOriginales: ['lodash;*=maintenu'],
+        },
+      ]);
+    });
+
+    it('n’ajoute jamais la borne de repli synthétique à `lignesOriginales` (RG-044)', () => {
+      const resultat = SaisieMasseDependancesUtils.analyser('lodash;4.17.0=maintenu', []);
+
+      expect(resultat.groupes[0]?.lignesOriginales).toEqual(['lodash;4.17.0=maintenu']);
+      expect(resultat.groupes[0]?.lignesOriginales).not.toContain('lodash;*=obsolete');
     });
 
     it('produit un groupe distinct par motif différent, dans l’ordre de première apparition', () => {
@@ -75,7 +113,10 @@ describe('SaisieMasseDependancesUtils', () => {
       expect(resultat.groupes).toEqual([
         {
           motif: 'lodash',
-          versions: [{ motifVersion: '4.*', statut: 'maintenu' }],
+          versions: [
+            { motifVersion: '4.*', statut: 'maintenu' },
+            { motifVersion: '*', statut: 'obsolete' },
+          ],
           lignesOriginales: ['lodash;4.*=maintenu'],
         },
       ]);
@@ -153,6 +194,7 @@ describe('SaisieMasseDependancesUtils', () => {
           versions: [
             { motifVersion: '4.17.0', statut: 'maintenu' },
             { motifVersion: '5.0.0', statut: 'maintenu' },
+            { motifVersion: '*', statut: 'obsolete' },
           ],
           lignesOriginales: ['lodash;4.17.0=maintenu', 'lodash;5.0.0=maintenu'],
         },

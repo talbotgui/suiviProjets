@@ -186,6 +186,10 @@ describe('SqmReferentielsParametrageComponent', () => {
       "Ce motif n'est pas une expression régulière valide, ou est vide.",
     ],
     ['typeReferentielInconnu', 'Ce type de référentiel est inconnu.'],
+    [
+      'motifDependanceDejaExistant',
+      'Une règle de dépendances existe déjà pour ce motif : modifiez directement la règle existante plutôt que d’en créer une nouvelle.',
+    ],
     ['motDePasseOuFichierInvalide', 'Mot de passe incorrect.'],
     ['fichierVerrouille', 'Le fichier de données est verrouillé par un autre processus.'],
     ['sessionVerrouillee', 'La session est verrouillée : déverrouillez-la avant de sauvegarder.'],
@@ -362,6 +366,150 @@ describe('SqmReferentielsParametrageComponent', () => {
         message: "Cette entrée n'est pas valide : vérifiez les champs obligatoires.",
       }),
     ]);
+  });
+
+  // --- Recette Phase 15 : C15-10/RG-042 (motif dupliqué, rejet strict) ---
+
+  it('bloque la création d’une règle de dépendances avec un motif déjà utilisé par une autre règle, sans appeler la commande native (RG-042)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'moment';
+    composant.versionsDependanceTexte = '4.*=maintenu';
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.messageErreur).toContain('existe déjà');
+    expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+    expect(invokeSimule).not.toHaveBeenCalled();
+  });
+
+  it('n’entrave pas la modification d’une règle de dépendances en conservant son propre motif inchangé (RG-042)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirEditionDependance('d1');
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.messageErreur).toBeNull();
+    expect(composant.actionEnAttenteMotDePasse()).toBe('dependance');
+  });
+
+  // --- Recette Phase 15 : C15-11/RG-043 (avertissement non bloquant sur un statut inconnu) ---
+
+  it('pose un avertissement non bloquant pour un statut hors des quatre valeurs connues, sans empêcher l’enregistrement (RG-043)', async () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'lodash';
+    composant.versionsDependanceTexte = '4.*=statutInconnu';
+    invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.avertissementStatutInconnu).toContain(
+      'statut hors des quatre valeurs reconnues',
+    );
+    expect(composant.actionEnAttenteMotDePasse()).toBe('dependance');
+
+    await composant.confirmerEnregistrementDependance('mot-de-passe');
+
+    expect(invokeSimule).toHaveBeenCalledWith(
+      'definir_referentiel',
+      expect.objectContaining({ typeReferentiel: 'reglesDependances' }),
+    );
+  });
+
+  it('ne pose aucun avertissement pour un statut connu (RG-043)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'lodash';
+    composant.versionsDependanceTexte = '4.*=maintenu';
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.avertissementStatutInconnu).toBeNull();
+  });
+
+  it('l’avertissement de statut inconnu est déclenché par comparaison sensible à la casse (« Obsolete », RG-043)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'lodash';
+    composant.versionsDependanceTexte = '4.*=Obsolete';
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.avertissementStatutInconnu).not.toBeNull();
+  });
+
+  // --- Recette Phase 15 : C15-12/US-045/RG-044 (borne de repli automatique) ---
+
+  it('pré-remplit une nouvelle règle de dépendances d’une borne de repli « *=obsolete » (RG-044)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirCreationDependance();
+
+    expect(composant.versionsDependanceTexte).toBe('*=obsolete');
+  });
+
+  it('positionne la ligne spécifique pré-remplie depuis la Fiche projet avant la borne de repli « *=obsolete » (RG-044)', () => {
+    const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
+    fixture.componentRef.setInput('motifPreselectionne', 'pkg-x');
+    fixture.componentRef.setInput('versionPreselectionnee', '2.0.0');
+
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.motifDependance).toBe('pkg-x');
+    expect(fixture.componentInstance.versionsDependanceTexte).toBe('2.0.0=\n*=obsolete');
+  });
+
+  it('ne duplique pas la borne de repli à l’édition d’une règle portant déjà une borne « * » avec un statut différent (RG-044)', () => {
+    const racine = DonneesDeTest.racineVide();
+    donneesApplication.chargerRacine({
+      ...racine,
+      referentiels: {
+        ...racine.referentiels,
+        reglesDependances: [
+          { id: 'd2', motif: 'lodash', versions: [{ motifVersion: '*', statut: 'maintenu' }] },
+        ],
+      },
+    });
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirEditionDependance('d2');
+
+    expect(composant.versionsDependanceTexte).toBe('*=maintenu');
+  });
+
+  it('ajoute automatiquement une borne de repli en dernière position à l’édition d’une règle n’en portant aucune (RG-044)', () => {
+    const racine = DonneesDeTest.racineVide();
+    donneesApplication.chargerRacine({
+      ...racine,
+      referentiels: {
+        ...racine.referentiels,
+        reglesDependances: [
+          { id: 'd3', motif: 'express', versions: [{ motifVersion: '4.*', statut: 'maintenu' }] },
+        ],
+      },
+    });
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirEditionDependance('d3');
+
+    expect(composant.versionsDependanceTexte).toBe('4.*=maintenu\n*=obsolete');
   });
 
   it('demande puis annule la suppression d’une règle de dépendances sans appeler la commande native (US-033, RG-035)', () => {

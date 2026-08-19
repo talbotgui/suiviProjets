@@ -103,7 +103,7 @@ Arbitrage humain rendu le 2026-08-18 : **option A retenue** (périmètre réduit
 
 Cet arbitrage lève la réserve de prématurité initialement posée par cette section : une qualification documentaire reste possible, sous réserve de la vérification technique complémentaire contre une instance réelle mentionnée ci-dessus, à mener avant tout chiffrage engageant.
 
-Numérotation coordonnée avec les cinq autres points `C15-NN` de cette même phase pour éviter toute collision d'identifiant (cf. `docs/03_plan/analyse_C15-10.md` à `analyse_C15-12.md`, ainsi que `RG-045` déjà qualifiée pour le point C15-13 dans `05_reglesGestion.md`, qui consomment déjà `RG-042` à `RG-045` dans l'ordre de traitement retenu) :
+Numérotation coordonnée avec les cinq autres points `C15-NN` de cette même phase pour éviter toute collision d'identifiant : `RG-042` à `RG-044`/`US-045` ont été consommées par C15-10 à C15-12 (développés et qualifiés dans `05_reglesGestion.md`/`04_casUsage.md`, analyses de qualification supprimées après développement), et `RG-045` par C15-13 (également qualifiée dans `05_reglesGestion.md`) :
 
 - **US-046** (provisoire) : cas d'usage d'audit historique à date passée, périmètre réduit aux indicateurs historisables, typé distinctement d'un audit régulier.
 - **RG-046** (provisoire, sous réserve d'éclatement en plusieurs règles lors de la qualification documentaire effective, compte tenu de l'ampleur du sujet) : couvre le typage distinct de l'audit historique, le comportement de repli sur la date Sonar disponible la plus proche, la restitution visuelle distincte sur Synthèse graphique/Fiche projet, et l'exclusion des sources à ref figée (SHA/tag).

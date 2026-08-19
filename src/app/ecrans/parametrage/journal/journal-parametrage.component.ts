@@ -138,6 +138,7 @@ export class SqmJournalParametrageComponent {
       case 'motDePasseSessionDivergent':
         return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'reglageApplicatifInvalide':
+      case 'motifDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'entreeReferentielIntrouvable':
       case 'motifNommageBranchesInvalide':

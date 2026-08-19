@@ -28,6 +28,18 @@
 // effet (constructeur) ouvre une fois pour toutes le formulaire de création d'une règle de dépendances pré-rempli
 // avec le motif reçu et, si présente, une première borne de version dont seul le motif de version est renseigné (le
 // statut restant à la charge de l'utilisateur), sur le même patron que `SqmMembresConnusAdminComponent` (Phase 4).
+//
+// Recette Phase 15 (arbitrage humain du 2026-08-18, C15-10/C15-11/C15-12, cf. `docs/03_plan/analyse_C15-10.md`,
+// `analyse_C15-11.md`, `analyse_C15-12.md`) :
+// - RG-042 : l'enregistrement d'une règle de dépendances est bloqué si le motif saisi correspond déjà au motif
+//   d'une autre entrée du référentiel (rejet strict, jamais de fusion implicite, symétrique de RG-040 pour la
+//   saisie en masse), qu'il s'agisse d'une saisie libre ou d'un pré-remplissage depuis la Fiche projet.
+// - RG-043 : un statut de borne de version hors des quatre valeurs bénéficiant d'une couleur dédiée à l'affichage
+//   (`obsolete`, `maintenu`, `aJourM1`, `aJourM3`, comparaison sensible à la casse) déclenche un avertissement non
+//   bloquant à l'enregistrement, distinct du bloc d'erreur bloquante.
+// - RG-044 : une borne de repli `*=obsolete` est injectée automatiquement en dernière position des bornes de
+//   version d'une règle de dépendances nouvellement créée (ou complétée à l'édition si aucune borne `*` n'existe
+//   déjà, indépendamment de son statut), pour couvrir les versions ne correspondant à aucun motif plus spécifique.
 import {
   Component,
   ElementRef,
@@ -155,7 +167,10 @@ export class SqmReferentielsParametrageComponent {
       this.motifDependance = motifCible;
       const versionCible = this.versionPreselectionnee();
       if (versionCible !== undefined && versionCible.length > 0) {
-        this.versionsDependanceTexte = `${versionCible}=`;
+        // RG-044 : la ligne spécifique pré-remplie doit précéder la borne de repli déjà positionnée par
+        // `ouvrirCreationDependance` (sémantique « première correspondance déclarée l'emporte », cf.
+        // `parametres-jugement.utils.ts`), jamais l'inverse.
+        this.versionsDependanceTexte = `${versionCible}=\n${SqmReferentielsParametrageComponent.BORNE_DE_REPLI_PAR_DEFAUT}`;
       }
     });
   }
@@ -179,6 +194,13 @@ export class SqmReferentielsParametrageComponent {
    * Message d'erreur de validation ou de rejet par le cœur natif, `null` si aucune erreur en cours.
    */
   public messageErreur: string | null = null;
+
+  /**
+   * Avertissement non bloquant sur le formulaire de règle de dépendances (RG-043 : statut de borne de version hors
+   * des quatre valeurs reconnues), `null` si aucun. Distinct de {@link messageErreur} : n'empêche jamais
+   * l'enregistrement, contrairement à un message d'erreur.
+   */
+  public avertissementStatutInconnu: string | null = null;
 
   /**
    * Action de référentiel en attente de ressaisie du mot de passe (RG-002). Signal (plutôt qu'une simple propriété)
@@ -216,19 +238,45 @@ export class SqmReferentielsParametrageComponent {
   public versionsDependanceTexte = '';
 
   /**
-   * Ouvre le formulaire pour la création d'une nouvelle règle de dépendances.
+   * Ligne de borne de repli injectée automatiquement à la création ou à l'édition d'une règle de dépendances
+   * dépourvue de borne `*` (RG-044). Décision arbitraire déjà validée par l'arbitrage humain du 2026-08-18 (cf.
+   * `docs/03_plan/analyse_C15-12.md`), faute de valeur métier fixée par un texte normatif antérieur, sur le modèle
+   * des autres valeurs par défaut arbitraires déjà documentées dans ce projet (cf.
+   * `.claude/rules/09-normes-developpement.md#structure-et-nommage`, nombre de sauvegardes de sécurité).
+   */
+  private static readonly BORNE_DE_REPLI_PAR_DEFAUT = '*=obsolete';
+
+  /**
+   * Statuts de borne de version bénéficiant d'une couleur dédiée à l'affichage (cf. texte d'aide du champ « Bornes
+   * de version »). Toute autre valeur reste acceptée par le cœur natif (champ libre, RG-022) mais déclenche un
+   * avertissement non bloquant à l'enregistrement (RG-043), comparaison strictement sensible à la casse.
+   */
+  private static readonly STATUTS_CONNUS: readonly string[] = [
+    'obsolete',
+    'maintenu',
+    'aJourM1',
+    'aJourM3',
+  ];
+
+  /**
+   * Ouvre le formulaire pour la création d'une nouvelle règle de dépendances, pré-rempli d'une borne de repli
+   * `*=obsolete` (RG-044), modifiable ou supprimable avant validation.
    */
   public ouvrirCreationDependance(): void {
     this.dependanceEnEditionId = null;
     this.motifDependance = '';
-    this.versionsDependanceTexte = '';
+    this.versionsDependanceTexte = SqmReferentielsParametrageComponent.BORNE_DE_REPLI_PAR_DEFAUT;
     this.messageErreur = null;
+    this.avertissementStatutInconnu = null;
     this.formulaireDependanceVisible.set(true);
     this.focusApresRendu(this.premierChampDependance);
   }
 
   /**
-   * Ouvre le formulaire pré-rempli pour la modification d'une règle de dépendances existante.
+   * Ouvre le formulaire pré-rempli pour la modification d'une règle de dépendances existante. Complète
+   * automatiquement les bornes reconstruites d'une ligne de repli `*=obsolete` en dernière position si aucune des
+   * bornes déjà persistées ne porte le motif `*` (RG-044) : la détection porte uniquement sur le motif, quel que
+   * soit le statut associé, pour ne jamais dupliquer une borne de repli déjà présente sous un autre statut.
    * @param id - Identifiant de la règle à modifier.
    */
   public ouvrirEditionDependance(id: string): void {
@@ -238,10 +286,16 @@ export class SqmReferentielsParametrageComponent {
     }
     this.dependanceEnEditionId = regle.id;
     this.motifDependance = regle.motif;
-    this.versionsDependanceTexte = regle.versions
-      .map((version) => `${version.motifVersion}=${version.statut}`)
-      .join('\n');
+    const lignes = regle.versions.map((version) => `${version.motifVersion}=${version.statut}`);
+    const contientDejaUneBorneDeRepli = regle.versions.some(
+      (version) => version.motifVersion === '*',
+    );
+    if (!contientDejaUneBorneDeRepli) {
+      lignes.push(SqmReferentielsParametrageComponent.BORNE_DE_REPLI_PAR_DEFAUT);
+    }
+    this.versionsDependanceTexte = lignes.join('\n');
     this.messageErreur = null;
+    this.avertissementStatutInconnu = null;
     this.formulaireDependanceVisible.set(true);
     this.focusApresRendu(this.premierChampDependance);
   }
@@ -279,18 +333,41 @@ export class SqmReferentielsParametrageComponent {
 
   /**
    * Valide le formulaire de règle de dépendances puis, si valide, ouvre la ressaisie du mot de passe (RG-002).
+   * Bloque avec {@link messageErreur} si le motif est vide, si une ligne de bornes est malformée, ou si le motif
+   * correspond déjà à une autre entrée du référentiel (RG-042, rejet strict, jamais de fusion implicite). Pose
+   * ensuite, sans bloquer l'enregistrement, un éventuel {@link avertissementStatutInconnu} si une borne porte un
+   * statut hors des quatre valeurs reconnues (RG-043).
    */
   public demanderEnregistrementDependance(): void {
     if (this.motifDependance.trim().length === 0) {
       this.messageErreur = 'Le motif est obligatoire.';
+      this.avertissementStatutInconnu = null;
       return;
     }
-    if (this.analyserVersions(this.versionsDependanceTexte) === undefined) {
+    const versions = this.analyserVersions(this.versionsDependanceTexte);
+    if (versions === undefined) {
       this.messageErreur =
         'Chaque ligne de bornes de version doit être au format « motifVersion=statut ».';
+      this.avertissementStatutInconnu = null;
+      return;
+    }
+    const motif = this.motifDependance.trim();
+    const motifDejaExistant = this.reglesDependances().some(
+      (regle) => regle.id !== this.dependanceEnEditionId && regle.motif === motif,
+    );
+    if (motifDejaExistant) {
+      this.messageErreur =
+        'Une règle de dépendances existe déjà pour ce motif : modifiez directement la règle existante plutôt que d’en créer une nouvelle (RG-042).';
+      this.avertissementStatutInconnu = null;
       return;
     }
     this.messageErreur = null;
+    const statutHorsListeConnue = versions.some(
+      (version) => !SqmReferentielsParametrageComponent.STATUTS_CONNUS.includes(version.statut),
+    );
+    this.avertissementStatutInconnu = statutHorsListeConnue
+      ? 'Au moins une borne de version porte un statut hors des quatre valeurs reconnues (obsolete, maintenu, aJourM1, aJourM3) : elle sera néanmoins enregistrée telle quelle.'
+      : null;
     this.actionEnAttenteMotDePasse.set('dependance');
   }
 
@@ -321,6 +398,7 @@ export class SqmReferentielsParametrageComponent {
       return;
     }
     this.formulaireDependanceVisible.set(false);
+    this.avertissementStatutInconnu = null;
     this.notification.succes(
       dependanceEnEditionId
         ? 'La règle de dépendances a été modifiée.'
@@ -613,6 +691,8 @@ export class SqmReferentielsParametrageComponent {
     switch (anomalie.type) {
       case 'entreeReferentielInvalide':
         return "Cette entrée n'est pas valide : vérifiez les champs obligatoires.";
+      case 'motifDependanceDejaExistant':
+        return 'Une règle de dépendances existe déjà pour ce motif : modifiez directement la règle existante plutôt que d’en créer une nouvelle.';
       case 'entreeReferentielIntrouvable':
         return "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).";
       case 'motifNommageBranchesInvalide':

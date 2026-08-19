@@ -331,6 +331,7 @@ export class SqmSeuilsParametrageComponent {
       case 'motDePasseSessionDivergent':
         return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'typeReferentielInconnu':
+      case 'motifDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'motifNommageBranchesInvalide':
       case 'groupeIntrouvable':

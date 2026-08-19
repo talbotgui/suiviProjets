@@ -764,6 +764,49 @@ mod tests {
     }
 
     #[test]
+    fn previsualiser_import_configuration_entree_referentiel_borne_de_version_malformee_est_signalee()
+    -> Result<(), ErreurConfigurationPartageable> {
+        // RG-043 (Phase 15, C15-11) : l'extension structurelle de `valider_entree_regles_dependances` (chaque
+        // élément de `versions` doit porter `motifVersion`/`statut` non vides) est réutilisée telle quelle par
+        // cette voie d'import, sans code dédié — cette même fonction est appelée par `calculer_differentiel`.
+        let racine = racine_de_test();
+        let dossier = DossierTemporaire::nouveau("differentiel-borne-version-malformee");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [
+                        { "id": "d9", "motif": "moment", "versions": [{ "motifVersion": "*" }] }
+                    ],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                },
+                "seuils": {},
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        let differentiel = previsualiser_import_configuration(&racine, &chemin)?;
+
+        assert!(
+            differentiel
+                .lignes
+                .iter()
+                .all(|ligne| ligne.chemin != "referentiels.reglesDependances/d9"),
+            "une entrée dont une borne de version est dépourvue de statut ne doit jamais être proposée à \
+             l'acceptation"
+        );
+        assert_eq!(differentiel.lignes_invalides.len(), 1);
+        assert_eq!(
+            differentiel.lignes_invalides[0].chemin,
+            "referentiels.reglesDependances/d9"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn previsualiser_import_configuration_version_schema_superieure_est_rejetee()
     -> Result<(), std::io::Error> {
         let racine = racine_de_test();

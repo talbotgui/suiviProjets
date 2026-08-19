@@ -707,6 +707,7 @@ export type CategorieErreurAdministration =
   | 'motifNommageBranchesInvalide'
   | 'reglageApplicatifInvalide'
   | 'entreeReferentielIntrouvable'
+  | 'motifDependanceDejaExistant'
   | 'annotationIntrouvable'
   | 'annotationSystemeNonSupprimable'
   | 'modePurgeAgeInconnu'

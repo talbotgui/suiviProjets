@@ -55,6 +55,12 @@ pub(crate) enum ErreurParametrage {
     /// existante du référentiel concerné (US-033, RG-035).
     #[error("l'entrée de référentiel désignée est introuvable")]
     EntreeReferentielIntrouvable,
+    /// Le motif soumis pour une entrée de `referentiels.reglesDependances` correspond déjà au `motif` d'une autre
+    /// entrée existante du référentiel (RG-042, Phase 15 C15-10) : revalidation côté cœur natif du contrôle déjà
+    /// effectué côté interface, rejet strict symétrique de RG-040 (saisie en masse) — jamais de fusion implicite,
+    /// l'utilisateur doit modifier directement la règle existante.
+    #[error("le motif soumis correspond déjà à une règle de dépendances existante")]
+    MotifDependanceDejaExistant,
 }
 
 /// Modifie un seuil de couleur (`parametres.seuils`), désigné par un chemin pointé (segments séparés par `.`, ex.
@@ -125,20 +131,32 @@ fn lire_champ_chaine_non_vide<'a>(
 }
 
 /// Valide la forme minimale attendue d'une entrée de `referentiels.reglesDependances` (`id`, `motif` non vides,
-/// `versions` tableau), sans interpréter le détail de chaque borne de version (rôle du Moteur de jugement, UI).
+/// `versions` tableau dont chaque élément est un objet portant `motifVersion`/`statut` non vides, RG-043, Phase 15
+/// C15-11), sans imposer de liste fermée de valeurs pour `statut` (champ libre, RG-022 : l'interprétation fine du
+/// contenu reste du seul ressort du Moteur de jugement, UI).
 ///
 /// `pub(crate)` depuis la Phase 9, incrément 3 (correction post-relecture) : réutilisé tel quel par
 /// `persistance::configuration_partageable::calculer_differentiel` pour signaler comme lignes invalides, plutôt
 /// que d'appliquer sans contrôle, les entrées importées ne respectant pas cette même forme minimale — la voie
-/// d'import ne doit jamais être moins stricte que la saisie manuelle sur les mêmes données.
+/// d'import ne doit jamais être moins stricte que la saisie manuelle sur les mêmes données. Cette réutilisation
+/// s'applique mécaniquement à l'extension structurelle des éléments de `versions` (RG-043), sans changement requis
+/// côté import.
 pub(crate) fn valider_entree_regles_dependances(entree: &Value) -> Result<&str, ErreurParametrage> {
     let objet = entree
         .as_object()
         .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
     let id = lire_champ_chaine_non_vide(objet, "id")?;
     lire_champ_chaine_non_vide(objet, "motif")?;
-    if !objet.get("versions").is_some_and(Value::is_array) {
-        return Err(ErreurParametrage::EntreeReferentielInvalide);
+    let versions = objet
+        .get("versions")
+        .and_then(Value::as_array)
+        .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
+    for version in versions {
+        let version_objet = version
+            .as_object()
+            .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
+        lire_champ_chaine_non_vide(version_objet, "motifVersion")?;
+        lire_champ_chaine_non_vide(version_objet, "statut")?;
     }
     Ok(id)
 }
@@ -217,8 +235,10 @@ pub(crate) fn upsert_par_id(regles: &mut Vec<Value>, id: &str, entree: Value) ->
 ///
 /// [`ErreurParametrage::TypeReferentielInconnu`] si `type_referentiel` ne désigne aucune des trois branches
 /// ci-dessus ; [`ErreurParametrage::EntreeReferentielInvalide`] si `entree` ne porte pas la forme minimale requise
-/// pour un référentiel-liste ; [`ErreurParametrage::MotifNommageBranchesInvalide`] si `entree` n'est pas une
-/// chaîne non vide et syntaxiquement valide comme expression régulière (RG-030).
+/// pour un référentiel-liste ; [`ErreurParametrage::MotifDependanceDejaExistant`] si `type_referentiel` vaut
+/// `"reglesDependances"` et que le `motif` soumis correspond déjà à une autre entrée existante du référentiel
+/// (RG-042) ; [`ErreurParametrage::MotifNommageBranchesInvalide`] si `entree` n'est pas une chaîne non vide et
+/// syntaxiquement valide comme expression régulière (RG-030).
 pub(crate) fn definir_referentiel(
     donnees: &mut DonneesRacine,
     type_referentiel: &str,
@@ -228,6 +248,27 @@ pub(crate) fn definir_referentiel(
     let objet = match type_referentiel {
         "reglesDependances" => {
             let id = valider_entree_regles_dependances(&entree)?.to_string();
+            // RG-042 (Phase 15, C15-10) : revalidation côté cœur natif du contrôle déjà effectué côté interface.
+            // Aucune AUTRE entrée déjà présente (identifiant différent) ne doit porter le même motif, pour éviter
+            // un doublon fonctionnellement mort (le Moteur de jugement ne retient que la première règle du tableau
+            // dont le motif correspond). Rejette avant toute mutation du référentiel.
+            let motif = entree
+                .get("motif")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let motif_deja_existant = donnees.referentiels.regles_dependances.iter().any(|regle| {
+                let regle_objet = regle.as_object();
+                let id_regle = regle_objet
+                    .and_then(|objet| objet.get("id"))
+                    .and_then(Value::as_str);
+                let motif_regle = regle_objet
+                    .and_then(|objet| objet.get("motif"))
+                    .and_then(Value::as_str);
+                id_regle != Some(id.as_str()) && motif_regle == Some(motif)
+            });
+            if motif_deja_existant {
+                return Err(ErreurParametrage::MotifDependanceDejaExistant);
+            }
             let avant = upsert_par_id(
                 &mut donnees.referentiels.regles_dependances,
                 &id,
@@ -639,6 +680,152 @@ mod tests {
 
         assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
         assert!(racine.referentiels.regles_dependances.is_empty());
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_motif_deja_existant_est_rejete_a_la_creation()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d2", "motif": "moment", "versions": [] }),
+            "2026-07-27T10:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurParametrage::MotifDependanceDejaExistant)
+        );
+        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        assert_eq!(racine.journal.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_mise_a_jour_sans_changer_le_motif_est_acceptee()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [{ "motifVersion": "*", "statut": "obsolete" }] }),
+            "2026-07-27T10:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_deux_motifs_differents_est_accepte()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d2", "motif": "lodash", "versions": [] }),
+            "2026-07-27T10:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(racine.referentiels.regles_dependances.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_element_versions_sans_motif_version_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [{ "statut": "obsolete" }] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+        assert!(racine.referentiels.regles_dependances.is_empty());
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_element_versions_sans_statut_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [{ "motifVersion": "*" }] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_element_versions_statut_vide_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [{ "motifVersion": "*", "statut": "" }] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_element_versions_non_objet_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": ["pas-un-objet"] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_statut_hors_liste_connue_est_accepte()
+    -> Result<(), ErreurParametrage> {
+        // RG-043 : le cœur natif ne ferme jamais l'ensemble des valeurs de `statut` (champ libre, RG-022) ; seule
+        // l'interface avertit, sans bloquer, sur un statut hors des quatre valeurs reconnues.
+        let mut racine = racine_de_test();
+
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [{ "motifVersion": "*", "statut": "statutInconnu" }] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        Ok(())
     }
 
     #[test]

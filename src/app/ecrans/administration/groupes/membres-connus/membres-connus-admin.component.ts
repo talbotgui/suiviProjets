@@ -452,6 +452,7 @@ export class SqmMembresConnusAdminComponent {
       case 'projetAbsentDuBrouillon':
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
+      case 'motifDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'motifNommageBranchesInvalide':
       case 'fichierIntrouvable':

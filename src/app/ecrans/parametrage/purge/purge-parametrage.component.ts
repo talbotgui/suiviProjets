@@ -213,6 +213,7 @@ export class SqmPurgeParametrageComponent {
         return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
+      case 'motifDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'motifNommageBranchesInvalide':
       case 'groupeIntrouvable':

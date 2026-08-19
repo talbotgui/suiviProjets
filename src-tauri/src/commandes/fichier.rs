@@ -86,6 +86,9 @@ pub(crate) enum ErreurFacade {
     /// L'entrée de référentiel désignée par son identifiant n'existe pas (Phase 10, incrément 8, US-033,
     /// `supprimerRegleDependance`/`supprimerRegleMarqueurIA`).
     EntreeReferentielIntrouvable,
+    /// Le motif soumis à `definirReferentiel` pour une règle de dépendances correspond déjà au motif d'une autre
+    /// entrée existante du référentiel (Phase 15, C15-10, RG-042) : rejet strict, jamais de fusion implicite.
+    MotifDependanceDejaExistant,
     /// L'annotation désignée n'existe pas dans la portée demandée (Phase 10, incrément 8, US-019,
     /// `supprimerAnnotation`).
     AnnotationIntrouvable,
@@ -205,6 +208,7 @@ impl From<crate::persistance::parametrage::ErreurParametrage> for ErreurFacade {
             ErreurParametrage::MotifNommageBranchesInvalide => Self::MotifNommageBranchesInvalide,
             ErreurParametrage::ReglageApplicatifInvalide => Self::ReglageApplicatifInvalide,
             ErreurParametrage::EntreeReferentielIntrouvable => Self::EntreeReferentielIntrouvable,
+            ErreurParametrage::MotifDependanceDejaExistant => Self::MotifDependanceDejaExistant,
         }
     }
 }

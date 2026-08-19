@@ -1556,6 +1556,7 @@ export class DonneesApplicationService {
       'motifNommageBranchesInvalide',
       'reglageApplicatifInvalide',
       'entreeReferentielIntrouvable',
+      'motifDependanceDejaExistant',
       'annotationIntrouvable',
       'annotationSystemeNonSupprimable',
       'modePurgeAgeInconnu',
