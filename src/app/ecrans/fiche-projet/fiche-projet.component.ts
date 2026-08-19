@@ -54,11 +54,13 @@ import type {
   Groupe,
   Projet,
   Resultat,
+  Source,
 } from '../../services/avecetat/etat/types-donnees';
 import { TypeSource } from '../../services/avecetat/etat/types-donnees';
 import { ErreurConnecteurUtils } from '../../services/sansetat/commandes/erreur-connecteur.utils';
 import type {
   Dependance,
+  Instance,
   Marqueur,
   MembreGitlab,
   MergeRequestOuverte,
@@ -68,6 +70,7 @@ import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
 import { DerniereCampagneUtils } from '../../services/sansetat/jugement/derniere-campagne.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
+import { LienExterneSourceUtils } from '../../services/sansetat/jugement/lien-externe-source.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
 import type { ResultatNoteSonar } from '../../services/sansetat/jugement/note-sonar.utils';
 import {
@@ -173,6 +176,23 @@ interface LigneMr {
 }
 
 /**
+ * Ligne d'affichage du lien direct vers une source GitLab/Sonar réellement interrogée (US-008, RG-045, C15-13),
+ * construit à partir des seuls champs déjà chargés en mémoire (`Instance.urlBase`, `Source.idExterne`), sans aucun
+ * appel réseau ni nouvelle commande de la Façade — cf. {@link LienExterneSourceUtils}.
+ */
+interface LigneSourceExterne {
+  /** Libellé affiché (« Dépôt GitLab » ou « Projet Sonar »). */
+  readonly label: string;
+  /** Lien direct construit. */
+  readonly url: string;
+  /**
+   * Indice au survol signalant le caractère non contractuel du lien (RG-045), présent uniquement pour une source
+   * GitLab : le lien Sonar repose sur un format d'usage stable et documenté, sans réserve équivalente à afficher.
+   */
+  readonly avertissementNonContractuel: string | undefined;
+}
+
+/**
  * Ligne d'affichage d'un membre du dépôt (colonne droite), avec son statut de rattachement déjà résolu (RG-006 à
  * RG-010).
  */
@@ -240,6 +260,8 @@ interface DonneesFicheProjet {
   readonly description: string;
   /** Ref auditée du dépôt GitLab rattaché, libellé de repli si aucune source GitLab n'est rattachée. */
   readonly refAuditeeLabel: string;
+  /** Liens directs vers les instances GitLab/Sonar réellement interrogées (US-008, RG-045, C15-13). */
+  readonly sourcesExternes: readonly LigneSourceExterne[];
   /** Étiquette du statut IA (RG-016). */
   readonly statutIa: EtiquetteStatutIa;
   /** `true` si le badge SONAR_KO est déclenché (RG-013), toujours faux si {@link pasDeSonar}. */
@@ -356,6 +378,15 @@ export class SqmFicheProjetComponent {
    * {@link SEUIL_LIEN_SAISIE_MASSE_DEPENDANCES}.
    */
   private static readonly SEUIL_LIEN_SAISIE_MASSE_MEMBRES = 5;
+
+  /**
+   * Indice au survol du lien direct vers un dépôt GitLab (RG-045, C15-13) : ce lien repose sur un comportement de
+   * redirection de l'application web GitLab à partir du seul identifiant numérique de projet, non contractualisé
+   * au même titre que l'API REST v4 utilisée par ailleurs par les connecteurs (cf. `docs/03_plan/analyse_C15-13.
+   * md#24-formats-durl-web-réellement-navigables-vérifiés-recherche-externe-format-non-présumé`).
+   */
+  private static readonly INDICE_LIEN_GITLAB_NON_CONTRACTUEL =
+    "Lien déduit de l'identifiant du dépôt GitLab (redirection de l'application web GitLab) : ce mécanisme n'est pas garanti dans le temps au même titre qu'un appel d'API.";
 
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
@@ -729,6 +760,7 @@ export class SqmFicheProjetComponent {
       nomProjet: projet.nom,
       description: projet.description,
       refAuditeeLabel: refAuditeeSource?.refAuditee ?? 'branche par défaut du dépôt',
+      sourcesExternes: this.construireSourcesExternes(projet.sources, groupe.instances),
       statutIa: this.construireEtiquetteStatutIa(projet.iaAutorisee, themes.marqueursIa),
       sonarKo,
       membreInconnuDetecte: membres.some((membre) => membre.inconnu),
@@ -787,6 +819,42 @@ export class SqmFicheProjetComponent {
       seuilsBruts,
       referentielsBruts,
     };
+  }
+
+  /**
+   * Construit les liens directs vers les instances GitLab/Sonar réellement interrogées par les sources du projet
+   * (US-008, RG-045, C15-13), à partir des seuls champs déjà chargés en mémoire (`Instance.urlBase`,
+   * `Source.idExterne`), sans aucun appel réseau ni nouvelle commande de la Façade. Une source dont l'instance de
+   * rattachement est introuvable (donnée mal formée) est silencieusement ignorée plutôt que de produire un lien
+   * cassé.
+   * @param sources - Sources rattachées au projet (`Projet.sources`).
+   * @param instances - Instances déclarées par le groupe de rattachement (`Groupe.instances`).
+   * @returns Les liens directs construits, dans l'ordre des sources.
+   */
+  private construireSourcesExternes(
+    sources: readonly Source[],
+    instances: readonly Instance[],
+  ): readonly LigneSourceExterne[] {
+    return sources.flatMap((source): readonly LigneSourceExterne[] => {
+      const instance = instances.find((candidate) => candidate.id === source.instanceId);
+      if (instance === undefined) {
+        return [];
+      }
+      if (source.type === TypeSource.DepotGitlab) {
+        const ligne: LigneSourceExterne = {
+          label: 'Dépôt GitLab',
+          url: LienExterneSourceUtils.construireLienGitlab(instance.urlBase, source.idExterne),
+          avertissementNonContractuel: SqmFicheProjetComponent.INDICE_LIEN_GITLAB_NON_CONTRACTUEL,
+        };
+        return [ligne];
+      }
+      const ligne: LigneSourceExterne = {
+        label: 'Projet Sonar',
+        url: LienExterneSourceUtils.construireLienSonar(instance.urlBase, source.idExterne),
+        avertissementNonContractuel: undefined,
+      };
+      return [ligne];
+    });
   }
 
   /**

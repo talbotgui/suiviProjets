@@ -28,6 +28,19 @@
               >— ref auditée : {{ donnees.refAuditeeLabel }}</span
             >
           </p>
+          @if (donnees.sourcesExternes.length > 0) {
+            <div class="fiche-projet__sources-externes d-flex aligne-centre ecart-3 texte-sm">
+              @for (source of donnees.sourcesExternes; track source.url) {
+                <a
+                  [href]="source.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [attr.title]="source.avertissementNonContractuel"
+                  >{{ source.label }}</a
+                >
+              }
+            </div>
+          }
           <div class="fiche-projet__badges d-flex aligne-centre ecart-2 retour-ligne">
             <app-badge [couleur]="donnees.statutIa.couleur" [libelle]="donnees.statutIa.label" />
             @if (donnees.statutIa.reserve; as reserve) {

@@ -86,6 +86,17 @@
         <span class="sources-admin__projet texte-discret texte-sm">{{ ligne.projetNom }}</span>
         <span class="sources-admin__type poids-demi-gras">{{ ligne.source.type }}</span>
         <span class="sources-admin__id-externe texte-sm">{{ ligne.source.idExterne }}</span>
+        @if (ligne.urlLien) {
+          <a
+            class="sources-admin__lien-externe texte-sm"
+            [href]="ligne.urlLien"
+            target="_blank"
+            rel="noopener noreferrer"
+            [attr.title]="ligne.titreLien"
+          >
+            Voir l'origine
+          </a>
+        }
         <span class="sources-admin__ref-auditee texte-discret texte-sm">
           {{ ligne.source.refAuditee ?? 'branche par défaut du dépôt (résolue à l’audit)' }}
         </span>

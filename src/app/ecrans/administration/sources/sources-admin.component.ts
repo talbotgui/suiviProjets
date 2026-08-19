@@ -19,7 +19,9 @@ import { SqmConfirmationSuppressionComponent } from '../../../composants/confirm
 import { SqmFormulaireSourceComponent } from '../../../composants/formulaire-source/formulaire-source.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
+import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
 import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/types-donnees';
+import { LienExterneSourceUtils } from '../../../services/sansetat/jugement/lien-externe-source.utils';
 
 /**
  * Ligne agrégée de la liste des sources : porte la source ainsi que les identifiants et noms de son groupe et de
@@ -32,6 +34,16 @@ export interface LigneSource {
   readonly projetId: string;
   readonly projetNom: string;
   readonly source: Source;
+  /**
+   * Lien direct vers l'instance GitLab/Sonar réellement interrogée par cette source (US-008, RG-045, C15-13),
+   * `undefined` si l'instance de rattachement est introuvable (donnée mal formée).
+   */
+  readonly urlLien: string | undefined;
+  /**
+   * Indice au survol du lien direct (RG-045), présent uniquement pour une source GitLab (lien non contractuel, cf.
+   * `SqmFicheProjetComponent`).
+   */
+  readonly titreLien: string | undefined;
 }
 
 /**
@@ -45,6 +57,15 @@ export interface LigneSource {
   templateUrl: './sources-admin.component.html',
 })
 export class SqmSourcesAdminComponent {
+  /**
+   * Indice au survol du lien direct vers un dépôt GitLab (RG-045, C15-13), identique à celui de
+   * `SqmFicheProjetComponent` : ce lien repose sur un comportement de redirection de l'application web GitLab à
+   * partir du seul identifiant numérique de projet, non contractualisé au même titre que l'API REST v4 utilisée par
+   * ailleurs par les connecteurs.
+   */
+  private static readonly INDICE_LIEN_GITLAB_NON_CONTRACTUEL =
+    "Lien déduit de l'identifiant du dépôt GitLab (redirection de l'application web GitLab) : ce mécanisme n'est pas garanti dans le temps au même titre qu'un appel d'API.";
+
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
@@ -177,15 +198,40 @@ export class SqmSourcesAdminComponent {
             (projet) => this.projetSelectionneId === null || projet.id === this.projetSelectionneId,
           )
           .flatMap((projet) =>
-            projet.sources.map((source) => ({
-              groupeId: groupe.id,
-              groupeNom: groupe.nom,
-              projetId: projet.id,
-              projetNom: projet.nom,
-              source,
-            })),
+            projet.sources.map((source) => {
+              const urlLien = this.construireUrlLien(source, groupe.instances);
+              return {
+                groupeId: groupe.id,
+                groupeNom: groupe.nom,
+                projetId: projet.id,
+                projetNom: projet.nom,
+                source,
+                urlLien,
+                titreLien:
+                  urlLien !== undefined && source.type === TypeSource.DepotGitlab
+                    ? SqmSourcesAdminComponent.INDICE_LIEN_GITLAB_NON_CONTRACTUEL
+                    : undefined,
+              };
+            }),
           ),
       );
+  }
+
+  /**
+   * Construit le lien direct vers l'instance GitLab/Sonar réellement interrogée par une source (US-008, RG-045,
+   * C15-13), à partir des seuls champs déjà chargés en mémoire (`Instance.urlBase`, `Source.idExterne`).
+   * @param source - Source dont le lien est construit.
+   * @param instances - Instances déclarées par le groupe de rattachement de la source.
+   * @returns Le lien direct construit, `undefined` si l'instance de rattachement est introuvable.
+   */
+  private construireUrlLien(source: Source, instances: Groupe['instances']): string | undefined {
+    const instance = instances.find((candidate) => candidate.id === source.instanceId);
+    if (instance === undefined) {
+      return undefined;
+    }
+    return source.type === TypeSource.DepotGitlab
+      ? LienExterneSourceUtils.construireLienGitlab(instance.urlBase, source.idExterne)
+      : LienExterneSourceUtils.construireLienSonar(instance.urlBase, source.idExterne);
   }
 
   /**

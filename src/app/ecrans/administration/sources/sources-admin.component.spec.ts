@@ -136,6 +136,64 @@ describe('SqmSourcesAdminComponent', () => {
     expect(lignePaiement?.projetId).toBe(autreProjetId);
   });
 
+  it('calcule le lien direct vers l’instance réellement interrogée, avec un indice au survol uniquement pour GitLab (RG-045, C15-13)', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    const groupeAvecSonarId = donneesApplication.creerGroupe({
+      nom: 'Socle Sonar',
+      description: '',
+      instances: [
+        {
+          id: 'instance-sonar',
+          type: TypeInstance.Sonar,
+          nom: 'sonar-prod',
+          urlBase: 'https://sonar.test',
+        },
+      ],
+    });
+    const projetSonarId = donneesApplication.creerProjet(groupeAvecSonarId, {
+      nom: 'API Paiement',
+      description: '',
+    });
+    donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-gitlab',
+      type: TypeSource.DepotGitlab,
+      idExterne: '1234',
+      refAuditee: undefined,
+    });
+    donneesApplication.creerSource(groupeAvecSonarId, projetSonarId, {
+      instanceId: 'instance-sonar',
+      type: TypeSource.ProjetSonar,
+      idExterne: 'entreprise:api-paiement',
+      refAuditee: undefined,
+    });
+
+    const lignes = composant.lignesSources();
+
+    const ligneGitlab = lignes.find((l) => l.source.idExterne === '1234');
+    expect(ligneGitlab?.urlLien).toBe('https://gitlab.test/projects/1234');
+    expect(ligneGitlab?.titreLien).toContain("n'est pas garanti");
+
+    const ligneSonar = lignes.find((l) => l.source.idExterne === 'entreprise:api-paiement');
+    expect(ligneSonar?.urlLien).toBe('https://sonar.test/dashboard?id=entreprise%3Aapi-paiement');
+    expect(ligneSonar?.titreLien).toBeUndefined();
+  });
+
+  it('laisse urlLien/titreLien à undefined, sans lien affiché, quand l’instance de rattachement de la source est introuvable (RG-045, C15-13)', () => {
+    const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
+    donneesApplication.creerSource(groupeId, projetId, {
+      instanceId: 'instance-inexistante',
+      type: TypeSource.DepotGitlab,
+      idExterne: '1234',
+      refAuditee: undefined,
+    });
+
+    const lignes = composant.lignesSources();
+
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0].urlLien).toBeUndefined();
+    expect(lignes[0].titreLien).toBeUndefined();
+  });
+
   it('restreint les sources aux projets du groupe filtré quand aucun projet n’est sélectionné', () => {
     const composant = TestBed.createComponent(SqmSourcesAdminComponent).componentInstance;
     donneesApplication.creerSource(groupeId, projetId, {

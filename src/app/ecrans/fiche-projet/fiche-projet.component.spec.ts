@@ -214,7 +214,14 @@ class DonneesDeTest {
       id: 'groupe-1',
       nom: 'Groupe Test',
       description: '',
-      instances: [{ id: 'instance-gitlab', type: TypeInstance.Gitlab, nom: 'GitLab', urlBase: '' }],
+      instances: [
+        {
+          id: 'instance-gitlab',
+          type: TypeInstance.Gitlab,
+          nom: 'GitLab',
+          urlBase: 'https://gitlab.test',
+        },
+      ],
       membresConnus: [
         {
           id: 'membre-connu-1',
@@ -423,6 +430,70 @@ describe('SqmFicheProjetComponent', () => {
     expect(element.textContent).toContain('Projet Test');
     expect(element.textContent).toContain('Une description de test.');
     expect(element.textContent).toContain('develop');
+  });
+
+  it('affiche le lien direct vers le dépôt GitLab, avec un indice au survol signalant son caractère non contractuel (RG-045, C15-13)', () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const lien = element.querySelector<HTMLAnchorElement>('.fiche-projet__sources-externes a');
+    expect(lien?.getAttribute('href')).toBe('https://gitlab.test/projects/1234');
+    expect(lien?.textContent?.trim()).toBe('Dépôt GitLab');
+    expect(lien?.getAttribute('title')).toContain("n'est pas garanti");
+  });
+
+  it('affiche également le lien direct vers le projet Sonar d’une source Sonar rattachée, sans indice au survol (RG-045, C15-13)', () => {
+    const projetGitlab = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const projet: Projet = {
+      ...projetGitlab,
+      sources: [
+        ...projetGitlab.sources,
+        {
+          id: 'source-sonar',
+          instanceId: 'instance-sonar',
+          type: TypeSource.ProjetSonar,
+          idExterne: 'entreprise:api-facturation',
+        },
+      ],
+    };
+    const racine = DonneesDeTest.racine(projet);
+    const racineAvecSonar: DonneesRacine = {
+      ...racine,
+      groupes: [
+        {
+          ...racine.groupes[0],
+          instances: [
+            ...racine.groupes[0].instances,
+            {
+              id: 'instance-sonar',
+              type: TypeInstance.Sonar,
+              nom: 'Sonar',
+              urlBase: 'https://sonar.test',
+            },
+          ],
+        },
+      ],
+    };
+    const fixture = creerFixture('projet-1', racineAvecSonar);
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const liens = element.querySelectorAll<HTMLAnchorElement>('.fiche-projet__sources-externes a');
+    expect(liens.length).toBe(2);
+    expect(liens[1].getAttribute('href')).toBe(
+      'https://sonar.test/dashboard?id=entreprise%3Aapi-facturation',
+    );
+    expect(liens[1].textContent?.trim()).toBe('Projet Sonar');
+    expect(liens[1].getAttribute('title')).toBeNull();
+  });
+
+  it('ignore silencieusement une source dont l’instance de rattachement est introuvable, sans lien cassé (RG-045, C15-13)', () => {
+    const projetGitlab = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const projet: Projet = {
+      ...projetGitlab,
+      sources: [{ ...projetGitlab.sources[0], instanceId: 'instance-inexistante' }],
+    };
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    expect(element.querySelector('.fiche-projet__sources-externes')).toBeNull();
   });
 
   it('affiche le badge membre inconnu en en-tête dès qu’un membre du dépôt est de statut inconnu (RG-006 à RG-009)', () => {
