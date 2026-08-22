@@ -64,13 +64,29 @@ fn migration_3_vers_4(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Quatrième migration réelle du projet (C15-14, audit historique à date passée), faisant progresser
+/// `versionSchema` de `4` à `5` suite à l'ajout des champs `typeAudit` et `dateExecution` sur `Audit` (cf.
+/// [`crate::modele::racine::Audit`]).
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_3_vers_4`] : les deux
+/// nouveaux champs portent `#[serde(default)]` (`typeAudit` se désérialisant à `TypeAudit::Reguliere`,
+/// `dateExecution` à `None`), donc leur absence sur un document existant se désérialise directement à ces valeurs
+/// par défaut sans qu'aucune valeur n'ait à être recalculée ni déplacée ; seule la version de schéma progresse.
+fn migration_4_vers_5(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(5));
+    }
+    Ok(())
+}
+
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
-/// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`] et
-/// [`migration_3_vers_4`].
+/// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
+/// [`migration_3_vers_4`] et [`migration_4_vers_5`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
     (3, migration_3_vers_4),
+    (4, migration_4_vers_5),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -326,6 +342,69 @@ mod tests {
             racine.referentiels.motif_nommage_branches,
             crate::modele::racine::MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT
         );
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_4_vers_5_ne_perd_aucune_donnee_existante_et_ajoute_un_audit_regulier_par_defaut()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document historique typique d'avant C15-14 : `versionSchema: 4`, un audit sans `typeAudit` ni
+        // `dateExecution` (absents car inexistants à l'époque). La migration ne doit ni échouer ni altérer les
+        // données existantes ; seul `versionSchema` progresse, `typeAudit` se désérialisant nativement à
+        // `TypeAudit::Reguliere` (`#[default]`) et `dateExecution` à `None` (rétrocompatibilité).
+        let mut valeur = json!({
+            "versionSchema": 4,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "groupes": [
+                {
+                    "id": "a0000000-0000-4000-8000-000000000001",
+                    "nom": "Groupe historique",
+                    "description": "",
+                    "instances": [],
+                    "membresConnus": [],
+                    "annotations": [],
+                    "indicateursDesactives": [],
+                    "projets": [
+                        {
+                            "id": "d0000000-0000-4000-8000-000000000001",
+                            "nom": "Projet historique",
+                            "description": "",
+                            "iaAutorisee": false,
+                            "sources": [],
+                            "annotations": [],
+                            "audits": [
+                                {
+                                    "id": "10000000-0000-4000-8000-000000000001",
+                                    "date": "2026-01-01",
+                                    "campagneId": "e0000000-0000-4000-8000-000000000001",
+                                    "resultats": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+        assert_eq!(valeur["groupes"][0]["nom"], json!("Groupe historique"));
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        let audit = &racine.groupes[0].projets[0].audits[0];
+        assert_eq!(
+            audit.type_audit,
+            crate::modele::racine::TypeAudit::Reguliere
+        );
+        assert_eq!(audit.date_execution, None);
         Ok(())
     }
 }

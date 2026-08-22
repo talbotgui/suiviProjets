@@ -304,6 +304,8 @@ mod tests {
                 date: "2026-07-23".to_string(),
                 campagne_id: "campagne-1".to_string(),
                 resultats: vec![],
+                type_audit: crate::modele::racine::TypeAudit::Reguliere,
+                date_execution: None,
             },
             statut: StatutResultatBrouillon::EnAttente,
             motif_rejet: None,

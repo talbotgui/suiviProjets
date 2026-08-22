@@ -23,6 +23,15 @@
 // ces comportements. `tester_connectivite`, `lister_sources_disponibles`, `interroger_branches` (autocomplétion)
 // et `interroger_derniere_analyse` restent instantanées, hors du périmètre de cette demande (pas des commandes
 // d'audit d'une campagne).
+//
+// Évolution C15-14 (audit historique à date passée, RG-046) : les onze commandes concernées reçoivent désormais un
+// paramètre `dateCiblee` optionnel supplémentaire (`FacadeCommandesService`). Décision arbitraire de ce
+// développement (à valider par un humain, cf. rapport de développement) : ce bouchon reste volontairement
+// insensible à ce paramètre plutôt que de simuler un repli de date ou un jeu de données déterministe dédié — il est
+// accepté sans erreur (chaque résolution ci-dessous lit `parametres` via un type `Readonly<Record<string,
+// unknown>>` générique, `dateCiblee` y transite donc déjà sans code supplémentaire) puis silencieusement ignoré, le
+// même jeu de données bouchonné étant retourné qu'un audit soit régulier ou historique. Un scénario de test
+// déterministe dédié pourra être introduit ultérieurement si le test de bout en bout Playwright en a besoin.
 import type {
   Branche,
   Dependance,

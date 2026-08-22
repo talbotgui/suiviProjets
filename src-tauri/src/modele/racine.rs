@@ -36,7 +36,14 @@ use std::collections::HashMap;
 /// ([`SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT`], `#[serde(default = "...")]`) ; voir la troisième étape
 /// réelle enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_3_vers_4`), sur
 /// le même modèle que les deux précédentes.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 4;
+///
+/// Passage de `4` à `5` (C15-14, audit historique à date passée) : ajout des champs `typeAudit` et `dateExecution`
+/// sur [`Audit`], tous deux additifs à valeur de repli (`#[serde(default)]`) — même palier systématique appliqué à
+/// chaque champ additif du modèle, y compris purement `#[serde(default)]` sans aucune transformation de donnée
+/// (cf. `migration_1_vers_2`/`migration_2_vers_3`/`migration_3_vers_4` ci-dessus) ; voir la quatrième étape réelle
+/// enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_4_vers_5`), sur le même
+/// modèle que les trois précédentes.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 5;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -635,19 +642,57 @@ pub(crate) struct ResultatCroiseIaNouveauCode {
     pub(crate) duplication_nouveau_code: Option<f64>,
 }
 
+/// Nature d'un [`Audit`] (C15-14, audit historique à date passée) : `Reguliere` pour un audit produit à la date du
+/// jour de la campagne (comportement historique, seule variante possible avant cette évolution), `Historique` pour
+/// un audit portant sur une date passée demandée explicitement, à périmètre d'indicateurs réduit (arbitrage humain
+/// du 2026-08-18, cf. [RG-046](../../../docs/02_documentation/05_reglesGestion.md#audits-et-campagnes)).
+///
+/// `#[default]` sur la variante `Reguliere` (idiome standard, stable depuis Rust 1.62, `derive(Default)` sur enum) :
+/// tout fichier de données antérieur à cette évolution, dépourvu du champ `typeAudit`, désérialise donc chacun de
+/// ses audits existants comme `Reguliere` (`#[serde(default)]` sur [`Audit::type_audit`]) — rétrocompatibilité
+/// totale, aucune migration de donnée nécessaire au-delà du bump de version de schéma (cf.
+/// [`crate::modele::racine::VERSION_SCHEMA_COURANTE`]).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum TypeAudit {
+    /// Audit produit à la date du jour de la campagne qui l'a réalisé (comportement historique).
+    #[default]
+    Reguliere,
+    /// Audit portant sur une date passée demandée explicitement (C15-14), à périmètre d'indicateurs réduit.
+    Historique,
+}
+
 /// Historique d'audit d'un projet : un ensemble de constats bruts obtenus à une date donnée.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Audit {
     /// Identifiant UUID v4 de l'audit.
     pub(crate) id: String,
-    /// Date de réalisation de l'audit.
+    /// Date effectivement analysée par cet audit (C15-14) : pour un audit régulier, date d'exécution de la
+    /// campagne (comportement historique inchangé) ; pour un audit historique, la date ciblée demandée — résolue/
+    /// repliée sur la date Sonar disponible la plus proche pour les indicateurs Sonar concernés, cf.
+    /// `crate::connecteurs::sonar::selectionner_point_le_plus_proche`. C'est ce choix qui permet de positionner
+    /// correctement un audit historique sur l'axe temporel de la Synthèse graphique sans aucun changement de la
+    /// mécanique de tri/affichage existante, `date` restant la seule donnée temporelle qu'elle consulte. Décision
+    /// arbitraire (cf. rapport de développement de cette évolution), non couverte explicitement par l'arbitrage du
+    /// 2026-08-18.
     pub(crate) date: String,
     /// Identifiant de la campagne qui a produit cet audit.
     pub(crate) campagne_id: String,
     /// Résultats typés obtenus (catalogue figé, cf. commentaire de [`Resultat`]).
     #[serde(default)]
     pub(crate) resultats: Vec<Resultat>,
+    /// Nature de cet audit (C15-14) : `Reguliere` par défaut pour la rétrocompatibilité des fichiers de données
+    /// antérieurs à cette évolution (cf. [`TypeAudit`]).
+    #[serde(default)]
+    pub(crate) type_audit: TypeAudit,
+    /// Horodatage réel de la campagne qui a produit cet audit (C15-14) : renseigné uniquement pour un audit
+    /// historique (`type_audit == TypeAudit::Historique`), où il se distingue de `date` (date ciblée demandée,
+    /// potentiellement très antérieure à l'exécution réelle de la campagne) ; toujours absent pour un audit
+    /// régulier, où il serait redondant avec `date` (décision arbitraire, cf. rapport de développement de cette
+    /// évolution).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) date_execution: Option<String>,
 }
 
 /// Projet suivi au sein d'un groupe.
@@ -1109,6 +1154,8 @@ mod tests {
                         sha_tete: "8c1d0e44".to_string(),
                         dernier_commit_le: "2026-06-05".to_string(),
                     })],
+                    type_audit: TypeAudit::Reguliere,
+                    date_execution: None,
                 }],
             }],
         });
@@ -1285,6 +1332,75 @@ mod tests {
         )?;
 
         assert_eq!(resultat.duplication_nouveau_code, None);
+        Ok(())
+    }
+
+    #[test]
+    fn audit_historique_sans_type_audit_ni_date_execution_se_desserialise_en_audit_regulier()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Non-régression (C15-14) : document historique antérieur à l'ajout de `typeAudit`/`dateExecution`, sur le
+        // même modèle que les deux tests précédents. Les deux champs absents du JSON doivent se désérialiser à
+        // leur repli (`TypeAudit::Reguliere` via `#[default]`, `None`) plutôt que de faire échouer la
+        // désérialisation.
+        let audit: Audit = serde_json::from_str(
+            r#"{
+                "id": "10000000-0000-4000-8000-000000000001",
+                "date": "2026-06-05",
+                "campagneId": "e0000000-0000-4000-8000-000000000001",
+                "resultats": []
+            }"#,
+        )?;
+
+        assert_eq!(audit.type_audit, TypeAudit::Reguliere);
+        assert_eq!(audit.date_execution, None);
+        Ok(())
+    }
+
+    #[test]
+    fn audit_historique_survit_a_un_aller_retour_json_avec_date_execution()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // C15-14 : un audit historique porte `typeAudit: "historique"` et `dateExecution` (horodatage réel de la
+        // campagne), distinct de `date` (date ciblée demandée) — round-trip complet pour vérifier la sérialisation
+        // camelCase des deux nouveaux champs.
+        let audit = Audit {
+            id: "10000000-0000-4000-8000-000000000002".to_string(),
+            date: "2025-01-15".to_string(),
+            campagne_id: "e0000000-0000-4000-8000-000000000001".to_string(),
+            resultats: vec![],
+            type_audit: TypeAudit::Historique,
+            date_execution: Some("2026-06-05T10:00:00Z".to_string()),
+        };
+
+        let json = serde_json::to_value(&audit)?;
+        assert_eq!(json["typeAudit"], serde_json::json!("historique"));
+        assert_eq!(
+            json["dateExecution"],
+            serde_json::json!("2026-06-05T10:00:00Z")
+        );
+
+        let relu: Audit = serde_json::from_value(json)?;
+        assert_eq!(relu, audit);
+        Ok(())
+    }
+
+    #[test]
+    fn audit_regulier_omet_date_execution_a_la_serialisation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // `skip_serializing_if = "Option::is_none"` sur `dateExecution` (C15-14) : un audit régulier, où ce champ
+        // n'a pas de sens (cf. Rustdoc d'`Audit::date_execution`), ne doit pas polluer le JSON produit.
+        let audit = Audit {
+            id: "10000000-0000-4000-8000-000000000003".to_string(),
+            date: "2026-06-05".to_string(),
+            campagne_id: "e0000000-0000-4000-8000-000000000001".to_string(),
+            resultats: vec![],
+            type_audit: TypeAudit::Reguliere,
+            date_execution: None,
+        };
+
+        let json = serde_json::to_value(&audit)?;
+        let objet = json.as_object().ok_or("objet JSON attendu")?;
+        assert!(!objet.contains_key("dateExecution"));
+        assert_eq!(json["typeAudit"], serde_json::json!("reguliere"));
         Ok(())
     }
 }

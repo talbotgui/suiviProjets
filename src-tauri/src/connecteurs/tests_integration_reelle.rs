@@ -112,6 +112,7 @@ async fn interroger_vitalite_reussit_contre_une_vraie_instance_gitlab() {
         "source-integration-reelle",
         &projet_id,
         None,
+        None,
         &client_http(),
     )
     .await;
@@ -143,6 +144,7 @@ async fn interroger_violations_reussit_contre_une_vraie_instance_sonar() {
         &jeton,
         "source-integration-reelle",
         &projet_cle,
+        None,
         &client_http(),
     )
     .await;
@@ -186,6 +188,7 @@ async fn interroger_marqueurs_ia_reussit_contre_une_vraie_instance_gitlab() {
         &projet_id,
         None,
         &regles,
+        None,
         &client_http(),
     )
     .await;
@@ -193,5 +196,119 @@ async fn interroger_marqueurs_ia_reussit_contre_une_vraie_instance_gitlab() {
     assert!(
         resultat.is_ok(),
         "interrogation des marqueurs IA GitLab attendue en succès : {resultat:?}"
+    );
+}
+
+/// C15-14 (audit historique à date passée) : point non vérifié contre une instance réelle au moment de ce
+/// développement (cf. rapport de développement, Étape 15 incrément 11) — le comportement combiné des paramètres `since`/`until`
+/// de `GET .../repository/commits` (un bug forum GitLab signale que `until` serait silencieusement ignoré en
+/// présence de `since` sur certaines versions). `interroger_contributeurs` ne peut par construction jamais échouer
+/// à cause de ce point précis (aucune dégradation gracieuse à vérifier ici, juste l'exactitude de la fenêtre
+/// retournée) : la vérification utile est humaine, à mener avec `cargo test -- --ignored --nocapture`, en
+/// comparant la fenêtre `[date_cible − 90j ; date_cible]` affichée aux commits réellement attendus sur le dépôt
+/// testé.
+#[tokio::test]
+#[ignore = "test d'intégration hors CI : nécessite une vraie instance GitLab, déclenchement manuel uniquement — \
+            confirme le comportement combiné since/until de repository/commits en mode historique (C15-14)"]
+async fn interroger_contributeurs_en_mode_historique_contre_une_vraie_instance_gitlab() {
+    let url = variable_env_requise(
+        "SQM_TEST_GITLAB_URL",
+        "SQM_TEST_GITLAB_URL doit être définie pour ce test d'intégration",
+    );
+    let jeton = variable_env_requise(
+        "SQM_TEST_GITLAB_TOKEN",
+        "SQM_TEST_GITLAB_TOKEN doit être définie pour ce test d'intégration",
+    );
+    let projet_id = variable_env_requise(
+        "SQM_TEST_GITLAB_PROJET_ID",
+        "SQM_TEST_GITLAB_PROJET_ID doit être définie pour ce test d'intégration",
+    );
+
+    // Date cible à adapter manuellement à une date pour laquelle le dépôt testé possède déjà des commits dans la
+    // fenêtre glissante de 90 jours précédente, afin qu'une vérification humaine du résultat affiché soit
+    // possible.
+    let date_cible = "2026-01-01";
+
+    let resultat = gitlab::interroger_contributeurs(
+        &url,
+        &jeton,
+        "source-integration-reelle",
+        &projet_id,
+        None,
+        Some(date_cible),
+        &client_http(),
+    )
+    .await;
+
+    assert!(
+        resultat.is_ok(),
+        "interrogation historique des contributeurs GitLab attendue en succès : {resultat:?}"
+    );
+    eprintln!(
+        "contributeurs (mode historique, fenêtre since/until combinée) = {resultat:?}\n\
+         vérification humaine attendue : les commits comptabilisés doivent relever de la fenêtre \
+         [{date_cible} − 90j ; {date_cible}], jamais de la fenêtre [maintenant − 90j ; maintenant]"
+    );
+}
+
+/// C15-14 (audit historique à date passée) : point non vérifié contre une instance réelle au moment de ce
+/// développement (cf. rapport de développement, Étape 15 incrément 11) — l'historisation réelle de `sonar.notes`
+/// (`reliability_rating`/`security_rating`/`sqale_rating`/`security_review_rating`) et de `sonar.ncloc` par
+/// `GET /api/measures/search_history`. `interroger_notes`/`interroger_ncloc` ne peuvent par construction jamais
+/// échouer en mode historique (dégradation gracieuse par valeur de repli, cf. leur documentation respective dans
+/// `sonar.rs`) : la vérification utile est humaine, à mener avec `cargo test -- --ignored --nocapture`, en
+/// confirmant que les valeurs affichées ci-dessous diffèrent bien de leur valeur de repli documentée (`5.0` pour
+/// chaque note, `0` pour `ncloc`) sur une date où l'instance testée dispose réellement d'une analyse.
+#[tokio::test]
+#[ignore = "test d'intégration hors CI : nécessite une vraie instance Sonar, déclenchement manuel uniquement — \
+            confirme l'historisation réelle de sonar.notes/sonar.ncloc en mode historique (C15-14)"]
+async fn interroger_notes_et_ncloc_en_mode_historique_contre_une_vraie_instance_sonar() {
+    let url = variable_env_requise(
+        "SQM_TEST_SONAR_URL",
+        "SQM_TEST_SONAR_URL doit être définie pour ce test d'intégration",
+    );
+    let jeton = variable_env_requise(
+        "SQM_TEST_SONAR_TOKEN",
+        "SQM_TEST_SONAR_TOKEN doit être définie pour ce test d'intégration",
+    );
+    let projet_cle = variable_env_requise(
+        "SQM_TEST_SONAR_PROJET_CLE",
+        "SQM_TEST_SONAR_PROJET_CLE doit être définie pour ce test d'intégration",
+    );
+
+    // Date cible à adapter manuellement à une date pour laquelle le projet testé possède déjà une analyse Sonar.
+    let date_cible = "2026-01-01";
+
+    let notes = sonar::interroger_notes(
+        &url,
+        &jeton,
+        "source-integration-reelle",
+        &projet_cle,
+        Some(date_cible),
+        &client_http(),
+    )
+    .await;
+    let ncloc = sonar::interroger_ncloc(
+        &url,
+        &jeton,
+        "source-integration-reelle",
+        &projet_cle,
+        Some(date_cible),
+        &client_http(),
+    )
+    .await;
+
+    assert!(
+        notes.is_ok(),
+        "interrogation historique des notes Sonar attendue en succès : {notes:?}"
+    );
+    assert!(
+        ncloc.is_ok(),
+        "interrogation historique du ncloc Sonar attendue en succès : {ncloc:?}"
+    );
+    eprintln!(
+        "notes (mode historique) = {notes:?}\nncloc (mode historique) = {ncloc:?}\n\
+         vérification humaine attendue : ces valeurs doivent différer de la valeur de repli (5.0 par note, 0 pour \
+         ncloc) si l'instance testée historise bien ces métriques via measures/search_history"
     );
 }

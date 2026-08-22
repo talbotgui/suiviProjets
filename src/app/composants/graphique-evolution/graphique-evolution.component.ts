@@ -88,10 +88,14 @@ export interface SerieGraphiqueEvolution {
 
 /**
  * Catégorie d'une ligne verticale étiquetée du graphique d'évolution : une annotation (US-019, Phase 8, créée
- * ailleurs — `SqmFicheProjetComponent` — et seulement lue et affichée ici, en lecture seule) ou un changement de
- * seuil (RG-023, `ChangementSeuilUtils`).
+ * ailleurs — `SqmFicheProjetComponent` — et seulement lue et affichée ici, en lecture seule), un changement de
+ * seuil (RG-023, `ChangementSeuilUtils`), ou un audit historique à date passée (C15-14, US-046, RG-046, créé
+ * ailleurs — `OrchestrateurCampagneService` — et seulement lu et affiché ici) : ce dernier marque la date ciblée
+ * d'un audit `typeAudit: 'historique'` sans jamais l'intégrer à la ligne de tendance continue d'une série (cf.
+ * `SqmSyntheseGraphiqueComponent.construireSerie`, qui l'exclut de `points`), pour ne pas distordre le calcul de
+ * tendance existant.
  */
-export type CategorieLigneVerticale = 'annotation' | 'changementSeuil';
+export type CategorieLigneVerticale = 'annotation' | 'changementSeuil' | 'auditHistorique';
 
 /**
  * Ligne verticale étiquetée du graphique d'évolution (charte d'ergonomie).
@@ -109,16 +113,20 @@ export interface LigneVerticaleGraphique {
 
 /**
  * Style visuel d'une catégorie de ligne verticale (couleur et tirets), décision arbitraire d'ergonomie (à valider
- * par un humain, cf. rapport de développement de cet incrément) faute de maquette haute-fidélité pour cet écran :
- * trait plein gris pour une annotation, trait tireté ambre pour un changement de seuil, afin de distinguer les deux
- * catégories au premier coup d'œil sans réutiliser les couleurs sémantiques vert/orange/rouge du Moteur de jugement
- * (RG-022), ces lignes verticales ne portant elles-mêmes aucun jugement de seuil.
+ * par un humain, cf. rapport de développement de cet incrément, complétée lors de C15-14 pour `auditHistorique`)
+ * faute de maquette haute-fidélité pour cet écran : trait plein gris pour une annotation, trait tireté ambre pour
+ * un changement de seuil, trait finement pointillé violet pour un audit historique — une troisième couleur inédite
+ * (`#7c3aed`, déjà présente dans `PALETTE_SERIES` de `SqmSyntheseGraphiqueComponent` comme couleur catégorielle de
+ * projet, mais jamais utilisée comme couleur sémantique de ligne verticale), pour rester immédiatement
+ * distinguable des deux catégories existantes comme des couleurs sémantiques vert/orange/rouge du Moteur de
+ * jugement (RG-022) : ces lignes verticales ne portent elles-mêmes aucun jugement de seuil.
  */
 const STYLE_LIGNE_VERTICALE: Readonly<
   Record<CategorieLigneVerticale, { readonly couleur: string; readonly tirets: readonly number[] }>
 > = {
   annotation: { couleur: '#6b7280', tirets: [] },
   changementSeuil: { couleur: '#d97706', tirets: [6, 4] },
+  auditHistorique: { couleur: '#7c3aed', tirets: [2, 2] },
 };
 
 /**

@@ -70,6 +70,7 @@ class DonneesDeTest {
       id: 'audit-1',
       date: DonneesDeTest.ilYA(-1),
       campagneId: 'campagne-1',
+      typeAudit: 'reguliere',
       resultats: [
         {
           type: 'gitlab.dependances',
@@ -430,6 +431,67 @@ describe('SqmFicheProjetComponent', () => {
     expect(element.textContent).toContain('Projet Test');
     expect(element.textContent).toContain('Une description de test.');
     expect(element.textContent).toContain('develop');
+  });
+
+  it(
+    'sélectionne le dernier audit RÉGULIER comme audit affiché par défaut, jamais un audit historique même ' +
+      'plus récemment intégré (C15-14, US-046, RG-046), et le liste séparément dans un encart dédié',
+    () => {
+      /**
+       * Réplique locale de `SqmFicheProjetComponent.formaterDateCourte` (méthode privée, non testable
+       * directement) : permet de comparer le libellé affiché sans dépendre d'un format de date écrit en dur,
+       * insensible au fuseau horaire d'exécution du test (même méthode `new Date(...)` que le composant, dans
+       * le même processus).
+       * @param dateIso - Date ISO 8601 à mettre en forme.
+       * @returns Le libellé court correspondant.
+       */
+      function formaterDateCourte(dateIso: string): string {
+        const date = new Date(dateIso);
+        const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
+        return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;
+      }
+
+      const auditRegulier = DonneesDeTest.auditComplet({});
+      const dateCibleeHistorique = DonneesDeTest.ilYA(-30);
+      const dateExecutionHistorique = DonneesDeTest.ilYA(0);
+      const auditHistorique: Audit = {
+        id: 'audit-historique-1',
+        date: dateCibleeHistorique,
+        campagneId: 'campagne-2',
+        typeAudit: 'historique',
+        dateExecution: dateExecutionHistorique,
+        resultats: [],
+      };
+      // L'audit historique est intégré APRÈS l'audit régulier (dernier de `Projet.audits`) : un `.at(-1)` naïf
+      // le sélectionnerait à tort comme « dernier audit » affiché par défaut.
+      const projet = DonneesDeTest.projet('projet-1', [auditRegulier, auditHistorique]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      // Isole la métadonnée « Dernier audit » du reste de la page (l'encart des audits historiques ci-dessous
+      // contient légitimement la date ciblée historique, un simple `element.textContent` ne suffirait donc pas).
+      const metadonneeDernierAudit = Array.from(
+        element.querySelectorAll('.fiche-projet__metadonnee'),
+      ).find((bloc) => bloc.textContent?.includes('Dernier audit'));
+      expect(metadonneeDernierAudit?.textContent).toContain(formaterDateCourte(auditRegulier.date));
+      expect(metadonneeDernierAudit?.textContent).not.toContain(
+        formaterDateCourte(dateCibleeHistorique),
+      );
+
+      const encartHistorique = element.querySelector('.fiche-projet__audits-historiques');
+      expect(encartHistorique).not.toBeNull();
+      expect(encartHistorique?.textContent).toContain('Audits historiques (1)');
+      expect(encartHistorique?.textContent).toContain(formaterDateCourte(dateCibleeHistorique));
+      expect(encartHistorique?.textContent).toContain(formaterDateCourte(dateExecutionHistorique));
+    },
+  );
+
+  it("n'affiche aucun encart d'audits historiques quand le projet n'en compte aucun", () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.querySelector('.fiche-projet__audits-historiques')).toBeNull();
   });
 
   it('affiche le lien direct vers le dépôt GitLab, avec un indice au survol signalant son caractère non contractuel (RG-045, C15-13)', () => {

@@ -149,6 +149,32 @@
           </section>
         }
 
+        <!-- Encart des audits historiques à date passée (C15-14, US-046, RG-046), distinct de l'audit régulier
+             restitué ci-dessus par défaut (donnees.dernierAuditLabel ignore toujours les audits historiques). -->
+        @if (donnees.auditsHistoriques.length > 0) {
+          <section
+            class="fiche-projet__audits-historiques carte rayon-lg interieur-x-4 interieur-y-3"
+          >
+            <h2 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">
+              Audits historiques ({{ donnees.auditsHistoriques.length }})
+            </h2>
+            <p class="texte-sm texte-tenue exterieur-bas-2 exterieur-haut-0">
+              Audits à date passée (C15-14), à périmètre d'indicateurs réduit : non pris en compte
+              par défaut ci-dessus, restitués séparément et juxtaposés sur la Synthèse graphique.
+            </p>
+            <ul
+              class="fiche-projet__audits-historiques-liste sans-liste d-flex direction-colonne ecart-1"
+            >
+              @for (audit of donnees.auditsHistoriques; track audit.id) {
+                <li>
+                  Date ciblée : <strong>{{ audit.dateCibleeLabel }}</strong> — campagne exécutée le
+                  {{ audit.dateExecutionLabel }}
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
         <div class="fiche-projet__corps">
           <!-- Colonne gauche : indicateurs Sonar (grisés si SONAR_KO), dépendances, MR ouvertes. -->
           <section class="fiche-projet__colonne d-flex direction-colonne ecart-2">

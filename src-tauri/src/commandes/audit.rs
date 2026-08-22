@@ -81,6 +81,7 @@ pub(crate) async fn interroger_vitalite(
     source_id: String,
     id_externe: String,
     ref_auditee: Option<String>,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabVitalite, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerVitalite");
@@ -99,6 +100,7 @@ pub(crate) async fn interroger_vitalite(
                     &source_id,
                     &id_externe,
                     ref_auditee.as_deref(),
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -181,6 +183,7 @@ pub(crate) async fn interroger_contributeurs(
     source_id: String,
     id_externe: String,
     ref_auditee: Option<String>,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabContributeurs, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerContributeurs");
@@ -199,6 +202,7 @@ pub(crate) async fn interroger_contributeurs(
                     &source_id,
                     &id_externe,
                     ref_auditee.as_deref(),
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -230,6 +234,7 @@ pub(crate) async fn interroger_merge_requests(
     source_id: String,
     id_externe: String,
     ref_auditee: Option<String>,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMergeRequests, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerMergeRequests");
@@ -248,6 +253,7 @@ pub(crate) async fn interroger_merge_requests(
                     &source_id,
                     &id_externe,
                     ref_auditee.as_deref(),
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -331,6 +337,7 @@ pub(crate) async fn interroger_branches_completes(
     source_id: String,
     id_externe: String,
     ref_auditee: Option<String>,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabBranches, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerBranchesCompletes");
@@ -349,6 +356,7 @@ pub(crate) async fn interroger_branches_completes(
                     &source_id,
                     &id_externe,
                     ref_auditee.as_deref(),
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -382,6 +390,7 @@ pub(crate) async fn interroger_dependances(
     source_id: String,
     id_externe: String,
     ref_auditee: Option<String>,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabDependances, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerDependances");
@@ -400,6 +409,7 @@ pub(crate) async fn interroger_dependances(
                     &source_id,
                     &id_externe,
                     ref_auditee.as_deref(),
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -437,6 +447,7 @@ pub(crate) async fn interroger_marqueurs_ia(
     id_externe: String,
     ref_auditee: Option<String>,
     regles_marqueurs_ia: Vec<RegleMarqueurIA>,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatGitlabMarqueursIa, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerMarqueursIa");
@@ -456,6 +467,7 @@ pub(crate) async fn interroger_marqueurs_ia(
                     &id_externe,
                     ref_auditee.as_deref(),
                     &regles_marqueurs_ia,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -487,6 +499,7 @@ pub(crate) async fn interroger_violations(
     instance: Instance,
     source_id: String,
     id_externe: String,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarViolations, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerViolations");
@@ -504,6 +517,7 @@ pub(crate) async fn interroger_violations(
                     &credential,
                     &source_id,
                     &id_externe,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -535,6 +549,7 @@ pub(crate) async fn interroger_dette(
     instance: Instance,
     source_id: String,
     id_externe: String,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarDette, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerDette");
@@ -552,6 +567,7 @@ pub(crate) async fn interroger_dette(
                     &credential,
                     &source_id,
                     &id_externe,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -582,6 +598,7 @@ pub(crate) async fn interroger_couverture(
     instance: Instance,
     source_id: String,
     id_externe: String,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarCouverture, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerCouverture");
@@ -599,6 +616,7 @@ pub(crate) async fn interroger_couverture(
                     &credential,
                     &source_id,
                     &id_externe,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -629,6 +647,7 @@ pub(crate) async fn interroger_notes(
     instance: Instance,
     source_id: String,
     id_externe: String,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarNotes, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerNotes");
@@ -646,6 +665,7 @@ pub(crate) async fn interroger_notes(
                     &credential,
                     &source_id,
                     &id_externe,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -676,6 +696,7 @@ pub(crate) async fn interroger_ncloc(
     instance: Instance,
     source_id: String,
     id_externe: String,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<ResultatSonarNcloc, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerNcloc");
@@ -693,6 +714,7 @@ pub(crate) async fn interroger_ncloc(
                     &credential,
                     &source_id,
                     &id_externe,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await
@@ -728,6 +750,7 @@ pub(crate) async fn interroger_ncloc(
 pub(crate) async fn interroger_derniere_analyse(
     instance: Instance,
     id_externe: String,
+    date_ciblee: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<Option<String>, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("interrogerDerniereAnalyse");
@@ -744,6 +767,7 @@ pub(crate) async fn interroger_derniere_analyse(
                     &instance.url_base,
                     &credential,
                     &id_externe,
+                    date_ciblee.as_deref(),
                     &etat.client_http(),
                 )
                 .await

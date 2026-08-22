@@ -92,6 +92,37 @@
       }
     </section>
 
+    <section class="constitution-campagne__date-ciblee carte interieur-4 exterieur-y-4">
+      <h3 class="texte-sm poids-gras exterieur-bas-2 exterieur-haut-0">Date d'analyse</h3>
+      <div class="champ">
+        <label for="constitution-campagne-date-ciblee">Date ciblée (optionnel)</label>
+        <input
+          id="constitution-campagne-date-ciblee"
+          type="date"
+          class="champ__controle"
+          [ngModel]="dateCiblee()"
+          (ngModelChange)="definirDateCiblee($event)"
+          aria-describedby="constitution-campagne-date-ciblee-aide"
+        />
+        <span id="constitution-campagne-date-ciblee-aide" class="champ__aide">
+          Laissez ce champ vide pour un audit régulier à la date du jour. Une date passée déclenche
+          un audit historique (C15-14, RG-046).
+        </span>
+      </div>
+      @if (modeHistoriqueActif()) {
+        <p
+          class="constitution-campagne__avertissement-historique texte-orange texte-xs exterieur-haut-2"
+          role="status"
+        >
+          Audit historique : périmètre d'indicateurs réduit (taille du dépôt et membres du dépôt non
+          interrogés, calcul croisé « IA sur le nouveau code » non calculé), repli automatique sur
+          la donnée Sonar disponible la plus proche, refusé pour une source dont la ref auditée est
+          un SHA/tag figé. Le résultat est restitué distinctement des audits réguliers sur la
+          Synthèse graphique et la Fiche projet.
+        </p>
+      }
+    </section>
+
     <button
       id="constitution-campagne-bouton-lancer"
       type="button"

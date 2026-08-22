@@ -41,7 +41,7 @@ import type {
 } from '../../composants/selecteur-vue/selecteur-vue.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import type { Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
+import type { Audit, Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { ChangementSeuilUtils } from '../../services/sansetat/jugement/changement-seuil.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
@@ -285,9 +285,10 @@ export class SqmSyntheseGraphiqueComponent {
 
   /**
    * Lignes verticales étiquetées du graphique : changements de seuil pertinents pour l'indicateur sélectionné
-   * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global) et annotations des
+   * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global), annotations des
    * projets actuellement retenus (US-019, Phase 8, créées ailleurs — `SqmFicheProjetComponent` — et seulement lues
-   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran).
+   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran), et marqueurs des audits
+   * historiques des projets retenus (C15-14, US-046, RG-046, cf. {@link marqueursAuditsHistoriques}).
    */
   public readonly lignesVerticales: Signal<readonly LigneVerticaleGraphique[]> = computed(() => {
     const racine = this.donneesApplication.racine();
@@ -318,8 +319,35 @@ export class SqmSyntheseGraphiqueComponent {
       }
     }
 
-    return [...lignesSeuil, ...annotationsParId.values()];
+    return [...lignesSeuil, ...annotationsParId.values(), ...this.marqueursAuditsHistoriques()];
   });
+
+  /**
+   * Marqueurs verticaux des audits historiques (C15-14, US-046, RG-046) des projets actuellement retenus, un par
+   * audit `typeAudit: 'historique'`, jamais intégrés à la ligne de tendance continue d'une série (cf.
+   * {@link construireSerie}, qui les exclut de `points`) : représentés séparément comme des lignes verticales de
+   * catégorie dédiée (`auditHistorique`, `composants/graphique-evolution/`), avec un libellé indiquant explicitement
+   * le projet et la date ciblée demandée, distinct de la date d'exécution réelle de la campagne
+   * (`Audit.dateExecution`).
+   * @returns Les lignes verticales des audits historiques des projets retenus.
+   */
+  private marqueursAuditsHistoriques(): readonly LigneVerticaleGraphique[] {
+    const lignes: LigneVerticaleGraphique[] = [];
+    for (const projet of this.projetsRetenus()) {
+      for (const audit of projet.audits) {
+        if (audit.typeAudit !== 'historique') {
+          continue;
+        }
+        lignes.push({
+          id: `historique-${projet.id}-${audit.id}`,
+          date: audit.date,
+          libelle: `${projet.nom} — audit historique (${audit.date})`,
+          categorie: 'auditHistorique',
+        });
+      }
+    }
+    return lignes;
+  }
 
   /**
    * Message affiché par le graphique en l'absence de donnée (RG explicite de la maquette : « message explicite
@@ -584,12 +612,24 @@ export class SqmSyntheseGraphiqueComponent {
     couleur: string,
   ): SerieGraphiqueEvolution {
     const points = [];
-    for (const audit of projet.audits) {
+    for (const audit of this.exclureAuditsHistoriques(projet.audits)) {
       const valeur = this.extraireValeur(indicateur, audit.resultats);
       if (valeur !== undefined) {
         points.push({ date: audit.date, valeur });
       }
     }
     return { id: projet.id, libelle: projet.nom, couleur, points };
+  }
+
+  /**
+   * Exclut les audits historiques (`typeAudit: 'historique'`, C15-14, US-046, RG-046) d'un historique d'audits,
+   * pour protéger la ligne de tendance continue d'une série (cf. {@link construireSerie}) : un audit historique à
+   * date passée ne doit jamais distordre le calcul de tendance existant, ni apparaître comme un point de la série
+   * qu'il représente déjà séparément (cf. {@link marqueursAuditsHistoriques}).
+   * @param audits - Historique complet des audits d'un projet (`Projet.audits`).
+   * @returns Les seuls audits réguliers (`typeAudit: 'reguliere'`), dans le même ordre.
+   */
+  private exclureAuditsHistoriques(audits: readonly Audit[]): readonly Audit[] {
+    return audits.filter((audit) => audit.typeAudit !== 'historique');
   }
 }

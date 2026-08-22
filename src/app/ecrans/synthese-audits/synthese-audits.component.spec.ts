@@ -83,6 +83,7 @@ class DonneesDeTest {
       id: `audit-${options.date ?? 'defaut'}`,
       date: options.date ?? DonneesDeTest.ilYA(0),
       campagneId: 'campagne-1',
+      typeAudit: 'reguliere',
       resultats: [
         {
           type: 'gitlab.vitalite',

@@ -73,6 +73,7 @@ class DonneesDeTest {
                   id: 'audit-0',
                   date: '2026-06-01T08:00:00Z',
                   campagneId: 'campagne-0',
+                  typeAudit: 'reguliere',
                   resultats: [
                     { type: 'sonar.ncloc', sourceId: 'source-1', ncloc: 10_000, parLangage: {} },
                   ],
@@ -135,6 +136,7 @@ class DonneesDeTest {
               id: 'audit-1',
               date: '2026-07-20T08:00:00Z',
               campagneId: 'campagne-1',
+              typeAudit: 'reguliere',
               resultats: [
                 { type: 'sonar.ncloc', sourceId: 'source-1', ncloc: 15_000, parLangage: {} },
               ],

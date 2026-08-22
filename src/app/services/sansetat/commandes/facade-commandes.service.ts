@@ -231,6 +231,8 @@ export class FacadeCommandesService {
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046, format `AAAA-MM-JJ`) ; absente, la date
+   * du jour est utilisée (comportement inchangé d'un audit régulier).
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerVitalite(
@@ -238,6 +240,7 @@ export class FacadeCommandesService {
     sourceId: string,
     idExterne: string,
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationVitalite> {
     return this.interrogerIndicateurGitlab<ResultatGitlabVitalite>(
       'interroger_vitalite',
@@ -245,6 +248,7 @@ export class FacadeCommandesService {
       sourceId,
       idExterne,
       refAuditee,
+      dateCiblee,
     );
   }
 
@@ -277,6 +281,7 @@ export class FacadeCommandesService {
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerContributeurs(
@@ -284,6 +289,7 @@ export class FacadeCommandesService {
     sourceId: string,
     idExterne: string,
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationContributeurs> {
     return this.interrogerIndicateurGitlab<ResultatGitlabContributeurs>(
       'interroger_contributeurs',
@@ -291,6 +297,7 @@ export class FacadeCommandesService {
       sourceId,
       idExterne,
       refAuditee,
+      dateCiblee,
     );
   }
 
@@ -300,6 +307,7 @@ export class FacadeCommandesService {
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerMergeRequests(
@@ -307,6 +315,7 @@ export class FacadeCommandesService {
     sourceId: string,
     idExterne: string,
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationMergeRequests> {
     return this.interrogerIndicateurGitlab<ResultatGitlabMergeRequests>(
       'interroger_merge_requests',
@@ -314,6 +323,7 @@ export class FacadeCommandesService {
       sourceId,
       idExterne,
       refAuditee,
+      dateCiblee,
     );
   }
 
@@ -349,6 +359,7 @@ export class FacadeCommandesService {
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerBranchesCompletes(
@@ -356,6 +367,7 @@ export class FacadeCommandesService {
     sourceId: string,
     idExterne: string,
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationBranchesCompletes> {
     return this.interrogerIndicateurGitlab<ResultatGitlabBranches>(
       'interroger_branches_completes',
@@ -363,6 +375,7 @@ export class FacadeCommandesService {
       sourceId,
       idExterne,
       refAuditee,
+      dateCiblee,
     );
   }
 
@@ -375,6 +388,7 @@ export class FacadeCommandesService {
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerDependances(
@@ -382,6 +396,7 @@ export class FacadeCommandesService {
     sourceId: string,
     idExterne: string,
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationDependances> {
     return this.interrogerIndicateurGitlab<ResultatGitlabDependances>(
       'interroger_dependances',
@@ -389,6 +404,7 @@ export class FacadeCommandesService {
       sourceId,
       idExterne,
       refAuditee,
+      dateCiblee,
     );
   }
 
@@ -401,6 +417,7 @@ export class FacadeCommandesService {
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param reglesMarqueursIA - Référentiel de règles de détection (`referentiels.reglesMarqueursIA`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerMarqueursIa(
@@ -409,6 +426,7 @@ export class FacadeCommandesService {
     idExterne: string,
     reglesMarqueursIA: readonly RegleMarqueurIA[],
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationMarqueursIa> {
     try {
       // Nom de clé IPC `reglesMarqueursIa` (et non `reglesMarqueursIA`) : la conversion snake_case -> camelCase
@@ -423,6 +441,7 @@ export class FacadeCommandesService {
           idExterne,
           reglesMarqueursIa: reglesMarqueursIA,
           refAuditee,
+          dateCiblee,
         },
       );
       return { type: 'succes', resultat };
@@ -445,18 +464,22 @@ export class FacadeCommandesService {
    * @param instance - Instance Sonar hébergeant le projet.
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé. En
+   * mode historique, résolue côté cœur natif par repli sur la donnée Sonar disponible la plus proche.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerViolations(
     instance: Instance,
     sourceId: string,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationViolations> {
     return this.interrogerIndicateurSonar<ResultatSonarViolations>(
       'interroger_violations',
       instance,
       sourceId,
       idExterne,
+      dateCiblee,
     );
   }
 
@@ -465,18 +488,21 @@ export class FacadeCommandesService {
    * @param instance - Instance Sonar hébergeant le projet.
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerDette(
     instance: Instance,
     sourceId: string,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationDette> {
     return this.interrogerIndicateurSonar<ResultatSonarDette>(
       'interroger_dette',
       instance,
       sourceId,
       idExterne,
+      dateCiblee,
     );
   }
 
@@ -485,18 +511,21 @@ export class FacadeCommandesService {
    * @param instance - Instance Sonar hébergeant le projet.
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerCouverture(
     instance: Instance,
     sourceId: string,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationCouverture> {
     return this.interrogerIndicateurSonar<ResultatSonarCouverture>(
       'interroger_couverture',
       instance,
       sourceId,
       idExterne,
+      dateCiblee,
     );
   }
 
@@ -505,18 +534,21 @@ export class FacadeCommandesService {
    * @param instance - Instance Sonar hébergeant le projet.
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerNotes(
     instance: Instance,
     sourceId: string,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationNotes> {
     return this.interrogerIndicateurSonar<ResultatSonarNotes>(
       'interroger_notes',
       instance,
       sourceId,
       idExterne,
+      dateCiblee,
     );
   }
 
@@ -525,18 +557,21 @@ export class FacadeCommandesService {
    * @param instance - Instance Sonar hébergeant le projet.
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async interrogerNcloc(
     instance: Instance,
     sourceId: string,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationNcloc> {
     return this.interrogerIndicateurSonar<ResultatSonarNcloc>(
       'interroger_ncloc',
       instance,
       sourceId,
       idExterne,
+      dateCiblee,
     );
   }
 
@@ -547,12 +582,14 @@ export class FacadeCommandesService {
    * du catalogue figé des résultats d'audit et n'est donc jamais destinée à être persistée seule.
    * @param instance - Instance Sonar hébergeant le projet.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046) ; absente, comportement inchangé.
    * @returns La date de dernière analyse (`null` si le projet n'a jamais été analysé) en cas de succès, ou
    * l'anomalie typée en cas d'échec.
    */
   public async interrogerDerniereAnalyse(
     instance: Instance,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<ResultatInterrogationDerniereAnalyse> {
     try {
       const resultat = await InvocationCommandeUtils.invoquer<string | null>(
@@ -560,6 +597,7 @@ export class FacadeCommandesService {
         {
           instance,
           idExterne,
+          dateCiblee,
         },
       );
       return { type: 'succes', resultat };
@@ -585,6 +623,9 @@ export class FacadeCommandesService {
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Identifiant du projet GitLab côté instance (`Source.idExterne`).
    * @param refAuditee - Ref auditée (`Source.refAuditee`) ; absente, la branche par défaut du dépôt est résolue.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046), transmise telle quelle si fournie par
+   * l'appelant ; `undefined` pour `interrogerTailleDepot`/`interrogerMembres`, jamais historisables (cf. plan
+   * C15-14 § orchestrateur), et pour tout appel en mode régulier.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   private async interrogerIndicateurGitlab<TResultat>(
@@ -593,6 +634,7 @@ export class FacadeCommandesService {
     sourceId: string,
     idExterne: string,
     refAuditee?: string,
+    dateCiblee?: string,
   ): Promise<
     | { readonly type: 'succes'; readonly resultat: TResultat }
     | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
@@ -603,6 +645,7 @@ export class FacadeCommandesService {
         sourceId,
         idExterne,
         refAuditee,
+        dateCiblee,
       });
       return { type: 'succes', resultat };
     } catch (erreur: unknown) {
@@ -626,6 +669,8 @@ export class FacadeCommandesService {
    * @param instance - Instance Sonar hébergeant le projet.
    * @param sourceId - Identifiant de la source concernée (`Source.id`), reporté tel quel dans le résultat.
    * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, RG-046), transmise telle quelle si fournie par
+   * l'appelant ; `undefined` pour tout appel en mode régulier.
    * @returns Le constat brut en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   private async interrogerIndicateurSonar<TResultat>(
@@ -633,6 +678,7 @@ export class FacadeCommandesService {
     instance: Instance,
     sourceId: string,
     idExterne: string,
+    dateCiblee?: string,
   ): Promise<
     | { readonly type: 'succes'; readonly resultat: TResultat }
     | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur }
@@ -642,6 +688,7 @@ export class FacadeCommandesService {
         instance,
         sourceId,
         idExterne,
+        dateCiblee,
       });
       return { type: 'succes', resultat };
     } catch (erreur: unknown) {

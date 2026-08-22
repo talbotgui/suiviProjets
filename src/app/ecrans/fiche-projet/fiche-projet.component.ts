@@ -12,6 +12,11 @@
 //
 // Route `fiche-projet/:projetId` (`app.routes.ts`), paramètre lié directement à l'`input()` {@link projetId} via
 // `withComponentInputBinding()` (`app.config.ts`).
+//
+// Évolution C15-14 (audit historique à date passée, US-046, RG-046) : le dernier audit restitué par défaut
+// (`dernierAuditLabel` et l'ensemble des indicateurs affichés) ignore désormais systématiquement les audits
+// historiques (`typeAudit: 'historique'`), jamais simplement `.at(-1)` ; un nouvel encart dédié
+// (`fiche-projet__audits-historiques`) liste séparément les audits historiques du projet, le cas échéant.
 import {
   Component,
   ElementRef,
@@ -49,6 +54,7 @@ import { NotificationService } from '../../services/avecetat/etat/notification.s
 import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/types-donnees';
 import type {
   Annotation,
+  Audit,
   EntreeJournal,
   EntreeReglesDependances,
   Groupe,
@@ -157,6 +163,21 @@ interface LigneDependance {
    * lien de création d'une règle pré-remplie (cf. {@link SqmFicheProjetComponent.queryParamsReferentielDependance}).
    */
   readonly nonReference: boolean;
+}
+
+/**
+ * Ligne d'affichage d'un audit historique à date passée (C15-14, US-046, RG-046), encart dédié distinct de l'audit
+ * régulier restitué par défaut ({@link DonneesFicheProjet.dernierAuditLabel}) : `dateCibleeLabel` est la date
+ * effectivement analysée (demandée par l'utilisateur), `dateExecutionLabel` l'horodatage réel de la campagne qui
+ * l'a produit (`Audit.dateExecution`), toujours postérieur ou égal à `dateCibleeLabel`.
+ */
+interface LigneAuditHistorique {
+  /** Identifiant de l'audit historique. */
+  readonly id: string;
+  /** Libellé de la date ciblée effectivement analysée (`Audit.date`). */
+  readonly dateCibleeLabel: string;
+  /** Libellé de l'horodatage réel de la campagne (`Audit.dateExecution`), `—` si absent (donnée non attendue). */
+  readonly dateExecutionLabel: string;
 }
 
 /**
@@ -270,8 +291,16 @@ interface DonneesFicheProjet {
   readonly membreInconnuDetecte: boolean;
   /** Libellé de l'âge du projet chez nous (`Projet.premierCommitInterne`). */
   readonly ageChezNousLabel: string;
-  /** Libellé de la date du dernier audit intégré, libellé de repli si jamais audité. */
+  /**
+   * Libellé de la date du dernier audit **régulier** intégré (C15-14, US-046, RG-046 : un audit historique n'est
+   * jamais sélectionné ici, cf. {@link auditsHistoriques} pour l'encart dédié), libellé de repli si jamais audité.
+   */
   readonly dernierAuditLabel: string;
+  /**
+   * Audits historiques à date passée du projet (C15-14, US-046, RG-046), triés du plus récent au plus ancien
+   * (date ciblée), tableau vide si aucun.
+   */
+  readonly auditsHistoriques: readonly LigneAuditHistorique[];
   /** Libellé de la dernière campagne ayant concerné ce projet, libellé de repli si aucune. */
   readonly derniereCampagneLabel: string;
   /** `true` si la dernière campagne s'est soldée par un échec pour ce projet (pilote {@link anomalieTechnique}). */
@@ -707,7 +736,10 @@ export class SqmFicheProjetComponent {
     );
     const campagneEnEchec = derniereCampagne?.verdict.statut === 'echec';
 
-    const dernierAudit = projet.audits.at(-1);
+    // C15-14, US-046, RG-046 : le dernier audit **régulier** est sélectionné ici, jamais simplement `.at(-1)`, pour
+    // ne pas remplacer silencieusement la restitution principale par un audit historique à date passée — ce
+    // dernier reste restitué séparément (cf. {@link construireAuditsHistoriques}).
+    const dernierAudit = projet.audits.filter((audit) => audit.typeAudit !== 'historique').at(-1);
     const themes = AgregationThemeFicheProjetUtils.regrouper(dernierAudit?.resultats ?? []);
 
     const seuilsFraicheurSonar = ParametresJugementUtils.lireSeuilsFraicheurSonar(seuilsBruts);
@@ -767,6 +799,7 @@ export class SqmFicheProjetComponent {
       ageChezNousLabel: this.construireAgeChezNousLabel(projet.premierCommitInterne, maintenant),
       dernierAuditLabel:
         dernierAudit === undefined ? 'jamais audité' : this.formaterDateCourte(dernierAudit.date),
+      auditsHistoriques: this.construireAuditsHistoriques(projet.audits),
       derniereCampagneLabel:
         derniereCampagne === undefined
           ? 'aucune campagne'
@@ -896,6 +929,28 @@ export class SqmFicheProjetComponent {
     const date = new Date(dateIso);
     const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
     return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;
+  }
+
+  /**
+   * Construit l'encart des audits historiques à date passée du projet (C15-14, US-046, RG-046), triés du plus
+   * récent au plus ancien (date ciblée), sur le même principe de tri que {@link Annotation} ({@link
+   * construireDonnees}).
+   * @param audits - Historique complet des audits du projet (`Projet.audits`).
+   * @returns Les lignes d'affichage des audits historiques, tableau vide si aucun.
+   */
+  private construireAuditsHistoriques(audits: readonly Audit[]): readonly LigneAuditHistorique[] {
+    return audits
+      .filter((audit) => audit.typeAudit === 'historique')
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .map((audit) => ({
+        id: audit.id,
+        dateCibleeLabel: this.formaterDateCourte(audit.date),
+        // `dateExecution` est toujours renseignée pour un audit historique (cf. commentaire de `Audit.
+        // dateExecution` dans `types-donnees.ts`) ; le libellé de repli ne couvre qu'une donnée malformée d'un
+        // fichier externe (RG-021), jamais un cas nominal.
+        dateExecutionLabel:
+          audit.dateExecution === undefined ? '—' : this.formaterDateCourte(audit.dateExecution),
+      }));
   }
 
   /**

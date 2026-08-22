@@ -519,6 +519,14 @@ export interface EntreeJournal {
 }
 
 /**
+ * Catégorie d'un audit (C15-14, RG-046), mirroir de `TypeAudit` côté cœur natif : `'reguliere'` pour un audit
+ * lancé à la date du jour (comportement historique de l'application, valeur par défaut de repli à la
+ * désérialisation d'un fichier antérieur à C15-14), `'historique'` pour un audit à date passée ciblée, à
+ * périmètre d'indicateurs réduit (cf. commentaire de {@link Audit.dateExecution}).
+ */
+export type TypeAudit = 'reguliere' | 'historique';
+
+/**
  * Historique d'audit d'un projet : un ensemble de constats bruts obtenus à une date donnée, mirroir de `Audit`
  * côté cœur natif. `resultats` (catalogue figé des types d'indicateurs, Phase 6, incrément 1) est désormais typé
  * par l'union discriminée {@link Resultat}.
@@ -526,12 +534,26 @@ export interface EntreeJournal {
 export interface Audit {
   /** Identifiant UUID v4 de l'audit. */
   readonly id: string;
-  /** Date de réalisation de l'audit. */
+  /**
+   * Date effectivement analysée : la date du jour pour un audit régulier, la date ciblée demandée pour un audit
+   * historique (C15-14) — jamais l'horodatage réel d'exécution de la campagne dans ce second cas, cf.
+   * {@link dateExecution}. C'est cette date qui positionne l'audit sur l'axe temporel des restitutions
+   * (Synthèse graphique, Fiche projet).
+   */
   readonly date: string;
   /** Identifiant de la campagne qui a produit cet audit. */
   readonly campagneId: string;
   /** Résultats typés obtenus (catalogue figé, union discriminée sur `type`). */
   readonly resultats: readonly Resultat[];
+  /** Catégorie de l'audit (C15-14, RG-046). */
+  readonly typeAudit: TypeAudit;
+  /**
+   * Horodatage réel (ISO 8601) de la campagne ayant produit cet audit, renseigné uniquement pour un audit
+   * historique (`typeAudit: 'historique'`) : absent pour un audit régulier, où il serait redondant avec
+   * {@link date}. Décision arbitraire de sémantique reprise telle quelle du plan C15-14 (§ modèle Rust), à
+   * valider par un humain (cf. rapport de développement).
+   */
+  readonly dateExecution?: string;
 }
 
 /**

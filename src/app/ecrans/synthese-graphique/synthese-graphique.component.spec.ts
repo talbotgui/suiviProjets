@@ -15,6 +15,7 @@ import type {
   Groupe,
   Projet,
   Resultat,
+  TypeAudit,
 } from '../../services/avecetat/etat/types-donnees';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmSyntheseGraphiqueComponent } from './synthese-graphique.component';
@@ -37,6 +38,7 @@ class DonneesDeTest {
    * @param options.violationsCritique - Nombre de violations critiques constaté.
    * @param options.tailleOctets - Taille du dépôt constatée, en octets.
    * @param options.nombreMrOuvertes - Nombre de demandes de fusion ouvertes constatées.
+   * @param options.typeAudit - Catégorie de l'audit (C15-14, RG-046), `'reguliere'` par défaut.
    * @returns L'audit de test.
    */
   public static audit(
@@ -47,6 +49,7 @@ class DonneesDeTest {
       readonly violationsCritique?: number;
       readonly tailleOctets?: number;
       readonly nombreMrOuvertes?: number;
+      readonly typeAudit?: TypeAudit;
     } = {},
   ): Audit {
     const resultats: Resultat[] = [];
@@ -96,7 +99,13 @@ class DonneesDeTest {
         })),
       });
     }
-    return { id: `audit-${date}`, date, campagneId: 'campagne-1', resultats };
+    return {
+      id: `audit-${date}`,
+      date,
+      campagneId: 'campagne-1',
+      resultats,
+      typeAudit: options.typeAudit ?? 'reguliere',
+    };
   }
 
   /**
@@ -250,6 +259,42 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     ]);
     expect(serieB?.points).toEqual([]);
   });
+
+  it(
+    'exclut les audits historiques (typeAudit "historique") de la ligne de tendance et les restitue ' +
+      'séparément comme marqueurs verticaux distincts (C15-14, US-046, RG-046)',
+    () => {
+      const projet = DonneesDeTest.projet('projet-a', 'Projet A', [
+        DonneesDeTest.audit('2026-06-05', { couverture: 61.2 }),
+        DonneesDeTest.audit('2026-04-01', { couverture: 55.0, typeAudit: 'historique' }),
+        DonneesDeTest.audit('2026-07-08', { couverture: 64.8 }),
+      ]);
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe 1',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projet],
+      };
+      const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+
+      const series = fixture.componentInstance.series();
+      expect(series[0]?.points).toEqual([
+        { date: '2026-06-05', valeur: 61.2 },
+        { date: '2026-07-08', valeur: 64.8 },
+      ]);
+
+      const lignes = fixture.componentInstance.lignesVerticales();
+      const ligneHistorique = lignes.find((ligne) => ligne.categorie === 'auditHistorique');
+      expect(ligneHistorique).toBeDefined();
+      expect(ligneHistorique?.date).toBe('2026-04-01');
+      expect(ligneHistorique?.libelle).toContain('Projet A');
+      expect(ligneHistorique?.libelle).toContain('2026-04-01');
+    },
+  );
 
   it('convertit la taille du dépôt en mégaoctets pour l’indicateur « Taille du dépôt »', () => {
     const projet = DonneesDeTest.projet('projet-a', 'Projet A', [

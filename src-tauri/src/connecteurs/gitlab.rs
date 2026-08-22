@@ -436,6 +436,10 @@ fn detecter_marqueurs(
 /// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux appels de pagination de l'arborescence.
 /// [`ErreurConnecteur::ReponseInattendue`] également si une règle `motif` porte un motif glob invalide (cas
 /// resté théorique : tout motif littéral échappé produit une expression régulière valide).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "huit paramètres factuellement distincts (connexion, identification de la source, ref auditée, référentiel de règles transmis par l'appelant, C15-14 : date cible du mode historique) ; les regrouper en structure dédiée n'apporterait pas de clarté supplémentaire pour ce seul point d'appel, sur le même principe que les autres commandes de la Façade déjà couvertes par cette même exception (cf. commandes/audit.rs, commandes/administration.rs)"
+)]
 pub(crate) async fn interroger_marqueurs_ia(
     url_base: &str,
     credential: &str,
@@ -443,10 +447,18 @@ pub(crate) async fn interroger_marqueurs_ia(
     id_externe: &str,
     ref_auditee: Option<&str>,
     regles: &[RegleMarqueurIA],
+    date_ciblee: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<ResultatGitlabMarqueursIa, ErreurConnecteur> {
-    let resolue =
-        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+    let resolue = resoudre_ref(
+        url_base,
+        credential,
+        id_externe,
+        ref_auditee,
+        date_ciblee,
+        client,
+    )
+    .await?;
 
     let mut entrees = Vec::new();
     for page in 1..=MAX_PAGES_ARBORESCENCE {
@@ -566,6 +578,60 @@ fn url_commit_ref(
     Ok(url)
 }
 
+/// Résout la branche par défaut du dépôt (`GET /projects/{id}`), factorisé entre [`resoudre_ref_effective`] et
+/// [`resoudre_ref_effective_a_date`] (C15-14) : les deux résolvent la même branche par défaut lorsque `ref_auditee`
+/// est absente, seule la résolution du commit correspondant diffère ensuite (commit de tête pour la première,
+/// commit le plus récent à une date donnée pour la seconde).
+///
+/// # Erreurs
+///
+/// Voir [`resoudre_ref_effective`] ; [`ErreurConnecteur::ReponseInattendue`] également si le champ
+/// `default_branch` est absent de la réponse.
+async fn resoudre_branche_par_defaut(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    client: &reqwest::Client,
+) -> Result<String, ErreurConnecteur> {
+    let url = format!(
+        "{}/api/v4/projects/{}",
+        url_base.trim_end_matches('/'),
+        id_externe
+    );
+    let reponse = client
+        .get(url)
+        .header("PRIVATE-TOKEN", credential)
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+    let statut = reponse.status();
+    if statut.as_u16() == 401 {
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if statut.as_u16() == 403 {
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if !statut.is_success() {
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    reponse
+        .json::<ReponseProjet>()
+        .await
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?
+        .default_branch
+        .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
+            message: "Champ default_branch absent de la réponse".to_string(),
+        })
+}
+
 /// Résout la ref effectivement auditée (branche par défaut du dépôt si `ref_auditee` est absente, cf.
 /// `Source.refAuditee`) ainsi que le SHA et la date du commit de tête correspondant, communs à toutes les
 /// opérations d'interrogation GitLab de cette phase.
@@ -585,45 +651,7 @@ async fn resoudre_ref_effective(
 ) -> Result<RefResolue, ErreurConnecteur> {
     let ref_effective = match ref_auditee {
         Some(ref_auditee) => ref_auditee.to_string(),
-        None => {
-            let url = format!(
-                "{}/api/v4/projects/{}",
-                url_base.trim_end_matches('/'),
-                id_externe
-            );
-            let reponse = client
-                .get(url)
-                .header("PRIVATE-TOKEN", credential)
-                .send()
-                .await
-                .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-            let statut = reponse.status();
-            if statut.as_u16() == 401 {
-                return Err(ErreurConnecteur::AuthentificationRefusee {
-                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
-                });
-            }
-            if statut.as_u16() == 403 {
-                return Err(ErreurConnecteur::DroitsInsuffisants {
-                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
-                });
-            }
-            if !statut.is_success() {
-                return Err(ErreurConnecteur::ReponseInattendue {
-                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
-                });
-            }
-            reponse
-                .json::<ReponseProjet>()
-                .await
-                .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-                    message: erreur.to_string(),
-                })?
-                .default_branch
-                .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
-                    message: "Champ default_branch absent de la réponse".to_string(),
-                })?
-        }
+        None => resoudre_branche_par_defaut(url_base, credential, id_externe, client).await?,
     };
 
     let url = url_commit_ref(url_base, id_externe, &ref_effective)?;
@@ -667,6 +695,156 @@ async fn resoudre_ref_effective(
     })
 }
 
+/// Résout la ref effectivement auditée « à une date donnée » (C15-14, audit historique) : même résolution de
+/// branche par défaut que [`resoudre_ref_effective`] si `ref_auditee` est absente, mais recherche ensuite, via
+/// `GET /repository/commits?ref_name=<ref>&until=<date_cible>&per_page=1`, le commit le plus récent antérieur ou
+/// égal à `date_cible` sur cette ref — au lieu du commit de tête courant de [`resoudre_ref_effective`]. Ce mode de
+/// résolution (paramètre serveur `until`, documenté par l'API GitLab pour ce point d'entrée) est distinct de celui
+/// utilisé côté Sonar (`recuperer_historique_mesures` + `selectionner_point_le_plus_proche`, entièrement côté
+/// client) : contrairement au paramètre `search_history` de l'API Sonar, non vérifié contre une instance réelle
+/// (cf. en-tête de module de `sonar.rs`), le comportement de `until` sur `repository/commits` est documenté de
+/// façon stable par l'API GitLab, ce qui justifie de s'y appuyer directement ici plutôt que de retraiter côté
+/// client une page de commits non filtrée.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::RefIntrouvable`] si la ref n'existe pas sur le dépôt, ou si aucun commit n'existe sur cette
+/// ref avant `date_cible` (liste vide en réponse) ; les autres catégories de [`ErreurConnecteur`] selon le statut
+/// ou la forme de la réponse, y compris pour l'appel préalable de résolution de la branche par défaut lorsque
+/// `ref_auditee` est absente.
+async fn resoudre_ref_effective_a_date(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    ref_auditee: Option<&str>,
+    date_cible: &str,
+    client: &reqwest::Client,
+) -> Result<RefResolue, ErreurConnecteur> {
+    let ref_effective = match ref_auditee {
+        Some(ref_auditee) => ref_auditee.to_string(),
+        None => resoudre_branche_par_defaut(url_base, credential, id_externe, client).await?,
+    };
+
+    let url = format!(
+        "{}/api/v4/projects/{}/repository/commits",
+        url_base.trim_end_matches('/'),
+        id_externe
+    );
+    let reponse = client
+        .get(url)
+        .header("PRIVATE-TOKEN", credential)
+        .query(&[
+            ("ref_name", ref_effective.as_str()),
+            ("until", date_cible),
+            ("per_page", "1"),
+        ])
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+    let statut = reponse.status();
+    if statut.as_u16() == 401 {
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if statut.as_u16() == 403 {
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if statut.as_u16() == 404 {
+        return Err(ErreurConnecteur::RefIntrouvable {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if !statut.is_success() {
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    let commits = reponse
+        .json::<Vec<ReponseCommit>>()
+        .await
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
+    let commit = commits
+        .into_iter()
+        .next()
+        .ok_or_else(|| ErreurConnecteur::RefIntrouvable {
+            message: format!(
+                "Aucun commit trouvé sur la ref « {ref_effective} » avant la date « {date_cible} »"
+            ),
+        })?;
+
+    Ok(RefResolue {
+        ref_effective,
+        sha_tete: commit.id,
+        date_commit: commit.committed_date,
+    })
+}
+
+/// Point d'entrée unique de résolution de ref pour les six opérations d'interrogation historisables (C15-14) :
+/// bascule vers [`resoudre_ref_effective_a_date`] quand `date_ciblee` est renseigné, sinon comportement inchangé
+/// via [`resoudre_ref_effective`] — un seul point de branchement, plutôt que de dupliquer ce `match` dans chacune
+/// des six opérations.
+async fn resoudre_ref(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    ref_auditee: Option<&str>,
+    date_ciblee: Option<&str>,
+    client: &reqwest::Client,
+) -> Result<RefResolue, ErreurConnecteur> {
+    match date_ciblee {
+        Some(date_cible) => {
+            resoudre_ref_effective_a_date(
+                url_base,
+                credential,
+                id_externe,
+                ref_auditee,
+                date_cible,
+                client,
+            )
+            .await
+        }
+        None => resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await,
+    }
+}
+
+/// Interprète une date cible d'audit historique (C15-14), reçue de l'Angular via `<input type="date">`
+/// (`AAAA-MM-JJ`) ou, plus robustement, au format ISO 8601 complet (`AAAA-MM-JJTHH:MM:SSZ`), comme la borne de fin
+/// de journée en UTC : une date sans heure (`AAAA-MM-JJ`) est interprétée comme `23:59:59` ce jour-là plutôt que
+/// minuit, pour inclure les commits/mesures survenus au cours de la journée ciblée plutôt que de les exclure par un
+/// arrondi vers le bas — décision arbitraire (cf. rapport de développement), aucune règle de gestion ne précisant
+/// ce point.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::ReponseInattendue`] si `date_cible` n'est ni un horodatage RFC 3339 valide, ni une date
+/// `AAAA-MM-JJ` valide.
+fn interpreter_date_cible_fin_de_journee(
+    date_cible: &str,
+) -> Result<chrono::DateTime<chrono::Utc>, ErreurConnecteur> {
+    if let Ok(horodatage) = chrono::DateTime::parse_from_rfc3339(date_cible) {
+        return Ok(horodatage.with_timezone(&chrono::Utc));
+    }
+    let date = chrono::NaiveDate::parse_from_str(date_cible, "%Y-%m-%d").map_err(|erreur| {
+        ErreurConnecteur::ReponseInattendue {
+            message: format!("Date cible « {date_cible} » invalide : {erreur}"),
+        }
+    })?;
+    let fin_de_journee =
+        date.and_hms_opt(23, 59, 59)
+            .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
+                message: format!("Date cible « {date_cible} » invalide"),
+            })?;
+    Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+        fin_de_journee,
+        chrono::Utc,
+    ))
+}
+
 /// Interroge la vitalité d'un dépôt GitLab, c'est-à-dire la date du dernier commit sur la ref auditée (US-009,
 /// `gitlab.vitalite`) : se limite à la résolution de la ref effective, qui fournit déjà cette date.
 ///
@@ -679,10 +857,18 @@ pub(crate) async fn interroger_vitalite(
     source_id: &str,
     id_externe: &str,
     ref_auditee: Option<&str>,
+    date_ciblee: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<ResultatGitlabVitalite, ErreurConnecteur> {
-    let resolue =
-        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+    let resolue = resoudre_ref(
+        url_base,
+        credential,
+        id_externe,
+        ref_auditee,
+        date_ciblee,
+        client,
+    )
+    .await?;
     Ok(ResultatGitlabVitalite {
         source_id: source_id.to_string(),
         ref_effective: resolue.ref_effective,
@@ -767,12 +953,27 @@ pub(crate) async fn interroger_contributeurs(
     source_id: &str,
     id_externe: &str,
     ref_auditee: Option<&str>,
+    date_ciblee: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<ResultatGitlabContributeurs, ErreurConnecteur> {
-    let resolue =
-        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
-    let depuis =
-        chrono::Utc::now() - chrono::Duration::days(i64::from(FENETRE_CONTRIBUTEURS_JOURS));
+    let resolue = resoudre_ref(
+        url_base,
+        credential,
+        id_externe,
+        ref_auditee,
+        date_ciblee,
+        client,
+    )
+    .await?;
+    // Fenêtre glissante décalée en mode historique (C15-14) : [date_cible − FENETRE_CONTRIBUTEURS_JOURS ;
+    // date_cible] au lieu de [maintenant − FENETRE_CONTRIBUTEURS_JOURS ; maintenant]. `jusqua` n'est transmis en
+    // paramètre `until` que si `date_ciblee` est renseigné : en mode régulier, l'absence de `until` (comportement
+    // historique inchangé) laisse l'API GitLab par défaut à l'instant présent.
+    let jusqua = match date_ciblee {
+        Some(date_cible) => interpreter_date_cible_fin_de_journee(date_cible)?,
+        None => chrono::Utc::now(),
+    };
+    let depuis = jusqua - chrono::Duration::days(i64::from(FENETRE_CONTRIBUTEURS_JOURS));
 
     let mut commits_par_email: std::collections::HashMap<String, (String, u32)> =
         std::collections::HashMap::new();
@@ -782,15 +983,19 @@ pub(crate) async fn interroger_contributeurs(
             url_base.trim_end_matches('/'),
             id_externe
         );
+        let mut parametres = vec![
+            ("ref_name", resolue.ref_effective.clone()),
+            ("since", depuis.to_rfc3339()),
+            ("per_page", TAILLE_PAGE_AUDIT.to_string()),
+            ("page", page.to_string()),
+        ];
+        if date_ciblee.is_some() {
+            parametres.push(("until", jusqua.to_rfc3339()));
+        }
         let reponse = client
             .get(url)
             .header("PRIVATE-TOKEN", credential)
-            .query(&[
-                ("ref_name", resolue.ref_effective.as_str()),
-                ("since", depuis.to_rfc3339().as_str()),
-                ("per_page", TAILLE_PAGE_AUDIT),
-                ("page", page.to_string().as_str()),
-            ])
+            .query(&parametres)
             .send()
             .await
             .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
@@ -847,7 +1052,10 @@ pub(crate) async fn interroger_contributeurs(
     })
 }
 
-/// Réponse d'une demande de fusion ouverte de l'API GitLab, réduite aux champs exploités ici.
+/// Réponse d'une demande de fusion de l'API GitLab, réduite aux champs exploités ici. `merged_at`/`closed_at`
+/// (C15-14) ne sont exploités qu'en mode historique, pour reconstituer côté client l'état « ouverte à la date
+/// cible » d'une demande de fusion depuis un listing `state=all` (cf. `interroger_merge_requests`) : absents ou
+/// `null` pour une demande de fusion encore ouverte, sur le modèle de l'API GitLab elle-même.
 #[derive(Debug, Deserialize)]
 struct ReponseMergeRequest {
     iid: u64,
@@ -856,58 +1064,153 @@ struct ReponseMergeRequest {
     #[serde(default)]
     has_conflicts: bool,
     web_url: String,
+    #[serde(default)]
+    merged_at: Option<String>,
+    #[serde(default)]
+    closed_at: Option<String>,
 }
 
-/// Interroge les demandes de fusion ouvertes d'un dépôt GitLab (US-009, `gitlab.merge_requests`).
+/// Nombre maximal de pages parcourues lors de la reconstitution complète des demandes de fusion en mode historique
+/// (`interroger_merge_requests`, C15-14, `state=all` paginé faute de filtre serveur par date) : même valeur que
+/// [`MAX_PAGES_BRANCHES_COMPLETES`], sur le même principe de borne de sécurité arbitraire.
+const MAX_PAGES_MERGE_REQUESTS_HISTORIQUE: u32 = MAX_PAGES_BRANCHES_COMPLETES;
+
+/// Interroge les demandes de fusion d'un dépôt GitLab (US-009, `gitlab.merge_requests`) : en mode régulier
+/// (`date_ciblee` absent), comportement inchangé (`state=opened`, une seule page). En mode historique (C15-14),
+/// aucun filtre serveur par date n'existant sur ce point d'API : listing complet paginé `state=all` (jusqu'à
+/// épuisement ou [`MAX_PAGES_MERGE_REQUESTS_HISTORIQUE`]), puis filtrage côté client des demandes de fusion
+/// « ouvertes à la date cible » — `created_at ≤ date_cible` et (`merged_at`/`closed_at` absent ou `> date_cible`) ;
+/// comparaison lexicographique directe des chaînes ISO 8601, valide pour ce format (cf.
+/// `selectionner_point_le_plus_proche` de `sonar.rs` pour le même principe).
 ///
 /// # Erreurs
 ///
-/// Voir [`resoudre_ref_effective`] ; la seconde requête (liste des demandes de fusion) suit le même mapping.
+/// Voir [`resoudre_ref_effective`] ; la seconde requête (liste des demandes de fusion, paginée en mode historique)
+/// suit le même mapping.
 pub(crate) async fn interroger_merge_requests(
     url_base: &str,
     credential: &str,
     source_id: &str,
     id_externe: &str,
     ref_auditee: Option<&str>,
+    date_ciblee: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<ResultatGitlabMergeRequests, ErreurConnecteur> {
-    let resolue =
-        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+    let resolue = resoudre_ref(
+        url_base,
+        credential,
+        id_externe,
+        ref_auditee,
+        date_ciblee,
+        client,
+    )
+    .await?;
 
-    let url = format!(
-        "{}/api/v4/projects/{}/merge_requests",
-        url_base.trim_end_matches('/'),
-        id_externe
-    );
-    let reponse = client
-        .get(url)
-        .header("PRIVATE-TOKEN", credential)
-        .query(&[("state", "opened"), ("per_page", TAILLE_PAGE_AUDIT)])
-        .send()
-        .await
-        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-    let statut = reponse.status();
-    if statut.as_u16() == 401 {
-        return Err(ErreurConnecteur::AuthentificationRefusee {
-            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+    let mut mr_brutes = Vec::new();
+    if let Some(date_cible) = date_ciblee {
+        for page in 1..=MAX_PAGES_MERGE_REQUESTS_HISTORIQUE {
+            let url = format!(
+                "{}/api/v4/projects/{}/merge_requests",
+                url_base.trim_end_matches('/'),
+                id_externe
+            );
+            let reponse = client
+                .get(url)
+                .header("PRIVATE-TOKEN", credential)
+                .query(&[
+                    ("state", "all"),
+                    ("per_page", TAILLE_PAGE_AUDIT),
+                    ("page", page.to_string().as_str()),
+                ])
+                .send()
+                .await
+                .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+            let statut = reponse.status();
+            if statut.as_u16() == 401 {
+                return Err(ErreurConnecteur::AuthentificationRefusee {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
+            }
+            if statut.as_u16() == 403 {
+                return Err(ErreurConnecteur::DroitsInsuffisants {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
+            }
+            if !statut.is_success() {
+                return Err(ErreurConnecteur::ReponseInattendue {
+                    message: format!("Statut HTTP {} reçu", statut.as_u16()),
+                });
+            }
+            let page_mrs = reponse
+                .json::<Vec<ReponseMergeRequest>>()
+                .await
+                .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                    message: erreur.to_string(),
+                })?;
+            if page_mrs.is_empty() {
+                break;
+            }
+            mr_brutes.extend(page_mrs);
+        }
+        // Normalisation en fin de journée (C15-14) avant comparaison lexicographique, sur le même principe que
+        // [`interroger_contributeurs`] : `date_cible` telle que reçue de l'écran (`AAAA-MM-JJ`, dix caractères) est
+        // toujours lexicographiquement inférieure à tout horodatage complet GitLab (`AAAA-MM-JJThh:mm:ssZ`) portant
+        // la même date, du seul fait d'être un préfixe plus court — une demande de fusion créée, fusionnée ou
+        // fermée le jour exact de la date ciblée était donc jusqu'ici incorrectement exclue/incluse selon le cas.
+        // Correction relevée en relecture isolée de cet incrément (cf. rapport de développement).
+        let date_cible_normalisee = interpreter_date_cible_fin_de_journee(date_cible)?.to_rfc3339();
+        mr_brutes.retain(|mr| {
+            let creee_avant_ou_a_la_date = mr.created_at.as_str() <= date_cible_normalisee.as_str();
+            let toujours_ouverte_a_la_date = match (&mr.merged_at, &mr.closed_at) {
+                (None, None) => true,
+                (Some(cloture), None) | (None, Some(cloture)) => {
+                    cloture.as_str() > date_cible_normalisee.as_str()
+                }
+                (Some(fusion), Some(fermeture)) => {
+                    fusion.as_str() > date_cible_normalisee.as_str()
+                        && fermeture.as_str() > date_cible_normalisee.as_str()
+                }
+            };
+            creee_avant_ou_a_la_date && toujours_ouverte_a_la_date
         });
+    } else {
+        let url = format!(
+            "{}/api/v4/projects/{}/merge_requests",
+            url_base.trim_end_matches('/'),
+            id_externe
+        );
+        let reponse = client
+            .get(url)
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[("state", "opened"), ("per_page", TAILLE_PAGE_AUDIT)])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        mr_brutes = reponse
+            .json::<Vec<ReponseMergeRequest>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
     }
-    if statut.as_u16() == 403 {
-        return Err(ErreurConnecteur::DroitsInsuffisants {
-            message: format!("Statut HTTP {} reçu", statut.as_u16()),
-        });
-    }
-    if !statut.is_success() {
-        return Err(ErreurConnecteur::ReponseInattendue {
-            message: format!("Statut HTTP {} reçu", statut.as_u16()),
-        });
-    }
-    let mr_ouvertes = reponse
-        .json::<Vec<ReponseMergeRequest>>()
-        .await
-        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-            message: erreur.to_string(),
-        })?
+
+    let mr_ouvertes = mr_brutes
         .into_iter()
         .map(|mr| MergeRequestOuverte {
             iid: mr.iid,
@@ -1086,10 +1389,18 @@ pub(crate) async fn interroger_branches_completes(
     source_id: &str,
     id_externe: &str,
     ref_auditee: Option<&str>,
+    date_ciblee: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<ResultatGitlabBranches, ErreurConnecteur> {
-    let resolue =
-        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+    let resolue = resoudre_ref(
+        url_base,
+        credential,
+        id_externe,
+        ref_auditee,
+        date_ciblee,
+        client,
+    )
+    .await?;
 
     let mut branches_brutes = Vec::new();
     for page in 1..=MAX_PAGES_BRANCHES_COMPLETES {
@@ -1842,10 +2153,18 @@ pub(crate) async fn interroger_dependances(
     source_id: &str,
     id_externe: &str,
     ref_auditee: Option<&str>,
+    date_ciblee: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<ResultatGitlabDependances, ErreurConnecteur> {
-    let resolue =
-        resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await?;
+    let resolue = resoudre_ref(
+        url_base,
+        credential,
+        id_externe,
+        ref_auditee,
+        date_ciblee,
+        client,
+    )
+    .await?;
 
     let mut chemins_manifestes = Vec::new();
     for page in 1..=MAX_PAGES_ARBORESCENCE {
@@ -2350,6 +2669,7 @@ mod tests {
             "f0000000-0000-4000-8000-000000000001",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2390,6 +2710,7 @@ mod tests {
             "f0000000-0000-4000-8000-000000000001",
             "1234",
             Some("feature/paiement-sepa"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2431,6 +2752,7 @@ mod tests {
             "source-1",
             "1234",
             None,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2453,6 +2775,7 @@ mod tests {
             "source-1",
             "1234",
             None,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2480,6 +2803,7 @@ mod tests {
             "source-1",
             "1234",
             Some("branche-absente"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2505,6 +2829,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2530,6 +2855,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2555,6 +2881,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -2563,6 +2890,103 @@ mod tests {
             resultat,
             Err(ErreurConnecteur::ReponseInattendue { .. })
         ));
+    }
+
+    #[tokio::test]
+    async fn interroger_vitalite_resout_via_date_cible_le_commit_le_plus_recent_avant_cette_date()
+    -> Result<(), ErreurConnecteur> {
+        // C15-14 : `resoudre_ref_effective_a_date` interroge `GET .../repository/commits?ref_name=...&until=...`
+        // au lieu de `GET .../repository/commits/{ref}` dès que `date_ciblee` est renseigné.
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("ref_name", "develop"))
+            .and(query_param("until", "2026-03-15"))
+            .and(query_param("per_page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "commit-avant-la-date", "committed_date": "2026-03-14T10:00:00Z" }
+            ])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_vitalite(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            Some("2026-03-15"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.ref_effective, "develop");
+        assert_eq!(resultat.sha_tete, "commit-avant-la-date");
+        assert_eq!(resultat.dernier_commit_le, "2026-03-14T10:00:00Z");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_vitalite_signale_ref_introuvable_si_aucun_commit_avant_la_date_cible() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_vitalite(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            Some("2020-01-01"),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::RefIntrouvable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_vitalite_resout_la_branche_par_defaut_en_mode_historique_si_ref_absente()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "default_branch": "main" })),
+            )
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "abc123", "committed_date": "2026-03-14T00:00:00Z" }
+            ])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_vitalite(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            None,
+            Some("2026-03-15"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.ref_effective, "main");
+        Ok(())
     }
 
     #[tokio::test]
@@ -2674,6 +3098,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -2682,6 +3107,63 @@ mod tests {
         assert_eq!(resultat.contributeurs.len(), 1);
         assert_eq!(resultat.contributeurs[0].email, "marie@entreprise.fr");
         assert_eq!(resultat.contributeurs[0].nombre_commits, 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_contributeurs_decale_la_fenetre_vers_la_date_cible_en_mode_historique()
+    -> Result<(), ErreurConnecteur> {
+        // C15-14 : en mode historique, la fenêtre glissante devient [date_cible − 90j ; date_cible] au lieu de
+        // [maintenant − 90j ; maintenant], et `until` est explicitement transmis (absent en mode régulier).
+        use wiremock::matchers::query_param;
+
+        let date_cible = "2026-02-01";
+        let jusqua = interpreter_date_cible_fin_de_journee(date_cible)?;
+        let depuis = jusqua - chrono::Duration::days(i64::from(FENETRE_CONTRIBUTEURS_JOURS));
+
+        let serveur = MockServer::start().await;
+        // Résolution de la ref à la date cible (`resoudre_ref_effective_a_date`) : `until` brut, distinct de la
+        // fenêtre since/until ci-dessous, et `per_page=1`.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("ref_name", "develop"))
+            .and(query_param("until", date_cible))
+            .and(query_param("per_page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "8c1d0e44", "committed_date": "2026-02-01T09:00:00Z" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .and(query_param("since", depuis.to_rfc3339()))
+            .and(query_param("until", jusqua.to_rfc3339()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "c1", "committed_date": "2026-01-20T00:00:00Z", "author_email": "marie@entreprise.fr", "author_name": "Marie" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_contributeurs(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            Some(date_cible),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat.contributeurs.len(), 1);
+        assert_eq!(resultat.contributeurs[0].email, "marie@entreprise.fr");
         Ok(())
     }
 
@@ -2712,6 +3194,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -2719,6 +3202,153 @@ mod tests {
         assert_eq!(resultat.mr_ouvertes.len(), 2);
         assert!(!resultat.mr_ouvertes[0].en_conflit);
         assert!(!resultat.mr_ouvertes[1].en_conflit);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_merge_requests_historique_filtre_les_mr_ouvertes_a_la_date_cible()
+    -> Result<(), ErreurConnecteur> {
+        // C15-14 : en mode historique, `state=all` paginé (au lieu de `state=opened`) puis filtrage côté client
+        // (`created_at <= date_cible` et `merged_at`/`closed_at` absent ou postérieur à `date_cible`).
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        // Résolution de la ref à la date cible (`resoudre_ref_effective_a_date`, C15-14) : `GET .../commits` avec
+        // `until`/`per_page=1`, distinct de la résolution régulière (`GET .../commits/{ref}`).
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("ref_name", "develop"))
+            .and(query_param("per_page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "8c1d0e44", "committed_date": "2026-01-31T10:00:00Z" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/merge_requests"))
+            .and(query_param("state", "all"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "iid": 100, "title": "Encore ouverte à la date cible", "created_at": "2026-01-01T00:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/100"
+                },
+                {
+                    "iid": 101, "title": "Fusionnée après la date cible", "created_at": "2026-01-02T00:00:00Z",
+                    "merged_at": "2026-02-10T00:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/101"
+                },
+                {
+                    "iid": 102, "title": "Fusionnée avant la date cible", "created_at": "2026-01-03T00:00:00Z",
+                    "merged_at": "2026-01-10T00:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/102"
+                },
+                {
+                    "iid": 103, "title": "Créée après la date cible", "created_at": "2026-03-01T00:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/103"
+                },
+                {
+                    "iid": 104, "title": "Fermée après la date cible", "created_at": "2026-01-04T00:00:00Z",
+                    "closed_at": "2026-02-15T00:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/104"
+                }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/merge_requests"))
+            .and(query_param("state", "all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_merge_requests(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            Some("2026-02-01"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        let iids: Vec<u64> = resultat.mr_ouvertes.iter().map(|mr| mr.iid).collect();
+        assert_eq!(iids, vec![100, 101, 104]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_merge_requests_historique_normalise_la_date_cible_en_fin_de_journee()
+    -> Result<(), ErreurConnecteur> {
+        // Non-régression (relevée en relecture isolée de C15-14) : `date_cible` telle que reçue de l'écran
+        // (`AAAA-MM-JJ`, dix caractères) est toujours lexicographiquement inférieure à tout horodatage complet
+        // GitLab portant la même date (préfixe plus court) — une demande de fusion créée le jour exact de la date
+        // ciblée était donc jusqu'ici incorrectement exclue par une comparaison brute, sans normalisation en fin de
+        // journée. Vérifie ici que ce cas limite (création, fusion et fermeture le jour exact de la date ciblée)
+        // est désormais traité correctement.
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("ref_name", "develop"))
+            .and(query_param("per_page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "8c1d0e44", "committed_date": "2026-01-31T10:00:00Z" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/merge_requests"))
+            .and(query_param("state", "all"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "iid": 200, "title": "Créée tôt le jour même de la date cible, encore ouverte",
+                    "created_at": "2026-02-01T08:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/200"
+                },
+                {
+                    "iid": 201, "title": "Créée tard le jour même de la date cible, encore ouverte",
+                    "created_at": "2026-02-01T23:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/201"
+                },
+                {
+                    "iid": 202, "title": "Fusionnée le jour même de la date cible",
+                    "created_at": "2026-01-15T00:00:00Z", "merged_at": "2026-02-01T10:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/202"
+                },
+                {
+                    "iid": 203, "title": "Fermée le jour même de la date cible",
+                    "created_at": "2026-02-01T05:00:00Z", "closed_at": "2026-02-01T20:00:00Z",
+                    "web_url": "https://gitlab.example.com/groupe/projet/-/merge_requests/203"
+                }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/merge_requests"))
+            .and(query_param("state", "all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_merge_requests(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            Some("2026-02-01"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        let iids: Vec<u64> = resultat.mr_ouvertes.iter().map(|mr| mr.iid).collect();
+        assert_eq!(iids, vec![200, 201]);
         Ok(())
     }
 
@@ -2944,6 +3574,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -2993,6 +3624,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3041,6 +3673,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3089,6 +3722,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3142,6 +3776,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3175,6 +3810,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -3210,6 +3846,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -3245,6 +3882,7 @@ mod tests {
             "1234",
             Some("develop"),
             &regles,
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -3300,6 +3938,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3341,6 +3980,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;
@@ -3443,6 +4083,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3498,6 +4139,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3528,6 +4170,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await?;
@@ -3557,6 +4200,7 @@ mod tests {
             "source-1",
             "1234",
             Some("develop"),
+            None, // date_ciblee
             &client_test_delai_court(),
         )
         .await;

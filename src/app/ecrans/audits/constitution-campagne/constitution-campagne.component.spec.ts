@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Router } from '@angular/router';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
+import { OrchestrateurCampagneService } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
 import { SqmConstitutionCampagneComponent } from './constitution-campagne.component';
 
@@ -248,5 +249,45 @@ describe('SqmConstitutionCampagneComponent', () => {
 
     expect(composant.confirmationMotDePasseVisible).toBe(false);
     expect(routerMock.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  describe('date d’analyse et audit historique (C15-14, US-046, RG-046)', () => {
+    it('ne doit pas activer le mode historique tant qu’aucune date n’est saisie', () => {
+      expect(composant.dateCiblee()).toBe('');
+      expect(composant.modeHistoriqueActif()).toBe(false);
+    });
+
+    it('doit activer le mode historique dès qu’une date est saisie, et le désactiver si elle est effacée', () => {
+      composant.definirDateCiblee('2026-05-01');
+      expect(composant.modeHistoriqueActif()).toBe(true);
+
+      composant.definirDateCiblee('');
+      expect(composant.modeHistoriqueActif()).toBe(false);
+    });
+
+    it('doit propager la date ciblée saisie à OrchestrateurCampagneService.lancerCampagne', () => {
+      const orchestrateurCampagne = TestBed.inject(OrchestrateurCampagneService);
+      const lancerCampagneSimule = jest
+        .spyOn(orchestrateurCampagne, 'lancerCampagne')
+        .mockResolvedValue({ type: 'succes' });
+      composant.basculerProjet(projetId);
+      composant.definirDateCiblee('2026-05-01');
+
+      composant.confirmerLancement('mot-de-passe');
+
+      expect(lancerCampagneSimule).toHaveBeenCalledWith([projetId], 'mot-de-passe', '2026-05-01');
+    });
+
+    it('ne doit transmettre aucune date ciblée à OrchestrateurCampagneService.lancerCampagne quand le champ est vide (comportement inchangé)', () => {
+      const orchestrateurCampagne = TestBed.inject(OrchestrateurCampagneService);
+      const lancerCampagneSimule = jest
+        .spyOn(orchestrateurCampagne, 'lancerCampagne')
+        .mockResolvedValue({ type: 'succes' });
+      composant.basculerProjet(projetId);
+
+      composant.confirmerLancement('mot-de-passe');
+
+      expect(lancerCampagneSimule).toHaveBeenCalledWith([projetId], 'mot-de-passe', undefined);
+    });
   });
 });

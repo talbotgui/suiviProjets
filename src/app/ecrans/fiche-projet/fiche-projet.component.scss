@@ -25,6 +25,15 @@
   border: 1px solid var(--sqm-rouge-bordure);
 }
 
+// C15-14 (US-046, RG-046) : encart des audits historiques à date passée, couleur alignée sur le marqueur visuel du
+// graphique d'évolution (`composants/graphique-evolution/`, `STYLE_LIGNE_VERTICALE.auditHistorique`, `#7c3aed`)
+// plutôt que sur un token sémantique existant (rouge/orange déjà réservés au jugement RG-022) : décision arbitraire
+// de ce développement, à valider par un humain — un token de charte dédié pourrait la remplacer si ce motif visuel
+// se généralise (cf. docs/02_documentation/10_charteErgonomie.md, sur le modèle déjà suivi pour C15-13).
+.fiche-projet__audits-historiques {
+  border: 1px solid #7c3aed;
+}
+
 .fiche-projet__corps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

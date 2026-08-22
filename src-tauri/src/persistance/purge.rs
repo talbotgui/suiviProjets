@@ -442,6 +442,8 @@ mod tests {
             date: date.to_string(),
             campagne_id: "campagne-1".to_string(),
             resultats: Vec::new(),
+            type_audit: crate::modele::racine::TypeAudit::Reguliere,
+            date_execution: None,
         }
     }
 

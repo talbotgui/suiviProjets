@@ -55,6 +55,7 @@ class DonneesDeTest {
               id: 'audit-0',
               date: '2026-06-01T08:00:00Z',
               campagneId: 'campagne-0',
+              typeAudit: 'reguliere',
               resultats: [
                 {
                   type: 'gitlab.dependances',
@@ -69,6 +70,7 @@ class DonneesDeTest {
               id: 'audit-1',
               date: '2026-07-01T08:00:00Z',
               campagneId: 'campagne-1',
+              typeAudit: 'reguliere',
               resultats: [
                 {
                   type: 'gitlab.dependances',

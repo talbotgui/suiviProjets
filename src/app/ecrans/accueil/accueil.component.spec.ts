@@ -40,6 +40,7 @@ class DonneesDeTest {
       id: `audit-${date}`,
       date,
       campagneId: 'campagne-1',
+      typeAudit: 'reguliere',
       resultats: [
         {
           type: 'gitlab.membres',
@@ -203,6 +204,7 @@ describe('SqmAccueilComponent', () => {
         id: 'audit-1',
         date: '2026-07-20T00:00:00Z',
         campagneId: 'campagne-1',
+        typeAudit: 'reguliere',
         resultats: [
           {
             type: 'gitlab.membres',

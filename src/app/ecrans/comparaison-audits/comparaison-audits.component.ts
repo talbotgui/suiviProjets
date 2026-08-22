@@ -19,6 +19,11 @@
 // (raccourcis compris) et mettre en forme le différentiel déjà calculé (libellés, couleurs), sur le modèle déjà
 // établi par `SqmFicheProjetComponent` pour la coloration des indicateurs Sonar et du statut de rattachement des
 // membres.
+//
+// Évolution C15-14 (audit historique à date passée, US-046, RG-046) : `construireOptions` suffixe le libellé d'un
+// audit historique (« (historique) ») dans le sélecteur, sans autre changement — le mécanisme de sélection/
+// différentiel existant (`DifferentielAuditsUtils`) reste inchangé, un audit historique restant comparable à un
+// audit régulier au même titre.
 import {
   Component,
   ElementRef,
@@ -366,6 +371,10 @@ export class SqmComparaisonAuditsComponent {
 
   /**
    * Construit les options de sélection (tous les audits du projet), triées de la plus ancienne à la plus récente.
+   * Un audit historique à date passée (C15-14, US-046, RG-046, `typeAudit: 'historique'`) reste sélectionnable au
+   * même titre qu'un audit régulier (le mécanisme de différentiel existant, `DifferentielAuditsUtils`, reste
+   * inchangé), mais porte un libellé suffixé explicite (« (historique) ») pour ne jamais laisser croire qu'il
+   * s'agit d'un audit régulier à la date affichée.
    * @param projet - Projet concerné.
    * @returns Les options de sélection.
    */
@@ -375,7 +384,10 @@ export class SqmComparaisonAuditsComponent {
       .map((audit) => ({
         id: audit.id,
         date: audit.date,
-        label: this.formaterDateCourte(audit.date),
+        label:
+          audit.typeAudit === 'historique'
+            ? `${this.formaterDateCourte(audit.date)} (historique)`
+            : this.formaterDateCourte(audit.date),
       }));
   }
 

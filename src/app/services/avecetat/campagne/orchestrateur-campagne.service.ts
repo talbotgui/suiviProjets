@@ -39,12 +39,24 @@
 //   - Le rapport d'anomalies détaillé (F08, RG-021 : catégorie/message/action suggérée/regroupement) reste un
 //     incrément ultérieur ; les anomalies sont collectées ici sous une forme minimale (`{ indicateur, sourceId,
 //     anomalie }`), décision arbitraire documentée dans le rapport de développement de cette phase.
+//
+// Évolution C15-14 (audit historique à date passée, US-046, RG-046) : `lancerCampagne`/`auditerProjet` reçoivent un
+// paramètre optionnel `dateCiblee`, absent = comportement strictement inchangé (audit régulier). Renseigné, le
+// périmètre d'indicateurs historisables est réduit (ni `gitlab.taille_depot`, ni `gitlab.membres`, ni
+// `croise.ia_nouveau_code`, ce dernier dépendant structurellement de métriques `new_*` non historisables), une
+// source GitLab dont la ref auditée est un SHA/tag figé est exclue des commandes GitLab de cet audit (dégradation
+// par source, jamais un échec de campagne, cf. {@link verifierRefAuditeeHistorique}), et l'`Audit` produit porte
+// `typeAudit: 'historique'`, `date` = la date ciblée demandée (jamais la date d'exécution réelle, cf. commentaire de
+// `Audit.dateExecution` dans `types-donnees.ts`) et `dateExecution` = l'horodatage réel de la campagne. Le repli
+// automatique sur la date Sonar disponible la plus proche en cas d'absence à la date demandée est intégralement
+// géré côté cœur natif (transparent pour ce service).
 import { Injectable, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { EMPTY, firstValueFrom, from } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import type {
   ErreurConnecteur,
+  Instance,
   RegleMarqueurIA,
   ResultatGitlabContributeurs,
   ResultatGitlabMarqueursIa,
@@ -64,6 +76,7 @@ import type {
   Resultat,
   ResultatBrouillonProjet,
   ResultatMutationAdministration,
+  Source,
   Verdict,
 } from '../etat/types-donnees';
 import { TypeSource } from '../etat/types-donnees';
@@ -159,11 +172,15 @@ export class OrchestrateurCampagneService {
    * @param perimetre - Identifiants des projets du périmètre de la campagne.
    * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour la sauvegarde du brouillon
    * (RG-002).
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, US-046, RG-046, format `AAAA-MM-JJ`) ; absente,
+   * comportement strictement inchangé (audit régulier à la date du jour). Cf. commentaire d'en-tête de ce fichier
+   * pour le détail du périmètre réduit appliqué lorsqu'elle est renseignée.
    * @returns Le Résultat typé de l'enregistrement du brouillon (`DonneesApplicationService.enregistrerBrouillon`).
    */
   public async lancerCampagne(
     perimetre: readonly string[],
     motDePasse: string,
+    dateCiblee?: string,
   ): Promise<ResultatMutationAdministration> {
     this.annulationDemandeeInterne.set(false);
     this.etatSession.demarrerProgressionCampagne(perimetre);
@@ -176,7 +193,7 @@ export class OrchestrateurCampagneService {
           if (this.annulationDemandeeInterne()) {
             return EMPTY;
           }
-          return from(this.auditerProjet(projetId, campagneId));
+          return from(this.auditerProjet(projetId, campagneId, dateCiblee));
         }, concurrence),
         toArray(),
       ),
@@ -225,16 +242,21 @@ export class OrchestrateurCampagneService {
    * dernier audit intégré du projet.
    * @param projetId - Identifiant du projet à auditer.
    * @param campagneId - Identifiant de la campagne en cours, reporté dans l'`Audit` produit en cas de succès.
+   * @param dateCiblee - Date ciblée d'un audit historique (C15-14, US-046, RG-046) ; absente, comportement
+   * strictement inchangé (audit régulier), cf. commentaire d'en-tête de ce fichier pour le périmètre réduit
+   * appliqué lorsqu'elle est renseignée.
    * @returns Le verdict d'exécution et, en cas de succès, l'entrée de brouillon prête à être proposée.
    */
   private async auditerProjet(
     projetId: string,
     campagneId: string,
+    dateCiblee?: string,
   ): Promise<{
     readonly projetId: string;
     readonly verdict: Verdict;
     readonly resultatBrouillon?: ResultatBrouillonProjet;
   }> {
+    const modeHistorique = dateCiblee !== undefined;
     const debut = Date.now();
     this.etatSession.mettreAJourProgressionProjet(projetId, { statut: 'enCours' });
     const resolution = this.resoudreProjetEtGroupe(this.donneesApplication.groupes(), projetId);
@@ -282,6 +304,17 @@ export class OrchestrateurCampagneService {
         connecteurActif: source.type === TypeSource.DepotGitlab ? 'gitlab' : 'sonar',
       });
       if (source.type === TypeSource.DepotGitlab) {
+        const verificationRef = await this.verifierRefAuditeeHistorique(
+          instance,
+          source,
+          dateCiblee,
+        );
+        if (verificationRef.exclue) {
+          anomalies.push(verificationRef.anomalieEntree);
+          dernierMotifEchec = verificationRef.motif;
+          continue;
+        }
+
         const reponseVitalite = await this.executerIndicateur(
           'gitlab.vitalite',
           resolution.groupe.indicateursDesactives,
@@ -292,26 +325,35 @@ export class OrchestrateurCampagneService {
               source.id,
               source.idExterne,
               source.refAuditee,
+              dateCiblee,
             ),
         );
         dernierMotifEchec =
           this.integrer(reponseVitalite, resultats, anomalies) ?? dernierMotifEchec;
         vitalite = reponseVitalite.resultatBrut;
 
-        const reponseTaille = await this.executerIndicateur(
-          'gitlab.taille_depot',
-          resolution.groupe.indicateursDesactives,
-          source.id,
-          () =>
-            this.facadeCommandes.interrogerTailleDepot(
-              instance,
-              source.id,
-              source.idExterne,
-              source.refAuditee,
-            ),
-        );
-        dernierMotifEchec = this.integrer(reponseTaille, resultats, anomalies) ?? dernierMotifEchec;
-        tailleDepot = reponseTaille.resultatBrut;
+        // `gitlab.taille_depot` n'est jamais interrogé en mode historique (RG-046 : absence tolérée, un audit à
+        // date passée ne saurait reconstituer une taille de dépôt à cette date sans nouvel appel API non couvert
+        // par le plan retenu) : `comptesTailleDepot` reste à 0 dans ce cas pour le résumé de fin de source.
+        let comptesTailleDepot = 0;
+        if (!modeHistorique) {
+          const reponseTaille = await this.executerIndicateur(
+            'gitlab.taille_depot',
+            resolution.groupe.indicateursDesactives,
+            source.id,
+            () =>
+              this.facadeCommandes.interrogerTailleDepot(
+                instance,
+                source.id,
+                source.idExterne,
+                source.refAuditee,
+              ),
+          );
+          dernierMotifEchec =
+            this.integrer(reponseTaille, resultats, anomalies) ?? dernierMotifEchec;
+          tailleDepot = reponseTaille.resultatBrut;
+          comptesTailleDepot = reponseTaille.resultatBrut === undefined ? 0 : 1;
+        }
 
         const reponseContributeurs = await this.executerIndicateur(
           'gitlab.contributeurs',
@@ -323,6 +365,7 @@ export class OrchestrateurCampagneService {
               source.id,
               source.idExterne,
               source.refAuditee,
+              dateCiblee,
             ),
         );
         dernierMotifEchec =
@@ -339,25 +382,32 @@ export class OrchestrateurCampagneService {
               source.id,
               source.idExterne,
               source.refAuditee,
+              dateCiblee,
             ),
         );
         dernierMotifEchec =
           this.integrer(reponseMergeRequests, resultats, anomalies) ?? dernierMotifEchec;
 
-        const reponseMembres = await this.executerIndicateur(
-          'gitlab.membres',
-          resolution.groupe.indicateursDesactives,
-          source.id,
-          () =>
-            this.facadeCommandes.interrogerMembres(
-              instance,
-              source.id,
-              source.idExterne,
-              source.refAuditee,
-            ),
-        );
-        dernierMotifEchec =
-          this.integrer(reponseMembres, resultats, anomalies) ?? dernierMotifEchec;
+        // `gitlab.membres` n'est jamais interrogé en mode historique (RG-046 : absence tolérée, même principe que
+        // `gitlab.taille_depot` ci-dessus).
+        let comptesMembres = 0;
+        if (!modeHistorique) {
+          const reponseMembres = await this.executerIndicateur(
+            'gitlab.membres',
+            resolution.groupe.indicateursDesactives,
+            source.id,
+            () =>
+              this.facadeCommandes.interrogerMembres(
+                instance,
+                source.id,
+                source.idExterne,
+                source.refAuditee,
+              ),
+          );
+          dernierMotifEchec =
+            this.integrer(reponseMembres, resultats, anomalies) ?? dernierMotifEchec;
+          comptesMembres = reponseMembres.resultatBrut?.membres.length ?? 0;
+        }
 
         const reponseBranches = await this.executerIndicateur(
           'gitlab.branches',
@@ -369,6 +419,7 @@ export class OrchestrateurCampagneService {
               source.id,
               source.idExterne,
               source.refAuditee,
+              dateCiblee,
             ),
         );
         dernierMotifEchec =
@@ -384,6 +435,7 @@ export class OrchestrateurCampagneService {
               source.id,
               source.idExterne,
               source.refAuditee,
+              dateCiblee,
             ),
         );
         dernierMotifEchec =
@@ -400,6 +452,7 @@ export class OrchestrateurCampagneService {
               source.idExterne,
               this.extraireReglesMarqueursIa(),
               source.refAuditee,
+              dateCiblee,
             ),
         );
         dernierMotifEchec =
@@ -412,10 +465,10 @@ export class OrchestrateurCampagneService {
         // résultats côté cœur natif avant toute nouvelle hypothèse d'agrégation.
         await this.facadeCommandes.consignerResumeSource(source.id, source.idExterne, {
           'gitlab.vitalite': reponseVitalite.resultatBrut === undefined ? 0 : 1,
-          'gitlab.taille_depot': reponseTaille.resultatBrut === undefined ? 0 : 1,
+          'gitlab.taille_depot': comptesTailleDepot,
           'gitlab.contributeurs': reponseContributeurs.resultatBrut?.contributeurs.length ?? 0,
           'gitlab.merge_requests': reponseMergeRequests.resultatBrut?.mrOuvertes.length ?? 0,
-          'gitlab.membres': reponseMembres.resultatBrut?.membres.length ?? 0,
+          'gitlab.membres': comptesMembres,
           'gitlab.branches': reponseBranches.resultatBrut?.branches.length ?? 0,
           'gitlab.dependances': reponseDependances.resultatBrut?.dependances.length ?? 0,
           'gitlab.marqueurs_ia': reponseMarqueursIa.resultatBrut?.marqueurs.length ?? 0,
@@ -425,7 +478,13 @@ export class OrchestrateurCampagneService {
           'sonar.violations',
           resolution.groupe.indicateursDesactives,
           source.id,
-          () => this.facadeCommandes.interrogerViolations(instance, source.id, source.idExterne),
+          () =>
+            this.facadeCommandes.interrogerViolations(
+              instance,
+              source.id,
+              source.idExterne,
+              dateCiblee,
+            ),
         );
         dernierMotifEchec =
           this.integrer(reponseViolations, resultats, anomalies) ?? dernierMotifEchec;
@@ -435,7 +494,8 @@ export class OrchestrateurCampagneService {
           'sonar.dette',
           resolution.groupe.indicateursDesactives,
           source.id,
-          () => this.facadeCommandes.interrogerDette(instance, source.id, source.idExterne),
+          () =>
+            this.facadeCommandes.interrogerDette(instance, source.id, source.idExterne, dateCiblee),
         );
         dernierMotifEchec = this.integrer(reponseDette, resultats, anomalies) ?? dernierMotifEchec;
 
@@ -443,7 +503,13 @@ export class OrchestrateurCampagneService {
           'sonar.couverture',
           resolution.groupe.indicateursDesactives,
           source.id,
-          () => this.facadeCommandes.interrogerCouverture(instance, source.id, source.idExterne),
+          () =>
+            this.facadeCommandes.interrogerCouverture(
+              instance,
+              source.id,
+              source.idExterne,
+              dateCiblee,
+            ),
         );
         dernierMotifEchec =
           this.integrer(reponseCouverture, resultats, anomalies) ?? dernierMotifEchec;
@@ -453,7 +519,8 @@ export class OrchestrateurCampagneService {
           'sonar.notes',
           resolution.groupe.indicateursDesactives,
           source.id,
-          () => this.facadeCommandes.interrogerNotes(instance, source.id, source.idExterne),
+          () =>
+            this.facadeCommandes.interrogerNotes(instance, source.id, source.idExterne, dateCiblee),
         );
         dernierMotifEchec = this.integrer(reponseNotes, resultats, anomalies) ?? dernierMotifEchec;
 
@@ -461,7 +528,8 @@ export class OrchestrateurCampagneService {
           'sonar.ncloc',
           resolution.groupe.indicateursDesactives,
           source.id,
-          () => this.facadeCommandes.interrogerNcloc(instance, source.id, source.idExterne),
+          () =>
+            this.facadeCommandes.interrogerNcloc(instance, source.id, source.idExterne, dateCiblee),
         );
         dernierMotifEchec = this.integrer(reponseNcloc, resultats, anomalies) ?? dernierMotifEchec;
         ncloc = reponseNcloc.resultatBrut;
@@ -471,6 +539,7 @@ export class OrchestrateurCampagneService {
           const reponseDerniereAnalyse = await this.facadeCommandes.interrogerDerniereAnalyse(
             instance,
             source.idExterne,
+            dateCiblee,
           );
           if (reponseDerniereAnalyse.type === 'succes') {
             derniereAnalyse = reponseDerniereAnalyse.resultat;
@@ -527,7 +596,13 @@ export class OrchestrateurCampagneService {
         ...ConnecteurCroiseUtils.calculerActiviteSansQualite(contributeurs, violations),
       });
     }
+    // `croise.ia_nouveau_code` n'est jamais calculé en mode historique (C15-14, RG-046) : ce résultat croisé
+    // dépend structurellement de métriques Sonar `new_*` (nouveau code depuis la dernière analyse), non
+    // historisables — un calcul à une date passée n'aurait ici aucun sens fonctionnel, contrairement à
+    // `croise.fraicheur_sonar`/`croise.activite_sans_qualite` ci-dessus, recalculés normalement même en mode
+    // historique à partir des résultats disponibles (éventuellement partiels).
     if (
+      !modeHistorique &&
       !resolution.groupe.indicateursDesactives.includes('croise.ia_nouveau_code') &&
       (marqueursIa !== undefined || couverture !== undefined || violations !== undefined)
     ) {
@@ -564,6 +639,28 @@ export class OrchestrateurCampagneService {
       nombreResultats: resultats.length,
     });
     const auditId = crypto.randomUUID();
+    // Construction de l'`Audit` produit (C15-14, RG-046) : un audit régulier porte `date` = l'horodatage réel
+    // d'exécution et `typeAudit: 'reguliere'`, sans `dateExecution` (comportement strictement inchangé) ; un audit
+    // historique porte `date` = la date ciblée demandée (jamais l'horodatage réel, cf. commentaire d'en-tête de ce
+    // fichier et de `Audit.date`/`Audit.dateExecution` dans `types-donnees.ts`) et `dateExecution` = l'horodatage
+    // réel de la campagne qui l'a produit.
+    const audit: Audit =
+      dateCiblee === undefined
+        ? {
+            id: auditId,
+            date: new Date().toISOString(),
+            campagneId,
+            resultats,
+            typeAudit: 'reguliere',
+          }
+        : {
+            id: auditId,
+            date: dateCiblee,
+            campagneId,
+            resultats,
+            typeAudit: 'historique',
+            dateExecution: new Date().toISOString(),
+          };
     return {
       projetId,
       verdict: {
@@ -573,16 +670,79 @@ export class OrchestrateurCampagneService {
       },
       resultatBrouillon: {
         projetId,
-        audit: {
-          id: auditId,
-          date: new Date().toISOString(),
-          campagneId,
-          resultats,
-        },
+        audit,
         statut: 'enAttente',
         aberrations,
       },
     };
+  }
+
+  /**
+   * Vérifie, en mode audit historique (`dateCiblee` renseigné), qu'une source GitLab n'est pas figée sur un
+   * SHA/tag (C15-14, RG-046, refus arbitré lors du cadrage de cette évolution) : une ref auditée strictement figée
+   * n'a par nature aucun sens à une date différente de celle où elle a été fixée. Réutilise `interrogerBranches`
+   * (autocomplétion existante, US-008) plutôt qu'un nouveau contrôle côté cœur natif : une branche vivante est
+   * acceptée (les commandes historisables résolvent alors elles-mêmes, côté cœur natif, le commit de cette branche
+   * à la date ciblée), un SHA/tag figé ou une branche supprimée entretemps sont refusés — dégradation par source
+   * (aucune commande GitLab n'est alors appelée pour cette source), jamais un échec de campagne. L'absence de
+   * `refAuditee` (branche par défaut du dépôt) est toujours acceptée sans appel, la branche par défaut restant par
+   * construction vivante ; de même en mode régulier (`dateCiblee` absent), où cette vérification n'a pas lieu
+   * d'être.
+   * @param instance - Instance GitLab hébergeant le dépôt de la source à vérifier.
+   * @param source - Source GitLab à vérifier.
+   * @param dateCiblee - Date ciblée de l'audit historique ; `undefined` = audit régulier, aucune vérification.
+   * @returns `{ exclue: false }` si la source peut être auditée (audit régulier, branche par défaut, ou ref vivante
+   * confirmée) ; sinon l'anomalie à consigner (forme minimale `{ indicateur, sourceId, anomalie }`, cf. commentaire
+   * d'en-tête de ce fichier) et le motif d'échec court associé.
+   */
+  private async verifierRefAuditeeHistorique(
+    instance: Instance,
+    source: Source,
+    dateCiblee: string | undefined,
+  ): Promise<
+    | { readonly exclue: false }
+    | {
+        readonly exclue: true;
+        readonly anomalieEntree: Record<string, unknown>;
+        readonly motif: string;
+      }
+  > {
+    if (dateCiblee === undefined || source.refAuditee === undefined) {
+      return { exclue: false };
+    }
+    const reponse = await this.facadeCommandes.interrogerBranches(
+      instance,
+      source.idExterne,
+      source.refAuditee,
+    );
+    if (reponse.type === 'echec') {
+      return {
+        exclue: true,
+        anomalieEntree: {
+          indicateur: 'gitlab.refFigee',
+          sourceId: source.id,
+          anomalie: reponse.anomalie,
+        },
+        motif: `gitlab.refFigee : ${reponse.anomalie.type}`,
+      };
+    }
+    if (!reponse.branches.includes(source.refAuditee)) {
+      return {
+        exclue: true,
+        anomalieEntree: {
+          indicateur: 'gitlab.refFigee',
+          sourceId: source.id,
+          anomalie: {
+            type: 'refFigeeNonAuditable',
+            message:
+              `Ref auditée « ${source.refAuditee} » absente des branches vivantes du dépôt : audit ` +
+              'historique refusé pour cette source (SHA/tag figé présumé).',
+          },
+        },
+        motif: `gitlab.refFigee : ref « ${source.refAuditee} » non vivante`,
+      };
+    }
+    return { exclue: false };
   }
 
   /**

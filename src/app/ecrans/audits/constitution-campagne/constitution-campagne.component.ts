@@ -17,7 +17,18 @@
 // incorrect) survient nécessairement après cette navigation : il n'est donc pas affiché ici, mais retenu par
 // `EtatSessionService.signalerEchecEnregistrementBrouillon` pour affichage par l'écran Brouillon dès sa prochaine
 // consultation (Phase 10, R10-06).
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+//
+// Évolution C15-14 (audit historique à date passée, US-046, RG-046) : section « Date d'analyse » optionnelle
+// (`<input type="date">` natif, convention déjà en place, cf. `SqmJournalParametrageComponent`), propagée à
+// `OrchestrateurCampagneService.lancerCampagne`. Décision arbitraire de ce développement (à valider par un
+// humain) : le bandeau d'avertissement de périmètre réduit réutilise le pattern déjà en place ailleurs dans
+// l'application pour un avertissement non bloquant (`texte-orange`, `role="status"`, cf.
+// `SqmSyntheseGraphiqueComponent`/`SqmSyntheseAuditsComponent`, « N vue(s) ignorée(s) »), plutôt que le composant
+// transverse `SqmBandeauAlerteComponent` (réservé par sa propre documentation à un signal prioritaire de type
+// RG-009/RG-037, non un simple rappel de périmètre).
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import type { WritableSignal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -34,7 +45,7 @@ import { ParametresJugementUtils } from '../../../services/sansetat/jugement/par
  */
 @Component({
   selector: 'app-constitution-campagne',
-  imports: [SqmConfirmationMotDePasseComponent, RouterLink],
+  imports: [SqmConfirmationMotDePasseComponent, RouterLink, FormsModule],
   templateUrl: './constitution-campagne.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './constitution-campagne.component.scss',
@@ -57,6 +68,13 @@ export class SqmConstitutionCampagneComponent {
    * Indique si la ressaisie du mot de passe du fichier est actuellement affichée avant lancement (RG-002).
    */
   public confirmationMotDePasseVisible = false;
+
+  /**
+   * Date ciblée saisie pour un audit historique à date passée (C15-14, US-046, RG-046), format `AAAA-MM-JJ` natif
+   * de `<input type="date">` (convention déjà en place, cf. `SqmJournalParametrageComponent`), chaîne vide =
+   * audit régulier à la date du jour (comportement par défaut, strictement inchangé).
+   */
+  public readonly dateCiblee: WritableSignal<string> = signal('');
 
   /**
    * Groupes actuellement chargés.
@@ -219,6 +237,23 @@ export class SqmConstitutionCampagneComponent {
   }
 
   /**
+   * Met à jour la date ciblée saisie pour la campagne à lancer (C15-14, US-046, RG-046).
+   * @param valeur - Date saisie au format `AAAA-MM-JJ`, chaîne vide pour revenir à un audit régulier.
+   */
+  public definirDateCiblee(valeur: string): void {
+    this.dateCiblee.set(valeur);
+  }
+
+  /**
+   * Indique si le mode audit historique est actif, c'est-à-dire qu'une date ciblée a été saisie (C15-14, US-046,
+   * RG-046) : pilote l'affichage du bandeau d'avertissement de périmètre réduit.
+   * @returns `true` si une date ciblée est actuellement saisie.
+   */
+  public modeHistoriqueActif(): boolean {
+    return this.dateCiblee().length > 0;
+  }
+
+  /**
    * Ouvre la ressaisie du mot de passe du fichier avant de lancer la campagne (RG-002).
    */
   public demanderLancement(): void {
@@ -242,8 +277,13 @@ export class SqmConstitutionCampagneComponent {
    */
   public confirmerLancement(motDePasse: string): void {
     this.confirmationMotDePasseVisible = false;
+    const dateCiblee = this.dateCiblee();
     void this.orchestrateurCampagne
-      .lancerCampagne(Array.from(this.selectionProjetIds), motDePasse)
+      .lancerCampagne(
+        Array.from(this.selectionProjetIds),
+        motDePasse,
+        dateCiblee.length > 0 ? dateCiblee : undefined,
+      )
       .then((resultat) => {
         if (resultat.type === 'echec') {
           this.etatSession.signalerEchecEnregistrementBrouillon(resultat.anomalie);

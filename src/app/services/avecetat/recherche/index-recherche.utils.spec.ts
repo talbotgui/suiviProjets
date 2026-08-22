@@ -44,6 +44,7 @@ class DonneesDeTest {
                 id: 'audit-ancien',
                 date: '2026-01-10T08:00:00Z',
                 campagneId: 'campagne-1',
+                typeAudit: 'reguliere',
                 resultats: [
                   {
                     type: 'gitlab.dependances',
@@ -72,6 +73,7 @@ class DonneesDeTest {
                 id: 'audit-recent',
                 date: '2026-07-01T08:00:00Z',
                 campagneId: 'campagne-2',
+                typeAudit: 'reguliere',
                 resultats: [
                   {
                     type: 'gitlab.dependances',
@@ -306,6 +308,7 @@ describe('IndexRechercheUtils', () => {
               id: 'audit-volumineux',
               date: '2026-07-15T08:00:00Z',
               campagneId: 'campagne-3',
+              typeAudit: 'reguliere' as const,
               resultats: [
                 {
                   type: 'gitlab.dependances' as const,

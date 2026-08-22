@@ -120,14 +120,17 @@ class DonneesDeTest {
   /**
    * Construit une source GitLab de test.
    * @param id - Identifiant de la source.
+   * @param refAuditee - Ref auditée (C15-14, RG-046 : nécessaire pour tester le refus d'une ref figée en mode
+   * audit historique), absente par défaut (branche par défaut du dépôt).
    * @returns La source construite.
    */
-  public static sourceGitlab(id: string): Source {
+  public static sourceGitlab(id: string, refAuditee?: string): Source {
     return {
       id,
       instanceId: INSTANCE_GITLAB.id,
       type: TypeSource.DepotGitlab,
       idExterne: `${id}-externe`,
+      refAuditee,
     };
   }
 
@@ -192,6 +195,11 @@ class DonneesDeTest {
 }
 
 const REPONSES_PAR_DEFAUT: Readonly<Record<string, unknown>> = {
+  // C15-14, RG-046 : liste des branches vivantes utilisée par la vérification de ref figée en mode audit
+  // historique (`interroger_branches`, autocomplétion US-008, à ne pas confondre avec `interroger_branches_completes`
+  // ci-dessous). `main` par défaut, pour que les tests sans `refAuditee` (branche par défaut du dépôt) comme ceux
+  // avec `refAuditee: 'main'` passent la vérification sans configuration supplémentaire.
+  interroger_branches: ['main'],
   interroger_vitalite: {
     sourceId: 'src',
     refEffective: 'main',
@@ -695,6 +703,7 @@ describe('OrchestrateurCampagneService', () => {
         id: 'audit-0',
         date: '2026-06-01T00:00:00Z',
         campagneId: 'campagne-0',
+        typeAudit: 'reguliere',
         resultats: [
           {
             type: 'gitlab.taille_depot',
@@ -843,6 +852,163 @@ describe('OrchestrateurCampagneService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    describe('mode historique (C15-14, US-046, RG-046)', () => {
+      const DATE_CIBLEE = '2026-05-01';
+
+      it(
+        'doit exclure une source GitLab dont la ref auditée n’est plus une branche vivante (refus ref ' +
+          'figée) sans appeler aucune commande GitLab pour cette source, ni échouer la campagne',
+        async () => {
+          const projet = DonneesDeTest.projet('projet-1', [
+            DonneesDeTest.sourceGitlab('source-1', 'v1.0.0'),
+          ]);
+          donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+          invokeSimule.mockImplementation((commande: string) => {
+            if (commande === 'interroger_branches') {
+              return Promise.resolve(['main', 'develop']);
+            }
+            return Promise.resolve(REPONSES_PAR_DEFAUT[commande]);
+          });
+
+          const resultat = await service.lancerCampagne(['projet-1'], 'mot-de-passe', DATE_CIBLEE);
+
+          expect(resultat).toEqual({ type: 'succes' });
+          expect(invokeSimule).toHaveBeenCalledWith(
+            'interroger_branches',
+            expect.objectContaining({ recherche: 'v1.0.0' }),
+          );
+          expect(invokeSimule).not.toHaveBeenCalledWith('interroger_vitalite', expect.anything());
+          expect(invokeSimule).not.toHaveBeenCalledWith(
+            'interroger_contributeurs',
+            expect.anything(),
+          );
+          const [, , , verdicts] = donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+          const verdict: Verdict = verdicts[0];
+          expect(verdict.statut).toBe('echec');
+          expect(verdict.anomalies).toEqual([
+            expect.objectContaining({ indicateur: 'gitlab.refFigee', sourceId: 'source-1' }),
+          ]);
+        },
+      );
+
+      it(
+        'doit auditer normalement une source GitLab dont la ref auditée est toujours une branche vivante, ' +
+          'en transmettant la date ciblée à chaque commande historisable',
+        async () => {
+          const projet = DonneesDeTest.projet('projet-1', [
+            DonneesDeTest.sourceGitlab('source-1', 'main'),
+          ]);
+          donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+          await service.lancerCampagne(['projet-1'], 'mot-de-passe', DATE_CIBLEE);
+
+          for (const commande of [
+            'interroger_vitalite',
+            'interroger_contributeurs',
+            'interroger_merge_requests',
+            'interroger_branches_completes',
+            'interroger_dependances',
+            'interroger_marqueurs_ia',
+          ]) {
+            expect(invokeSimule).toHaveBeenCalledWith(
+              commande,
+              expect.objectContaining({ dateCiblee: DATE_CIBLEE }),
+            );
+          }
+        },
+      );
+
+      it('ne doit jamais interroger gitlab.taille_depot ni gitlab.membres en mode historique', async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe', DATE_CIBLEE);
+
+        expect(invokeSimule).not.toHaveBeenCalledWith('interroger_taille_depot', expect.anything());
+        expect(invokeSimule).not.toHaveBeenCalledWith('interroger_membres', expect.anything());
+        const [, , , , resultatsParProjet] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        const resultats: readonly unknown[] = resultatsParProjet[0].audit.resultats;
+        expect(
+          resultats.some((resultat) =>
+            UtilitairesTest.estResultatDeType(resultat, 'gitlab.taille_depot'),
+          ),
+        ).toBe(false);
+        expect(
+          resultats.some((resultat) =>
+            UtilitairesTest.estResultatDeType(resultat, 'gitlab.membres'),
+          ),
+        ).toBe(false);
+      });
+
+      it(
+        'ne doit jamais calculer croise.ia_nouveau_code en mode historique, même quand marqueurs IA, ' +
+          'couverture et violations sont disponibles',
+        async () => {
+          const projet = DonneesDeTest.projet('projet-1', [
+            DonneesDeTest.sourceGitlab('source-1'),
+            DonneesDeTest.sourceSonar('source-2'),
+          ]);
+          donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+          await service.lancerCampagne(['projet-1'], 'mot-de-passe', DATE_CIBLEE);
+
+          const [, , , , resultatsParProjet] =
+            donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+          const resultats: readonly unknown[] = resultatsParProjet[0].audit.resultats;
+          expect(
+            resultats.some((resultat) =>
+              UtilitairesTest.estResultatDeType(resultat, 'croise.ia_nouveau_code'),
+            ),
+          ).toBe(false);
+          // Les deux autres résultats croisés restent calculés normalement en mode historique.
+          expect(
+            resultats.some((resultat) =>
+              UtilitairesTest.estResultatDeType(resultat, 'croise.fraicheur_sonar'),
+            ),
+          ).toBe(true);
+          expect(
+            resultats.some((resultat) =>
+              UtilitairesTest.estResultatDeType(resultat, 'croise.activite_sans_qualite'),
+            ),
+          ).toBe(true);
+        },
+      );
+
+      it(
+        'doit construire un Audit typeAudit "historique", date = date ciblée et dateExecution = ' +
+          'horodatage réel de la campagne',
+        async () => {
+          const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+          donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+          const avant = Date.now();
+
+          await service.lancerCampagne(['projet-1'], 'mot-de-passe', DATE_CIBLEE);
+
+          const [, , , , resultatsParProjet] =
+            donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+          const audit: Audit = resultatsParProjet[0].audit;
+          expect(audit.typeAudit).toBe('historique');
+          expect(audit.date).toBe(DATE_CIBLEE);
+          expect(audit.dateExecution).toBeDefined();
+          expect(new Date(audit.dateExecution ?? '').getTime()).toBeGreaterThanOrEqual(avant);
+        },
+      );
+
+      it('doit construire un Audit typeAudit "reguliere" sans dateExecution quand aucune date n’est ciblée', async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        const [, , , , resultatsParProjet] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        const audit: Audit = resultatsParProjet[0].audit;
+        expect(audit.typeAudit).toBe('reguliere');
+        expect(audit.dateExecution).toBeUndefined();
+      });
     });
   });
 });

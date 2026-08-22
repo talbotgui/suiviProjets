@@ -969,7 +969,13 @@ describe('DonneesApplicationService', () => {
 
     const RESULTAT_EN_ATTENTE: ResultatBrouillonProjet = {
       projetId: 'projet-1',
-      audit: { id: 'audit-1', date: '2026-07-23', campagneId: 'campagne-1', resultats: [] },
+      audit: {
+        id: 'audit-1',
+        date: '2026-07-23',
+        campagneId: 'campagne-1',
+        resultats: [],
+        typeAudit: 'reguliere',
+      },
       statut: 'enAttente',
     };
 

@@ -61,6 +61,7 @@ class DonneesDeTest {
       id,
       date: DonneesDeTest.ilYA(decalageJours),
       campagneId: 'campagne-1',
+      typeAudit: 'reguliere',
       resultats: [
         {
           type: 'sonar.couverture',
@@ -109,6 +110,7 @@ class DonneesDeTest {
       id: options.id,
       date: DonneesDeTest.ilYA(options.decalageJours),
       campagneId: 'campagne-1',
+      typeAudit: 'reguliere',
       resultats: [
         {
           type: 'sonar.couverture',
@@ -345,6 +347,40 @@ describe('SqmComparaisonAuditsComponent', () => {
     const element = DomTestUtils.obtenirElementNatif(fixture);
     expect(element.textContent).toContain('ne compte pas encore deux audits intégrés');
   });
+
+  it(
+    'suffixe le libellé d’un audit historique par « (historique) » dans les deux sélecteurs, sans ' +
+      'suffixer un audit régulier (C15-14, US-046, RG-046)',
+    () => {
+      const auditRegulier = DonneesDeTest.auditMinimal('audit-regulier', -1, 50);
+      const auditHistorique: Audit = {
+        id: 'audit-historique',
+        date: DonneesDeTest.ilYA(-10),
+        campagneId: 'campagne-2',
+        typeAudit: 'historique',
+        dateExecution: DonneesDeTest.ilYA(-1),
+        resultats: [
+          {
+            type: 'sonar.couverture',
+            sourceId: 'source-sonar',
+            couverture: 40,
+            couvertureNouveauCode: 40,
+          },
+        ],
+      };
+      const projet = DonneesDeTest.projet('projet-1', [auditHistorique, auditRegulier]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const optionsAvant = Array.from(
+        element.querySelectorAll<HTMLOptionElement>('#comparaison-audits-avant option'),
+      );
+      const optionHistorique = optionsAvant.find((option) => option.value === 'audit-historique');
+      const optionReguliere = optionsAvant.find((option) => option.value === 'audit-regulier');
+      expect(optionHistorique?.textContent).toContain('(historique)');
+      expect(optionReguliere?.textContent).not.toContain('(historique)');
+    },
+  );
 
   describe('sélection par défaut et raccourcis', () => {
     /**

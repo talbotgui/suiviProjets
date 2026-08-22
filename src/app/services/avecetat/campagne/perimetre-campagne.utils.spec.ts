@@ -50,7 +50,13 @@ class DonneesDeTest {
    * @returns L'audit construit.
    */
   public static audit(date: string): Audit {
-    return { id: `audit-${date}`, date, campagneId: 'campagne-x', resultats: [] };
+    return {
+      id: `audit-${date}`,
+      date,
+      campagneId: 'campagne-x',
+      resultats: [],
+      typeAudit: 'reguliere',
+    };
   }
 }
 
