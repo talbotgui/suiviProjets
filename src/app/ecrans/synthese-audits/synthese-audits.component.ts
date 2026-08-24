@@ -1097,7 +1097,13 @@ export class SqmSyntheseAuditsComponent {
     const resultatCouverture = this.trouverResultat(resultats, 'sonar.couverture');
     const resultatNotes = this.trouverResultat(resultats, 'sonar.notes');
     const resultatViolations = this.trouverResultat(resultats, 'sonar.violations');
-    const resultatMr = this.trouverResultat(resultats, 'gitlab.merge_requests');
+    // Agrégation entre toutes les sources GitLab du projet, pas la seule première rencontrée (cf. commentaire de
+    // {@link trouverTousResultats}) : un projet à deux dépôts (back + front) avec des MR ouvertes uniquement sur le
+    // second sinon affiché à tort « Aucune ».
+    const mrOuvertesToutesSources = this.trouverTousResultats(
+      resultats,
+      'gitlab.merge_requests',
+    ).flatMap((resultat) => resultat.mrOuvertes);
     const resultatMembres = this.trouverResultat(resultats, 'gitlab.membres');
     const resultatMarqueurs = this.trouverResultat(resultats, 'gitlab.marqueurs_ia');
     const resultatFraicheurSonar = this.trouverResultat(resultats, 'croise.fraicheur_sonar');
@@ -1150,7 +1156,7 @@ export class SqmSyntheseAuditsComponent {
               resultatViolations.parSeverite.critique,
               violationsSeuils?.critique,
             ),
-      mr: this.calculerEtiquetteMr(resultatMr?.mrOuvertes ?? [], seuils.mrOuvertes, maintenant),
+      mr: this.calculerEtiquetteMr(mrOuvertesToutesSources, seuils.mrOuvertes, maintenant),
       membreInconnuDetecte: membres.inconnu,
       membresLabel: membres.label,
       ia: this.calculerEtiquetteIa(projet.iaAutorisee, resultatMarqueurs?.marqueurs ?? []),
@@ -1169,6 +1175,28 @@ export class SqmSyntheseAuditsComponent {
     type: TType,
   ): Extract<Resultat, { type: TType }> | undefined {
     return resultats.find(
+      (resultat): resultat is Extract<Resultat, { type: TType }> => resultat.type === type,
+    );
+  }
+
+  /**
+   * Retrouve, dans une liste de résultats typés, TOUS les résultats portant le discriminant `type` demandé : un
+   * projet portant plusieurs sources GitLab (ex. un dépôt back et un dépôt front) produit un résultat de ce type
+   * par source (`OrchestrateurCampagneService.auditerProjet`), que {@link trouverResultat} ne restitue qu'à
+   * hauteur de la première source rencontrée — insuffisant pour un constat à agréger entre toutes les sources
+   * (ex. MR ouvertes, `gitlab.merge_requests` étant explicitement hors périmètre de
+   * `AgregationThemeFicheProjetUtils.regrouper`). Sur le modèle de `AgregationThemeFicheProjetUtils.trouverTous`/
+   * `SqmFicheProjetComponent.mrOuvertesToutesSources` (corrige la même classe d'anomalie que R15-06, restée
+   * non corrigée sur cet écran jusqu'ici pour la colonne MR ouvertes).
+   * @param resultats - Résultats du dernier audit intégré.
+   * @param type - Discriminant `type` recherché.
+   * @returns Tous les résultats trouvés, tableau vide si aucun.
+   */
+  private trouverTousResultats<TType extends Resultat['type']>(
+    resultats: readonly Resultat[],
+    type: TType,
+  ): readonly Extract<Resultat, { type: TType }>[] {
+    return resultats.filter(
       (resultat): resultat is Extract<Resultat, { type: TType }> => resultat.type === type,
     );
   }

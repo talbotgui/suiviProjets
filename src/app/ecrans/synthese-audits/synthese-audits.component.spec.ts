@@ -540,6 +540,52 @@ describe('SqmSyntheseAuditsComponent', () => {
     },
   );
 
+  it(
+    'compte les MR ouvertes fusionnées entre plusieurs sources GitLab du même projet, jamais seulement celles ' +
+      'de la première (même classe d’anomalie que R15-06, corrigée le 2026-08-24 pour cette colonne)',
+    () => {
+      const audit: Audit = {
+        ...DonneesDeTest.auditComplet({}),
+        resultats: [
+          ...DonneesDeTest.auditComplet({}).resultats,
+          {
+            type: 'gitlab.merge_requests',
+            sourceId: 'source-front',
+            refEffective: 'main',
+            shaTete: 'def456',
+            mrOuvertes: [
+              {
+                iid: 5,
+                titre: 'Ajout composant',
+                creeLe: DonneesDeTest.ilYA(-3),
+                enConflit: false,
+                webUrl: 'https://gitlab.exemple.test/groupe/projet-front/-/merge_requests/5',
+              },
+            ],
+          },
+        ],
+      };
+      const projet = DonneesDeTest.projet('projet-1', 'Projet Multi-sources MR', [audit]);
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projet],
+      };
+
+      const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+      const ligne = fixture.componentInstance.toutesLesLignes()[0];
+
+      // La première source (`gitlab.merge_requests` par défaut de `auditComplet`) ne porte aucune MR ouverte :
+      // sans agrégation multi-sources, la colonne afficherait à tort « Aucune » malgré la MR de la seconde source.
+      expect(ligne.mr?.label).toBe('1 · ok');
+    },
+  );
+
   it('grise la ligne « jamais audité » sans lui appliquer aucun seuil de couleur (état particulier)', () => {
     const fixture = creerFixture(DonneesDeTest.racineDeBase());
     const element = DomTestUtils.obtenirElementNatif(fixture);
