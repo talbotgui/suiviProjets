@@ -500,6 +500,46 @@ describe('SqmSyntheseAuditsComponent', () => {
     },
   );
 
+  it(
+    'trie la colonne Couverture sur la valeur numérique du pourcentage, jamais sur son libellé formaté ' +
+      '(`extraireValeurTri` : « 100.0 % » précédait « 5.0 % » en tri alphabétique avant correction)',
+    () => {
+      const fixture = creerFixture(DonneesDeTest.racineDeBase());
+      const composant = fixture.componentInstance;
+      const colonneCouverture = composant
+        .colonnes()
+        .find((colonne) => colonne.cle === 'couverture');
+      const ligneProjetSain = composant.toutesLesLignes()[0];
+
+      expect(ligneProjetSain.couverture?.label).toBe('80.0 %');
+      expect(colonneCouverture?.extraireValeurTri?.(ligneProjetSain)).toBe(80);
+    },
+  );
+
+  it(
+    'trie la colonne MR ouvertes sur le décompte numérique brut, jamais sur son libellé formaté ' +
+      '(`extraireValeurTri`), 0 en l’absence de demande de fusion ouverte',
+    () => {
+      const fixture = creerFixture(DonneesDeTest.racineCasAvances());
+      const composant = fixture.componentInstance;
+      const colonneMr = composant.colonnes().find((colonne) => colonne.cle === 'mrOuvertes');
+      const ligneSansMr = composant
+        .toutesLesLignes()
+        .find((ligne) => ligne.nomProjet === 'Projet Ancien Échec');
+      const ligneDeuxMr = composant
+        .toutesLesLignes()
+        .find((ligne) => ligne.nomProjet === 'Projet Vitalité Orange');
+      if (ligneSansMr === undefined || ligneDeuxMr === undefined) {
+        throw new Error('Lignes de test introuvables.');
+      }
+
+      expect(ligneSansMr.mr?.label).toBe('Aucune');
+      expect(colonneMr?.extraireValeurTri?.(ligneSansMr)).toBe(0);
+      expect(ligneDeuxMr.mr?.label).toBe('2 · 1 conflit');
+      expect(colonneMr?.extraireValeurTri?.(ligneDeuxMr)).toBe(2);
+    },
+  );
+
   it('grise la ligne « jamais audité » sans lui appliquer aucun seuil de couleur (état particulier)', () => {
     const fixture = creerFixture(DonneesDeTest.racineDeBase());
     const element = DomTestUtils.obtenirElementNatif(fixture);

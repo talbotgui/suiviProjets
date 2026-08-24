@@ -155,6 +155,14 @@ interface EtiquetteCouleur {
   readonly label: string;
   /** Couleur sémantique, absente si non calculable (seuil courant indisponible). */
   readonly couleur?: Couleur;
+  /**
+   * Valeur numérique sous-jacente au libellé, quand ce dernier restitue effectivement un nombre (ex. pourcentage
+   * de couverture, décompte de demandes de fusion ouvertes) : consommée par `extraireValeurTri` des colonnes
+   * concernées pour un tri numérique plutôt qu'alphabétique sur le libellé déjà formaté (`80.0 %` triait avant
+   * `5.0 %` en tri purement alphabétique, cf. correction du 2026-08-24). Absente pour les étiquettes purement
+   * catégorielles (Vitalité, IA...) dont le libellé n'est pas la simple mise en forme d'un nombre.
+   */
+  readonly valeurNumerique?: number;
 }
 
 /**
@@ -716,6 +724,11 @@ export class SqmSyntheseAuditsComponent {
         libelle: 'Couverture',
         triable: true,
         extraireTexteBrut: (ligne) => ligne.couverture?.label ?? '',
+        // Tri numérique sur le pourcentage brut plutôt qu'alphabétique sur le libellé formaté (`80.0 %` triait
+        // avant `5.0 %` en tri alphabétique) ; repli sur le libellé quand non calculable (`pasDeSonar`), cohérent
+        // avec le comportement de repli du comparateur générique (`SqmTableauDenseComponent.comparerLignes`).
+        extraireValeurTri: (ligne) =>
+          ligne.couverture?.valeurNumerique ?? ligne.couverture?.label ?? '',
         extraireCellule: (ligne) => this.extraireCelluleCouverture(ligne),
         explication: { cle: 'couverture', seuilsBruts },
       },
@@ -738,6 +751,10 @@ export class SqmSyntheseAuditsComponent {
         libelle: 'MR ouvertes',
         triable: true,
         extraireTexteBrut: (ligne) => ligne.mr?.label ?? '',
+        // Tri numérique sur le décompte brut de demandes de fusion ouvertes plutôt qu'alphabétique sur le libellé
+        // formaté (`10 · ok` triait avant `2 · ok` en tri alphabétique) ; repli sur le libellé quand non
+        // calculable, même convention que la colonne Couverture ci-dessus.
+        extraireValeurTri: (ligne) => ligne.mr?.valeurNumerique ?? ligne.mr?.label ?? '',
         extraireCellule: (ligne) => this.celluleBadgeOuTexte(ligne.mr),
         explication: { cle: 'mrOuvertes', seuilsBruts },
       },
@@ -1299,7 +1316,7 @@ export class SqmSyntheseAuditsComponent {
     }
     const label = `${resultat.couverture.toFixed(1)} %`;
     if (seuils.type === 'absent') {
-      return { label };
+      return { label, valeurNumerique: resultat.couverture };
     }
     return {
       label,
@@ -1308,6 +1325,7 @@ export class SqmSyntheseAuditsComponent {
         seuils.valeur.seuilRouge,
         seuils.valeur.seuilOrange,
       ),
+      valeurNumerique: resultat.couverture,
     };
   }
 
@@ -1361,7 +1379,7 @@ export class SqmSyntheseAuditsComponent {
     maintenant: Date,
   ): EtiquetteCouleur {
     if (mrOuvertes.length === 0) {
-      return { label: 'Aucune' };
+      return { label: 'Aucune', valeurNumerique: 0 };
     }
     const nombreConflits = mrOuvertes.filter((mr) => mr.enConflit).length;
     const label =
@@ -1369,7 +1387,7 @@ export class SqmSyntheseAuditsComponent {
         ? `${mrOuvertes.length} · ${nombreConflits} conflit${nombreConflits > 1 ? 's' : ''}`
         : `${mrOuvertes.length} · ok`;
     if (seuils.type === 'absent') {
-      return { label };
+      return { label, valeurNumerique: mrOuvertes.length };
     }
     const ageMaxJours = Math.max(
       ...mrOuvertes.map((mr) => this.joursDepuis(mr.creeLe, maintenant)),
@@ -1384,7 +1402,11 @@ export class SqmSyntheseAuditsComponent {
       pourcentageConflit,
       seuils.valeur.pourcentageConflitRouge,
     );
-    return { label, couleur: this.pireCouleur(couleurAge, couleurConflit) };
+    return {
+      label,
+      couleur: this.pireCouleur(couleurAge, couleurConflit),
+      valeurNumerique: mrOuvertes.length,
+    };
   }
 
   /**
