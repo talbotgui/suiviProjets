@@ -1367,23 +1367,49 @@ export class SqmFicheProjetComponent {
   /**
    * Construit le texte pré-rempli de la modale de saisie en masse de règles de dépendances, à partir des
    * dépendances non référencées actuellement constatées sur le projet affiché : une ligne par couple
-   * (référence, version) distinct, statut laissé vide pour saisie explicite par l'utilisateur. Décision arbitraire
-   * de ce développement (à valider par un humain, faute de précision documentaire sur le pré-remplissage exact
-   * attendu) : pré-remplissage cohérent avec le lien unitaire « Créer une règle » déjà existant (US-033, cf.
-   * {@link queryParamsReferentielDependance}), qui pré-remplit de la même façon le motif et le motif de version
-   * sans jamais présumer du statut.
+   * (référence, version) distinct, statut laissé vide pour saisie explicite par l'utilisateur, version débarrassée
+   * de son éventuel préfixe de plage semver npm (cf. {@link retirerPrefixeSemver}). Chaque ligne de version est
+   * immédiatement suivie d'une seconde ligne de même motif portant la borne de repli `*`, statut également laissé
+   * vide : rend visible et modifiable dans le texte pré-rempli la borne que {@link SaisieMasseDependancesUtils}
+   * ajoute sinon silencieusement avec un statut par défaut figé (`obsolete`, RG-044) si le groupe n'en porte encore
+   * aucune à l'analyse. Décision arbitraire de ce développement (à valider par un humain, faute de précision
+   * documentaire sur le pré-remplissage exact attendu) : pré-remplissage cohérent avec le lien unitaire
+   * « Créer une règle » déjà existant (US-033, cf. {@link queryParamsReferentielDependance}) pour le motif et le
+   * motif de version, sans jamais présumer du statut.
    * @param dependances - Lignes d'affichage des dépendances du projet.
-   * @returns Le texte pré-rempli, une ligne par dépendance non référencée distincte, au format
-   * `motif;motifVersion=` de la grammaire retenue par {@link SaisieMasseDependancesUtils}.
+   * @returns Le texte pré-rempli, deux lignes par dépendance non référencée distincte (version nettoyée, puis
+   * borne `*`), au format `motif;motifVersion=` de la grammaire retenue par {@link SaisieMasseDependancesUtils}.
    */
   public texteInitialSaisieMasseDependances(dependances: readonly LigneDependance[]): string {
-    const lignes = new Set<string>();
+    const clesVues = new Set<string>();
+    const lignes: string[] = [];
     for (const dependance of dependances) {
-      if (dependance.nonReference) {
-        lignes.add(`${dependance.reference};${dependance.version}=`);
+      if (!dependance.nonReference) {
+        continue;
       }
+      const version = this.retirerPrefixeSemver(dependance.version);
+      const cle = `${dependance.reference};${version}`;
+      if (clesVues.has(cle)) {
+        continue;
+      }
+      clesVues.add(cle);
+      lignes.push(`${dependance.reference};${version}=`);
+      lignes.push(`${dependance.reference};*=obsolete`);
     }
-    return Array.from(lignes).join('\n');
+    return lignes.join('\n');
+  }
+
+  /**
+   * Retire un préfixe de plage semver npm (`^`/`~`) éventuellement présent en tête d'une version de dépendance
+   * constatée, pour ne jamais pré-remplir une borne de règle de dépendances avec un opérateur de plage : la
+   * grammaire de {@link SaisieMasseDependancesUtils} (comme le formulaire unitaire
+   * `SqmReferentielsParametrageComponent.analyserVersions`) n'attend qu'un motif de version exact ou à jokers
+   * (`*`), jamais un caractère de plage npm.
+   * @param version - Version brute constatée, potentiellement préfixée de `^` ou `~`.
+   * @returns La version sans son préfixe de plage éventuel.
+   */
+  private retirerPrefixeSemver(version: string): string {
+    return version.replace(/^[\^~]/, '');
   }
 
   /**

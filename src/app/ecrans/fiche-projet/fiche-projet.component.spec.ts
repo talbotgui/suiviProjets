@@ -1112,22 +1112,93 @@ describe('SqmFicheProjetComponent', () => {
       expect(bouton).not.toBeNull();
     });
 
-    it('pré-remplit la modale, à l’ouverture, d’une ligne par dépendance non référencée distincte, statut vide', () => {
-      const projet = DonneesDeTest.projet('projet-1', [
-        auditAvecDependances(dependancesNonReferencees(6)),
-      ]);
-      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
-      const composant = fixture.componentInstance;
+    it(
+      'pré-remplit la modale, à l’ouverture, de deux lignes par dépendance non référencée distincte ' +
+        '(version, puis borne de repli « * »), statuts vides',
+      () => {
+        const projet = DonneesDeTest.projet('projet-1', [
+          auditAvecDependances(dependancesNonReferencees(6)),
+        ]);
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+        const composant = fixture.componentInstance;
 
-      composant.ouvrirSaisieMasseDependances();
-      fixture.detectChanges();
+        composant.ouvrirSaisieMasseDependances();
+        fixture.detectChanges();
 
-      const modale = DomTestUtils.obtenirComposantEnfant(fixture, SqmModaleSaisieMasseComponent);
-      const lignesAttendues = dependancesNonReferencees(6).map(
-        (dependance) => `${dependance.reference};${dependance.version}=`,
-      );
-      expect(modale.texte().split('\n').sort()).toEqual([...lignesAttendues].sort());
-    });
+        const modale = DomTestUtils.obtenirComposantEnfant(fixture, SqmModaleSaisieMasseComponent);
+        const lignesAttendues = dependancesNonReferencees(6).flatMap((dependance) => [
+          `${dependance.reference};${dependance.version}=`,
+          `${dependance.reference};*=`,
+        ]);
+        expect(modale.texte().split('\n').sort()).toEqual([...lignesAttendues].sort());
+      },
+    );
+
+    it(
+      'place la ligne de borne « * » immédiatement sous chaque ligne de version, et retire un préfixe de ' +
+        'plage semver npm (`^`/`~`) éventuellement présent en tête d’une version constatée',
+      () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+        const composant = fixture.componentInstance;
+
+        const texte = composant.texteInitialSaisieMasseDependances([
+          {
+            reference: 'pkg1',
+            version: '^1.2.3',
+            manifeste: 'package.json',
+            statut: { label: '—' },
+            nonReference: true,
+          },
+          {
+            reference: 'pkg2',
+            version: '~2.0.0',
+            manifeste: 'package.json',
+            statut: { label: '—' },
+            nonReference: true,
+          },
+          // Dépendance référencée : exclue du texte pré-rempli, jamais de ligne produite pour elle.
+          {
+            reference: 'pkg3',
+            version: '3.0.0',
+            manifeste: 'package.json',
+            statut: { label: '—' },
+            nonReference: false,
+          },
+        ]);
+
+        expect(texte.split('\n')).toEqual(['pkg1;1.2.3=', 'pkg1;*=', 'pkg2;2.0.0=', 'pkg2;*=']);
+      },
+    );
+
+    it(
+      'ne produit qu’un seul couple de lignes pour deux dépendances non référencées de même référence dont ' +
+        'les versions ne diffèrent qu’avant nettoyage du préfixe de plage semver npm',
+      () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+        const composant = fixture.componentInstance;
+
+        const texte = composant.texteInitialSaisieMasseDependances([
+          {
+            reference: 'pkg1',
+            version: '^1.2.3',
+            manifeste: 'pom.xml',
+            statut: { label: '—' },
+            nonReference: true,
+          },
+          {
+            reference: 'pkg1',
+            version: '1.2.3',
+            manifeste: 'package.json',
+            statut: { label: '—' },
+            nonReference: true,
+          },
+        ]);
+
+        expect(texte.split('\n')).toEqual(['pkg1;1.2.3=', 'pkg1;*=']);
+      },
+    );
 
     it('enregistre chaque règle regroupée par un appel indépendant à definirReferentiel, notifie le succès total et referme la modale', async () => {
       const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
