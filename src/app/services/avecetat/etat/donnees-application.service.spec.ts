@@ -530,6 +530,65 @@ describe('DonneesApplicationService', () => {
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'erreurInterne' } });
     });
 
+    it('invoque qualifier_membres avec les paramètres attendus et met à jour la racine (US-044, RG-041)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 2 };
+      invokeSimule.mockResolvedValue({ donnees: racineMiseAJour, reussites: [true, true] });
+
+      const resultat = await service.qualifierMembres(
+        groupeId,
+        [
+          DONNEES_MEMBRE,
+          { critere: 'bob', typeCritere: TypeCritereMembre.Email, statut: StatutMembre.Client },
+        ],
+        'Saisie en masse (Fiche projet)',
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('qualifier_membres', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        groupeId,
+        entrees: [
+          {
+            critere: 'alice',
+            typeCritere: TypeCritereMembre.Username,
+            statut: StatutMembre.Interne,
+            libelle: undefined,
+            aliasEmail: undefined,
+          },
+          {
+            critere: 'bob',
+            typeCritere: TypeCritereMembre.Email,
+            statut: StatutMembre.Client,
+            libelle: undefined,
+            aliasEmail: undefined,
+          },
+        ],
+        origine: 'Saisie en masse (Fiche projet)',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes', reussites: [true, true] });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet en Résultat « echec » sans jamais y refléter un échec d’entrée individuelle (RG-041)', async () => {
+      invokeSimule.mockRejectedValue({ type: 'motDePasseSessionDivergent' });
+
+      const resultat = await service.qualifierMembres(
+        groupeId,
+        [DONNEES_MEMBRE],
+        'Saisie en masse (Fiche projet)',
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'motDePasseSessionDivergent' },
+      });
+      expect(service.racine()?.versionSchema).toBe(1);
+    });
+
     it('invoque definir_politique_ia avec les paramètres attendus et met à jour la racine', async () => {
       const racineAvantAppel = DonneesDeTest.racineActuelle(service);
       const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
@@ -616,6 +675,44 @@ describe('DonneesApplicationService', () => {
       );
 
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'entreeReferentielInvalide' } });
+    });
+
+    it('invoque definir_referentiels avec les paramètres attendus et met à jour la racine (US-043, RG-040)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 3 };
+      invokeSimule.mockResolvedValue({ donnees: racineMiseAJour, reussites: [true, false] });
+      const entrees = [
+        { id: 'd1', motif: 'moment', versions: [] },
+        { id: 'd2', motif: 'lodash', versions: [] },
+      ];
+
+      const resultat = await service.definirReferentiels(
+        'reglesDependances',
+        entrees,
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('definir_referentiels', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        typeReferentiel: 'reglesDependances',
+        entrees,
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes', reussites: [true, false] });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet en Résultat « echec » sans jamais y refléter un échec d’entrée individuelle (RG-040)', async () => {
+      invokeSimule.mockRejectedValue({ type: 'sessionVerrouillee' });
+
+      const resultat = await service.definirReferentiels(
+        'reglesDependances',
+        [{ id: 'd1', motif: 'moment', versions: [] }],
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'sessionVerrouillee' } });
     });
 
     it('invoque definir_vue avec les paramètres attendus et met à jour la racine (US-028)', async () => {

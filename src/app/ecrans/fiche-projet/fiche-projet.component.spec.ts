@@ -1200,12 +1200,12 @@ describe('SqmFicheProjetComponent', () => {
       },
     );
 
-    it('enregistre chaque règle regroupée par un appel indépendant à definirReferentiel, notifie le succès total et referme la modale', async () => {
+    it('enregistre tous les groupes par un seul appel batch à definirReferentiels, notifie le succès total et referme la modale', async () => {
       const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
       const racine = DonneesDeTest.racine(projet);
       const fixture = creerFixture('projet-1', racine);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-      jest.mocked(invoke).mockResolvedValue(racine);
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, reussites: [true, true] });
       const composant = fixture.componentInstance;
 
       composant.ouvrirSaisieMasseDependances();
@@ -1216,31 +1216,29 @@ describe('SqmFicheProjetComponent', () => {
       );
 
       expect(resultat).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 2 });
-      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledTimes(1);
       expect(invoke).toHaveBeenCalledWith(
-        'definir_referentiel',
+        'definir_referentiels',
         expect.objectContaining({
           typeReferentiel: 'reglesDependances',
           motDePasse: 'mot-de-passe',
         }),
       );
-      const appels = jest.mocked(invoke).mock.calls;
-      const motifsAppeles = appels.map((appel) => {
-        const parametres = appel[1];
-        if (
-          parametres === undefined ||
-          typeof parametres !== 'object' ||
-          !('entree' in parametres)
-        ) {
-          throw new Error('Paramètres de commande inattendus dans ce test.');
-        }
-        const entree = parametres['entree'];
-        if (
-          entree === undefined ||
-          typeof entree !== 'object' ||
-          entree === null ||
-          !('motif' in entree)
-        ) {
+      const appel = jest.mocked(invoke).mock.calls[0];
+      const parametres = appel?.[1];
+      if (
+        parametres === undefined ||
+        typeof parametres !== 'object' ||
+        !('entrees' in parametres)
+      ) {
+        throw new Error('Paramètres de commande inattendus dans ce test.');
+      }
+      const entrees = parametres['entrees'];
+      if (!Array.isArray(entrees)) {
+        throw new Error('Entrées de commande inattendues dans ce test.');
+      }
+      const motifsAppeles = entrees.map((entree: unknown) => {
+        if (entree === null || typeof entree !== 'object' || !('motif' in entree)) {
           throw new Error('Entrée de commande inattendue dans ce test.');
         }
         return entree.motif;
@@ -1262,7 +1260,7 @@ describe('SqmFicheProjetComponent', () => {
       const racine = DonneesDeTest.racine(projet);
       const fixture = creerFixture('projet-1', racine);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-      jest.mocked(invoke).mockResolvedValue(racine);
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, reussites: [true] });
       const composant = fixture.componentInstance;
 
       const resultat = await composant.traiterSaisieMasseDependances(
@@ -1272,7 +1270,7 @@ describe('SqmFicheProjetComponent', () => {
 
       expect(invoke).toHaveBeenCalledTimes(1);
       expect(invoke).toHaveBeenCalledWith(
-        'definir_referentiel',
+        'definir_referentiels',
         expect.objectContaining({ typeReferentiel: 'reglesDependances' }),
       );
       expect(resultat.nombreReussies).toBe(1);
@@ -1291,10 +1289,7 @@ describe('SqmFicheProjetComponent', () => {
       const racine = DonneesDeTest.racine(projet);
       const fixture = creerFixture('projet-1', racine);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-      jest
-        .mocked(invoke)
-        .mockResolvedValueOnce(racine)
-        .mockRejectedValueOnce({ type: 'motDePasseOuFichierInvalide' });
+      jest.mocked(invoke).mockResolvedValueOnce({ donnees: racine, reussites: [true, false] });
       const composant = fixture.componentInstance;
       composant.ouvrirSaisieMasseDependances();
 
@@ -1303,7 +1298,7 @@ describe('SqmFicheProjetComponent', () => {
         'mot-de-passe',
       );
 
-      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledTimes(1);
       expect(resultat.nombreReussies).toBe(1);
       expect(resultat.erreurs).toEqual([
         {
@@ -1324,7 +1319,7 @@ describe('SqmFicheProjetComponent', () => {
 
       // Nouvelle tentative, uniquement sur la ligne restée en échec (pkg1 n'est jamais re-soumise, cf. RG-040).
       jest.mocked(invoke).mockReset();
-      jest.mocked(invoke).mockResolvedValue(racine);
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, reussites: [true] });
       const secondeTentative = await composant.traiterSaisieMasseDependances(
         resultat.texteRestant,
         'mot-de-passe',
@@ -1332,10 +1327,43 @@ describe('SqmFicheProjetComponent', () => {
 
       expect(invoke).toHaveBeenCalledTimes(1);
       expect(invoke).toHaveBeenCalledWith(
-        'definir_referentiel',
+        'definir_referentiels',
         expect.objectContaining({ typeReferentiel: 'reglesDependances' }),
       );
       expect(secondeTentative).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 1 });
+    });
+
+    it('échec technique global (ex. mot de passe invalide) : reporte tous les groupes du lot en échec, sans notification de succès', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
+      const composant = fixture.componentInstance;
+      composant.ouvrirSaisieMasseDependances();
+
+      const resultat = await composant.traiterSaisieMasseDependances(
+        'pkg1;1.0.0=maintenu\npkg2;1.0.0=maintenu',
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(resultat.nombreReussies).toBe(0);
+      expect(resultat.erreurs).toEqual([
+        {
+          ligne: 'pkg1;1.0.0=maintenu',
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        },
+        {
+          ligne: 'pkg2;1.0.0=maintenu',
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        },
+      ]);
+      expect(resultat.texteRestant).toBe('pkg1;1.0.0=maintenu\npkg2;1.0.0=maintenu');
+      expect(TestBed.inject(NotificationService).liste()).toEqual([]);
+
+      composant.gererResultatSaisieMasseDependances(resultat);
+      expect(composant.modaleSaisieMasseDependancesVisible()).toBe(true);
     });
   });
 
@@ -1374,12 +1402,12 @@ describe('SqmFicheProjetComponent', () => {
       }
     });
 
-    it('enregistre chaque ligne par un appel indépendant à qualifierMembre (sans regroupement, RG-041 point 4), notifie le succès total et referme la modale', async () => {
+    it('enregistre toutes les lignes par un seul appel batch à qualifierMembres (sans regroupement, RG-041 point 4), notifie le succès total et referme la modale', async () => {
       const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
       const racine = DonneesDeTest.racine(projet);
       const fixture = creerFixture('projet-1', racine);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-      jest.mocked(invoke).mockResolvedValue({ donnees: racine, membresEnConflit: [] });
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, reussites: [true, true] });
       const composant = fixture.componentInstance;
 
       composant.ouvrirSaisieMasseMembres();
@@ -1390,30 +1418,27 @@ describe('SqmFicheProjetComponent', () => {
       );
 
       expect(resultat).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 2 });
-      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledTimes(1);
       expect(invoke).toHaveBeenCalledWith(
-        'qualifier_membre',
+        'qualifier_membres',
         expect.objectContaining({
           groupeId: 'groupe-1',
           origine: 'Saisie en masse (Fiche projet)',
           motDePasse: 'mot-de-passe',
         }),
       );
-      const appels = jest.mocked(invoke).mock.calls;
-      const parametresAppeles = appels.map((appel) => appel[1]);
-      expect(parametresAppeles).toEqual([
-        expect.objectContaining({
-          membreId: undefined,
-          critere: 'mnovak',
-          typeCritere: 'username',
-          statut: 'interne',
-        }),
-        expect.objectContaining({
-          membreId: undefined,
-          critere: 'inconnu1',
-          typeCritere: 'email',
-          statut: 'client',
-        }),
+      const appel = jest.mocked(invoke).mock.calls[0];
+      const parametres = appel?.[1];
+      if (
+        parametres === undefined ||
+        typeof parametres !== 'object' ||
+        !('entrees' in parametres)
+      ) {
+        throw new Error('Paramètres de commande inattendus dans ce test.');
+      }
+      expect(parametres['entrees']).toEqual([
+        expect.objectContaining({ critere: 'mnovak', typeCritere: 'username', statut: 'interne' }),
+        expect.objectContaining({ critere: 'inconnu1', typeCritere: 'email', statut: 'client' }),
       ]);
       expect(TestBed.inject(NotificationService).liste()).toEqual([
         expect.objectContaining({ type: 'succes', message: '2 membres qualifiés.' }),
@@ -1428,7 +1453,7 @@ describe('SqmFicheProjetComponent', () => {
       const racine = DonneesDeTest.racine(projet);
       const fixture = creerFixture('projet-1', racine);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-      jest.mocked(invoke).mockResolvedValue({ donnees: racine, membresEnConflit: [] });
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, reussites: [true] });
       const composant = fixture.componentInstance;
 
       // « jdupont;username » figure déjà parmi les membres connus du groupe de test (DonneesDeTest.racine).
@@ -1438,10 +1463,16 @@ describe('SqmFicheProjetComponent', () => {
       );
 
       expect(invoke).toHaveBeenCalledTimes(1);
-      expect(invoke).toHaveBeenCalledWith(
-        'qualifier_membre',
-        expect.objectContaining({ critere: 'inconnu1' }),
-      );
+      const appel = jest.mocked(invoke).mock.calls[0];
+      const parametres = appel?.[1];
+      if (
+        parametres === undefined ||
+        typeof parametres !== 'object' ||
+        !('entrees' in parametres)
+      ) {
+        throw new Error('Paramètres de commande inattendus dans ce test.');
+      }
+      expect(parametres['entrees']).toEqual([expect.objectContaining({ critere: 'inconnu1' })]);
       expect(resultat.nombreReussies).toBe(1);
       expect(resultat.erreurs).toEqual([
         {
@@ -1458,10 +1489,7 @@ describe('SqmFicheProjetComponent', () => {
       const racine = DonneesDeTest.racine(projet);
       const fixture = creerFixture('projet-1', racine);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
-      jest
-        .mocked(invoke)
-        .mockResolvedValueOnce({ donnees: racine, membresEnConflit: [] })
-        .mockRejectedValueOnce({ type: 'motDePasseOuFichierInvalide' });
+      jest.mocked(invoke).mockResolvedValueOnce({ donnees: racine, reussites: [true, false] });
       const composant = fixture.componentInstance;
       composant.ouvrirSaisieMasseMembres();
 
@@ -1470,7 +1498,7 @@ describe('SqmFicheProjetComponent', () => {
         'mot-de-passe',
       );
 
-      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledTimes(1);
       expect(resultat.nombreReussies).toBe(1);
       expect(resultat.erreurs).toEqual([
         {
@@ -1488,7 +1516,7 @@ describe('SqmFicheProjetComponent', () => {
 
       // Nouvelle tentative, uniquement sur la ligne restée en échec (inconnu1 n'est jamais re-soumis, RG-041).
       jest.mocked(invoke).mockReset();
-      jest.mocked(invoke).mockResolvedValue({ donnees: racine, membresEnConflit: [] });
+      jest.mocked(invoke).mockResolvedValue({ donnees: racine, reussites: [true] });
       const secondeTentative = await composant.traiterSaisieMasseMembres(
         resultat.texteRestant,
         'mot-de-passe',
@@ -1496,10 +1524,43 @@ describe('SqmFicheProjetComponent', () => {
 
       expect(invoke).toHaveBeenCalledTimes(1);
       expect(invoke).toHaveBeenCalledWith(
-        'qualifier_membre',
-        expect.objectContaining({ critere: 'inconnu2' }),
+        'qualifier_membres',
+        expect.objectContaining({ groupeId: 'groupe-1' }),
       );
       expect(secondeTentative).toEqual({ texteRestant: '', erreurs: [], nombreReussies: 1 });
+    });
+
+    it('échec technique global (ex. mot de passe invalide) : reporte toutes les lignes du lot en échec, sans notification de succès', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const racine = DonneesDeTest.racine(projet);
+      const fixture = creerFixture('projet-1', racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockRejectedValue({ type: 'motDePasseOuFichierInvalide' });
+      const composant = fixture.componentInstance;
+      composant.ouvrirSaisieMasseMembres();
+
+      const resultat = await composant.traiterSaisieMasseMembres(
+        'inconnu1;username=interne\ninconnu2;username=client',
+        'mot-de-passe',
+      );
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(resultat.nombreReussies).toBe(0);
+      expect(resultat.erreurs).toEqual([
+        {
+          ligne: 'inconnu1;username=interne',
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        },
+        {
+          ligne: 'inconnu2;username=client',
+          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+        },
+      ]);
+      expect(resultat.texteRestant).toBe('inconnu1;username=interne\ninconnu2;username=client');
+      expect(TestBed.inject(NotificationService).liste()).toEqual([]);
+
+      composant.gererResultatSaisieMasseMembres(resultat);
+      expect(composant.modaleSaisieMasseMembresVisible()).toBe(true);
     });
 
     it("rejette une ligne dont le statut n'est pas explicitement saisi, sans jamais lui attribuer de valeur par défaut (RG-041, point 3)", async () => {

@@ -96,6 +96,56 @@ pub(crate) fn definir_referentiel(
     resultat
 }
 
+/// Ajoute ou met à jour plusieurs entrées d'un même référentiel en une seule opération, sauvegarde le fichier une
+/// seule fois (uniquement si au moins une entrée a réussi) et consigne au journal une entrée par entrée
+/// effectivement enregistrée (US-043, RG-023, RG-040).
+///
+/// Nommée par symétrie plurielle avec `definirReferentiel` (décision arbitraire, cf. convention documentée en tête
+/// de ce module et `.claude/rules/09-normes-developpement.md`) : non citée littéralement par
+/// `13_conceptionDetaillee.md`, qui ne décrit que la commande unitaire ; introduite pour corriger un défaut de
+/// performance de la saisie en masse de règles de dépendances (US-043), qui appelait jusqu'ici `definirReferentiel`
+/// une fois par groupe créé — un coût (dérivation Argon2id, rotation des sauvegardes de sécurité RG-003, écriture
+/// chiffrée complète) proportionnel au nombre de groupes saisis.
+///
+/// # Erreurs
+///
+/// Ne propage jamais l'échec de validation d'une entrée individuelle (reflété par `reussites`, cf.
+/// [`parametrage::definir_referentiels`]) ; les anomalies de sauvegarde héritées de
+/// [`crate::persistance::erreurs::ErreurPersistance`] en cas d'échec de l'écriture disque (déclenchée uniquement si
+/// au moins une entrée a réussi).
+#[tauri::command]
+pub(crate) fn definir_referentiels(
+    chemin: String,
+    donnees: DonneesRacine,
+    type_referentiel: String,
+    entrees: Vec<Value>,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<super::fichier::ReponseMutationMasse, ErreurFacade> {
+    crate::journalisation::consigner_debut_commande("definirReferentiels");
+    let resultat = (|| -> Result<super::fichier::ReponseMutationMasse, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let reussites =
+            parametrage::definir_referentiels(&mut donnees, &type_referentiel, entrees, horodatage);
+
+        if reussites.iter().any(|reussite| *reussite) {
+            let cle_session = moteur::sauvegarder_fichier(
+                Path::new(&chemin),
+                &donnees,
+                &mot_de_passe,
+                "definirReferentiels",
+            )?;
+            etat.definir(PathBuf::from(chemin), cle_session);
+        }
+
+        Ok(super::fichier::ReponseMutationMasse { donnees, reussites })
+    })();
+    crate::journalisation::consigner_fin_commande("definirReferentiels");
+    resultat
+}
+
 /// Supprime une entrée du référentiel des règles de dépendances, sauvegarde le fichier et consigne la suppression
 /// au journal (US-033, RG-035, Phase 10 incrément 8).
 ///

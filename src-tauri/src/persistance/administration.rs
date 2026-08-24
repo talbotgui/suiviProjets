@@ -177,6 +177,70 @@ pub(crate) fn qualifier_membre(
     Ok(membres_en_conflit)
 }
 
+/// Entrée d'un lot de qualifications de membres connus (US-044, RG-041), un par ligne validée de la modale de
+/// saisie en masse : mêmes champs qu'un appel unitaire de [`qualifier_membre`], sans `membre_id` (saisie en masse
+/// strictement additive, uniquement des créations, jamais de modification d'une règle existante — celles-ci sont
+/// déjà rejetées en amont côté interface par `SaisieMasseMembresUtils.analyser`).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EntreeQualificationMembre {
+    pub(crate) critere: String,
+    pub(crate) type_critere: TypeCritere,
+    pub(crate) statut: StatutMembre,
+    pub(crate) libelle: Option<String>,
+    pub(crate) alias_email: Option<String>,
+}
+
+/// Qualifie plusieurs membres connus d'un même groupe en une seule fois (US-044, RG-041), appelée par la commande
+/// batch `qualifierMembres` de la Façade, introduite pour corriger un défaut de performance de la saisie en masse
+/// de membres connus : celle-ci appelait jusqu'ici [`qualifier_membre`] une fois par ligne, chaque appel
+/// déclenchant une sauvegarde disque complète (dérivation Argon2id, rotation des sauvegardes de sécurité RG-003,
+/// écriture chiffrée complète), un coût proportionnel au nombre de lignes saisies.
+///
+/// Applique [`qualifier_membre`] séquentiellement, entrée par entrée, dans l'ordre de `entrees`, SANS jamais
+/// modifier cette fonction, sur le même patron que
+/// [`crate::persistance::parametrage::definir_referentiels`] : ne propage jamais l'échec d'une entrée vers
+/// l'appelant — un échec sur une entrée (ex. doublon de username, RG-008, y compris entre deux entrées du même
+/// lot, puisque chaque appel relit `donnees` déjà muté par les appels précédents) n'empêche jamais la tentative des
+/// entrées suivantes (échec partiel, RG-041 point 5, jamais de rollback des entrées déjà réussies du même lot).
+/// Chaque entrée effectivement enregistrée produit sa propre entrée de journal, comme le ferait un appel unitaire.
+/// `membre_id` est toujours `None` (uniquement des créations) et `origine` est partagée par toutes les entrées du
+/// lot.
+///
+/// La sauvegarde effective du fichier reste, comme pour [`qualifier_membre`], de la seule responsabilité de la
+/// commande de la Façade qui invoque cette fonction — laquelle ne doit sauvegarder qu'une seule fois pour
+/// l'ensemble du lot, uniquement si au moins une entrée a réussi.
+///
+/// # Retour
+///
+/// Un indicateur de succès par entrée, dans le même ordre que `entrees`.
+pub(crate) fn qualifier_membres(
+    donnees: &mut DonneesRacine,
+    groupe_id: &str,
+    entrees: Vec<EntreeQualificationMembre>,
+    origine: String,
+    horodatage: String,
+) -> Vec<bool> {
+    entrees
+        .into_iter()
+        .map(|entree| {
+            qualifier_membre(
+                donnees,
+                groupe_id,
+                None,
+                entree.critere,
+                entree.type_critere,
+                entree.statut,
+                entree.libelle,
+                entree.alias_email,
+                origine.clone(),
+                horodatage.clone(),
+            )
+            .is_ok()
+        })
+        .collect()
+}
+
 /// Détecte les règles de membres connus en conflit au sein d'un même groupe (RG-008) : deux règles distinctes
 /// portant le même `typeCritere` et le même `critere` mais un `statut` différent. Fonction pure, opérant
 /// uniquement sur la liste de règles fournie, sans aucune donnée d'audit (hors périmètre de cette phase, cf.
@@ -673,6 +737,126 @@ mod tests {
             StatutMembre::Partenaire
         );
         Ok(())
+    }
+
+    fn entree_qualification(
+        critere: &str,
+        type_critere: TypeCritere,
+        statut: StatutMembre,
+    ) -> EntreeQualificationMembre {
+        EntreeQualificationMembre {
+            critere: critere.to_string(),
+            type_critere,
+            statut,
+            libelle: None,
+            alias_email: None,
+        }
+    }
+
+    #[test]
+    fn qualifier_membres_toutes_reussissent_et_journalise_une_entree_par_ligne() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        let reussites = qualifier_membres(
+            &mut racine,
+            "g1",
+            vec![
+                entree_qualification("alice", TypeCritere::Username, StatutMembre::Interne),
+                entree_qualification("bob", TypeCritere::Username, StatutMembre::Client),
+            ],
+            "Administration".to_string(),
+            "2026-07-21T09:20:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![true, true]);
+        assert_eq!(racine.groupes[0].membres_connus.len(), 2);
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn qualifier_membres_echec_partiel_au_milieu_du_lot_continue_avec_les_suivantes() {
+        // `membre_id` étant toujours absent en saisie en masse, `qualifier_membre` résout la règle cible par
+        // correspondance de critère : le doublon de username (RG-008) ne peut donc se déclencher que si les
+        // données portent déjà, avant cette soumission, deux règles distinctes avec le même critère — état résiduel
+        // incohérent (ex. import antérieur au blocage à la saisie, R10-07), construit ici directement pour ce test,
+        // symétrique de `qualifier_membre_signale_un_conflit_residuel_sans_bloquer_une_edition_non_liee`.
+        let mut groupe = groupe_vide("g1");
+        groupe.membres_connus.push(membre(
+            "m1",
+            "dave",
+            TypeCritere::Username,
+            StatutMembre::Interne,
+        ));
+        groupe.membres_connus.push(membre(
+            "m2",
+            "dave",
+            TypeCritere::Username,
+            StatutMembre::Client,
+        ));
+        let mut racine = racine_avec_groupe(groupe);
+
+        let reussites = qualifier_membres(
+            &mut racine,
+            "g1",
+            vec![
+                entree_qualification("bob", TypeCritere::Username, StatutMembre::Client),
+                entree_qualification("dave", TypeCritere::Username, StatutMembre::Partenaire),
+                entree_qualification("carol", TypeCritere::Username, StatutMembre::Interne),
+            ],
+            "Administration".to_string(),
+            "2026-07-21T09:25:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![true, false, true]);
+        assert_eq!(racine.groupes[0].membres_connus.len(), 4);
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn qualifier_membres_deux_entrees_du_meme_lot_portant_le_meme_critere_se_fusionnent_dans_la_meme_regle()
+     {
+        // À la différence de `definir_referentiels` (RG-042, rejet strict d'un motif dupliqué), deux entrées de
+        // saisie en masse de membres portant le même critère ne peuvent normalement jamais atteindre cette fonction
+        // (dédoublonnées en amont par `SaisieMasseMembresUtils.analyser`, RG-041) ; si elles y parvenaient malgré
+        // tout, `membre_id` étant absent, la seconde entrée met simplement à jour la règle créée par la première
+        // (résolution par correspondance de critère), sans erreur ni duplication de règle.
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        let reussites = qualifier_membres(
+            &mut racine,
+            "g1",
+            vec![
+                entree_qualification("alice", TypeCritere::Username, StatutMembre::Interne),
+                entree_qualification("alice", TypeCritere::Username, StatutMembre::Client),
+            ],
+            "Administration".to_string(),
+            "2026-07-21T09:30:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![true, true]);
+        assert_eq!(racine.groupes[0].membres_connus.len(), 1);
+        assert_eq!(
+            racine.groupes[0].membres_connus[0].statut,
+            StatutMembre::Client
+        );
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn qualifier_membres_lot_vide_ne_fait_rien() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        let reussites = qualifier_membres(
+            &mut racine,
+            "g1",
+            vec![],
+            "Administration".to_string(),
+            "2026-07-21T09:35:00Z".to_string(),
+        );
+
+        assert!(reussites.is_empty());
+        assert!(racine.groupes[0].membres_connus.is_empty());
+        assert!(racine.journal.is_empty());
     }
 
     #[test]

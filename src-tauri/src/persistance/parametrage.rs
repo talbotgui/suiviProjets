@@ -308,6 +308,40 @@ pub(crate) fn definir_referentiel(
     Ok(())
 }
 
+/// Ajoute ou met à jour plusieurs entrées d'un même référentiel en une seule fois (US-043, RG-040), appelée par la
+/// commande batch `definirReferentiels` de la Façade, introduite pour corriger un défaut de performance de la
+/// saisie en masse de règles de dépendances : celle-ci appelait jusqu'ici [`definir_referentiel`] une fois par
+/// groupe créé — un coût (dérivation Argon2id, rotation des sauvegardes de sécurité RG-003, écriture chiffrée
+/// complète) proportionnel au nombre de groupes saisis, ressenti comme très long par l'utilisateur.
+///
+/// Applique [`definir_referentiel`] séquentiellement, entrée par entrée, dans l'ordre de `entrees`, SANS jamais
+/// modifier cette fonction : à la différence de celle-ci, ne propage jamais l'échec d'une entrée vers l'appelant —
+/// un échec sur une entrée (ex. motif déjà existant, RG-042, y compris entre deux entrées du même lot, puisque
+/// chaque appel relit `donnees` déjà muté par les appels précédents) n'empêche jamais la tentative des entrées
+/// suivantes (échec partiel, RG-040 point 5, jamais de rollback des entrées déjà réussies du même lot). Chaque
+/// entrée effectivement enregistrée produit sa propre entrée de journal, comme le ferait un appel unitaire.
+///
+/// La sauvegarde effective du fichier reste, comme pour [`definir_referentiel`], de la seule responsabilité de la
+/// commande de la Façade qui invoque cette fonction — laquelle ne doit sauvegarder qu'une seule fois pour
+/// l'ensemble du lot, uniquement si au moins une entrée a réussi.
+///
+/// # Retour
+///
+/// Un indicateur de succès par entrée, dans le même ordre que `entrees`.
+pub(crate) fn definir_referentiels(
+    donnees: &mut DonneesRacine,
+    type_referentiel: &str,
+    entrees: Vec<Value>,
+    horodatage: String,
+) -> Vec<bool> {
+    entrees
+        .into_iter()
+        .map(|entree| {
+            definir_referentiel(donnees, type_referentiel, entree, horodatage.clone()).is_ok()
+        })
+        .collect()
+}
+
 /// Consigne au journal une modification ou une suppression, factorisé pour les cinq fonctions de réglages
 /// applicatifs (`definir_verrouillage`/`definir_concurrence_audit`/`definir_proxy`/
 /// `definir_nombre_sauvegardes_securite`/`definir_seuil_avertissement_taille`, US-034, US-035, RG-031, RG-032) et
@@ -939,6 +973,81 @@ mod tests {
         );
 
         assert_eq!(resultat, Err(ErreurParametrage::TypeReferentielInconnu));
+    }
+
+    #[test]
+    fn definir_referentiels_toutes_reussissent_et_journalise_une_entree_par_ligne() {
+        let mut racine = racine_de_test();
+
+        let reussites = definir_referentiels(
+            &mut racine,
+            "reglesDependances",
+            vec![
+                json!({ "id": "d1", "motif": "moment", "versions": [] }),
+                json!({ "id": "d2", "motif": "lodash", "versions": [] }),
+            ],
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![true, true]);
+        assert_eq!(racine.referentiels.regles_dependances.len(), 2);
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn definir_referentiels_echec_partiel_au_milieu_du_lot_continue_avec_les_suivantes() {
+        let mut racine = racine_de_test();
+        // Champ manquant sur l'entrée du milieu (EntreeReferentielInvalide) : ne doit pas empêcher la troisième.
+        let reussites = definir_referentiels(
+            &mut racine,
+            "reglesDependances",
+            vec![
+                json!({ "id": "d1", "motif": "moment", "versions": [] }),
+                json!({ "id": "d2", "versions": [] }),
+                json!({ "id": "d3", "motif": "lodash", "versions": [] }),
+            ],
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![true, false, true]);
+        assert_eq!(racine.referentiels.regles_dependances.len(), 2);
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn definir_referentiels_detecte_un_motif_duplique_entre_deux_entrees_du_meme_lot() {
+        let mut racine = racine_de_test();
+        // Deux entrées distinctes (id différents) portant le même motif : la seconde doit être rejetée par RG-042,
+        // la première ayant déjà été appliquée en mémoire par l'appel précédent de la boucle.
+        let reussites = definir_referentiels(
+            &mut racine,
+            "reglesDependances",
+            vec![
+                json!({ "id": "d1", "motif": "moment", "versions": [] }),
+                json!({ "id": "d2", "motif": "moment", "versions": [] }),
+            ],
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![true, false]);
+        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        assert_eq!(racine.journal.len(), 1);
+    }
+
+    #[test]
+    fn definir_referentiels_lot_vide_ne_fait_rien() {
+        let mut racine = racine_de_test();
+
+        let reussites = definir_referentiels(
+            &mut racine,
+            "reglesDependances",
+            vec![],
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert!(reussites.is_empty());
+        assert!(racine.referentiels.regles_dependances.is_empty());
+        assert!(racine.journal.is_empty());
     }
 
     #[test]

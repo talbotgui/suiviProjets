@@ -67,6 +67,43 @@ describe('BouchonParametrageUtils', () => {
     expect(resultat.referentiels.reglesDependances).toHaveLength(1);
   });
 
+  it('ajoute plusieurs entrées de référentiel en une seule fois et renvoie une réussite par entrée (US-043, RG-040)', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly donnees: {
+        readonly referentiels: {
+          readonly reglesDependances: readonly { readonly motif: string }[];
+        };
+      };
+      readonly reussites: readonly boolean[];
+    }>('definir_referentiels', {
+      donnees: DONNEES_DE_BASE,
+      typeReferentiel: 'reglesDependances',
+      entrees: [
+        { motif: 'log4j:log4j', versions: [] },
+        { motif: 'moment', versions: [] },
+      ],
+    });
+
+    expect(resultat.donnees.referentiels.reglesDependances).toHaveLength(3);
+    expect(resultat.reussites).toEqual([true, true]);
+  });
+
+  it('un lot vide ne modifie pas le référentiel (definir_referentiels)', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly donnees: {
+        readonly referentiels: { readonly reglesDependances: readonly unknown[] };
+      };
+      readonly reussites: readonly boolean[];
+    }>('definir_referentiels', {
+      donnees: DONNEES_DE_BASE,
+      typeReferentiel: 'reglesDependances',
+      entrees: [],
+    });
+
+    expect(resultat.donnees.referentiels.reglesDependances).toHaveLength(1);
+    expect(resultat.reussites).toEqual([]);
+  });
+
   it('remplace le motif de nommage des branches (scalaire)', async () => {
     const resultat = await BouchonParametrageUtils.invoquer<{
       readonly referentiels: { readonly motifNommageBranches: string };
@@ -103,7 +140,9 @@ describe('BouchonParametrageUtils', () => {
 
   it('crée une catégorie de seuils absente jusque-là (chemin pointé et racine parametres inconnus)', async () => {
     const resultat = await BouchonParametrageUtils.invoquer<{
-      readonly parametres: { readonly seuils: { readonly nouvelleCategorie: { readonly champ: number } } };
+      readonly parametres: {
+        readonly seuils: { readonly nouvelleCategorie: { readonly champ: number } };
+      };
     }>('definir_seuil', { donnees: {}, cle: 'nouvelleCategorie.champ', valeur: 42 });
 
     expect(resultat.parametres.seuils.nouvelleCategorie.champ).toBe(42);

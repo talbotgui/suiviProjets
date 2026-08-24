@@ -22,9 +22,10 @@ interface DonneesTest {
 }
 
 describe('BouchonAdministrationUtils', () => {
-  it('doit exposer les six commandes de FacadeAdministrationService dans COMMANDES', () => {
+  it('doit exposer les sept commandes de FacadeAdministrationService dans COMMANDES', () => {
     expect([...BouchonAdministrationUtils.COMMANDES]).toEqual([
       'qualifier_membre',
+      'qualifier_membres',
       'definir_politique_ia',
       'supprimer_membre_connu',
       'enregistrer_brouillon',
@@ -130,7 +131,9 @@ describe('BouchonAdministrationUtils', () => {
         groupes: [
           {
             ...GROUPE_VIDE,
-            membresConnus: [{ id: 'm1', critere: 'ancien', typeCritere: 'username', statut: 'interne' }],
+            membresConnus: [
+              { id: 'm1', critere: 'ancien', typeCritere: 'username', statut: 'interne' },
+            ],
           },
         ],
       };
@@ -153,6 +156,70 @@ describe('BouchonAdministrationUtils', () => {
         critere: 'jdupont',
         statut: 'externe',
       });
+    });
+  });
+
+  describe('qualifier_membres', () => {
+    it('doit ajouter plusieurs règles en une seule fois et renvoyer une réussite par entrée (US-044, RG-041)', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        readonly donnees: DonneesTest;
+        readonly reussites: readonly boolean[];
+      }>('qualifier_membres', {
+        donnees: RACINE_VIDE,
+        groupeId: 'groupe-1',
+        entrees: [
+          { critere: 'jdupont', typeCritere: 'username', statut: 'interne' },
+          { critere: 'bdurand', typeCritere: 'username', statut: 'client' },
+        ],
+        origine: 'Saisie en masse (Fiche projet)',
+      });
+
+      expect(resultat.reussites).toEqual([true, true]);
+      expect(resultat.donnees.groupes[0]?.membresConnus).toHaveLength(2);
+    });
+
+    it('doit simuler un échec partiel sur un doublon de username sans interrompre le lot (RG-006/RG-007, RG-041 point 5)', async () => {
+      const racineAvecMembre = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            membresConnus: [{ id: 'm1', critere: 'jdupont', typeCritere: 'username' }],
+          },
+        ],
+      };
+
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        readonly donnees: DonneesTest;
+        readonly reussites: readonly boolean[];
+      }>('qualifier_membres', {
+        donnees: racineAvecMembre,
+        groupeId: 'groupe-1',
+        entrees: [
+          { critere: 'bdurand', typeCritere: 'username', statut: 'client' },
+          { critere: 'jdupont', typeCritere: 'username', statut: 'interne' },
+          { critere: 'ccharpentier', typeCritere: 'username', statut: 'interne' },
+        ],
+        origine: 'Saisie en masse (Fiche projet)',
+      });
+
+      expect(resultat.reussites).toEqual([true, false, true]);
+      expect(resultat.donnees.groupes[0]?.membresConnus).toHaveLength(3);
+    });
+
+    it('un lot vide ne modifie pas les membres connus', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        readonly donnees: DonneesTest;
+        readonly reussites: readonly boolean[];
+      }>('qualifier_membres', {
+        donnees: RACINE_VIDE,
+        groupeId: 'groupe-1',
+        entrees: [],
+        origine: 'Saisie en masse (Fiche projet)',
+      });
+
+      expect(resultat.reussites).toEqual([]);
+      expect(resultat.donnees.groupes[0]?.membresConnus).toHaveLength(0);
     });
   });
 
@@ -206,7 +273,12 @@ describe('BouchonAdministrationUtils', () => {
 
       const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
         'definir_politique_ia',
-        { donnees: racineIaDejaAutorisee, groupeId: 'groupe-1', projetId: 'projet-1', iaAutorisee: true },
+        {
+          donnees: racineIaDejaAutorisee,
+          groupeId: 'groupe-1',
+          projetId: 'projet-1',
+          iaAutorisee: true,
+        },
       );
 
       const projet = donnees.groupes[0]?.projets[0];

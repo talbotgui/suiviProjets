@@ -1415,12 +1415,13 @@ export class SqmFicheProjetComponent {
   /**
    * Stratégie de traitement injectée dans la modale de saisie en masse de règles de dépendances (US-043, RG-040) :
    * analyse et regroupe le texte collé via {@link SaisieMasseDependancesUtils.analyser} (rejet des lignes
-   * malformées ou en conflit avec une règle déjà existante, sans bloquer les autres lignes valides), puis
-   * enregistre chaque règle regroupée résultante par un appel indépendant à la commande native `definirReferentiel`
-   * (une fois par motif regroupé, jamais une fois par ligne brute), chaque appel produisant sa propre entrée de
-   * journal (RG-023). En cas d'échec sur un groupe, les groupes déjà enregistrés avec succès le restent (jamais
-   * re-soumis) : seules les lignes originales du ou des groupes en échec sont restituées dans le texte restant,
-   * pour correction ou nouvelle tentative par l'utilisateur (RG-040).
+   * malformées ou en conflit avec une règle déjà existante, sans bloquer les autres lignes valides), puis enregistre
+   * l'ensemble des règles regroupées résultantes par UN SEUL appel à la commande native batch `definirReferentiels`
+   * (jamais un appel par motif regroupé, correction de performance du 2026-08-24 : une sauvegarde disque unique
+   * pour tout le lot plutôt qu'une par groupe créé), chaque groupe effectivement enregistré produisant néanmoins sa
+   * propre entrée de journal (RG-023). En cas d'échec sur un groupe, les groupes déjà enregistrés avec succès le
+   * restent (jamais re-soumis) : seules les lignes originales du ou des groupes en échec sont restituées dans le
+   * texte restant, pour correction ou nouvelle tentative par l'utilisateur (RG-040).
    * @param texte - Texte collé courant de la modale.
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur pour cette soumission (RG-002).
    * @returns Le résultat du traitement, consommé par la modale pour mettre à jour son affichage.
@@ -1438,33 +1439,40 @@ export class SqmFicheProjetComponent {
     const lignesEnEchec: string[] = [];
     let nombreReussies = 0;
 
-    for (const groupe of analyse.groupes) {
-      const entree: EntreeReglesDependances = {
+    if (analyse.groupes.length > 0) {
+      const entrees: EntreeReglesDependances[] = analyse.groupes.map((groupe) => ({
         id: crypto.randomUUID(),
         motif: groupe.motif,
         versions: groupe.versions,
-      };
-      // Boucle séquentielle intentionnelle : chaque règle regroupée doit être enregistrée par un appel indépendant
-      // à `definirReferentiel` (RG-040), un échec sur un groupe ne devant jamais empêcher la tentative des groupes
-      // suivants (échec partiel, RG-040 point 5) ; `donneesApplication.definirReferentiel` relit par ailleurs la
-      // racine courante à chaque appel (`racineActuelle()`), qui doit donc déjà refléter le résultat de l'appel
-      // précédent avant le suivant.
-      const resultat = await this.donneesApplication.definirReferentiel(
+      }));
+      // Un seul appel batch pour l'ensemble des groupes (US-043, RG-040) : une seule sauvegarde effective du
+      // fichier, contre une par groupe créé jusqu'ici. `donneesApplication.definirReferentiels` ne propage jamais
+      // l'échec d'une entrée individuelle : `reussites` reflète, dans le même ordre que `entrees`/`analyse.groupes`,
+      // le résultat réel de chaque groupe (échec partiel possible, RG-040 point 5, jamais de rollback des groupes
+      // déjà réussis du même lot). `resultat.type === 'echec'` ne couvre qu'un échec technique global de l'appel
+      // (ex. mot de passe invalide) : dans ce cas, tous les groupes de ce lot sont traités comme en échec, cohérent
+      // avec le comportement antérieur (chaque appel indépendant échouait alors identiquement).
+      const resultat = await this.donneesApplication.definirReferentiels(
         'reglesDependances',
-        entree,
+        entrees,
         motDePasse,
       );
-      if (resultat.type === 'succes') {
-        nombreReussies += 1;
-      } else {
-        for (const ligne of groupe.lignesOriginales) {
-          erreurs.push({
-            ligne,
-            message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
-          });
-          lignesEnEchec.push(ligne);
+      const reussites =
+        resultat.type === 'succes' ? resultat.reussites : analyse.groupes.map(() => false);
+
+      analyse.groupes.forEach((groupe, index) => {
+        if (reussites[index]) {
+          nombreReussies += 1;
+        } else {
+          for (const ligne of groupe.lignesOriginales) {
+            erreurs.push({
+              ligne,
+              message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+            });
+            lignesEnEchec.push(ligne);
+          }
         }
-      }
+      });
     }
 
     if (nombreReussies > 0) {
@@ -1606,17 +1614,17 @@ export class SqmFicheProjetComponent {
    * Stratégie de traitement injectée dans la modale de saisie en masse de qualifications de membres (US-044,
    * RG-041) : analyse le texte collé via {@link SaisieMasseMembresUtils.analyser} (rejet des lignes malformées, de
    * type de critère ou de statut non reconnu, en conflit avec une règle déjà existante du groupe ou en doublon
-   * interne au lot, sans bloquer les autres lignes valides), puis enregistre chaque qualification valide par un
-   * appel indépendant à la commande native `qualifierMembre` (une fois par ligne, jamais de regroupement — RG-041,
-   * point 4, à la différence de la saisie en masse de règles de dépendances). Le champ `membreId` n'est jamais
-   * transmis (toujours `undefined`) : il ne s'agit ici que de créations, jamais de modifications d'une règle
-   * existante (rejetées en amont par {@link SaisieMasseMembresUtils.analyser}), et l'identifiant d'une règle
-   * nouvellement créée est généré côté cœur natif, jamais côté interface (asymétrie avec `definirReferentiel`,
-   * documentée dans `referentiels-parametrage.component.ts`, vérifiée dans le code de
-   * `DonneesApplicationService.qualifierMembre` avant ce développement). Chaque appel produit sa propre entrée de
-   * journal (RG-023). En cas d'échec sur une ligne, les lignes déjà enregistrées avec succès le restent (jamais
-   * re-soumises) : seule la ligne originale en échec est restituée dans le texte restant, pour correction ou
-   * nouvelle tentative par l'utilisateur (RG-041, point 5).
+   * interne au lot, sans bloquer les autres lignes valides), puis enregistre l'ensemble des qualifications valides
+   * par UN SEUL appel à la commande native batch `qualifierMembres` (jamais un appel par ligne, correction de
+   * performance du 2026-08-24 : une sauvegarde disque unique pour tout le lot plutôt qu'une par ligne saisie). Le
+   * champ `membreId` n'est jamais transmis (toujours `undefined`) : il ne s'agit ici que de créations, jamais de
+   * modifications d'une règle existante (rejetées en amont par {@link SaisieMasseMembresUtils.analyser}), et
+   * l'identifiant d'une règle nouvellement créée est généré côté cœur natif, jamais côté interface (asymétrie avec
+   * `definirReferentiel`, documentée dans `referentiels-parametrage.component.ts`, vérifiée dans le code de
+   * `DonneesApplicationService.qualifierMembre` avant ce développement). Chaque ligne effectivement enregistrée
+   * produit néanmoins sa propre entrée de journal (RG-023). En cas d'échec sur une ligne, les lignes déjà
+   * enregistrées avec succès le restent (jamais re-soumises) : seule la ligne originale en échec est restituée dans
+   * le texte restant, pour correction ou nouvelle tentative par l'utilisateur (RG-041, point 5).
    * @param texte - Texte collé courant de la modale.
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur pour cette soumission (RG-002, une seule
    * ressaisie pour tout le lot).
@@ -1644,33 +1652,40 @@ export class SqmFicheProjetComponent {
     const lignesEnEchec: string[] = [];
     let nombreReussies = 0;
 
-    for (const entree of analyse.entrees) {
-      const donnees: DonneesMembreConnu = {
+    if (analyse.entrees.length > 0) {
+      const entrees: DonneesMembreConnu[] = analyse.entrees.map((entree) => ({
         membreId: undefined,
         critere: entree.critere,
         typeCritere: this.convertirTypeCritereSaisieMasse(entree.typeCritere),
         statut: this.convertirStatutSaisieMasse(entree.statut),
-      };
-      // Boucle séquentielle intentionnelle : chaque ligne doit être enregistrée par un appel indépendant à
-      // `qualifierMembre` (RG-041), un échec sur une ligne ne devant jamais empêcher la tentative des lignes
-      // suivantes (échec partiel, RG-041 point 5) ; `donneesApplication.qualifierMembre` relit par ailleurs la
-      // racine courante à chaque appel, qui doit donc déjà refléter le résultat de l'appel précédent avant le
-      // suivant.
-      const resultat = await this.donneesApplication.qualifierMembre(
+      }));
+      // Un seul appel batch pour l'ensemble des lignes (US-044, RG-041) : une seule sauvegarde effective du
+      // fichier, contre une par ligne saisie jusqu'ici. `donneesApplication.qualifierMembres` ne propage jamais
+      // l'échec d'une entrée individuelle : `reussites` reflète, dans le même ordre que `entrees`/`analyse.entrees`,
+      // le résultat réel de chaque ligne (échec partiel possible, RG-041 point 5, jamais de rollback des lignes
+      // déjà réussies du même lot). `resultat.type === 'echec'` ne couvre qu'un échec technique global de l'appel
+      // (ex. mot de passe invalide) : dans ce cas, toutes les lignes de ce lot sont traitées comme en échec, cohérent
+      // avec le comportement antérieur (chaque appel indépendant échouait alors identiquement).
+      const resultat = await this.donneesApplication.qualifierMembres(
         groupeId,
-        donnees,
+        entrees,
         ORIGINE_SAISIE_MASSE_MEMBRES,
         motDePasse,
       );
-      if (resultat.type === 'succes') {
-        nombreReussies += 1;
-      } else {
-        erreurs.push({
-          ligne: entree.ligneOriginale,
-          message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
-        });
-        lignesEnEchec.push(entree.ligneOriginale);
-      }
+      const reussites =
+        resultat.type === 'succes' ? resultat.reussites : analyse.entrees.map(() => false);
+
+      analyse.entrees.forEach((entree, index) => {
+        if (reussites[index]) {
+          nombreReussies += 1;
+        } else {
+          erreurs.push({
+            ligne: entree.ligneOriginale,
+            message: 'Une erreur inattendue est survenue lors de l’enregistrement.',
+          });
+          lignesEnEchec.push(entree.ligneOriginale);
+        }
+      });
     }
 
     if (nombreReussies > 0) {

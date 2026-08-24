@@ -54,14 +54,18 @@ import type {
   PrevisualisationPurge,
   PrevisualisationPurgeJournal,
   Projet,
+  ReponseDefinitionReferentiels,
   ReponseQualificationMembre,
+  ReponseQualificationMembres,
   ResultatBrouillonProjet,
+  ResultatDefinitionReferentielsMasse,
   ResultatDeverrouillage,
   ResultatMutationAdministration,
   ResultatPrevisualisationImportConfiguration,
   ResultatPrevisualisationPurge,
   ResultatPrevisualisationPurgeJournal,
   ResultatQualificationMembre,
+  ResultatQualificationMembresMasse,
   Source,
   StatutMembre,
   StatutTraitementAlerte,
@@ -658,6 +662,54 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Qualifie plusieurs membres connus d'un même groupe en une seule opération (US-044, RG-041) : invoque la
+   * commande native `qualifierMembres`, qui consigne une entrée de journal par entrée effectivement enregistrée et
+   * sauvegarde le fichier une seule fois pour tout le lot (RG-002, RG-023) avant de renvoyer la racine mise à jour,
+   * substituée à l'état courant de ce Store. L'échec de validation d'une entrée individuelle (ex. doublon de
+   * username, RG-008) n'est jamais un rejet de Promise : il est reflété par `reussites`, dans le même ordre que
+   * `entrees` — à charge de l'appelant de le répartir sur ses propres lignes d'origine (RG-041 point 5). Chaque
+   * entrée ne porte jamais `membreId` (saisie en masse strictement additive, uniquement des créations).
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param entrees - Critère, type, statut et métadonnées de chaque règle à qualifier, dans l'ordre.
+   * @param origine - Origine consignée au journal (partagée par toutes les entrées du lot).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération, portant `reussites` en cas de succès de l'appel batch lui-même.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async qualifierMembres(
+    groupeId: string,
+    entrees: readonly DonneesMembreConnu[],
+    origine: string,
+    motDePasse: string,
+  ): Promise<ResultatQualificationMembresMasse> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const reponse = await this.facadeAdministration.qualifierMembres<
+        DonneesRacine,
+        ReponseQualificationMembres
+      >({
+        chemin,
+        donnees: racine,
+        groupeId,
+        entrees: entrees.map((entree) => ({
+          critere: entree.critere,
+          typeCritere: entree.typeCritere,
+          statut: entree.statut,
+          libelle: entree.libelle,
+          aliasEmail: entree.aliasEmail,
+        })),
+        origine,
+        motDePasse,
+      });
+      this.racineInterne.set(reponse.donnees);
+      return { type: 'succes', reussites: reponse.reussites };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Définit la politique d'autorisation de l'IA d'un projet (US-024) : invoque la commande native
    * `definirPolitiqueIA`, qui consigne la modification au journal, crée l'annotation système sur autorisation
    * (RG-015) et sauvegarde effectivement le fichier (RG-002, RG-023) avant de renvoyer la racine mise à jour,
@@ -767,6 +819,44 @@ export class DonneesApplicationService {
       });
       this.racineInterne.set(nouvelleRacine);
       return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Ajoute ou met à jour plusieurs entrées d'un même référentiel en une seule opération (US-043, RG-040) : invoque
+   * la commande native `definirReferentiels`, qui consigne une entrée de journal par entrée effectivement
+   * enregistrée et sauvegarde le fichier une seule fois pour tout le lot (RG-002, RG-023) avant de renvoyer la
+   * racine mise à jour, substituée à l'état courant de ce Store. L'échec de validation d'une entrée individuelle
+   * (ex. motif déjà existant, RG-042) n'est jamais un rejet de Promise : il est reflété par `reussites`, dans le
+   * même ordre que `entrees` — à charge de l'appelant de le répartir sur ses propres lignes d'origine (RG-040).
+   * @param typeReferentiel - Branche de référentiel concernée.
+   * @param entrees - Entrées à ajouter ou mettre à jour, dans l'ordre.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération, portant `reussites` en cas de succès de l'appel batch lui-même.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirReferentiels(
+    typeReferentiel: string,
+    entrees: readonly unknown[],
+    motDePasse: string,
+  ): Promise<ResultatDefinitionReferentielsMasse> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const reponse = await this.facadeParametrage.definirReferentiels<
+        DonneesRacine,
+        ReponseDefinitionReferentiels
+      >({
+        chemin,
+        donnees: racine,
+        typeReferentiel,
+        entrees,
+        motDePasse,
+      });
+      this.racineInterne.set(reponse.donnees);
+      return { type: 'succes', reussites: reponse.reussites };
     } catch (erreur: unknown) {
       return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
     }

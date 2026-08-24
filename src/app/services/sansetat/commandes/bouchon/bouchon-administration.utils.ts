@@ -25,7 +25,7 @@
 
 /**
  * Catégories d'anomalie que ce bouchon sait lever, sous-ensemble de `CategorieErreurAdministration`
- * (`services/avecetat/etat/types-donnees.ts`) pertinent aux six commandes couvertes ici — dupliqué localement en
+ * (`services/avecetat/etat/types-donnees.ts`) pertinent aux sept commandes couvertes ici — dupliqué localement en
  * chaîne de caractères plutôt qu'importé, pour la même raison que le reste de ce fichier.
  */
 type CategorieAnomalieBouchon =
@@ -52,15 +52,19 @@ class AnomalieAdministrationBouchon extends Error {
   }
 }
 
-/** Réponse brute d'une commande bouchonnée : soit la racine mise à jour, soit l'enveloppe propre à `qualifier_membre`. */
+/**
+ * Réponse brute d'une commande bouchonnée : soit la racine mise à jour, soit l'une des deux enveloppes propres à
+ * `qualifier_membre`/`qualifier_membres`.
+ */
 type ReponseBouchonAdministration =
   | Record<string, unknown>
-  | { readonly donnees: Record<string, unknown>; readonly membresEnConflit: readonly string[] };
+  | { readonly donnees: Record<string, unknown>; readonly membresEnConflit: readonly string[] }
+  | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
 
 /**
- * Bouchon TS des six commandes de la Façade portées par `FacadeAdministrationService` (qualification des membres
- * connus, politique d'autorisation de l'IA, cycle de vie du brouillon d'une campagne), activé hors contexte Tauri
- * par `InvocationCommandeUtils`.
+ * Bouchon TS des sept commandes de la Façade portées par `FacadeAdministrationService` (qualification des membres
+ * connus, unitaire et en masse, politique d'autorisation de l'IA, cycle de vie du brouillon d'une campagne), activé
+ * hors contexte Tauri par `InvocationCommandeUtils`.
  */
 export class BouchonAdministrationUtils {
   /**
@@ -69,6 +73,7 @@ export class BouchonAdministrationUtils {
    */
   public static readonly COMMANDES: ReadonlySet<string> = new Set([
     'qualifier_membre',
+    'qualifier_membres',
     'definir_politique_ia',
     'supprimer_membre_connu',
     'enregistrer_brouillon',
@@ -113,6 +118,8 @@ export class BouchonAdministrationUtils {
     switch (commande) {
       case 'qualifier_membre':
         return BouchonAdministrationUtils.qualifierMembre(parametres);
+      case 'qualifier_membres':
+        return BouchonAdministrationUtils.qualifierMembres(parametres);
       case 'definir_politique_ia':
         return BouchonAdministrationUtils.horodater(
           BouchonAdministrationUtils.definirPolitiqueIA(parametres),
@@ -200,6 +207,50 @@ export class BouchonAdministrationUtils {
       }),
     );
     return { donnees: nouvelleRacine, membresEnConflit: [] };
+  }
+
+  /**
+   * Qualifie plusieurs membres connus d'un même groupe en une seule fois (US-044, RG-041), sur le modèle de
+   * {@link qualifierMembre} ci-dessus appliqué en boucle. Contrairement au bouchon batch de
+   * `BouchonParametrageUtils.definirReferentiels`, celui-ci DOIT simuler l'échec partiel : `qualifierMembre` simule
+   * déjà `doublonUsernameMembreConnu` (RG-008), qu'une entrée de ce lot peut légitimement déclencher sans que cela
+   * n'interrompe le traitement des entrées suivantes (échec partiel, RG-041 point 5) — chaque entrée en échec est
+   * simplement ignorée (`donnees` inchangé pour elle), la boucle continuant avec les entrées suivantes sur la
+   * racine déjà mutée par celles réussies.
+   * @param parametres - Paramètres reçus (`groupeId`, `entrees`, `origine`, `donnees`).
+   * @returns L'enveloppe `{ donnees, reussites }` attendue par `ReponseMutationMasse` côté cœur natif.
+   */
+  private static qualifierMembres(parametres: Readonly<Record<string, unknown>>): {
+    readonly donnees: Record<string, unknown>;
+    readonly reussites: readonly boolean[];
+  } {
+    const entreesBrutes = parametres['entrees'];
+    const entrees = Array.isArray(entreesBrutes) ? entreesBrutes : [];
+    let donnees = BouchonAdministrationUtils.exigerObjet(parametres['donnees']);
+    const reussites: boolean[] = [];
+    for (const entreeBrute of entrees) {
+      if (!BouchonAdministrationUtils.estObjet(entreeBrute)) {
+        reussites.push(false);
+        continue;
+      }
+      try {
+        const resultat = BouchonAdministrationUtils.qualifierMembre({
+          ...parametres,
+          donnees,
+          membreId: undefined,
+          critere: entreeBrute['critere'],
+          typeCritere: entreeBrute['typeCritere'],
+          statut: entreeBrute['statut'],
+          libelle: entreeBrute['libelle'],
+          aliasEmail: entreeBrute['aliasEmail'],
+        });
+        donnees = resultat.donnees;
+        reussites.push(true);
+      } catch {
+        reussites.push(false);
+      }
+    }
+    return { donnees, reussites };
   }
 
   /**

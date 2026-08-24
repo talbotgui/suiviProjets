@@ -37,10 +37,11 @@ type ReponseBouchonParametrage =
       readonly octetsAvant: number;
       readonly octetsApres: number;
     }
-  | { readonly nbEntreesSupprimees: number };
+  | { readonly nbEntreesSupprimees: number }
+  | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
 
 /**
- * Bouchon TS des quinze commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
+ * Bouchon TS des seize commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
  * purges, réglages applicatifs), activé hors contexte Tauri par `InvocationCommandeUtils`.
  */
 export class BouchonParametrageUtils {
@@ -51,6 +52,7 @@ export class BouchonParametrageUtils {
   public static readonly COMMANDES: ReadonlySet<string> = new Set([
     'definir_seuil',
     'definir_referentiel',
+    'definir_referentiels',
     'previsualiser_purge_densite',
     'executer_purge_densite',
     'previsualiser_purge_age',
@@ -107,6 +109,8 @@ export class BouchonParametrageUtils {
         return BouchonParametrageUtils.horodater(
           BouchonParametrageUtils.definirReferentiel(parametres),
         );
+      case 'definir_referentiels':
+        return BouchonParametrageUtils.definirReferentiels(parametres);
       case 'previsualiser_purge_densite':
       case 'previsualiser_purge_age':
         return { nbAuditsSupprimes: 0, nbProjetsConcernes: 0, octetsAvant: 0, octetsApres: 0 };
@@ -224,6 +228,30 @@ export class BouchonParametrageUtils {
         : liste.map((existante, position) => (position === index ? entreeAvecId : existante));
 
     return { ...donnees, referentiels: { ...referentiels, [typeReferentiel]: nouvelleListe } };
+  }
+
+  /**
+   * Ajoute ou met à jour plusieurs entrées d'un même référentiel en une seule fois (US-043, RG-040), sur le modèle
+   * de {@link definirReferentiel} ci-dessus appliqué en boucle. Simplification assumée, cohérente avec celle déjà
+   * documentée en tête de ce fichier pour `definir_referentiel` (RG-023 non alimenté, RG-042 non revalidé) : chaque
+   * entrée réussit toujours (`reussites` ne porte que des `true`), aucun échec simulé sur cette commande.
+   * @param parametres - Paramètres reçus (`typeReferentiel`, `entrees`, `donnees`).
+   * @returns L'enveloppe `{ donnees, reussites }` attendue par `ReponseMutationMasse` côté cœur natif.
+   */
+  private static definirReferentiels(parametres: Readonly<Record<string, unknown>>): {
+    readonly donnees: Record<string, unknown>;
+    readonly reussites: readonly boolean[];
+  } {
+    const entreesBrutes = parametres['entrees'];
+    const entrees = Array.isArray(entreesBrutes) ? entreesBrutes : [];
+    let donnees = BouchonParametrageUtils.exigerObjet(parametres['donnees']);
+    for (const entree of entrees) {
+      donnees = BouchonParametrageUtils.definirReferentiel({ ...parametres, donnees, entree });
+    }
+    return {
+      donnees: BouchonParametrageUtils.horodater(donnees),
+      reussites: entrees.map(() => true),
+    };
   }
 
   /**

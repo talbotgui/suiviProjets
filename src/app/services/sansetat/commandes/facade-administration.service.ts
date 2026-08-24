@@ -23,7 +23,7 @@
 // directement, rompant la frontière unique documentée en en-tête de `FacadeCommandesService`).
 //
 // Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis le 2026-07-28 : point de
-// passage unique permettant le bouchon TS des six commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
+// passage unique permettant le bouchon TS des sept commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
 // `invocation-commande.utils.ts` et `bouchon/bouchon-administration.utils.ts`.
 import { Injectable } from '@angular/core';
 import { InvocationCommandeUtils } from './invocation-commande.utils';
@@ -52,6 +52,46 @@ export interface ParametresQualificationMembre<TDonnees> {
   /** Alias courriel optionnel. */
   readonly aliasEmail: string | undefined;
   /** Origine consignée au journal des modifications (RG-023). */
+  readonly origine: string;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
+ * Entrée d'un lot de qualifications de membres connus transmis à la commande native `qualifierMembres` (US-044,
+ * RG-041) : mêmes champs qu'un appel unitaire de `qualifierMembre`, sans `membreId` (saisie en masse strictement
+ * additive, uniquement des créations).
+ */
+export interface EntreeQualificationMembreMasse {
+  /** Motif de reconnaissance (login, email ou domaine selon `typeCritere`). */
+  readonly critere: string;
+  /** Type du critère de reconnaissance. */
+  readonly typeCritere: string;
+  /** Statut associé (interne, client, partenaire). */
+  readonly statut: string;
+  /** Libellé lisible optionnel. */
+  readonly libelle: string | undefined;
+  /** Alias courriel optionnel. */
+  readonly aliasEmail: string | undefined;
+}
+
+/**
+ * Paramètres transmis à la commande native `qualifierMembres` (US-044, RG-041, ajoutée le 2026-08-24), génériques
+ * sur le type concret de la racine échangée (`TDonnees`) pour ne jamais importer ce type depuis `services/avecetat/etat/`.
+ * Symétrique plurielle de {@link ParametresQualificationMembre} : `entrees` porte l'ensemble des entrées du lot,
+ * enregistrées en une seule opération avec une seule sauvegarde effective du fichier (correction de performance de
+ * la saisie en masse de membres connus, qui appelait jusqu'ici `qualifierMembre` une fois par entrée).
+ */
+export interface ParametresQualificationMembres<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Identifiant du groupe de rattachement des règles qualifiées. */
+  readonly groupeId: string;
+  /** Entrées à qualifier, dans l'ordre où le tableau `reussites` de la réponse sera renvoyé. */
+  readonly entrees: readonly EntreeQualificationMembreMasse[];
+  /** Origine consignée au journal des modifications (RG-023), partagée par toutes les entrées du lot. */
   readonly origine: string;
   /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
   readonly motDePasse: string;
@@ -139,8 +179,9 @@ export interface ParametresResolutionBrouillon<TDonnees> {
 /**
  * Client typé de la Façade de commandes, dédié en Phase 4 à la qualification des membres connus d'un groupe et à
  * la politique d'autorisation de l'IA d'un projet (US-022 à US-024), et en Phase 5 (incrément 2) au cycle de vie
- * du brouillon d'une campagne (US-014). Chaque méthode invoque une commande Tauri identique côté cœur natif
- * (`qualifier_membre`, `definir_politique_ia`, `supprimer_membre_connu`, `enregistrer_brouillon`,
+ * du brouillon d'une campagne (US-014). Complétée le 2026-08-24 par la qualification en masse de membres connus
+ * (US-044, RG-041). Chaque méthode invoque une commande Tauri identique côté cœur natif (`qualifier_membre`,
+ * `qualifier_membres`, `definir_politique_ia`, `supprimer_membre_connu`, `enregistrer_brouillon`,
  * `integrer_brouillon`, `rejeter_brouillon`) et reste générique sur le type concret de la racine échangée (cf.
  * commentaire d'en-tête de ce fichier) : c'est l'appelant (`DonneesApplicationService`) qui porte la connaissance
  * du type `DonneesRacine`.
@@ -157,6 +198,18 @@ export class FacadeAdministrationService {
     parametres: ParametresQualificationMembre<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('qualifier_membre', { ...parametres });
+  }
+
+  /**
+   * Qualifie plusieurs membres connus d'un même groupe en une seule opération, sauvegarde le fichier une seule fois
+   * et consigne une entrée de journal par entrée effectivement enregistrée (US-044, RG-023, RG-041).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresQualificationMembres}.
+   * @returns L'enveloppe `{ donnees, reussites }` de la réponse native, typée par l'appelant via `TReponse`.
+   */
+  public async qualifierMembres<TDonnees, TReponse>(
+    parametres: ParametresQualificationMembres<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('qualifier_membres', { ...parametres });
   }
 
   /**

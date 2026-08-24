@@ -127,6 +127,22 @@ pub(crate) enum ErreurFacade {
     ErreurInterne,
 }
 
+/// Réponse commune aux commandes batch qui mutent puis sauvegardent plusieurs entrées en une seule opération
+/// (`definirReferentiels`, `qualifierMembres`, ajoutées le 2026-08-24 en correction de performance de la saisie en
+/// masse, RG-040/RG-041) : la racine mise à jour et un indicateur de succès par entrée soumise, dans le même ordre.
+/// Partagée entre les deux commandes plutôt que dupliquée, sur le modèle déjà
+/// pratiqué pour [`ErreurFacade`] ci-dessus. Un échec sur une entrée n'est jamais propagé (reflété par `reussites`
+/// à `false` pour l'entrée concernée) : la boucle continue avec les entrées suivantes, sans jamais annuler celles
+/// déjà réussies du même lot.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReponseMutationMasse {
+    /// Racine des données mises à jour, à substituer intégralement à l'état courant de l'UI.
+    pub(crate) donnees: DonneesRacine,
+    /// Indicateur de succès par entrée soumise, dans le même ordre que les entrées transmises à la commande.
+    pub(crate) reussites: Vec<bool>,
+}
+
 /// Revérifie, avant toute réécriture du fichier de données par une commande de mutation, que le mot de passe fourni
 /// correspond bien à la clé dérivée déjà authentifiée par la session courante (Phase 10, R10-01, RG-002) : empêche
 /// qu'une commande qui ne redemande le mot de passe qu'en apparence ne change silencieusement le mot de passe du

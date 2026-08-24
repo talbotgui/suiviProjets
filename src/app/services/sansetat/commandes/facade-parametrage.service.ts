@@ -72,6 +72,26 @@ export interface ParametresDefinitionReferentiel<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `definirReferentiels` (US-043, RG-040, ajoutée le 2026-08-24), génériques
+ * sur le type concret de la racine échangée (`TDonnees`) pour ne jamais importer ce type depuis `services/avecetat/etat/`.
+ * Symétrique plurielle de {@link ParametresDefinitionReferentiel} : `entrees` porte l'ensemble des entrées du lot,
+ * enregistrées en une seule opération avec une seule sauvegarde effective du fichier (correction de performance de
+ * la saisie en masse de règles de dépendances, qui appelait jusqu'ici `definirReferentiel` une fois par entrée).
+ */
+export interface ParametresDefinitionReferentiels<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Branche de référentiel concernée (`reglesDependances`, seule utilisée à ce jour). */
+  readonly typeReferentiel: string;
+  /** Entrées à ajouter ou mettre à jour, dans l'ordre où le tableau `reussites` de la réponse sera renvoyé. */
+  readonly entrees: readonly unknown[];
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
  * Paramètres transmis à la commande native `previsualiserPurgeDensite` (US-025, Phase 7, incrément 4), générique
  * sur le type concret de la racine échangée (`TDonnees`).
  */
@@ -238,7 +258,8 @@ export interface ParametresExecutionPurgeJournal<TDonnees> {
  * son existence distincte de `FacadeCommandesService`/`FacadeAdministrationService`. Étendu à la Phase 10,
  * incrément 8 : suppression d'une entrée de référentiel (US-033, RG-035, C10-05), réglages applicatifs (US-034,
  * RG-031, C10-01), seuil d'avertissement de taille (US-035, RG-032, C10-02) et purge du journal des modifications
- * (US-036, RG-034, C10-03).
+ * (US-036, RG-034, C10-03). Complétée le 2026-08-24 : définition en masse d'entrées de référentiel
+ * (`definirReferentiels`, US-043, RG-040), correction de performance de la saisie en masse de règles de dépendances.
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeParametrageService {
@@ -264,6 +285,18 @@ export class FacadeParametrageService {
     parametres: ParametresDefinitionReferentiel<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('definir_referentiel', { ...parametres });
+  }
+
+  /**
+   * Ajoute ou met à jour plusieurs entrées d'un même référentiel en une seule opération, sauvegarde le fichier une
+   * seule fois et consigne une entrée de journal par entrée effectivement enregistrée (US-043, RG-023, RG-040).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionReferentiels}.
+   * @returns L'enveloppe `{ donnees, reussites }` de la réponse native, typée par l'appelant via `TReponse`.
+   */
+  public async definirReferentiels<TDonnees, TReponse>(
+    parametres: ParametresDefinitionReferentiels<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_referentiels', { ...parametres });
   }
 
   /**

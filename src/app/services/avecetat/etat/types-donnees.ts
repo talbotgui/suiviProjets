@@ -706,6 +706,28 @@ export interface ReponseQualificationMembre {
 }
 
 /**
+ * Réponse de la commande native `definirReferentiels` (US-043, RG-040, ajoutée le 2026-08-24), mirroir de
+ * `ReponseMutationMasse` côté cœur natif.
+ */
+export interface ReponseDefinitionReferentiels {
+  /** Racine des données mises à jour, à substituer intégralement à l'état courant du Store. */
+  readonly donnees: DonneesRacine;
+  /** Indicateur de succès par entrée soumise, dans le même ordre que `entrees`. */
+  readonly reussites: readonly boolean[];
+}
+
+/**
+ * Réponse de la commande native `qualifierMembres` (US-044, RG-041, ajoutée le 2026-08-24), mirroir de
+ * `ReponseMutationMasse` côté cœur natif.
+ */
+export interface ReponseQualificationMembres {
+  /** Racine des données mises à jour, à substituer intégralement à l'état courant du Store. */
+  readonly donnees: DonneesRacine;
+  /** Indicateur de succès par entrée soumise, dans le même ordre que `entrees`. */
+  readonly reussites: readonly boolean[];
+}
+
+/**
  * Catégorie d'anomalie remontée par `qualifierMembre`/`definirPolitiqueIA`/`supprimerMembreConnu` (Phase 4), par
  * `enregistrerBrouillon`/`integrerBrouillon`/`rejeterBrouillon` (Phase 5, incrément 2), par
  * `definirSeuil`/`definirReferentiel` (Phase 7, incrément 1), par `definirVue`/`supprimerVue` (Phase 9,
@@ -765,6 +787,26 @@ export interface ErreurAdministration {
  */
 export type ResultatQualificationMembre =
   | { readonly type: 'succes'; readonly membresEnConflit: readonly string[] }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
+ * Résultat typé d'une définition en masse d'entrées de référentiel, exposé par
+ * `DonneesApplicationService.definirReferentiels` (US-043, RG-040) : union discriminée sur `type`, sur le modèle de
+ * {@link ResultatQualificationMembre}. La branche `echec` ne couvre qu'un échec **technique global** de l'opération
+ * (mot de passe invalide, session verrouillée, écriture disque) — l'échec de validation d'une entrée individuelle
+ * (ex. motif déjà existant, RG-042) n'y apparaît jamais : il est reflété par `reussites` dans la branche `succes`.
+ */
+export type ResultatDefinitionReferentielsMasse =
+  | { readonly type: 'succes'; readonly reussites: readonly boolean[] }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
+ * Résultat typé d'une qualification en masse de membres connus, exposé par
+ * `DonneesApplicationService.qualifierMembres` (US-044, RG-041) : mêmes remarques que
+ * {@link ResultatDefinitionReferentielsMasse} sur la portée de la branche `echec`.
+ */
+export type ResultatQualificationMembresMasse =
+  | { readonly type: 'succes'; readonly reussites: readonly boolean[] }
   | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
 
 /**
