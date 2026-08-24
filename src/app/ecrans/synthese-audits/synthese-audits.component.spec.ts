@@ -16,6 +16,7 @@ import type {
   Groupe,
   MembreConnu,
   Projet,
+  TypeAudit,
 } from '../../services/avecetat/etat/types-donnees';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmSyntheseAuditsComponent } from './synthese-audits.component';
@@ -57,6 +58,7 @@ class DonneesDeTest {
    * @param options.usernamesMembres - Identifiants des membres du dépôt constatés lors de cet audit.
    * @param options.mrOuvertes - Demandes de fusion ouvertes constatées.
    * @param options.marqueurs - Marqueurs d'outils IA détectés.
+   * @param options.typeAudit - Catégorie de l'audit (C15-14, RG-046), `'reguliere'` par défaut.
    * @returns L'audit de test.
    */
   public static auditComplet(options: {
@@ -77,13 +79,14 @@ class DonneesDeTest {
       readonly nature: string;
       readonly outil: string;
     }[];
+    readonly typeAudit?: TypeAudit;
   }): Audit {
     const dernierCommitLe = options.dernierCommitLe ?? DonneesDeTest.ilYA(-5);
     return {
       id: `audit-${options.date ?? 'defaut'}`,
       date: options.date ?? DonneesDeTest.ilYA(0),
       campagneId: 'campagne-1',
-      typeAudit: 'reguliere',
+      typeAudit: options.typeAudit ?? 'reguliere',
       resultats: [
         {
           type: 'gitlab.vitalite',
@@ -509,6 +512,60 @@ describe('SqmSyntheseAuditsComponent', () => {
     expect(ligneJamaisAuditee?.querySelectorAll('.badge').length).toBe(0);
     expect(ligneJamaisAuditee?.querySelectorAll('.tableau-dense__texte-couleur').length).toBe(0);
   });
+
+  it(
+    'restitue les données du dernier audit **régulier**, jamais d’un audit historique plus récent ' +
+      '(C15-14, RG-046) : un audit historique ne collectant jamais gitlab.taille_depot, une sélection naïve du ' +
+      'dernier audit produit ferait disparaître la colonne Taille alors qu’une valeur régulière existe',
+    () => {
+      /**
+       * Réplique locale de `SqmSyntheseAuditsComponent.formaterDate` (méthode privée, non testable directement) :
+       * permet de comparer le libellé affiché sans dépendre d'un format de date écrit en dur, insensible au fuseau
+       * horaire d'exécution du test (même méthode `new Date(...)` que le composant, dans le même processus ;
+       * même réplique déjà utilisée dans `fiche-projet.component.spec.ts` pour le même besoin RG-046).
+       * @param dateIso - Date ISO 8601 à mettre en forme.
+       * @returns Le libellé court correspondant.
+       */
+      function formaterDate(dateIso: string): string {
+        const date = new Date(dateIso);
+        const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
+        return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;
+      }
+
+      const auditRegulier = DonneesDeTest.auditComplet({ date: DonneesDeTest.ilYA(-10) });
+      const auditHistorique = DonneesDeTest.auditComplet({
+        date: DonneesDeTest.ilYA(-1),
+        typeAudit: 'historique',
+      });
+      // L'audit historique est intégré APRÈS l'audit régulier (dernier de `Projet.audits`) : un `.at(-1)` naïf
+      // le sélectionnerait à tort comme « dernier audit » de la ligne de synthèse.
+      const projet = DonneesDeTest.projet('projet-historique', 'Projet Historique', [
+        auditRegulier,
+        auditHistorique,
+      ]);
+      const groupe: Groupe = {
+        id: 'groupe-historique',
+        nom: 'Groupe Historique',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projet],
+      };
+
+      const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+      const ligne = fixture.componentInstance.toutesLesLignes()[0];
+
+      expect(ligne.jamaisAudite).toBe(false);
+      expect(ligne.dateAuditLabel).toBe(formaterDate(auditRegulier.date));
+      expect(ligne.dateAuditLabel).not.toBe(formaterDate(auditHistorique.date));
+      const colonneTaille = fixture.componentInstance
+        .colonnes()
+        .find((colonne) => colonne.cle === 'taille');
+      expect(colonneTaille?.extraireTexteBrut(ligne)).not.toBe('—');
+    },
+  );
 
   it('grise les seules cellules Sonar (Couverture, Notes, Violations) d’une ligne SONAR_KO (RG-013), jamais les autres', () => {
     const fixture = creerFixture(DonneesDeTest.racineDeBase());

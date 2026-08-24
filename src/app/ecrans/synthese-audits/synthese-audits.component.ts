@@ -1044,7 +1044,10 @@ export class SqmSyntheseAuditsComponent {
     reglesDependances: LectureDefensive<readonly RegleDependance[]>,
   ): LigneSyntheseAudit {
     const campagneEnEchec = this.campagneEnEchecPourProjet(campagnes, projet.id);
-    const dernierAudit = projet.audits.at(-1);
+    // C15-14, US-046, RG-046 (arbitrage humain du 2026-08-24) : le dernier audit **régulier** est sélectionné ici,
+    // jamais simplement `.at(-1)`, pour ne pas remplacer silencieusement la restitution de synthèse par un audit
+    // historique à date passée — même convention que `FicheProjetComponent.construireDonnees`.
+    const dernierAudit = projet.audits.filter((audit) => audit.typeAudit !== 'historique').at(-1);
     if (dernierAudit === undefined) {
       return {
         projetId: projet.id,
