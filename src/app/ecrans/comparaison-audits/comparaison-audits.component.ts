@@ -234,7 +234,7 @@ export class SqmComparaisonAuditsComponent {
 
   /**
    * Identifiant de l'audit le plus ancien explicitement sélectionné par l'utilisateur (sélecteur ou raccourci),
-   * `null` tant qu'aucune sélection explicite n'a été faite (repli automatique sur l'avant-dernier audit, cf.
+   * `null` tant qu'aucune sélection explicite n'a été faite (repli automatique sur l'audit le plus ancien, cf.
    * {@link calculerEtat}).
    */
   private readonly idAvantSelectionne: WritableSignal<string | null> = signal(null);
@@ -453,11 +453,7 @@ export class SqmComparaisonAuditsComponent {
       options,
       options[options.length - 1].id,
     );
-    let idAvant = this.resoudreId(
-      this.idAvantSelectionne(),
-      options,
-      options[options.length - 2].id,
-    );
+    let idAvant = this.resoudreId(this.idAvantSelectionne(), options, options[0].id);
     // R10-15 : ce repli restait jusqu'ici silencieux (la sélection de l'utilisateur était modifiée sans avertissement
     // dès lors que les deux dates désignaient le même audit) ; un message explicite est désormais restitué via
     // `messageSelectionRepliee` plutôt que de se limiter au changement silencieux de sélection.

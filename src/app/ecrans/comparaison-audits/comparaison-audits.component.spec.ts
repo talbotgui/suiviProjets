@@ -399,10 +399,10 @@ describe('SqmComparaisonAuditsComponent', () => {
       ]);
     }
 
-    it('sélectionne par défaut le dernier audit et l’avant-dernier', () => {
+    it('sélectionne par défaut l’audit le plus ancien et l’audit le plus récent', () => {
       const fixture = creerFixture('projet-1', DonneesDeTest.racine(projetQuatreAudits()));
       const element = DomTestUtils.obtenirElementNatif(fixture);
-      expect(element.textContent).toContain('30.0 %'); // a2 -> avant-dernier retenu par défaut
+      expect(element.textContent).toContain('10.0 %'); // a0 -> avant (le plus ancien) retenu par défaut
       expect(element.textContent).toContain('40.0 %'); // a3 -> après (dernier)
     });
 
@@ -524,7 +524,7 @@ describe('SqmComparaisonAuditsComponent', () => {
         throw new Error('État "pret" attendu.');
       }
       expect(etatValue.donnees.idApres).toBe('a3');
-      expect(etatValue.donnees.idAvant).toBe('a2');
+      expect(etatValue.donnees.idAvant).toBe('a0');
     });
   });
 
