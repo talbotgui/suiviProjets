@@ -26,6 +26,23 @@ describe('SqmGraphiqueEvolutionComponent', () => {
     return Chart.getChart(canvas);
   }
 
+  /**
+   * Garde de type par présence de propriété, sans détour par une assertion de type (aucune autorisée dans ce
+   * dépôt, `@typescript-eslint/consistent-type-assertions: never`) : nécessaire pour lire une propriété d'un jeu
+   * de données `chart.js` propre aux graphiques en ligne (ex. `showLine`, `pointStyle`), absente du type générique
+   * large restitué par `Chart.getChart` (limite connue des types `chart.js` non paramétrés explicitement, cf.
+   * `SqmGraphiqueEvolutionComponent` qui fixe `'line'` partout où c'est possible).
+   * @param valeur - Valeur à vérifier.
+   * @param propriete - Nom de la propriété recherchée.
+   * @returns `true` si `valeur` porte effectivement cette propriété.
+   */
+  function possedePropriete<TPropriete extends string>(
+    valeur: object,
+    propriete: TPropriete,
+  ): valeur is Record<TPropriete, unknown> {
+    return propriete in valeur;
+  }
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [SqmGraphiqueEvolutionComponent],
@@ -238,6 +255,96 @@ describe('SqmGraphiqueEvolutionComponent', () => {
       composant.zoomerArriere();
       composant.reinitialiserZoom();
     }).not.toThrow();
+  });
+
+  it(
+    'restitue les points d’audits historiques d’une série comme un jeu de données distinct, non relié par ' +
+      'une ligne et de forme différente (croix), sans bouton de légende supplémentaire (C15-14, US-046, RG-046)',
+    () => {
+      const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+      const series: readonly SerieGraphiqueEvolution[] = [
+        {
+          id: 'projet-1',
+          libelle: 'Projet 1',
+          couleur: '#1a56db',
+          points: [
+            { date: '2026-06-05T00:00:00Z', valeur: 61.2 },
+            { date: '2026-07-08T00:00:00Z', valeur: 64.8 },
+          ],
+          pointsHistoriques: [{ date: '2026-04-01T00:00:00Z', valeur: 55.0 }],
+        },
+      ];
+      fixture.componentRef.setInput('series', series);
+      fixture.detectChanges();
+
+      const instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
+      expect(instance?.data.datasets).toHaveLength(2);
+      const datasetHistorique = instance?.data.datasets[1];
+      if (datasetHistorique === undefined) {
+        throw new Error('Jeu de données des audits historiques attendu.');
+      }
+      expect(datasetHistorique.data).toEqual([
+        { x: new Date('2026-04-01T00:00:00Z').getTime(), y: 55.0 },
+      ]);
+      expect(possedePropriete(datasetHistorique, 'showLine') && datasetHistorique.showLine).toBe(
+        false,
+      );
+      expect(
+        possedePropriete(datasetHistorique, 'pointStyle') && datasetHistorique.pointStyle,
+      ).toBe('crossRot');
+
+      const boutons = DomTestUtils.obtenirElementNatif(fixture).querySelectorAll(
+        '.graphique-evolution__bouton-serie',
+      );
+      expect(boutons).toHaveLength(1);
+    },
+  );
+
+  it('masque les points historiques d’une série en même temps que sa ligne de tendance', () => {
+    const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+    const series: readonly SerieGraphiqueEvolution[] = [
+      {
+        id: 'projet-1',
+        libelle: 'Projet 1',
+        couleur: '#1a56db',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 61.2 }],
+        pointsHistoriques: [{ date: '2026-04-01T00:00:00Z', valeur: 55.0 }],
+      },
+    ];
+    fixture.componentRef.setInput('series', series);
+    fixture.detectChanges();
+    fixture.componentInstance.basculerSerie('projet-1');
+    fixture.detectChanges();
+
+    const instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
+    expect(instance?.data.datasets[0]?.hidden).toBe(true);
+    expect(instance?.data.datasets[1]?.hidden).toBe(true);
+  });
+
+  it('n’affiche la légende des formes de point que si au moins une série porte un audit historique', () => {
+    const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+    const series: readonly SerieGraphiqueEvolution[] = [
+      {
+        id: 'projet-1',
+        libelle: 'Projet 1',
+        couleur: '#1a56db',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 61.2 }],
+      },
+    ];
+    fixture.componentRef.setInput('series', series);
+    fixture.detectChanges();
+
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    expect(element.querySelector('.graphique-evolution__legende-formes')).toBeNull();
+
+    fixture.componentRef.setInput('series', [
+      { ...series[0], pointsHistoriques: [{ date: '2026-04-01T00:00:00Z', valeur: 55.0 }] },
+    ]);
+    fixture.detectChanges();
+
+    const legendeFormes = element.querySelector('.graphique-evolution__legende-formes');
+    expect(legendeFormes?.textContent).toContain('Audit régulier');
+    expect(legendeFormes?.textContent).toContain('Audit historique');
   });
 
   it('détruit proprement l’instance chart.js à la destruction du composant', () => {

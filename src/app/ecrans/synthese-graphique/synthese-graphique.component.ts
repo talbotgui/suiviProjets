@@ -30,6 +30,7 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { toPng } from 'html-to-image';
 import type {
   LigneVerticaleGraphique,
+  PointSerieGraphique,
   SerieGraphiqueEvolution,
 } from '../../composants/graphique-evolution/graphique-evolution.component';
 import { SqmGraphiqueEvolutionComponent } from '../../composants/graphique-evolution/graphique-evolution.component';
@@ -285,10 +286,11 @@ export class SqmSyntheseGraphiqueComponent {
 
   /**
    * Lignes verticales étiquetées du graphique : changements de seuil pertinents pour l'indicateur sélectionné
-   * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global), annotations des
+   * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global), et annotations des
    * projets actuellement retenus (US-019, Phase 8, créées ailleurs — `SqmFicheProjetComponent` — et seulement lues
-   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran), et marqueurs des audits
-   * historiques des projets retenus (C15-14, US-046, RG-046, cf. {@link marqueursAuditsHistoriques}).
+   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran). Les audits historiques (C15-14,
+   * US-046, RG-046) ne sont pas représentés ici : ils apparaissent comme des points de forme distincte directement
+   * sur les séries (cf. {@link construireSerie}, `SerieGraphiqueEvolution.pointsHistoriques`).
    */
   public readonly lignesVerticales: Signal<readonly LigneVerticaleGraphique[]> = computed(() => {
     const racine = this.donneesApplication.racine();
@@ -319,35 +321,8 @@ export class SqmSyntheseGraphiqueComponent {
       }
     }
 
-    return [...lignesSeuil, ...annotationsParId.values(), ...this.marqueursAuditsHistoriques()];
+    return [...lignesSeuil, ...annotationsParId.values()];
   });
-
-  /**
-   * Marqueurs verticaux des audits historiques (C15-14, US-046, RG-046) des projets actuellement retenus, un par
-   * audit `typeAudit: 'historique'`, jamais intégrés à la ligne de tendance continue d'une série (cf.
-   * {@link construireSerie}, qui les exclut de `points`) : représentés séparément comme des lignes verticales de
-   * catégorie dédiée (`auditHistorique`, `composants/graphique-evolution/`), avec un libellé indiquant explicitement
-   * le projet et la date ciblée demandée, distinct de la date d'exécution réelle de la campagne
-   * (`Audit.dateExecution`).
-   * @returns Les lignes verticales des audits historiques des projets retenus.
-   */
-  private marqueursAuditsHistoriques(): readonly LigneVerticaleGraphique[] {
-    const lignes: LigneVerticaleGraphique[] = [];
-    for (const projet of this.projetsRetenus()) {
-      for (const audit of projet.audits) {
-        if (audit.typeAudit !== 'historique') {
-          continue;
-        }
-        lignes.push({
-          id: `historique-${projet.id}-${audit.id}`,
-          date: audit.date,
-          libelle: `${projet.nom} — audit historique (${audit.date})`,
-          categorie: 'auditHistorique',
-        });
-      }
-    }
-    return lignes;
-  }
 
   /**
    * Message affiché par le graphique en l'absence de donnée (RG explicite de la maquette : « message explicite
@@ -598,9 +573,11 @@ export class SqmSyntheseGraphiqueComponent {
   }
 
   /**
-   * Construit la série d'un projet pour l'indicateur sélectionné, un point par audit du projet portant le constat
-   * nécessaire, dans l'ordre chronologique de `Projet.audits` (déjà croissant, cf. `docs/02_documentation/
-   * 12_modeleDonnees.md`).
+   * Construit la série d'un projet pour l'indicateur sélectionné, un point par audit régulier du projet portant le
+   * constat nécessaire, dans l'ordre chronologique de `Projet.audits` (déjà croissant, cf. `docs/02_documentation/
+   * 12_modeleDonnees.md`), complétée des points d'audits historiques du même projet (cf.
+   * {@link pointsHistoriquesDuProjet}), jamais intégrés à la ligne de tendance mais restitués séparément sous une
+   * forme de point distincte par le composant transverse de graphique.
    * @param projet - Projet concerné.
    * @param indicateur - Indicateur sélectionné.
    * @param couleur - Couleur catégorielle assignée à ce projet (cf. {@link PALETTE_SERIES}).
@@ -618,18 +595,51 @@ export class SqmSyntheseGraphiqueComponent {
         points.push({ date: audit.date, valeur });
       }
     }
-    return { id: projet.id, libelle: projet.nom, couleur, points };
+    return {
+      id: projet.id,
+      libelle: projet.nom,
+      couleur,
+      points,
+      pointsHistoriques: this.pointsHistoriquesDuProjet(projet, indicateur),
+    };
   }
 
   /**
    * Exclut les audits historiques (`typeAudit: 'historique'`, C15-14, US-046, RG-046) d'un historique d'audits,
    * pour protéger la ligne de tendance continue d'une série (cf. {@link construireSerie}) : un audit historique à
    * date passée ne doit jamais distordre le calcul de tendance existant, ni apparaître comme un point de la série
-   * qu'il représente déjà séparément (cf. {@link marqueursAuditsHistoriques}).
+   * qu'il représente déjà séparément (cf. {@link pointsHistoriquesDuProjet}).
    * @param audits - Historique complet des audits d'un projet (`Projet.audits`).
    * @returns Les seuls audits réguliers (`typeAudit: 'reguliere'`), dans le même ordre.
    */
   private exclureAuditsHistoriques(audits: readonly Audit[]): readonly Audit[] {
     return audits.filter((audit) => audit.typeAudit !== 'historique');
+  }
+
+  /**
+   * Points des audits historiques (C15-14, US-046, RG-046) d'un projet pour l'indicateur sélectionné, un point par
+   * audit `typeAudit: 'historique'` portant le constat nécessaire (même règle d'omission qu'un point régulier, cf.
+   * {@link extraireValeur}), jamais intégrés à la ligne de tendance continue de la série (cf. {@link construireSerie}
+   * et {@link exclureAuditsHistoriques}) mais restitués séparément par le composant transverse de graphique sous une
+   * forme de point distincte, partageant la couleur de la série.
+   * @param projet - Projet concerné.
+   * @param indicateur - Indicateur sélectionné.
+   * @returns Les points des audits historiques du projet.
+   */
+  private pointsHistoriquesDuProjet(
+    projet: Projet,
+    indicateur: CleIndicateurGraphique,
+  ): readonly PointSerieGraphique[] {
+    const points: PointSerieGraphique[] = [];
+    for (const audit of projet.audits) {
+      if (audit.typeAudit !== 'historique') {
+        continue;
+      }
+      const valeur = this.extraireValeur(indicateur, audit.resultats);
+      if (valeur !== undefined) {
+        points.push({ date: audit.date, valeur });
+      }
+    }
+    return points;
   }
 }

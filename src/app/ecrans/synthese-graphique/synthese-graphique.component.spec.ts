@@ -221,7 +221,13 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     const element = DomTestUtils.obtenirElementNatif(fixture);
 
     expect(fixture.componentInstance.series()).toEqual([
-      { id: 'projet-1', libelle: 'Projet 1', couleur: '#1a56db', points: [] },
+      {
+        id: 'projet-1',
+        libelle: 'Projet 1',
+        couleur: '#1a56db',
+        points: [],
+        pointsHistoriques: [],
+      },
     ]);
     expect(element.querySelector('[role="status"]')?.textContent).toContain(
       'Couverture de tests (%)',
@@ -262,7 +268,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
 
   it(
     'exclut les audits historiques (typeAudit "historique") de la ligne de tendance et les restitue ' +
-      'séparément comme marqueurs verticaux distincts (C15-14, US-046, RG-046)',
+      'séparément comme points de forme distincte de la même série (C15-14, US-046, RG-046)',
     () => {
       const projet = DonneesDeTest.projet('projet-a', 'Projet A', [
         DonneesDeTest.audit('2026-06-05', { couverture: 61.2 }),
@@ -286,13 +292,8 @@ describe('SqmSyntheseGraphiqueComponent', () => {
         { date: '2026-06-05', valeur: 61.2 },
         { date: '2026-07-08', valeur: 64.8 },
       ]);
-
-      const lignes = fixture.componentInstance.lignesVerticales();
-      const ligneHistorique = lignes.find((ligne) => ligne.categorie === 'auditHistorique');
-      expect(ligneHistorique).toBeDefined();
-      expect(ligneHistorique?.date).toBe('2026-04-01');
-      expect(ligneHistorique?.libelle).toContain('Projet A');
-      expect(ligneHistorique?.libelle).toContain('2026-04-01');
+      expect(series[0]?.pointsHistoriques).toEqual([{ date: '2026-04-01', valeur: 55.0 }]);
+      expect(fixture.componentInstance.lignesVerticales()).toEqual([]);
     },
   );
 
