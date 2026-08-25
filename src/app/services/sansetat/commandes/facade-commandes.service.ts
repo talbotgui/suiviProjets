@@ -14,8 +14,10 @@
 // passage unique permettant le bouchon TS des commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
 // `invocation-commande.utils.ts`.
 // Évolution du 2026-08-02 (US-008, RG-036) : `listerSourcesDisponibles`, qui remplace la saisie libre de
-// l'identifiant externe d'une source par une liste avec autocomplétion, chargée en un seul appel à la sélection de
-// l'instance.
+// l'identifiant externe d'une source par une liste avec autocomplétion. Évolution du 2026-08-25 (même règle) :
+// cette liste n'est plus chargée en un seul appel non filtré à la sélection de l'instance (coûteux côté GitLab,
+// à l'origine d'un statut HTTP 502 constaté en usage réel) mais recherchée au fil de la frappe via un paramètre
+// `recherche` optionnel, sur le modèle déjà en place pour `interrogerBranches`.
 import { Injectable } from '@angular/core';
 import { InvocationCommandeUtils } from './invocation-commande.utils';
 import type {
@@ -194,21 +196,27 @@ export class FacadeCommandesService {
   }
 
   /**
-   * Liste les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une instance, pour
-   * l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le 2026-08-02) : remplace la
-   * saisie libre. Le credential utilisé est celui déjà mémorisé côté cœur natif pour cette instance
-   * (`definirCredentials`) : il n'est jamais retransmis par cette méthode, sur le même principe que
+   * Recherche, parmi les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une instance,
+   * ceux correspondant au terme recherché, pour l'autocomplétion de l'identifiant externe d'une source (US-008,
+   * RG-036) : remplace la saisie libre. Le credential utilisé est celui déjà mémorisé côté cœur natif pour cette
+   * instance (`definirCredentials`) : il n'est jamais retransmis par cette méthode, sur le même principe que
    * {@link interrogerBranches}.
-   * @param instance - Instance GitLab ou Sonar dont on liste les dépôts/projets accessibles.
-   * @returns La liste des dépôts/projets disponibles en cas de succès, ou l'anomalie typée en cas d'échec.
+   *
+   * `recherche` vide ou absent ne déclenche aucun appel réseau (RG-036, évolution du 2026-08-25) : cf. le
+   * commentaire de `gitlab::lister_projets` côté cœur natif pour la justification (délestage d'un chargement complet
+   * non filtré, à l'origine d'un statut HTTP 502 constaté en usage réel contre une instance GitLab volumineuse).
+   * @param instance - Instance GitLab ou Sonar dont on recherche les dépôts/projets accessibles.
+   * @param recherche - Terme recherché, saisi par l'utilisateur.
+   * @returns La liste des dépôts/projets correspondants en cas de succès, ou l'anomalie typée en cas d'échec.
    */
   public async listerSourcesDisponibles(
     instance: Instance,
+    recherche?: string,
   ): Promise<ResultatListerSourcesDisponibles> {
     try {
       const sourcesDisponibles = await InvocationCommandeUtils.invoquer<
         readonly SourceDisponible[]
-      >('lister_sources_disponibles', { instance });
+      >('lister_sources_disponibles', { instance, recherche });
       return { type: 'succes', sourcesDisponibles };
     } catch (erreur: unknown) {
       if (this.estErreurConnecteur(erreur)) {

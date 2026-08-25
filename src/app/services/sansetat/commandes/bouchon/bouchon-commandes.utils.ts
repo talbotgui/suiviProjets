@@ -12,7 +12,9 @@
 //   randomiser produirait des grades ou des répartitions par langage incohérents plutôt que réalistes.
 //
 // Évolution du 2026-08-02 (US-008, RG-036) : `lister_sources_disponibles`, résolue par `instance.id` depuis
-// `SOURCES_DISPONIBLES_PAR_INSTANCE` (`donnees-bouchon.ts`), triée par libellé insensible à la casse.
+// `SOURCES_DISPONIBLES_PAR_INSTANCE` (`donnees-bouchon.ts`), triée par libellé insensible à la casse. Évolution du
+// 2026-08-25 (même règle) : filtrée par le paramètre `recherche` (liste vide sans terme fourni), le chargement
+// complet non filtré ayant été abandonné côté cœur natif (statut HTTP 502 constaté en usage réel).
 //
 // Évolution de la Phase 12 : les commandes d'interrogation GitLab/Sonar d'une campagne d'audit (constantes de
 // {@link COMMANDES_INTERROGATION_AUDIT} ci-dessous) sont désormais résolues après un délai artificiel fixe
@@ -443,15 +445,21 @@ export class BouchonCommandesUtils {
   }
 
   /**
-   * Résout la commande `lister_sources_disponibles` (US-008, RG-036, ajouté le 2026-08-02), triée par libellé par
-   * ordre alphabétique insensible à la casse, sur le même principe que le cœur natif.
-   * @param parametres - Paramètres de la commande, portant `instance` (dont `instance.id`).
-   * @returns La liste des dépôts/projets disponibles bouchonnée pour cette instance, vide si l'instance est
-   * inconnue du jeu de données du bouchon.
+   * Résout la commande `lister_sources_disponibles` (US-008, RG-036), triée par libellé par ordre alphabétique
+   * insensible à la casse, sur le même principe que le cœur natif. `recherche` vide ou absent retourne une liste
+   * vide sans filtrage (RG-036, évolution du 2026-08-25) : le bouchon reste ainsi représentatif du comportement
+   * réel devenu recherche serveur au fil de la frappe, plutôt qu'un chargement complet préalable à toute saisie.
+   * @param parametres - Paramètres de la commande, portant `instance` (dont `instance.id`) et `recherche`.
+   * @returns Les dépôts/projets bouchonnés de cette instance dont le libellé contient le terme recherché, vide si
+   * l'instance est inconnue du jeu de données du bouchon ou si aucun terme n'est fourni.
    */
   private static listerSourcesDisponibles(
     parametres: Readonly<Record<string, unknown>>,
   ): readonly SourceDisponible[] {
+    const recherche = parametres['recherche'];
+    if (typeof recherche !== 'string' || recherche.trim().length === 0) {
+      return [];
+    }
     const instance = parametres['instance'];
     const instanceId =
       typeof instance === 'object' &&
@@ -462,9 +470,9 @@ export class BouchonCommandesUtils {
         : undefined;
     const disponibles =
       instanceId === undefined ? [] : (SOURCES_DISPONIBLES_PAR_INSTANCE.get(instanceId) ?? []);
-    return [...disponibles].sort((a, b) =>
-      a.libelle.toLowerCase().localeCompare(b.libelle.toLowerCase()),
-    );
+    return [...disponibles]
+      .filter((source) => source.libelle.toLowerCase().includes(recherche.toLowerCase()))
+      .sort((a, b) => a.libelle.toLowerCase().localeCompare(b.libelle.toLowerCase()));
   }
 
   /**

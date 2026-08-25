@@ -149,12 +149,17 @@ pub(crate) async fn interroger_branches(
     resultat
 }
 
-/// Liste les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une Instance, pour
-/// l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le 2026-08-02). Le credential
-/// utilisé est celui déjà mémorisé en mémoire pour l'instance concernée (US-003), sur le même principe que
-/// [`interroger_branches`] : il n'est jamais retransmis en clair par l'appelant. Nom de commande choisi par
-/// symétrie avec `interrogerBranches`/`testerConnectivite`, faute de nom fourni littéralement par
-/// `docs/02_documentation/13_conceptionDetaillee.md` (décision, cf. rapport de développement de cette évolution).
+/// Recherche, parmi les dépôts GitLab ou les projets Sonar accessibles avec le credential courant d'une Instance,
+/// ceux correspondant au terme recherché, pour l'autocomplétion de l'identifiant externe d'une source (US-008,
+/// RG-036, ajouté le 2026-08-02). Le credential utilisé est celui déjà mémorisé en mémoire pour l'instance
+/// concernée (US-003), sur le même principe que [`interroger_branches`] : il n'est jamais retransmis en clair par
+/// l'appelant. Nom de commande choisi par symétrie avec `interrogerBranches`/`testerConnectivite`, faute de nom
+/// fourni littéralement par `docs/02_documentation/13_conceptionDetaillee.md` (décision, cf. rapport de
+/// développement de cette évolution).
+///
+/// `recherche` vide ou absent ne déclenche aucun appel réseau (RG-036, évolution du 2026-08-25) : voir
+/// [`gitlab::lister_projets`] pour la justification (délestage d'un appel `membership=true` non filtré, coûteux
+/// côté GitLab, à l'origine d'un `ReponseInattendue` « Statut HTTP 502 reçu » constaté en usage réel).
 ///
 /// # Erreurs
 ///
@@ -163,6 +168,7 @@ pub(crate) async fn interroger_branches(
 #[tauri::command]
 pub(crate) async fn lister_sources_disponibles(
     instance: Instance,
+    recherche: Option<String>,
     etat: State<'_, EtatSession>,
 ) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
     crate::journalisation::consigner_debut_commande("listerSourcesDisponibles");
@@ -172,24 +178,36 @@ pub(crate) async fn lister_sources_disponibles(
                 .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
                     message: "Aucun credential en mémoire pour cette instance".to_string(),
                 })?;
+        // Court-circuite avant toute journalisation d'appel connecteur (RG-036, évolution du 2026-08-25) : un
+        // terme vide ne déclenchant aucun appel réseau (cf. `gitlab::lister_projets`), journaliser un « appel »
+        // dans ce cas serait trompeur (aucune requête n'est jamais envoyée).
+        let Some(terme) = recherche
+            .as_deref()
+            .map(str::trim)
+            .filter(|terme| !terme.is_empty())
+        else {
+            return Ok(Vec::new());
+        };
+        let description_recherche = format!("recherche « {terme} »");
         crate::journalisation::consigner_appel_connecteur(
             "listerSourcesDisponibles",
             &instance.nom,
-            "toutes les sources accessibles",
+            &description_recherche,
         );
         let client = etat.client_http();
         let resultat = match instance.type_instance {
             TypeInstance::Gitlab => {
-                gitlab::lister_projets(&instance.url_base, &credential, &client).await
+                gitlab::lister_projets(&instance.url_base, &credential, Some(terme), &client).await
             }
             TypeInstance::Sonar => {
-                sonar::rechercher_projets(&instance.url_base, &credential, &client).await
+                sonar::rechercher_projets(&instance.url_base, &credential, Some(terme), &client)
+                    .await
             }
         };
         crate::journalisation::consigner_resultat_connecteur(
             "listerSourcesDisponibles",
             &instance.nom,
-            "toutes les sources accessibles",
+            &description_recherche,
             resultat,
         )
     }

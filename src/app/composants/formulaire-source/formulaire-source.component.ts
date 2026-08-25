@@ -15,6 +15,14 @@
 // est impératif ici y compris pour les quatre premiers champs, alimentés non seulement par les gestionnaires
 // `(ngModelChange)` synchrones habituels mais aussi par l'`effect` de préchargement depuis {@link sourceAModifier}
 // ci-dessous, qui ne s'exécute pas dans la pile d'un évènement DOM.
+//
+// Évolution du 2026-08-25 (RG-036) : l'autocomplétion de l'identifiant externe n'est plus alimentée par un
+// chargement complet et mis en cache des dépôts/projets disponibles à la seule sélection de l'instance, mais par
+// une recherche serveur débouncée ({@link rechercheSource$}) au fil de la frappe dans le champ, sur le modèle déjà
+// en place pour {@link rechercheBranche$}/{@link rechercherBranches}. Un chargement complet non filtré
+// (`membership=true` sans `search`) provoquait un statut HTTP 502 contre une instance GitLab volumineuse (le proxy
+// interne de GitLab dépassant son propre délai avant que la réponse ne soit prête), indépendamment du délai du
+// client HTTP (cf. rapport de développement de cette évolution).
 import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
@@ -52,6 +60,7 @@ import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
 import type {
   Instance,
   ResultatInterrogationBranches,
+  ResultatListerSourcesDisponibles,
   SourceDisponible,
 } from '../../services/sansetat/commandes/types-facade';
 
@@ -81,18 +90,19 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
   private readonly rechercheBranche$: Subject<string> = new Subject<string>();
 
   /**
+   * Termes successifs saisis dans le champ d'identifiant externe, débouncés avant de déclencher la recherche
+   * serveur des dépôts/projets disponibles (US-008, RG-036, évolution du 2026-08-25) : plus de chargement complet
+   * en un seul appel avant toute saisie (cf. commentaire de `gitlab::lister_projets` côté cœur natif pour la
+   * justification — un statut HTTP 502 constaté en usage réel contre une instance GitLab volumineuse).
+   */
+  private readonly rechercheSource$: Subject<string> = new Subject<string>();
+
+  /**
    * Premier champ du formulaire (Type), résolu une fois ce champ effectivement rendu dans le DOM (cf.
    * {@link ngAfterViewInit}, C15-02).
    */
   private readonly premierChampFormulaire: Signal<ElementRef<HTMLSelectElement> | undefined> =
     viewChild<ElementRef<HTMLSelectElement>>('premierChampFormulaire');
-
-  /**
-   * Dépôts GitLab ou projets Sonar disponibles déjà chargés, indexés par `Instance.id` (US-008, RG-036) : un seul
-   * appel par instance pour la durée de vie du composant, plutôt qu'un appel à chaque sélection de cette même
-   * instance.
-   */
-  private readonly sourcesDisponiblesParInstance = new Map<string, readonly SourceDisponible[]>();
 
   /**
    * Types de source proposés au formulaire (dépôt GitLab, projet Sonar).
@@ -206,7 +216,6 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
       this.type.set(source.type);
       this.idExterne.set(source.idExterne);
       this.refAuditee.set(source.refAuditee ?? '');
-      void this.chargerSourcesDisponibles(source.instanceId);
     });
 
     this.rechercheBranche$
@@ -218,6 +227,17 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
       )
       .subscribe((resultat) => {
         this.appliquerResultatBranches(resultat);
+      });
+
+    this.rechercheSource$
+      .pipe(
+        debounceTime(DELAI_DEBOUNCE_RECHERCHE_MS),
+        distinctUntilChanged(),
+        switchMap((terme) => this.rechercherSourcesDisponibles(terme)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((resultat) => {
+        this.appliquerResultatSourcesDisponibles(resultat);
       });
   }
 
@@ -272,13 +292,33 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
   }
 
   /**
-   * Sélectionne l'instance du formulaire de source et déclenche le chargement (mis en cache) de la liste des
-   * dépôts/projets disponibles pour l'autocomplétion de l'identifiant externe (US-008, RG-036).
+   * Sélectionne l'instance du formulaire de source (US-008, RG-036) : la liste des dépôts/projets disponibles pour
+   * l'autocomplétion de l'identifiant externe reste vide tant que l'utilisateur n'a pas commencé à saisir un terme
+   * recherché (cf. {@link modifierIdExterne}), évolution du 2026-08-25 remplaçant le chargement complet préalable.
    * @param instanceId - Identifiant de l'instance désormais sélectionnée dans le formulaire.
    */
   public selectionnerInstance(instanceId: string): void {
     this.instanceId.set(instanceId);
-    void this.chargerSourcesDisponibles(instanceId);
+    this.sourcesDisponibles.set([]);
+    this.credentialAbsent.set(false);
+  }
+
+  /**
+   * Met à jour l'identifiant externe saisi et relance (de façon débouncée) la recherche serveur des dépôts/projets
+   * disponibles (US-008, RG-036, évolution du 2026-08-25).
+   * @param valeur - Nouvelle valeur saisie dans le champ d'identifiant externe.
+   */
+  public modifierIdExterne(valeur: string): void {
+    this.idExterne.set(valeur);
+    this.rechercherSourceExterne();
+  }
+
+  /**
+   * Déclenche (de façon débouncée) la recherche serveur des dépôts/projets disponibles pour le terme actuellement
+   * saisi dans le champ d'identifiant externe (US-008, RG-036).
+   */
+  public rechercherSourceExterne(): void {
+    this.rechercheSource$.next(this.idExterne());
   }
 
   /**
@@ -381,30 +421,39 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
   }
 
   /**
-   * Charge, en un seul appel mis en cache pour la durée de vie du composant (US-008, RG-036), la liste des dépôts
-   * GitLab ou des projets Sonar disponibles pour l'instance désignée, pour l'autocomplétion de l'identifiant
-   * externe. Sans effet si `instanceId` est vide ou déjà présente dans le cache.
-   * @param instanceId - Identifiant de l'instance dont on charge la liste des dépôts/projets disponibles.
+   * Recherche, pour le terme donné, les dépôts GitLab ou projets Sonar disponibles de l'instance actuellement
+   * sélectionnée dans le formulaire (US-008, RG-036, évolution du 2026-08-25). N'effectue aucun appel réseau si
+   * aucune instance n'est sélectionnée ou si le terme est vide, sur le même principe que
+   * {@link interrogerBranchesPourInstance}.
+   * @param terme - Terme de recherche saisi par l'utilisateur.
+   * @returns Un flux résolvant le résultat de la recherche, ou `null` si elle n'a pas pu être lancée.
    */
-  private async chargerSourcesDisponibles(instanceId: string): Promise<void> {
-    if (instanceId.length === 0) {
+  private rechercherSourcesDisponibles(
+    terme: string,
+  ): Observable<ResultatListerSourcesDisponibles | null> {
+    const instance = this.instancesCompatibles().find(
+      (candidat) => candidat.id === this.instanceId(),
+    );
+    if (!instance || terme.trim().length === 0) {
+      return of(null);
+    }
+    return from(this.facadeCommandes.listerSourcesDisponibles(instance, terme)).pipe(
+      catchError(() => of(null)),
+    );
+  }
+
+  /**
+   * Applique le résultat d'une recherche de dépôts/projets disponibles à l'état du formulaire.
+   * @param resultat - Résultat de la recherche, `null` si elle n'a pas pu être lancée.
+   */
+  private appliquerResultatSourcesDisponibles(
+    resultat: ResultatListerSourcesDisponibles | null,
+  ): void {
+    if (!resultat) {
       this.sourcesDisponibles.set([]);
       return;
     }
-    const enCache = this.sourcesDisponiblesParInstance.get(instanceId);
-    if (enCache) {
-      this.sourcesDisponibles.set(enCache);
-      this.credentialAbsent.set(false);
-      return;
-    }
-    const instance = this.instancesCompatibles().find((candidat) => candidat.id === instanceId);
-    if (!instance) {
-      this.sourcesDisponibles.set([]);
-      return;
-    }
-    const resultat = await this.facadeCommandes.listerSourcesDisponibles(instance);
     if (resultat.type === 'succes') {
-      this.sourcesDisponiblesParInstance.set(instanceId, resultat.sourcesDisponibles);
       this.sourcesDisponibles.set(resultat.sourcesDisponibles);
       this.credentialAbsent.set(false);
       return;

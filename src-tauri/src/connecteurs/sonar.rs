@@ -844,11 +844,15 @@ struct ReponseComponentsSearch {
     components: Vec<ComposantDisponible>,
 }
 
-/// Recherche l'ensemble des projets Sonar accessibles avec le credential courant (`qualifiers=TRK`, seuls les
-/// projets, jamais les autres types de composants Sonar), pour l'autocomplétion de l'identifiant externe d'une
-/// source (US-008, RG-036, ajouté le 2026-08-02) : un seul appel (paginé jusqu'à épuisement ou
-/// [`MAX_PAGES_PROJETS`]) par sélection d'instance côté appelant, celui-ci restant responsable de la mise en
-/// cache. Résultat trié par ordre alphabétique du libellé (`name`), insensible à la casse (RG-036).
+/// Recherche, parmi les projets Sonar accessibles avec le credential courant (`qualifiers=TRK`, seuls les
+/// projets, jamais les autres types de composants Sonar), ceux dont le nom correspond au terme recherché, pour
+/// l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036). Un appel (paginé jusqu'à épuisement ou
+/// [`MAX_PAGES_PROJETS`]) par terme recherché, débouncé côté appelant. Résultat trié par ordre alphabétique du
+/// libellé (`name`), insensible à la casse (RG-036).
+///
+/// `recherche` vide ou absent ne déclenche aucun appel réseau et retourne une liste vide, sur le même principe que
+/// côté GitLab (`gitlab::lister_projets`, RG-036, évolution du 2026-08-25, cf. rapport de développement de cette
+/// évolution).
 ///
 /// # Erreurs
 ///
@@ -858,8 +862,12 @@ struct ReponseComponentsSearch {
 pub(crate) async fn rechercher_projets(
     url_base: &str,
     credential: &str,
+    recherche: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
+    let Some(terme) = recherche.map(str::trim).filter(|terme| !terme.is_empty()) else {
+        return Ok(Vec::new());
+    };
     let mut composants = Vec::new();
     for page in 1..=MAX_PAGES_PROJETS {
         let url = format!("{}/api/components/search", url_base.trim_end_matches('/'));
@@ -868,6 +876,7 @@ pub(crate) async fn rechercher_projets(
             .bearer_auth(credential)
             .query(&[
                 ("qualifiers", "TRK"),
+                ("q", terme),
                 ("ps", TAILLE_PAGE_PROJETS),
                 ("p", page.to_string().as_str()),
             ])
@@ -2018,8 +2027,13 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let disponibles =
-            rechercher_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+        let disponibles = rechercher_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("portail"),
+            &client_test_delai_court(),
+        )
+        .await?;
 
         assert_eq!(
             disponibles
@@ -2052,12 +2066,79 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let disponibles =
-            rechercher_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+        let disponibles = rechercher_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("groupe"),
+            &client_test_delai_court(),
+        )
+        .await?;
 
         assert_eq!(disponibles.len(), 1);
         assert_eq!(disponibles[0].libelle, "Un");
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_projets_transmet_le_terme_de_recherche() {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .and(query_param("q", "portail"))
+            .and(query_param("p", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "components": [{ "key": "nova:front-portail", "name": "Front Portail" }]
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/components/search"))
+            .and(query_param("p", "2"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "components": [] })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let disponibles = rechercher_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("portail"),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(
+            disponibles.map(|projets| projets.len()).unwrap_or_default(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn rechercher_projets_ne_fait_aucun_appel_reseau_sans_terme_recherche() {
+        // Aucun `Mock` monté : cf. commentaire de `lister_projets_ne_fait_aucun_appel_reseau_sans_terme_recherche`
+        // côté GitLab (`gitlab.rs`), même principe (RG-036, évolution du 2026-08-25).
+        let serveur = MockServer::start().await;
+
+        let sans_terme = rechercher_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            None,
+            &client_test_delai_court(),
+        )
+        .await;
+        let terme_vide = rechercher_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("   "),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(sans_terme, Ok(Vec::new()));
+        assert_eq!(terme_vide, Ok(Vec::new()));
     }
 
     #[tokio::test]
@@ -2069,8 +2150,13 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let resultat =
-            rechercher_projets(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
+        let resultat = rechercher_projets(
+            &serveur.uri(),
+            "jeton-invalide",
+            Some("api"),
+            &client_test_delai_court(),
+        )
+        .await;
 
         assert!(matches!(
             resultat,
@@ -2087,8 +2173,13 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let resultat =
-            rechercher_projets(&serveur.uri(), "jeton-limite", &client_test_delai_court()).await;
+        let resultat = rechercher_projets(
+            &serveur.uri(),
+            "jeton-limite",
+            Some("api"),
+            &client_test_delai_court(),
+        )
+        .await;
 
         assert!(matches!(
             resultat,

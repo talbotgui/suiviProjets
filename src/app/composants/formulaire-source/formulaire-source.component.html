@@ -48,7 +48,7 @@
     aide="Ex. groupe/sous-groupe/projet (GitLab) ou clé de projet (Sonar)."
     [options]="optionsRecherche()"
     [valeur]="idExterne()"
-    (valeurChange)="idExterne.set($event)"
+    (valeurChange)="modifierIdExterne($event)"
     [requis]="true"
   />
 

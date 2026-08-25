@@ -185,16 +185,17 @@ describe('FacadeCommandesService', () => {
   });
 
   describe('listerSourcesDisponibles (US-008, RG-036)', () => {
-    it('doit invoquer lister_sources_disponibles avec l’instance fournie', async () => {
+    it('doit invoquer lister_sources_disponibles avec l’instance et le terme recherché fournis', async () => {
       invokeSimule.mockResolvedValue([
         { idExterne: '1234', libelle: 'entreprise/api-facturation' },
         { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
       ]);
 
-      const resultat = await service.listerSourcesDisponibles(INSTANCE_GITLAB);
+      const resultat = await service.listerSourcesDisponibles(INSTANCE_GITLAB, 'entreprise');
 
       expect(invokeSimule).toHaveBeenCalledWith('lister_sources_disponibles', {
         instance: INSTANCE_GITLAB,
+        recherche: 'entreprise',
       });
       expect(resultat).toEqual({
         type: 'succes',

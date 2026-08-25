@@ -166,12 +166,12 @@ pub(crate) async fn interroger_branches(
     Ok(corps.into_iter().map(|branche| branche.name).collect())
 }
 
-/// Nombre maximal de pages parcourues lors du listing des dépôts accessibles avec le credential courant
+/// Nombre maximal de pages parcourues lors de la recherche des dépôts accessibles avec le credential courant
 /// (`lister_projets`, US-008, RG-036, ajouté le 2026-08-02) : borne de sécurité arbitraire (cf. rapport de
 /// développement de cette évolution), sur le même principe que [`MAX_PAGES_CONTRIBUTEURS`] plus bas.
 const MAX_PAGES_PROJETS: u32 = 20;
 
-/// Nombre d'éléments par page du listing des dépôts accessibles (RG-036), aligné sur le maximum autorisé par
+/// Nombre d'éléments par page de la recherche des dépôts accessibles (RG-036), aligné sur le maximum autorisé par
 /// l'API GitLab, sur le même principe que [`TAILLE_PAGE_AUDIT`] plus bas.
 const TAILLE_PAGE_PROJETS: &str = "100";
 
@@ -183,11 +183,18 @@ struct ReponseProjetDisponible {
     path_with_namespace: String,
 }
 
-/// Liste l'ensemble des dépôts GitLab accessibles avec le credential courant (`membership=true`), pour
-/// l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036, ajouté le 2026-08-02) : un seul appel
-/// (paginé jusqu'à épuisement ou [`MAX_PAGES_PROJETS`]) par sélection d'instance côté appelant, celui-ci restant
-/// responsable de la mise en cache. Résultat trié par ordre alphabétique du libellé (`path_with_namespace`),
-/// insensible à la casse (RG-036).
+/// Recherche, parmi les dépôts GitLab accessibles avec le credential courant (`membership=true`), ceux dont le nom
+/// correspond au terme recherché, pour l'autocomplétion de l'identifiant externe d'une source (US-008, RG-036).
+/// Un appel (paginé jusqu'à épuisement ou [`MAX_PAGES_PROJETS`]) par terme recherché, débouncé côté appelant.
+/// Résultat trié par ordre alphabétique du libellé (`path_with_namespace`), insensible à la casse (RG-036).
+///
+/// `recherche` vide ou absent ne déclenche aucun appel réseau et retourne une liste vide (RG-036, évolution du
+/// 2026-08-25) : jusque-là, la sélection d'une instance chargeait en un seul appel non filtré (`membership=true`
+/// sans `search`) l'intégralité des dépôts accessibles, avant toute saisie de l'utilisateur — un appel coûteux côté
+/// GitLab (énumération de l'appartenance à tous les groupes/sous-groupes), à l'origine d'un `ReponseInattendue`
+/// (« Statut HTTP 502 reçu ») constaté contre une instance GitLab Community Edition 18.11.11 dont le proxy interne
+/// (Workhorse) dépassait son propre délai avant que la réponse ne soit prête, indépendamment du délai du client
+/// HTTP (cf. rapport de développement de cette évolution).
 ///
 /// # Erreurs
 ///
@@ -196,8 +203,12 @@ struct ReponseProjetDisponible {
 pub(crate) async fn lister_projets(
     url_base: &str,
     credential: &str,
+    recherche: Option<&str>,
     client: &reqwest::Client,
 ) -> Result<Vec<SourceDisponible>, ErreurConnecteur> {
+    let Some(terme) = recherche.map(str::trim).filter(|terme| !terme.is_empty()) else {
+        return Ok(Vec::new());
+    };
     let mut projets = Vec::new();
     for page in 1..=MAX_PAGES_PROJETS {
         let url = format!("{}/api/v4/projects", url_base.trim_end_matches('/'));
@@ -207,6 +218,7 @@ pub(crate) async fn lister_projets(
             .query(&[
                 ("membership", "true"),
                 ("simple", "true"),
+                ("search", terme),
                 ("per_page", TAILLE_PAGE_PROJETS),
                 ("page", page.to_string().as_str()),
             ])
@@ -2570,8 +2582,13 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let disponibles =
-            lister_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+        let disponibles = lister_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("nova"),
+            &client_test_delai_court(),
+        )
+        .await?;
 
         assert_eq!(
             disponibles
@@ -2606,12 +2623,78 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let disponibles =
-            lister_projets(&serveur.uri(), "jeton-valide", &client_test_delai_court()).await?;
+        let disponibles = lister_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("groupe"),
+            &client_test_delai_court(),
+        )
+        .await?;
 
         assert_eq!(disponibles.len(), 1);
         assert_eq!(disponibles[0].libelle, "groupe/un");
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_projets_transmet_le_terme_de_recherche() {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .and(query_param("search", "api"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 1234, "path_with_namespace": "entreprise/api-facturation" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let disponibles = lister_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("api"),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(
+            disponibles.map(|projets| projets.len()).unwrap_or_default(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn lister_projets_ne_fait_aucun_appel_reseau_sans_terme_recherche() {
+        // Aucun `Mock` monté : un appel HTTP réel provoquerait un 404 non géré, faisant échouer les assertions
+        // ci-dessous si le court-circuit décrit par la doc de `lister_projets` (RG-036, évolution du 2026-08-25)
+        // venait à disparaître.
+        let serveur = MockServer::start().await;
+
+        let sans_terme = lister_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            None,
+            &client_test_delai_court(),
+        )
+        .await;
+        let terme_vide = lister_projets(
+            &serveur.uri(),
+            "jeton-valide",
+            Some("   "),
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(sans_terme, Ok(Vec::new()));
+        assert_eq!(terme_vide, Ok(Vec::new()));
     }
 
     #[tokio::test]
@@ -2623,8 +2706,13 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let resultat =
-            lister_projets(&serveur.uri(), "jeton-invalide", &client_test_delai_court()).await;
+        let resultat = lister_projets(
+            &serveur.uri(),
+            "jeton-invalide",
+            Some("api"),
+            &client_test_delai_court(),
+        )
+        .await;
 
         assert!(matches!(
             resultat,
@@ -2641,8 +2729,13 @@ mod tests {
             .mount(&serveur)
             .await;
 
-        let resultat =
-            lister_projets(&serveur.uri(), "jeton-limite", &client_test_delai_court()).await;
+        let resultat = lister_projets(
+            &serveur.uri(),
+            "jeton-limite",
+            Some("api"),
+            &client_test_delai_court(),
+        )
+        .await;
 
         assert!(matches!(
             resultat,

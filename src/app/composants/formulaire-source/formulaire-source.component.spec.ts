@@ -379,15 +379,9 @@ describe('SqmFormulaireSourceComponent', () => {
   });
 
   describe('autocomplétion de l’identifiant externe (US-008, RG-036, C11-02)', () => {
-    it('transmet les sources disponibles au champ de recherche riche après sélection de l’instance', async () => {
+    it('n’invoque aucun appel réseau à la seule sélection de l’instance (RG-036, évolution du 2026-08-25)', () => {
       const facade = TestBed.inject(FacadeCommandesService);
-      jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
-        type: 'succes',
-        sourcesDisponibles: [
-          { idExterne: '1234', libelle: 'entreprise/api-facturation' },
-          { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
-        ],
-      });
+      const lister = jest.spyOn(facade, 'listerSourcesDisponibles');
 
       const fixture = TestBed.createComponent(SqmFormulaireSourceComponent);
       fixture.componentRef.setInput('groupeId', groupeId);
@@ -396,14 +390,9 @@ describe('SqmFormulaireSourceComponent', () => {
       fixture.detectChanges();
 
       composant.selectionnerInstance('instance-gitlab');
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.detectChanges();
 
-      expect(composant.optionsRecherche()).toEqual([
-        { valeur: '1234', libelle: 'entreprise/api-facturation' },
-        { valeur: '1567', libelle: 'entreprise/batch-comptable' },
-      ]);
+      expect(lister).not.toHaveBeenCalled();
+      expect(composant.sourcesDisponibles()).toEqual([]);
 
       const elementNatif = DomTestUtils.obtenirElementNatif(fixture);
       const champRecherche = elementNatif.querySelector('app-champ-recherche-riche');
@@ -411,7 +400,8 @@ describe('SqmFormulaireSourceComponent', () => {
       expect(champRecherche?.querySelector('#formulaire-source-champ-id-externe')).not.toBeNull();
     });
 
-    it('charge la liste des sources disponibles à la sélection de l’instance', async () => {
+    it('recherche les sources disponibles après un court silence de saisie (US-008)', async () => {
+      jest.useFakeTimers();
       const facade = TestBed.inject(FacadeCommandesService);
       const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
         type: 'succes',
@@ -425,20 +415,27 @@ describe('SqmFormulaireSourceComponent', () => {
       fixture.componentRef.setInput('groupeId', groupeId);
       fixture.componentRef.setInput('projetId', projetId);
       const composant = fixture.componentInstance;
-
       composant.selectionnerInstance('instance-gitlab');
+
+      composant.modifierIdExterne('entreprise');
+      jest.advanceTimersByTime(300);
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(lister).toHaveBeenCalledWith(expect.objectContaining({ id: 'instance-gitlab' }));
+      expect(lister).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'instance-gitlab' }),
+        'entreprise',
+      );
       expect(composant.instanceId()).toBe('instance-gitlab');
-      expect(composant.sourcesDisponibles()).toEqual([
-        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
-        { idExterne: '1567', libelle: 'entreprise/batch-comptable' },
+      expect(composant.optionsRecherche()).toEqual([
+        { valeur: '1234', libelle: 'entreprise/api-facturation' },
+        { valeur: '1567', libelle: 'entreprise/batch-comptable' },
       ]);
+      jest.useRealTimers();
     });
 
-    it("n'invoque qu'un seul appel par instance, la seconde sélection réutilisant le cache", async () => {
+    it("n'invoque qu'un seul appel quand le terme recherché est inchangé (distinctUntilChanged)", async () => {
+      jest.useFakeTimers();
       const facade = TestBed.inject(FacadeCommandesService);
       const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
         type: 'succes',
@@ -449,11 +446,14 @@ describe('SqmFormulaireSourceComponent', () => {
       fixture.componentRef.setInput('groupeId', groupeId);
       fixture.componentRef.setInput('projetId', projetId);
       const composant = fixture.componentInstance;
+      composant.selectionnerInstance('instance-gitlab');
 
-      composant.selectionnerInstance('instance-gitlab');
+      composant.modifierIdExterne('entreprise');
+      jest.advanceTimersByTime(300);
       await Promise.resolve();
       await Promise.resolve();
-      composant.selectionnerInstance('instance-gitlab');
+      composant.rechercherSourceExterne();
+      jest.advanceTimersByTime(300);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -461,9 +461,11 @@ describe('SqmFormulaireSourceComponent', () => {
       expect(composant.sourcesDisponibles()).toEqual([
         { idExterne: '1234', libelle: 'entreprise/api-facturation' },
       ]);
+      jest.useRealTimers();
     });
 
     it("signale l'absence de credential plutôt que de proposer des sources disponibles", async () => {
+      jest.useFakeTimers();
       const facade = TestBed.inject(FacadeCommandesService);
       jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
         type: 'echec',
@@ -477,21 +479,21 @@ describe('SqmFormulaireSourceComponent', () => {
       fixture.componentRef.setInput('groupeId', groupeId);
       fixture.componentRef.setInput('projetId', projetId);
       const composant = fixture.componentInstance;
-
       composant.selectionnerInstance('instance-gitlab');
+
+      composant.modifierIdExterne('entreprise');
+      jest.advanceTimersByTime(300);
       await Promise.resolve();
       await Promise.resolve();
 
       expect(composant.credentialAbsent()).toBe(true);
       expect(composant.sourcesDisponibles()).toEqual([]);
+      jest.useRealTimers();
     });
 
-    it('précharge la liste des sources disponibles à l’instanciation en mode édition', async () => {
+    it('ne précharge plus la liste des sources disponibles à l’instanciation en mode édition (RG-036, évolution du 2026-08-25)', () => {
       const facade = TestBed.inject(FacadeCommandesService);
-      const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
-        type: 'succes',
-        sourcesDisponibles: [{ idExterne: '1234', libelle: 'entreprise/api-facturation' }],
-      });
+      const lister = jest.spyOn(facade, 'listerSourcesDisponibles');
       const sourceId = donneesApplication.creerSource(groupeId, projetId, {
         instanceId: 'instance-gitlab',
         type: TypeSource.DepotGitlab,
@@ -510,13 +512,10 @@ describe('SqmFormulaireSourceComponent', () => {
       fixture.componentRef.setInput('projetId', projetId);
       fixture.componentRef.setInput('sourceAModifier', sourceExistante);
       fixture.detectChanges();
-      await Promise.resolve();
-      await Promise.resolve();
 
-      expect(lister).toHaveBeenCalledWith(expect.objectContaining({ id: 'instance-gitlab' }));
-      expect(fixture.componentInstance.sourcesDisponibles()).toEqual([
-        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
-      ]);
+      expect(lister).not.toHaveBeenCalled();
+      expect(fixture.componentInstance.idExterne()).toBe('1234');
+      expect(fixture.componentInstance.sourcesDisponibles()).toEqual([]);
     });
   });
 });

@@ -177,11 +177,12 @@ describe('BouchonCommandesUtils', () => {
   });
 
   describe('lister_sources_disponibles (US-008, RG-036)', () => {
-    it('doit résoudre la liste triée par libellé pour une instance connue', async () => {
+    it('doit résoudre la liste filtrée par le terme recherché, triée par libellé, pour une instance connue', async () => {
       const disponibles = await BouchonCommandesUtils.invoquer<
         readonly { readonly idExterne: string; readonly libelle: string }[]
       >('lister_sources_disponibles', {
         instance: { id: 'b0000000-0000-4000-8000-000000000001', type: 'gitlab' },
+        recherche: 'entreprise',
       });
 
       expect(disponibles.map((source) => source.libelle)).toEqual([
@@ -192,10 +193,30 @@ describe('BouchonCommandesUtils', () => {
       ]);
     });
 
+    it('doit ne retourner que les sources dont le libellé correspond au terme recherché', async () => {
+      const disponibles = await BouchonCommandesUtils.invoquer<
+        readonly { readonly idExterne: string; readonly libelle: string }[]
+      >('lister_sources_disponibles', {
+        instance: { id: 'b0000000-0000-4000-8000-000000000001', type: 'gitlab' },
+        recherche: 'batch',
+      });
+
+      expect(disponibles.map((source) => source.libelle)).toEqual(['entreprise/batch-comptable']);
+    });
+
+    it('doit retourner une liste vide quand aucun terme recherché n’est fourni (RG-036, évolution du 2026-08-25)', async () => {
+      const disponibles = await BouchonCommandesUtils.invoquer<readonly unknown[]>(
+        'lister_sources_disponibles',
+        { instance: { id: 'b0000000-0000-4000-8000-000000000001', type: 'gitlab' } },
+      );
+
+      expect(disponibles).toEqual([]);
+    });
+
     it('doit retourner une liste vide pour une instance inconnue du jeu de données', async () => {
       const disponibles = await BouchonCommandesUtils.invoquer<readonly unknown[]>(
         'lister_sources_disponibles',
-        { instance: { id: 'instance-inconnue', type: 'gitlab' } },
+        { instance: { id: 'instance-inconnue', type: 'gitlab' }, recherche: 'entreprise' },
       );
 
       expect(disponibles).toEqual([]);
@@ -204,7 +225,7 @@ describe('BouchonCommandesUtils', () => {
     it('doit retourner une liste vide si le paramètre instance est absent ou mal formé', async () => {
       const disponibles = await BouchonCommandesUtils.invoquer<readonly unknown[]>(
         'lister_sources_disponibles',
-        {},
+        { recherche: 'entreprise' },
       );
 
       expect(disponibles).toEqual([]);
@@ -235,7 +256,11 @@ describe('BouchonCommandesUtils', () => {
         readonly ratioDette: number;
       }>('interroger_dette', { sourceId: SOURCE_ID_SONAR_CONNU });
 
-      expect(resultat).toEqual({ sourceId: SOURCE_ID_SONAR_CONNU, detteMinutes: 13980, ratioDette: 3.1 });
+      expect(resultat).toEqual({
+        sourceId: SOURCE_ID_SONAR_CONNU,
+        detteMinutes: 13980,
+        ratioDette: 3.1,
+      });
     });
 
     it('doit inclure duplicationNouveauCode seulement quand le constat le porte', async () => {
