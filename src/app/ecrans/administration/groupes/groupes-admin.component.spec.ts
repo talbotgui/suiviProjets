@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type { DonneesRacine } from '../../../services/avecetat/etat/types-donnees';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { SqmGroupesAdminComponent } from './groupes-admin.component';
 
 /**
@@ -144,6 +145,32 @@ describe('SqmGroupesAdminComponent', () => {
     composant.supprimerInstance(idInstance);
 
     expect(composant.instances).toEqual([]);
+  });
+
+  it('pose le focus sur le champ Type de la nouvelle instance à chaque clic sur « Ajouter une instance » (C15-02)', async () => {
+    const fixture = TestBed.createComponent(SqmGroupesAdminComponent);
+    const composantLocal = fixture.componentInstance;
+    composantLocal.ouvrirCreation();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    composantLocal.ajouterInstance();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const champTypePremiereInstance = DomTestUtils.obtenirElementNatif(
+      fixture,
+    ).querySelector<HTMLElement>('#groupes-admin-instance-0-champ-type');
+    expect(document.activeElement).toBe(champTypePremiereInstance);
+
+    composantLocal.ajouterInstance();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const champTypeDeuxiemeInstance = DomTestUtils.obtenirElementNatif(
+      fixture,
+    ).querySelector<HTMLElement>('#groupes-admin-instance-1-champ-type');
+    expect(document.activeElement).toBe(champTypeDeuxiemeInstance);
   });
 
   it('pré-remplit le formulaire lors de la modification', () => {

@@ -90,6 +90,7 @@
             @for (instance of instances; track instance.id; let i = $index) {
               <div class="groupes-admin__instance d-flex retour-ligne aligne-centre ecart-2">
                 <select
+                  #champTypeInstance
                   [id]="'groupes-admin-instance-' + i + '-champ-type'"
                   [name]="'type-' + instance.id"
                   class="champ__controle"

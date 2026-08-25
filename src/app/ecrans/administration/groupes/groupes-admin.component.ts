@@ -20,6 +20,7 @@ import {
   effect,
   inject,
   viewChild,
+  viewChildren,
   ChangeDetectionStrategy,
   input,
 } from '@angular/core';
@@ -81,6 +82,13 @@ export class SqmGroupesAdminComponent {
    */
   private readonly premierChampFormulaire: Signal<ElementRef<HTMLInputElement> | undefined> =
     viewChild<ElementRef<HTMLInputElement>>('premierChampFormulaire');
+
+  /**
+   * Premier champ (Type) de chaque ligne d'instance actuellement affichée, dans l'ordre du `@for` (C15-02) :
+   * permet de poser le focus sur celui de la dernière ligne ajoutée par {@link ajouterInstance}.
+   */
+  private readonly champsTypeInstance: Signal<readonly ElementRef<HTMLSelectElement>[]> =
+    viewChildren<ElementRef<HTMLSelectElement>>('champTypeInstance');
 
   /**
    * Identifiant du groupe à présélectionner dans le sous-onglet Membres connus (cf. commentaire d'en-tête).
@@ -227,13 +235,24 @@ export class SqmGroupesAdminComponent {
   }
 
   /**
-   * Ajoute une instance vide à la liste en cours d'édition.
+   * Ajoute une instance vide à la liste en cours d'édition, et pose le focus sur son premier champ (Type, C15-02)
+   * dès son rendu effectif.
    */
   public ajouterInstance(): void {
     this.instances = [
       ...this.instances,
       { id: crypto.randomUUID(), type: TypeInstance.Gitlab, nom: '', urlBase: '' },
     ];
+    afterNextRender(() => this.focusDerniereInstance(), { injector: this.injector });
+  }
+
+  /**
+   * Pose le focus sur le champ Type de la dernière ligne d'instance affichée (celle ajoutée par
+   * {@link ajouterInstance}). Sans effet si aucune instance n'est affichée.
+   */
+  private focusDerniereInstance(): void {
+    const champs = this.champsTypeInstance();
+    champs[champs.length - 1]?.nativeElement.focus();
   }
 
   /**
