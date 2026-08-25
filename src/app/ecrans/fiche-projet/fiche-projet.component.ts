@@ -1369,16 +1369,15 @@ export class SqmFicheProjetComponent {
    * dépendances non référencées actuellement constatées sur le projet affiché : une ligne par couple
    * (référence, version) distinct, statut laissé vide pour saisie explicite par l'utilisateur, version débarrassée
    * de son éventuel préfixe de plage semver npm (cf. {@link retirerPrefixeSemver}). Chaque ligne de version est
-   * immédiatement suivie d'une seconde ligne de même motif portant la borne de repli `*`, statut également laissé
-   * vide : rend visible et modifiable dans le texte pré-rempli la borne que {@link SaisieMasseDependancesUtils}
-   * ajoute sinon silencieusement avec un statut par défaut figé (`obsolete`, RG-044) si le groupe n'en porte encore
-   * aucune à l'analyse. Décision arbitraire de ce développement (à valider par un humain, faute de précision
-   * documentaire sur le pré-remplissage exact attendu) : pré-remplissage cohérent avec le lien unitaire
-   * « Créer une règle » déjà existant (US-033, cf. {@link queryParamsReferentielDependance}) pour le motif et le
-   * motif de version, sans jamais présumer du statut.
+   * immédiatement suivie d'une seconde ligne de même motif portant la borne de repli `*=obsolete` : rend visible et
+   * modifiable dans le texte pré-rempli le même complément automatique que {@link SaisieMasseDependancesUtils}
+   * ajouterait sinon silencieusement en fin d'analyse si le groupe n'en porte encore aucune (RG-044, US-045),
+   * cohérent avec le pré-remplissage déjà retenu par le formulaire unitaire de l'écran de Paramétrage pour la même
+   * borne de repli.
    * @param dependances - Lignes d'affichage des dépendances du projet.
    * @returns Le texte pré-rempli, deux lignes par dépendance non référencée distincte (version nettoyée, puis
-   * borne `*`), au format `motif;motifVersion=` de la grammaire retenue par {@link SaisieMasseDependancesUtils}.
+   * borne `*=obsolete`), au format `motif;motifVersion=statut` de la grammaire retenue par
+   * {@link SaisieMasseDependancesUtils}.
    */
   public texteInitialSaisieMasseDependances(dependances: readonly LigneDependance[]): string {
     const clesVues = new Set<string>();

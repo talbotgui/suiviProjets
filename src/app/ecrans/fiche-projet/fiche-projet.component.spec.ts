@@ -1114,7 +1114,7 @@ describe('SqmFicheProjetComponent', () => {
 
     it(
       'pré-remplit la modale, à l’ouverture, de deux lignes par dépendance non référencée distincte ' +
-        '(version, puis borne de repli « * »), statuts vides',
+        '(version, puis borne de repli « *=obsolete »)',
       () => {
         const projet = DonneesDeTest.projet('projet-1', [
           auditAvecDependances(dependancesNonReferencees(6)),
@@ -1128,7 +1128,7 @@ describe('SqmFicheProjetComponent', () => {
         const modale = DomTestUtils.obtenirComposantEnfant(fixture, SqmModaleSaisieMasseComponent);
         const lignesAttendues = dependancesNonReferencees(6).flatMap((dependance) => [
           `${dependance.reference};${dependance.version}=`,
-          `${dependance.reference};*=`,
+          `${dependance.reference};*=obsolete`,
         ]);
         expect(modale.texte().split('\n').sort()).toEqual([...lignesAttendues].sort());
       },
@@ -1167,7 +1167,12 @@ describe('SqmFicheProjetComponent', () => {
           },
         ]);
 
-        expect(texte.split('\n')).toEqual(['pkg1;1.2.3=', 'pkg1;*=', 'pkg2;2.0.0=', 'pkg2;*=']);
+        expect(texte.split('\n')).toEqual([
+          'pkg1;1.2.3=',
+          'pkg1;*=obsolete',
+          'pkg2;2.0.0=',
+          'pkg2;*=obsolete',
+        ]);
       },
     );
 
@@ -1196,7 +1201,7 @@ describe('SqmFicheProjetComponent', () => {
           },
         ]);
 
-        expect(texte.split('\n')).toEqual(['pkg1;1.2.3=', 'pkg1;*=']);
+        expect(texte.split('\n')).toEqual(['pkg1;1.2.3=', 'pkg1;*=obsolete']);
       },
     );
 
