@@ -10,7 +10,8 @@
 // normatif :
 // - Le majeur d'une version est le premier groupe de chiffres en tête de la chaîne (`"6.1.4"` -> 6, `"21.*"` ->
 //   21) ; une version dont la tête n'est pas numérique (`"*"`, `"${x}"`, `""`, `"v2"`) est exclue du calcul, sans
-//   valeur de repli inventée (RG-011).
+//   valeur de repli inventée (RG-011). Le préfixe de plage sémantique `^`/`~` d'une version constatée est retiré au
+//   préalable (`StatutObsolescenceUtils.normaliserVersionConstatee`), faute de quoi `"^6.1.4"` serait exclu.
 // - Le majeur de référence d'une règle est celui de sa PREMIÈRE borne de version : par convention retenue avec
 //   l'utilisateur, la première ligne saisie fait foi de la dernière version majeure connue (RG-050).
 // - Le retard d'une dépendance est `max(0, majeurRéférence − majeurDétecté)` : jamais négatif (une dépendance en
@@ -73,7 +74,9 @@ export class ObsolescenceRetardUtils {
     regle: RegleDependance,
   ): number | undefined {
     const majeurReference = ObsolescenceRetardUtils.majeurReferenceRegle(regle);
-    const majeurDetecte = ObsolescenceRetardUtils.parseMajeur(dependance.version);
+    const majeurDetecte = ObsolescenceRetardUtils.parseMajeur(
+      StatutObsolescenceUtils.normaliserVersionConstatee(dependance.version),
+    );
     if (majeurReference === undefined || majeurDetecte === undefined) {
       return undefined;
     }

@@ -40,6 +40,21 @@ export class StatutObsolescenceUtils {
   }
 
   /**
+   * Retire le préfixe de plage sémantique (`^` ou `~`) éventuellement porté en tête d'une version constatée de
+   * dépendance (`"^6.1.4"` → `"6.1.4"`, `"~2.3.0"` → `"2.3.0"`), afin que la confrontation aux motifs de version des
+   * règles ({@link calculerStatutObsolescence}, via `ParametresJugementUtils.correspondMotifGlob`) et le calcul du
+   * retard d'obsolescence (`ObsolescenceRetardUtils`, `obsolescence-retard.utils.ts`) portent sur le numéro de
+   * version lui-même : sans ce retrait, `"^6.1.4"` ne correspond à aucun motif `"6.*"` et sa tête non numérique
+   * l'exclut du calcul du retard. Seul ce caractère de tête est retiré ; toute autre chaîne (dont les plages plus
+   * riches `>=`, `1.x`, intervalles, non spécifiées par un texte normatif) est renvoyée inchangée.
+   * @param version - Version constatée d'une dépendance, telle que remontée par l'audit (`Dependance.version`).
+   * @returns La version sans son préfixe `^`/`~` de tête, ou `version` inchangée.
+   */
+  public static normaliserVersionConstatee(version: string): string {
+    return version.startsWith('^') || version.startsWith('~') ? version.slice(1) : version;
+  }
+
+  /**
    * Calcule le statut d'obsolescence d'une dépendance constatée (RG-011 : ce statut n'est jamais stocké comme un
    * constat, seulement calculé à l'affichage) : la première règle dont le motif (glob) correspond à la référence
    * de la dépendance est retenue (précédence par ordre de déclaration du référentiel, décision arbitraire à
@@ -64,8 +79,9 @@ export class StatutObsolescenceUtils {
     if (regleCorrespondante === undefined) {
       return { type: 'nonReference' };
     }
+    const versionConstatee = StatutObsolescenceUtils.normaliserVersionConstatee(dependance.version);
     const versionCorrespondante = regleCorrespondante.versions.find((version) =>
-      ParametresJugementUtils.correspondMotifGlob(version.motifVersion, dependance.version),
+      ParametresJugementUtils.correspondMotifGlob(version.motifVersion, versionConstatee),
     );
     if (versionCorrespondante === undefined) {
       return { type: 'nonReference' };

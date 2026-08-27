@@ -62,6 +62,34 @@ describe('StatutObsolescenceUtils', () => {
         ),
       ).toEqual({ type: 'nonReference' });
     });
+
+    it('ignore le préfixe de plage (^/~) de la version constatée pour la confrontation aux motifs', () => {
+      expect(
+        StatutObsolescenceUtils.calculerStatutObsolescence(
+          { reference: 'org.springframework:spring-core', version: '^6.1.4' },
+          REGLES,
+        ),
+      ).toEqual({ type: 'statut', statut: 'aJourM1' });
+      expect(
+        StatutObsolescenceUtils.calculerStatutObsolescence(
+          { reference: 'org.springframework:spring-core', version: '~5.3.30' },
+          REGLES,
+        ),
+      ).toEqual({ type: 'statut', statut: 'maintenu' });
+    });
+  });
+
+  describe('normaliserVersionConstatee', () => {
+    it('retire un préfixe ^ ou ~ de tête', () => {
+      expect(StatutObsolescenceUtils.normaliserVersionConstatee('^6.1.4')).toBe('6.1.4');
+      expect(StatutObsolescenceUtils.normaliserVersionConstatee('~2.3.0')).toBe('2.3.0');
+    });
+
+    it('renvoie la chaîne inchangée en l’absence de préfixe de plage', () => {
+      expect(StatutObsolescenceUtils.normaliserVersionConstatee('6.1.4')).toBe('6.1.4');
+      expect(StatutObsolescenceUtils.normaliserVersionConstatee('>=1.0.0')).toBe('>=1.0.0');
+      expect(StatutObsolescenceUtils.normaliserVersionConstatee('')).toBe('');
+    });
   });
 
   describe('canoniserCasseStatut (amendement RG-043)', () => {

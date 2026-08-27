@@ -131,6 +131,18 @@ describe('ObsolescenceRetardUtils', () => {
         }),
       ).toBeUndefined();
     });
+
+    it('ignore le préfixe de plage (^/~) de la version constatée pour le calcul du retard', () => {
+      expect(
+        ObsolescenceRetardUtils.calculerRetardDependance(
+          Fixtures.dep('java', '^17.0.2'),
+          REGLES[0],
+        ),
+      ).toBe(4);
+      expect(
+        ObsolescenceRetardUtils.calculerRetardDependance(Fixtures.dep('java', '~8'), REGLES[0]),
+      ).toBe(13);
+    });
   });
 
   describe('calculerObsolescenceParCategorie', () => {
