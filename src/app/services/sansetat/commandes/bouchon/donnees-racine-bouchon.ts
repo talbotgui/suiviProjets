@@ -11,9 +11,13 @@
 // `DonneesRacine` : ce bouchon reste donc lui aussi générique (`RacineBouchon`, structure large mais peu détaillée),
 // à l'identique de ce choix côté Façade.
 //
-// `RACINE_BOUCHON_CHARGEMENT` (`charger_fichier`) reprend telle quelle la racine de
+// `RACINE_BOUCHON_CHARGEMENT` (`charger_fichier`) reprend la racine de
 // `docs/01_besoin/exemple-donnees.json` (deux groupes, six projets, deux campagnes), cohérente par construction
-// avec `donnees-bouchon.ts` : mêmes identifiants de source, mêmes constats bruts. `construireRacineBouchonVide`
+// avec `donnees-bouchon.ts` : mêmes identifiants de source, mêmes constats bruts. Écarts assumés par rapport à
+// `exemple-donnees.json` (fichier gelé) : `categoriesDependances` et la règle de dépendances `java` par défaut
+// (US-048/US-050) ; quelques règles de dépendances catégorisées et leurs bornes de version réordonnées de la plus
+// récente à la plus ancienne, plus une dépendance `java` ajoutée à un audit, afin que l'écran Obsolescence affiche
+// des indicateurs non vides en `ng serve` (relecture N1/N2). `construireRacineBouchonVide`
 // (`creer_fichier`) reproduit `DonneesRacine::nouvelle` côté cœur natif (`src-tauri/src/modele/racine.rs`) :
 // groupes/campagnes/référentiels vides, horodatage de création courant. Les trois branches de `parametres` que
 // l'interface laisse en `unknown` (`audit`, `proxy`, `sauvegarde`) sont tout de même renseignées ici avec les
@@ -71,7 +75,7 @@ const CATEGORIES_DEPENDANCES_PAR_DEFAUT: readonly { id: string; libelle: string;
  * GitLab comme une dépendance de référence `java`) à la catégorie `exec`.
  */
 const REGLE_JAVA_PAR_DEFAUT: unknown = {
-  id: '50000000-0000-4000-8000-000000000001',
+  id: '20000000-0000-4000-8000-000000000010',
   motif: 'java',
   categorie: '40000000-0000-4000-8000-000000000001',
   versions: [
@@ -276,6 +280,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'develop',
                   shaTete: '8c1d0e44',
                   dependances: [
+                    { reference: 'java', version: '11', manifeste: 'pom.xml' },
                     {
                       reference: 'org.springframework:spring-core',
                       version: '5.3.12',
@@ -1391,14 +1396,19 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
     },
   ],
   referentiels: {
+    // Bornes de version ordonnées de la plus récente à la plus ancienne (la première borne fait foi de la version
+    // majeure de référence pour l'écran Obsolescence, RG-050) ; quelques règles catégorisées pour que l'écran
+    // Obsolescence affiche des indicateurs non vides en `ng serve` / recette manuelle (relecture N1/N2).
     reglesDependances: [
+      REGLE_JAVA_PAR_DEFAUT,
       {
         id: '20000000-0000-4000-8000-000000000001',
         motif: 'org.springframework:*',
+        categorie: '40000000-0000-4000-8000-000000000003',
         versions: [
-          { motifVersion: '4.*', statut: 'obsolete' },
-          { motifVersion: '5.3.*', statut: 'maintenu' },
           { motifVersion: '6.1.*', statut: 'aJourM1' },
+          { motifVersion: '5.3.*', statut: 'maintenu' },
+          { motifVersion: '4.*', statut: 'obsolete' },
         ],
       },
       {
@@ -1409,9 +1419,10 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
       {
         id: '20000000-0000-4000-8000-000000000003',
         motif: 'org.apache.logging.log4j:*',
+        categorie: '40000000-0000-4000-8000-000000000003',
         versions: [
-          { motifVersion: '2.17.*', statut: 'maintenu' },
           { motifVersion: '2.23.*', statut: 'aJourM1' },
+          { motifVersion: '2.17.*', statut: 'maintenu' },
         ],
       },
       {
@@ -1422,10 +1433,11 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
       {
         id: '20000000-0000-4000-8000-000000000005',
         motif: '@angular/*',
+        categorie: '40000000-0000-4000-8000-000000000004',
         versions: [
-          { motifVersion: '16.*', statut: 'maintenu' },
-          { motifVersion: '17.*', statut: 'aJourM3' },
           { motifVersion: '18.*', statut: 'aJourM1' },
+          { motifVersion: '17.*', statut: 'aJourM3' },
+          { motifVersion: '16.*', statut: 'maintenu' },
         ],
       },
       {

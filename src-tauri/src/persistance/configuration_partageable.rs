@@ -175,6 +175,11 @@ pub(crate) fn ecrire_configuration(
 /// par un humain, cf. rapport de développement), aucune migration dédiée à la configuration partageable seule
 /// n'étant fournie par la documentation source. Refuse explicitement un fichier plus récent plutôt que de le
 /// migrer de façon hasardeuse (même politique que `crate::persistance::moteur::charger_fichier`).
+///
+/// Conséquence assumée (relecture N11) : `migration_5_vers_6` insérant la règle de dépendances `java` par défaut
+/// (US-050) quand elle est absente, l'import d'une configuration antérieure à la version 6 fait apparaître cette
+/// règle comme une ligne « Ajout » du différentiel — l'utilisateur reste libre de ne pas l'accepter, comme pour
+/// toute autre ligne.
 fn lire_configuration(chemin: &Path) -> Result<Value, ErreurConfigurationPartageable> {
     let contenu = std::fs::read_to_string(chemin)
         .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;

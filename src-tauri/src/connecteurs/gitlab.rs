@@ -2129,8 +2129,13 @@ fn majeur_version_java(version: &str) -> u32 {
 /// [`Dependance`] synthétique de référence `java` (`manifeste: "pom.xml"`), ou `None` si aucun `pom.xml` ne déclare
 /// l'une des [`PROPRIETES_VERSION_JAVA`]. Pour chaque pom, les properties sont fusionnées avec sa chaîne de parents
 /// disponible (comme pour la résolution des dépendances) ; en présence de valeurs divergentes entre modules, la
-/// version majeure la plus élevée est retenue (départage stable par ordre de découverte), la version de Java d'un
-/// dépôt étant, en pratique, celle du module le plus exigeant.
+/// version majeure la plus élevée est retenue (départage stable par ordre de découverte).
+///
+/// **Décision arbitraire à valider par un humain** (cf. rapport de développement de cet incrément) : retenir le
+/// majeur le plus élevé revient à supposer que la version de Java d'un dépôt est celle du module le plus à jour ;
+/// le compromis inverse (retenir le module le moins maintenu) serait défendable pour un indicateur d'*obsolescence*.
+/// L'ordre de consultation des propriétés (`source` puis `target` puis `release` au sein d'un pom) est lui aussi un
+/// choix arbitraire, repris de la demande fonctionnelle.
 fn extraire_version_java(
     poms_bruts_ordonnes: &[(String, PomBrut)],
     poms_bruts: &HashMap<String, PomBrut>,

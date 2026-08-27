@@ -499,7 +499,9 @@ export class ParametresJugementUtils {
 
   /**
    * Valide une entrée brute de `referentiels.categoriesDependances` (US-048) : `id` et `libelle` chaînes non
-   * vides, `sigle` chaîne (éventuellement vide) sinon repli sur chaîne vide.
+   * vides ; `sigle` tronqué aux trois premiers caractères s'il est plus long (le cœur natif et l'interface
+   * plafonnent à trois, mais un fichier édité ou importé à la main pourrait déborder), repli sur les trois
+   * premières lettres du libellé en majuscules si `sigle` est absent, non-chaîne ou vide.
    * @param brut - Élément brut du tableau `categoriesDependances`.
    * @returns L'entrée validée, ou `undefined` si elle est malformée (entrée silencieusement écartée).
    */
@@ -514,7 +516,11 @@ export class ParametresJugementUtils {
     ) {
       return undefined;
     }
-    return { id, libelle, sigle: typeof sigle === 'string' ? sigle : '' };
+    const sigleNettoye =
+      typeof sigle === 'string' && sigle.length > 0
+        ? sigle.slice(0, 3)
+        : libelle.slice(0, 3).toUpperCase();
+    return { id, libelle, sigle: sigleNettoye };
   }
 
   /**

@@ -72,6 +72,7 @@ import type {
   ResultatMutationAdministration,
 } from '../../../services/avecetat/etat/types-donnees';
 import type { VersionDependance } from '../../../services/sansetat/jugement/parametres-jugement.utils';
+import { ObsolescenceRetardUtils } from '../../../services/sansetat/jugement/obsolescence-retard.utils';
 
 /**
  * Action de référentiel actuellement en attente de ressaisie du mot de passe (RG-002), `null` si aucune. Les deux
@@ -215,6 +216,13 @@ export class SqmReferentielsParametrageComponent {
   public avertissementStatutInconnu: string | null = null;
 
   /**
+   * Avertissement non bloquant (relecture N1) : la première borne de version d'une règle de dépendances fait foi de
+   * la version majeure la plus récente connue pour le calcul du retard d'obsolescence (RG-050) ; si une borne
+   * ultérieure porte un majeur plus élevé, ce calcul serait faussé. `null` si aucun.
+   */
+  public avertissementOrdreVersions: string | null = null;
+
+  /**
    * Action de référentiel en attente de ressaisie du mot de passe (RG-002). Signal (plutôt qu'une simple propriété)
    * car mutée depuis la continuation asynchrone des quatre méthodes `confirmer*` de ce composant, hors de toute
    * planification automatique de détection de changement en application zoneless (cf. `cheminCreation` de
@@ -283,6 +291,7 @@ export class SqmReferentielsParametrageComponent {
     this.categorieDependance = null;
     this.messageErreur = null;
     this.avertissementStatutInconnu = null;
+    this.avertissementOrdreVersions = null;
     this.formulaireDependanceVisible.set(true);
     this.focusApresRendu(this.premierChampDependance);
   }
@@ -312,6 +321,7 @@ export class SqmReferentielsParametrageComponent {
     this.versionsDependanceTexte = lignes.join('\n');
     this.messageErreur = null;
     this.avertissementStatutInconnu = null;
+    this.avertissementOrdreVersions = null;
     this.formulaireDependanceVisible.set(true);
     this.focusApresRendu(this.premierChampDependance);
   }
@@ -358,6 +368,7 @@ export class SqmReferentielsParametrageComponent {
     if (this.motifDependance.trim().length === 0) {
       this.messageErreur = 'Le motif est obligatoire.';
       this.avertissementStatutInconnu = null;
+      this.avertissementOrdreVersions = null;
       return;
     }
     const versions = this.analyserVersions(this.versionsDependanceTexte);
@@ -365,6 +376,7 @@ export class SqmReferentielsParametrageComponent {
       this.messageErreur =
         'Chaque ligne de bornes de version doit être au format « motifVersion=statut ».';
       this.avertissementStatutInconnu = null;
+      this.avertissementOrdreVersions = null;
       return;
     }
     const motif = this.motifDependance.trim();
@@ -375,6 +387,7 @@ export class SqmReferentielsParametrageComponent {
       this.messageErreur =
         'Une règle de dépendances existe déjà pour ce motif : modifiez directement la règle existante plutôt que d’en créer une nouvelle (RG-042).';
       this.avertissementStatutInconnu = null;
+      this.avertissementOrdreVersions = null;
       return;
     }
     this.messageErreur = null;
@@ -384,7 +397,30 @@ export class SqmReferentielsParametrageComponent {
     this.avertissementStatutInconnu = statutHorsListeConnue
       ? 'Au moins une borne de version porte un statut hors des quatre valeurs reconnues (obsolete, maintenu, aJourM1, aJourM3) : elle sera néanmoins enregistrée telle quelle.'
       : null;
+    this.avertissementOrdreVersions =
+      SqmReferentielsParametrageComponent.premiereBorneNestPasLaPlusRecente(versions)
+        ? "La première borne de version n'est pas celle qui porte le numéro majeur le plus élevé : elle sert pourtant de version de référence pour le calcul du retard d'obsolescence (écran Obsolescence). Placez la version la plus récente en première ligne."
+        : null;
     this.actionEnAttenteMotDePasse.set('dependance');
+  }
+
+  /**
+   * Indique si la première borne de version n'est pas celle qui porte le numéro majeur le plus élevé parmi les
+   * bornes numériquement analysables (relecture N1, RG-050).
+   * @param versions - Bornes de version analysées.
+   * @returns `true` s'il faut avertir l'utilisateur.
+   */
+  private static premiereBorneNestPasLaPlusRecente(
+    versions: readonly VersionDependance[],
+  ): boolean {
+    const premierMajeur = ObsolescenceRetardUtils.parseMajeur(versions[0]?.motifVersion ?? '');
+    if (premierMajeur === undefined) {
+      return false;
+    }
+    return versions.slice(1).some((version) => {
+      const majeur = ObsolescenceRetardUtils.parseMajeur(version.motifVersion);
+      return majeur !== undefined && majeur > premierMajeur;
+    });
   }
 
   /**
@@ -417,6 +453,7 @@ export class SqmReferentielsParametrageComponent {
     }
     this.formulaireDependanceVisible.set(false);
     this.avertissementStatutInconnu = null;
+    this.avertissementOrdreVersions = null;
     this.notification.succes(
       dependanceEnEditionId
         ? 'La règle de dépendances a été modifiée.'

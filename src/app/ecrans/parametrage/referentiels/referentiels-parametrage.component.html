@@ -242,6 +242,11 @@
             {{ avertissementStatutInconnu }}
           </p>
         }
+        @if (avertissementOrdreVersions) {
+          <p class="referentiels-parametrage__avertissement texte-orange texte-sm" role="status">
+            {{ avertissementOrdreVersions }}
+          </p>
+        }
         <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
           <button
             id="referentiels-parametrage-bouton-annuler-dependance"

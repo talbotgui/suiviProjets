@@ -361,18 +361,20 @@ describe('ParametresJugementUtils', () => {
       });
     });
 
-    it('replie un sigle absent ou non-chaîne sur une chaîne vide', () => {
+    it('replie un sigle absent ou non-chaîne sur les 3 premières lettres du libellé et tronque un sigle trop long', () => {
       const resultat = ParametresJugementUtils.lireCategoriesDependances({
         categoriesDependances: [
           { id: 'c1', libelle: 'exec' },
           { id: 'c2', libelle: 'os', sigle: 7 },
+          { id: 'c3', libelle: 'fmkBack', sigle: 'FRAMEWORK' },
         ],
       });
       expect(resultat).toEqual({
         type: 'valeur',
         valeur: [
-          { id: 'c1', libelle: 'exec', sigle: '' },
-          { id: 'c2', libelle: 'os', sigle: '' },
+          { id: 'c1', libelle: 'exec', sigle: 'EXE' },
+          { id: 'c2', libelle: 'os', sigle: 'OS' },
+          { id: 'c3', libelle: 'fmkBack', sigle: 'FRA' },
         ],
       });
     });

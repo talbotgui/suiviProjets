@@ -113,6 +113,7 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
       ],
       marqueurs: [],
       dependances: [
+        { reference: 'java', version: '21', manifeste: 'pom.xml' },
         { reference: 'org.springframework:spring-core', version: '6.1.8', manifeste: 'pom.xml' },
         {
           reference: 'org.apache.logging.log4j:log4j-core',
@@ -147,6 +148,7 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
       membres: [{ username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: true }],
       marqueurs: [],
       dependances: [
+        { reference: 'java', version: '17', manifeste: 'pom.xml' },
         {
           reference: 'org.springframework.boot:spring-boot-starter-batch',
           version: '3.2.5',
@@ -178,6 +180,7 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
       membres: [{ username: 'jpetit', nom: 'Julien Petit', niveauAcces: 40, herite: true }],
       marqueurs: [],
       dependances: [
+        { reference: 'java', version: '8', manifeste: 'pom.xml' },
         { reference: 'org.springframework:spring-core', version: '4.3.30', manifeste: 'pom.xml' },
         { reference: 'log4j:log4j', version: '1.2.17', manifeste: 'pom.xml' },
       ],

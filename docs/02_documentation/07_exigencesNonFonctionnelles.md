@@ -103,7 +103,7 @@ La qualification juridique précise du traitement (responsable de traitement, ba
 | RNF-004 | US-009, US-010, US-012 |
 | RNF-006, RNF-007, RNF-008 | US-025 ; échelle de volumétrie retenue à l'étape 4 |
 | RNF-009, RNF-010, RNF-011 | US-010, US-011, US-013 |
-| RNF-019, RNF-020 | Ensemble des écrans de restitution (Synthèse des audits, Fiche projet, Liste de travail) |
+| RNF-019, RNF-020 | Ensemble des écrans de restitution (Synthèse des audits, Synthèse graphique, Obsolescence, Fiche projet, Liste de travail) |
 | RNF-030, RNF-031 | US-037 ; aucun objectif mesurable dédié de l'étape 2, trou documentaire comblé en Phase 10 (cf. [plan de développement](../03_plan/plan_13_developpement.md#phase-10--rattrapage--bugs)) |
 | RNF-021, RNF-022, RNF-023 | Contrainte d'architecture desktop ([Specification.md, section 1.1](../01_besoin/Specification.md#11-architecture-retenue)) |
 | RNF-024, RNF-025, RNF-026, RNF-029 | Principe « Français intégral » ([Specification.md, section 1.2](../01_besoin/Specification.md#12-principes-de-conception)) |

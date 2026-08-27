@@ -105,7 +105,14 @@ describe('BouchonCommandesUtils', () => {
       readonly dependances: readonly unknown[];
     }>('interroger_dependances', { sourceId: SOURCE_ID_GITLAB_CONNU });
 
-    expect(resultat.dependances).toHaveLength(3);
+    // 3 dépendances déclarées + la version de Java synthétique (US-050, ajoutée au jeu bouchon pour l'écran
+    // Obsolescence).
+    expect(resultat.dependances).toHaveLength(4);
+    expect(resultat.dependances).toContainEqual({
+      reference: 'java',
+      version: '21',
+      manifeste: 'pom.xml',
+    });
   });
 
   it('doit résoudre interroger_marqueurs_ia (F18) pour une source connue du jeu de données', async () => {

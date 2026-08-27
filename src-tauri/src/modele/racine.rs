@@ -129,7 +129,7 @@ fn categories_dependances_par_defaut() -> Vec<Value> {
 /// GitLab émet la version de Java des `pom.xml` comme une dépendance de référence `java`
 /// ([`crate::connecteurs::gitlab`]), et cette règle la rattache par défaut à la catégorie `exec` pour qu'elle
 /// alimente l'écran Obsolescence sans configuration préalable.
-pub(crate) const REGLE_JAVA_ID: &str = "50000000-0000-4000-8000-000000000001";
+pub(crate) const REGLE_JAVA_ID: &str = "20000000-0000-4000-8000-000000000010";
 
 /// Motif de la règle de dépendances par défaut couvrant la version de Java (cf. [`REGLE_JAVA_ID`]).
 pub(crate) const REGLE_JAVA_MOTIF: &str = "java";

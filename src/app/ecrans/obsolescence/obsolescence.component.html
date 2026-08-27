@@ -45,7 +45,7 @@
             class="champ__controle obsolescence__champ-borne"
             [attr.aria-label]="'Retard minimal ' + categorie.libelle"
             min="0"
-            [max]="maxParCategorie().get(categorie.id) ?? 0"
+            [max]="maxFiltre(categorie.id)"
             [value]="minFiltre(categorie.id)"
             (change)="onChangerBorne(categorie.id, 'min', champMin.value)"
           />
@@ -57,7 +57,7 @@
             class="champ__controle obsolescence__champ-borne"
             [attr.aria-label]="'Retard maximal ' + categorie.libelle"
             min="0"
-            [max]="maxParCategorie().get(categorie.id) ?? 0"
+            [max]="maxFiltre(categorie.id)"
             [value]="maxFiltre(categorie.id)"
             (change)="onChangerBorne(categorie.id, 'max', champMax.value)"
           />
@@ -85,7 +85,7 @@
             <span
               class="obsolescence__pastille"
               aria-hidden="true"
-              [style.background-color]="couleurCategorie(categorie.id)"
+              [style.background-color]="couleurParCategorie().get(categorie.id)"
             ></span>
             <span>{{ categorie.libelle }}</span>
             <span class="texte-discret police-mono">
@@ -109,22 +109,22 @@
       </p>
     } @else {
       <div class="obsolescence__grille">
-        @for (ligne of projetsAffiches(); track ligne.projetId) {
+        @for (tuile of tuiles(); track tuile.projetId) {
           <button
             type="button"
             class="obsolescence__tuile d-flex direction-colonne ecart-2"
-            [title]="infobulleProjet(ligne)"
-            (click)="ouvrirDetail(ligne.projetId)"
+            [title]="tuile.infobulle"
+            (click)="ouvrirDetail(tuile.projetId)"
           >
             <span class="obsolescence__nom-projet poids-demi-gras texte-sm">{{
-              ligne.nomProjet
+              tuile.nomProjet
             }}</span>
-            @for (categorie of categories(); track categorie.id) {
+            @for (mesure of tuile.mesures; track mesure.categorieId) {
               <app-barre-mesure
-                [sigle]="categorie.sigle"
-                [valeur]="valeurProjet(ligne, categorie.id)"
-                [valeurMax]="maxParCategorie().get(categorie.id) ?? 0"
-                [couleur]="couleurCategorie(categorie.id)"
+                [sigle]="mesure.sigle"
+                [valeur]="mesure.valeur"
+                [valeurMax]="mesure.valeurMax"
+                [couleur]="mesure.couleur"
               />
             }
           </button>
@@ -141,10 +141,14 @@
 @if (detailProjetSelectionne(); as detail) {
   <div class="superposition">
     <div
+      #panneauModale
       class="obsolescence-detail superposition__panneau superposition__panneau--large carte d-flex direction-colonne ecart-3"
       role="dialog"
       aria-modal="true"
       aria-labelledby="obsolescence-detail-titre"
+      tabindex="-1"
+      (keydown.tab)="piegerFocus($event)"
+      (keydown.shift.tab)="piegerFocus($event)"
     >
       <header class="d-flex aligne-centre justifie-espace ecart-2">
         <h2 id="obsolescence-detail-titre" class="texte-lg poids-gras exterieur-0">
@@ -171,15 +175,17 @@
             <thead>
               <tr>
                 <th scope="col">Dépendance</th>
+                <th scope="col">Manifeste</th>
                 <th scope="col">Catégorie</th>
                 <th scope="col">Version</th>
                 <th scope="col">Retard</th>
               </tr>
             </thead>
             <tbody>
-              @for (dep of detail.lignes; track dep.reference) {
+              @for (dep of detail.lignes; track dep.reference + ' ' + dep.manifeste) {
                 <tr [class.obsolescence-detail__java]="dep.estJava">
                   <td class="police-mono">{{ dep.reference }}</td>
+                  <td class="police-mono texte-discret">{{ dep.manifeste }}</td>
                   <td>{{ dep.categorie }}</td>
                   <td class="police-mono">{{ dep.version }}</td>
                   <td class="police-mono">{{ dep.retard }}</td>

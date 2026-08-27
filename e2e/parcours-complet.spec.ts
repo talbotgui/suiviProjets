@@ -512,6 +512,25 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('app-graphique-evolution')).toBeVisible();
   });
 
+  // 19b. Obsolescence — grille de tuiles et modale de détail du dernier audit d'un projet (US-051).
+  await test.step('19b. Obsolescence', async () => {
+    await avantChangementEcran(page, '19b-obsolescence');
+    await page.locator('#shell-lien-obsolescence').click();
+    await expect(page).toHaveURL(/\/obsolescence$/);
+
+    // Le bandeau de légende porte au moins les catégories de dépendance par défaut (exec, os, fmkBack, fmkFront).
+    await expect(page.locator('.obsolescence__legende')).toContainText('exec');
+    const premiereTuile = page.locator('.obsolescence__tuile').first();
+    await expect(premiereTuile).toBeVisible();
+
+    await premiereTuile.click();
+    await expect(page.locator('.obsolescence-detail')).toBeVisible();
+    await page.locator('#obsolescence-detail-fermer').click();
+    await expect(page.locator('.obsolescence-detail')).toHaveCount(0);
+
+    await page.locator('#obsolescence-bouton-export').click();
+  });
+
   // 20. Comparaison entre deux audits — comparaison des deux audits intégrés d'un même projet.
   await test.step('20. Comparaison entre deux audits', async () => {
     await avantChangementEcran(page, '20-comparaison-audits');

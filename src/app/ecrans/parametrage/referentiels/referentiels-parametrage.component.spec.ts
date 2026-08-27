@@ -503,6 +503,33 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.avertissementStatutInconnu).not.toBeNull();
   });
 
+  it('avertit, sans bloquer, quand la première borne n’est pas la version majeure la plus récente (relecture N1, RG-050)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'org.springframework:*';
+    composant.versionsDependanceTexte = '4.*=obsolete\n6.*=maintenu';
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.avertissementOrdreVersions).toContain('numéro majeur le plus élevé');
+    expect(composant.actionEnAttenteMotDePasse()).toBe('dependance');
+  });
+
+  it('ne pose aucun avertissement d’ordre quand la première borne porte le majeur le plus élevé (N1)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'org.springframework:*';
+    composant.versionsDependanceTexte = '6.*=maintenu\n4.*=obsolete\n*=obsolete';
+
+    composant.demanderEnregistrementDependance();
+
+    expect(composant.avertissementOrdreVersions).toBeNull();
+  });
+
   // --- Recette Phase 15 : C15-12/US-045/RG-044 (borne de repli automatique) ---
 
   it('pré-remplit une nouvelle règle de dépendances d’une borne de repli « *=obsolete » (RG-044)', () => {

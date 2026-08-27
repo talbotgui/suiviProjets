@@ -199,8 +199,8 @@ describe('SqmObsolescenceComponent', () => {
     const composant = creer(racine).componentInstance;
 
     const ligne = composant.projetsAffiches()[0];
-    expect(composant.valeurProjet(ligne, 'cat-exec')).toBe(4); // 21 - 17
-    expect(composant.valeurProjet(ligne, 'cat-back')).toBe(1); // 6 - 5
+    expect(ligne.valeurParCategorie.get('cat-exec')).toBe(4); // 21 - 17
+    expect(ligne.valeurParCategorie.get('cat-back')).toBe(1); // 6 - 5
     expect(composant.total()).toBe(1);
   });
 
@@ -275,7 +275,7 @@ describe('SqmObsolescenceComponent', () => {
     const composant = creer(racine).componentInstance;
 
     composant.onChangerDate('2026-03-01');
-    expect(composant.valeurProjet(composant.projetsAffiches()[0], 'cat-exec')).toBe(13); // audit de janvier
+    expect(composant.projetsAffiches()[0].valeurParCategorie.get('cat-exec')).toBe(13); // audit de janvier
   });
 
   it('calcule la médiane par catégorie sur les projets affichés', () => {
@@ -328,6 +328,78 @@ describe('SqmObsolescenceComponent', () => {
     const composant = creer(DonneesDeTest.racine([])).componentInstance;
     composant.ouvrirDetail('inexistant');
     expect(composant.detailProjetSelectionne()).toBeNull();
+  });
+
+  it('distingue une même dépendance déclarée dans deux manifestes, sans plantage de rendu (B1)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'com.google.guava:guava', version: '31.0', manifeste: 'pom.xml' },
+          { reference: 'com.google.guava:guava', version: '30.0', manifeste: 'build.gradle' },
+        ]),
+      ]),
+    ]);
+    const fixture = creer(racine);
+    fixture.componentInstance.ouvrirDetail('p1');
+    fixture.detectChanges();
+
+    const lignes = fixture.componentInstance.detailProjetSelectionne()?.lignes ?? [];
+    expect(lignes).toHaveLength(2);
+    expect(lignes.map((ligne) => ligne.manifeste)).toEqual(['build.gradle', 'pom.xml']);
+    expect(
+      DomTestUtils.obtenirElementNatif(fixture).querySelectorAll(
+        '.obsolescence-detail__tableau tbody tr',
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('restaure le focus sur l’élément déclencheur à la fermeture de la modale (N7, RNF-019)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '17', manifeste: 'pom.xml' },
+        ]),
+      ]),
+    ]);
+    const fixture = creer(racine);
+    const declencheur =
+      DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLButtonElement>(
+        '.obsolescence__tuile',
+      );
+    declencheur?.focus();
+    expect(document.activeElement).toBe(declencheur);
+
+    fixture.componentInstance.ouvrirDetail('p1');
+    fixture.detectChanges();
+    fixture.componentInstance.fermerDetail();
+
+    expect(document.activeElement).toBe(declencheur);
+    expect(fixture.componentInstance.detailProjetSelectionne()).toBeNull();
+  });
+
+  it('piège le focus dans le panneau de la modale (N7)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '17', manifeste: 'pom.xml' },
+        ]),
+      ]),
+    ]);
+    const fixture = creer(racine);
+    fixture.componentInstance.ouvrirDetail('p1');
+    fixture.detectChanges();
+    const panneau =
+      DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLElement>('.obsolescence-detail');
+    const focusables = panneau?.querySelectorAll<HTMLElement>('button') ?? [];
+    const dernier = focusables[focusables.length - 1];
+    dernier.focus();
+
+    const evenement = new KeyboardEvent('keydown', { key: 'Tab' });
+    const preventDefault = jest.spyOn(evenement, 'preventDefault');
+    fixture.componentInstance.piegerFocus(evenement);
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(document.activeElement).toBe(focusables[0]);
   });
 
   it('indique « jamais audité » dans la modale d’un projet sans audit retenu', () => {
@@ -390,7 +462,7 @@ describe('SqmObsolescenceComponent', () => {
       ]),
     ]);
     const composant = creer(racine).componentInstance;
-    const infobulle = composant.infobulleProjet(composant.projetsAffiches()[0]);
+    const infobulle = composant.projetsAffiches()[0].infobulle;
     expect(infobulle).toContain('exec : 4 version(s) majeure(s) de retard');
     expect(infobulle).toContain('fmkBack : aucune dépendance');
   });
@@ -424,10 +496,22 @@ describe('SqmObsolescenceComponent', () => {
     expect(element.textContent).toContain("Aucune catégorie de dépendance n'est définie");
   });
 
-  it('cycle la palette de couleurs par position de catégorie', () => {
-    const composant = creer(DonneesDeTest.racine([])).componentInstance;
-    expect(composant.couleurCategorie('cat-exec')).not.toBe(composant.couleurCategorie('cat-back'));
-    expect(composant.couleurCategorie('inconnue')).toBe(composant.couleurCategorie('cat-exec'));
+  it('associe une teinte distincte à chaque catégorie et cycle la palette au-delà de 6', () => {
+    const racine = DonneesDeTest.racine([]);
+    const septCategories = Array.from({ length: 7 }, (_valeur, index) => ({
+      id: `c${index}`,
+      libelle: `Cat ${index}`,
+      sigle: 'CAT',
+    }));
+    const composant = creer({
+      ...racine,
+      referentiels: { ...racine.referentiels, categoriesDependances: septCategories },
+    }).componentInstance;
+
+    const couleurs = composant.couleurParCategorie();
+    expect(couleurs.get('c0')).not.toBe(couleurs.get('c1'));
+    expect(couleurs.get('c6')).toBe(couleurs.get('c0')); // 7e catégorie -> retour au début de la palette
+    expect(couleurs.get('inconnue')).toBeUndefined();
   });
 
   it('exporte la grille en PNG et notifie du nom de fichier', async () => {

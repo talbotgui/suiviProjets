@@ -12,15 +12,21 @@
 //   égale à la date du filtre (initialisée à aujourd'hui), sur le modèle de sélection de la Synthèse des audits.
 // - Filtre par catégorie : un couple valeur min / valeur max par catégorie, appliqués en ET ; un couple laissé à
 //   pleine amplitude (`[0, max]`) n'est pas un filtre actif (un projet sans valeur pour cette catégorie n'est alors
-//   pas exclu) ; dès qu'un couple est resserré, un projet sans valeur pour cette catégorie est exclu.
+//   pas exclu) ; dès qu'un couple est resserré, un projet sans valeur pour cette catégorie est exclu (choix
+//   surprenant relevé en relecture, N10 : conservé faute d'un comportement plus intuitif consensuel).
 // - Palette : une teinte constante par catégorie, indexée par la position de la catégorie dans le référentiel
 //   (`PALETTE_CATEGORIES`, cycle si plus de catégories que de teintes) ; la valeur est encodée par la seule
 //   longueur de barre, la valeur numérique restant toujours affichée (RNF-020).
 // - Médiane d'une catégorie : médiane des valeurs des projets AFFICHÉS ayant une valeur pour cette catégorie (les
 //   projets sans valeur sont exclus du calcul, jamais comptés `0`).
+//
+// Toutes les données par tuile (mesures, infobulle) et la table des couleurs sont précalculées dans des `computed`
+// (N9, relecture) : aucune méthode en O(n) n'est appelée depuis le gabarit dans une boucle de rendu.
 import {
   Component,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -57,7 +63,7 @@ const PALETTE_CATEGORIES: readonly string[] = [
   'hsl(340 55% 55%)',
 ];
 
-/** Retard d'obsolescence d'un projet, par catégorie, pour l'audit retenu. */
+/** Retard d'obsolescence d'un projet, par catégorie, pour l'audit retenu (données brutes, avant filtrage). */
 interface LigneObsolescence {
   readonly projetId: string;
   readonly nomProjet: string;
@@ -67,6 +73,25 @@ interface LigneObsolescence {
   readonly audit: Audit | undefined;
   /** Retard par identifiant de catégorie ; une catégorie absente signifie « aucune valeur » (jamais `0`). */
   readonly valeurParCategorie: ReadonlyMap<string, number>;
+  /** Texte de l'infobulle native de la tuile, précalculé. */
+  readonly infobulle: string;
+}
+
+/** Mesure affichée d'une catégorie sur une tuile (une barre). */
+interface MesureCategorie {
+  readonly categorieId: string;
+  readonly sigle: string;
+  readonly couleur: string;
+  readonly valeur: number | null;
+  readonly valeurMax: number;
+}
+
+/** Tuile affichée : projet + une mesure par catégorie, après application des filtres. */
+interface TuileObsolescence {
+  readonly projetId: string;
+  readonly nomProjet: string;
+  readonly infobulle: string;
+  readonly mesures: readonly MesureCategorie[];
 }
 
 /** Couple de bornes d'un filtre par catégorie. */
@@ -78,10 +103,18 @@ interface BornesFiltre {
 /** Ligne de détail d'une dépendance dans la modale du dernier audit d'un projet. */
 interface LigneDetailDependance {
   readonly reference: string;
+  readonly manifeste: string;
   readonly version: string;
   readonly categorie: string;
   readonly retard: string;
   readonly estJava: boolean;
+}
+
+/** Contenu de la modale de détail. */
+interface DetailProjet {
+  readonly nomProjet: string;
+  readonly dateAudit: string;
+  readonly lignes: readonly LigneDetailDependance[];
 }
 
 /**
@@ -100,9 +133,17 @@ export class SqmObsolescenceComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly injector: Injector = inject(Injector);
 
   private readonly conteneurExport: Signal<ElementRef<HTMLElement> | undefined> =
     viewChild<ElementRef<HTMLElement>>('conteneurExport');
+
+  /** Panneau de la modale de détail, résolu une fois la modale rendue (gestion du focus). */
+  private readonly panneauModale: Signal<ElementRef<HTMLElement> | undefined> =
+    viewChild<ElementRef<HTMLElement>>('panneauModale');
+
+  /** Élément qui avait le focus avant l'ouverture de la modale, pour le lui rendre à la fermeture. */
+  private elementFocusAvantModale: HTMLElement | null = null;
 
   /** Groupe sélectionné (`null` = tous les groupes). */
   public readonly filtreGroupeId: WritableSignal<string | null> = signal<string | null>(null);
@@ -128,8 +169,7 @@ export class SqmObsolescenceComponent {
    * @returns La date du jour.
    */
   private static aujourdhui(): string {
-    const maintenant = new Date();
-    return ExportImageUtils.construireHorodatage(maintenant).slice(0, 10);
+    return ExportImageUtils.construireHorodatage(new Date()).slice(0, 10);
   }
 
   /** Groupes disponibles, triés par nom (via le Store). */
@@ -143,27 +183,37 @@ export class SqmObsolescenceComponent {
     return lecture.type === 'valeur' ? lecture.valeur : [];
   });
 
+  /** Couleur de barre associée à chaque catégorie (par position dans le référentiel), précalculée. */
+  public readonly couleurParCategorie: Signal<ReadonlyMap<string, string>> = computed(() => {
+    const table = new Map<string, string>();
+    this.categories().forEach((categorie, index) => {
+      table.set(categorie.id, PALETTE_CATEGORIES[index % PALETTE_CATEGORIES.length]);
+    });
+    return table;
+  });
+
+  /** Règles de dépendances courantes (lues une seule fois par cycle, RG-022). */
+  private readonly regles: Signal<readonly RegleDependance[]> = computed(() => {
+    const lecture = ParametresJugementUtils.lireReglesDependances(
+      this.donneesApplication.racine()?.referentiels,
+    );
+    return lecture.type === 'valeur' ? lecture.valeur : [];
+  });
+
   /** Retard d'obsolescence de chaque projet (tous groupes), pour la date de filtre courante. */
   private readonly lignesTousProjets: Signal<readonly LigneObsolescence[]> = computed(() => {
     const racine = this.donneesApplication.racine();
     if (racine === null) {
       return [];
     }
-    const lectureRegles = ParametresJugementUtils.lireReglesDependances(racine.referentiels);
-    const regles: readonly RegleDependance[] =
-      lectureRegles.type === 'valeur' ? lectureRegles.valeur : [];
+    const regles = this.regles();
     const categories = this.categories();
     const dateLimite = this.filtreDate();
 
     const lignes: LigneObsolescence[] = [];
     for (const groupe of racine.groupes) {
       for (const projet of groupe.projets) {
-        const audit = projet.audits
-          .filter(
-            (candidat) =>
-              candidat.typeAudit !== 'historique' && candidat.date.slice(0, 10) <= dateLimite,
-          )
-          .at(-1);
+        const audit = SqmObsolescenceComponent.auditRetenu(projet.audits, dateLimite);
         const obsolescence: readonly ObsolescenceCategorie[] =
           audit === undefined
             ? []
@@ -172,14 +222,21 @@ export class SqmObsolescenceComponent {
                 regles,
                 categories,
               );
+        const valeurParCategorie = new Map(
+          obsolescence.map((entree) => [entree.categorieId, entree.valeur]),
+        );
         lignes.push({
           projetId: projet.id,
           nomProjet: projet.nom,
           groupeId: groupe.id,
           nomGroupe: groupe.nom,
           audit,
-          valeurParCategorie: new Map(
-            obsolescence.map((entree) => [entree.categorieId, entree.valeur]),
+          valeurParCategorie,
+          infobulle: SqmObsolescenceComponent.construireInfobulle(
+            projet.nom,
+            groupe.nom,
+            categories,
+            valeurParCategorie,
           ),
         });
       }
@@ -188,6 +245,44 @@ export class SqmObsolescenceComponent {
       .slice()
       .sort((a, b) => TriAlphabetiqueUtils.comparerTextes(a.nomProjet, b.nomProjet));
   });
+
+  /**
+   * Dernier audit régulier d'un projet dont la date (jour) est antérieure ou égale à la date limite.
+   * @param audits - Audits du projet.
+   * @param dateLimite - Date limite au format `AAAA-MM-JJ`.
+   * @returns L'audit retenu, ou `undefined`.
+   */
+  private static auditRetenu(audits: readonly Audit[], dateLimite: string): Audit | undefined {
+    return audits
+      .filter(
+        (candidat) =>
+          candidat.typeAudit !== 'historique' && candidat.date.slice(0, 10) <= dateLimite,
+      )
+      .at(-1);
+  }
+
+  /**
+   * Construit le texte de l'infobulle d'une tuile.
+   * @param nomProjet - Nom du projet.
+   * @param nomGroupe - Nom du groupe.
+   * @param categories - Catégories du référentiel.
+   * @param valeurParCategorie - Retard par identifiant de catégorie.
+   * @returns Le texte de l'infobulle.
+   */
+  private static construireInfobulle(
+    nomProjet: string,
+    nomGroupe: string,
+    categories: readonly CategorieDependance[],
+    valeurParCategorie: ReadonlyMap<string, number>,
+  ): string {
+    const details = categories.map((categorie) => {
+      const valeur = valeurParCategorie.get(categorie.id);
+      const texte =
+        valeur === undefined ? 'aucune dépendance' : `${valeur} version(s) majeure(s) de retard`;
+      return `${categorie.libelle} : ${texte}`;
+    });
+    return `${nomProjet} (${nomGroupe})\n${details.join('\n')}`;
+  }
 
   /**
    * Valeur maximale de chaque catégorie, tous filtres ignorés (borne haute des curseurs de filtre, cf. maquette).
@@ -231,11 +326,31 @@ export class SqmObsolescenceComponent {
     });
   });
 
+  /** Tuiles à afficher : projet + une mesure par catégorie, tout précalculé pour le gabarit. */
+  public readonly tuiles: Signal<readonly TuileObsolescence[]> = computed(() => {
+    const categories = this.categories();
+    const couleurs = this.couleurParCategorie();
+    const maxParCategorie = this.maxParCategorie();
+    return this.projetsAffiches().map((ligne) => ({
+      projetId: ligne.projetId,
+      nomProjet: ligne.nomProjet,
+      infobulle: ligne.infobulle,
+      mesures: categories.map((categorie) => ({
+        categorieId: categorie.id,
+        sigle: categorie.sigle,
+        couleur: couleurs.get(categorie.id) ?? PALETTE_CATEGORIES[0],
+        valeur: ligne.valeurParCategorie.get(categorie.id) ?? null,
+        valeurMax: maxParCategorie.get(categorie.id) ?? 0,
+      })),
+    }));
+  });
+
   /** Médiane de chaque catégorie sur les projets affichés (projets sans valeur exclus). */
   public readonly medianeParCategorie: Signal<ReadonlyMap<string, number>> = computed(() => {
     const mediane = new Map<string, number>();
+    const lignes = this.projetsAffiches();
     for (const categorie of this.categories()) {
-      const valeurs = this.projetsAffiches()
+      const valeurs = lignes
         .map((ligne) => ligne.valeurParCategorie.get(categorie.id))
         .filter((valeur): valeur is number => valeur !== undefined)
         .sort((a, b) => a - b);
@@ -255,11 +370,7 @@ export class SqmObsolescenceComponent {
   public readonly total: Signal<number> = computed(() => this.projetsAffiches().length);
 
   /** Détail des dépendances du dernier audit retenu du projet sélectionné (modale). */
-  public readonly detailProjetSelectionne: Signal<{
-    readonly nomProjet: string;
-    readonly dateAudit: string;
-    readonly lignes: readonly LigneDetailDependance[];
-  } | null> = computed(() => {
+  public readonly detailProjetSelectionne: Signal<DetailProjet | null> = computed(() => {
     const projetId = this.projetSelectionne();
     if (projetId === null) {
       return null;
@@ -271,10 +382,7 @@ export class SqmObsolescenceComponent {
     if (ligne.audit === undefined) {
       return { nomProjet: ligne.nomProjet, dateAudit: 'jamais audité', lignes: [] };
     }
-    const racine = this.donneesApplication.racine();
-    const lectureRegles = ParametresJugementUtils.lireReglesDependances(racine?.referentiels);
-    const regles: readonly RegleDependance[] =
-      lectureRegles.type === 'valeur' ? lectureRegles.valeur : [];
+    const regles = this.regles();
     const libelleParCategorie = new Map(
       this.categories().map((categorie) => [categorie.id, categorie.libelle]),
     );
@@ -290,6 +398,7 @@ export class SqmObsolescenceComponent {
       const categorieId = regle?.categorie;
       return {
         reference: dependance.reference,
+        manifeste: dependance.manifeste,
         version: dependance.version,
         categorie: categorieId === undefined ? '—' : (libelleParCategorie.get(categorieId) ?? '—'),
         retard: retard === undefined ? '—' : String(retard),
@@ -299,44 +408,14 @@ export class SqmObsolescenceComponent {
     return {
       nomProjet: ligne.nomProjet,
       dateAudit: ligne.audit.date.slice(0, 10),
-      lignes: lignesDetail.slice().sort((a, b) => a.reference.localeCompare(b.reference)),
+      lignes: lignesDetail
+        .slice()
+        .sort(
+          (a, b) =>
+            a.reference.localeCompare(b.reference) || a.manifeste.localeCompare(b.manifeste),
+        ),
     };
   });
-
-  /**
-   * Couleur de barre associée à une catégorie (par position dans le référentiel).
-   * @param categorieId - Identifiant de la catégorie.
-   * @returns La couleur CSS.
-   */
-  public couleurCategorie(categorieId: string): string {
-    const index = this.categories().findIndex((categorie) => categorie.id === categorieId);
-    const position = index < 0 ? 0 : index;
-    return PALETTE_CATEGORIES[position % PALETTE_CATEGORIES.length];
-  }
-
-  /**
-   * Valeur d'obsolescence d'un projet pour une catégorie, ou `null` si le projet n'a aucune dépendance de cette
-   * catégorie au dernier audit retenu.
-   * @param ligne - Ligne du projet.
-   * @param categorieId - Identifiant de la catégorie.
-   * @returns La valeur, ou `null`.
-   */
-  public valeurProjet(ligne: LigneObsolescence, categorieId: string): number | null {
-    return ligne.valeurParCategorie.get(categorieId) ?? null;
-  }
-
-  /**
-   * Infobulle native d'une tuile : détail texte complet de toutes les catégories du projet.
-   * @param ligne - Ligne du projet.
-   * @returns Le texte de l'infobulle.
-   */
-  public infobulleProjet(ligne: LigneObsolescence): string {
-    const details = this.categories().map((categorie) => {
-      const valeur = ligne.valeurParCategorie.get(categorie.id);
-      return `${categorie.libelle} : ${valeur === undefined ? 'aucune dépendance' : `${valeur} version(s) majeure(s) de retard`}`;
-    });
-    return `${ligne.nomProjet} (${ligne.nomGroupe})\n${details.join('\n')}`;
-  }
 
   /**
    * Borne minimale actuelle du filtre d'une catégorie (0 par défaut).
@@ -404,16 +483,55 @@ export class SqmObsolescenceComponent {
   }
 
   /**
-   * Ouvre la modale de détail du dernier audit d'un projet.
+   * Ouvre la modale de détail du dernier audit d'un projet et déplace le focus dans le panneau (RNF-019).
    * @param projetId - Identifiant du projet.
    */
   public ouvrirDetail(projetId: string): void {
+    this.elementFocusAvantModale =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.projetSelectionne.set(projetId);
+    afterNextRender(() => this.panneauModale()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 
-  /** Ferme la modale de détail. */
+  /** Ferme la modale de détail et rend le focus à l'élément déclencheur (RNF-019). */
   public fermerDetail(): void {
+    if (this.projetSelectionne() === null) {
+      return;
+    }
     this.projetSelectionne.set(null);
+    this.elementFocusAvantModale?.focus();
+    this.elementFocusAvantModale = null;
+  }
+
+  /**
+   * Piège le focus à l'intérieur du panneau de la modale (Tab / Maj+Tab en boucle, RNF-019).
+   * @param evenement - Évènement `keydown` lié à la touche `Tab` (`$event` du gabarit, typé `Event` par Angular).
+   */
+  public piegerFocus(evenement: Event): void {
+    const panneau = this.panneauModale()?.nativeElement;
+    if (!(evenement instanceof KeyboardEvent) || panneau === undefined) {
+      return;
+    }
+    const focusables = Array.from(
+      panneau.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (focusables.length === 0) {
+      return;
+    }
+    const premier = focusables[0];
+    const dernier = focusables[focusables.length - 1];
+    const actif = document.activeElement;
+    if (evenement.shiftKey && (actif === premier || actif === panneau)) {
+      evenement.preventDefault();
+      dernier.focus();
+    } else if (!evenement.shiftKey && actif === dernier) {
+      evenement.preventDefault();
+      premier.focus();
+    }
   }
 
   /**
