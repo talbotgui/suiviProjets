@@ -10,6 +10,36 @@ import { ParametresJugementUtils, type RegleDependance } from './parametres-juge
  */
 export class StatutObsolescenceUtils {
   /**
+   * Statuts d'obsolescence bénéficiant d'un traitement dédié à l'affichage (libellé + couleur) sur les écrans de
+   * restitution (Fiche projet, Comparaison d'audits, Synthèse des audits, Obsolescence), dans leur casse canonique.
+   * Le champ `statut` d'une borne de version reste une chaîne libre (RG-022) : toute autre valeur est acceptée et
+   * affichée telle quelle. Source unique de vérité, réutilisée par le formulaire unitaire de règle de dépendances
+   * (avertissement RG-043) et par {@link canoniserCasseStatut}.
+   */
+  public static readonly STATUTS_CANONIQUES: readonly string[] = [
+    'obsolete',
+    'maintenu',
+    'aJourM1',
+    'aJourM3',
+  ];
+
+  /**
+   * Corrige la casse d'un statut d'obsolescence qui correspond, casse mise à part, à l'une des quatre valeurs
+   * canoniques (`MAINTENU`/`Maintenu` → `maintenu`, `AJOURM1` → `aJourM1`, ...), pour que le Moteur de jugement et
+   * les écrans de restitution (comparaisons sensibles à la casse) le reconnaissent (RG-043). Toute valeur ne
+   * correspondant à aucune des quatre canoniques est renvoyée inchangée : `statut` demeure un champ libre (RG-022),
+   * et un simple passage en minuscules casserait `aJourM1`/`aJourM3`.
+   * @param statut - Statut saisi, déjà débarrassé de ses espaces superflus par l'appelant.
+   * @returns La forme canonique correspondante, ou `statut` inchangé si aucune ne correspond.
+   */
+  public static canoniserCasseStatut(statut: string): string {
+    const canonique = StatutObsolescenceUtils.STATUTS_CANONIQUES.find(
+      (valeur) => valeur.toLowerCase() === statut.toLowerCase(),
+    );
+    return canonique ?? statut;
+  }
+
+  /**
    * Calcule le statut d'obsolescence d'une dépendance constatée (RG-011 : ce statut n'est jamais stocké comme un
    * constat, seulement calculé à l'affichage) : la première règle dont le motif (glob) correspond à la référence
    * de la dépendance est retenue (précédence par ordre de déclaration du référentiel, décision arbitraire à

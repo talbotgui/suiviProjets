@@ -35,9 +35,11 @@
 // - RG-042 : l'enregistrement d'une règle de dépendances est bloqué si le motif saisi correspond déjà au motif
 //   d'une autre entrée du référentiel (rejet strict, jamais de fusion implicite, symétrique de RG-040 pour la
 //   saisie en masse), qu'il s'agisse d'une saisie libre ou d'un pré-remplissage depuis la Fiche projet.
-// - RG-043 : un statut de borne de version hors des quatre valeurs bénéficiant d'une couleur dédiée à l'affichage
-//   (`obsolete`, `maintenu`, `aJourM1`, `aJourM3`, comparaison sensible à la casse) déclenche un avertissement non
-//   bloquant à l'enregistrement, distinct du bloc d'erreur bloquante.
+// - RG-043 (amendée Phase 16) : la casse d'un statut de borne de version correspondant, casse mise à part, à l'une
+//   des quatre valeurs bénéficiant d'une couleur dédiée à l'affichage (`obsolete`, `maintenu`, `aJourM1`, `aJourM3`)
+//   est corrigée automatiquement à l'analyse (`analyserVersions`, `StatutObsolescenceUtils.canoniserCasseStatut`) ;
+//   seul un libellé réellement hors de ces quatre valeurs déclenche l'avertissement non bloquant à l'enregistrement,
+//   distinct du bloc d'erreur bloquante (le statut restant un champ libre, RG-022).
 // - RG-044 : une borne de repli `*=obsolete` est injectée automatiquement en dernière position des bornes de
 //   version d'une règle de dépendances nouvellement créée (ou complétée à l'édition si aucune borne `*` n'existe
 //   déjà, indépendamment de son statut), pour couvrir les versions ne correspondant à aucun motif plus spécifique.
@@ -73,6 +75,7 @@ import type {
 } from '../../../services/avecetat/etat/types-donnees';
 import type { VersionDependance } from '../../../services/sansetat/jugement/parametres-jugement.utils';
 import { ObsolescenceRetardUtils } from '../../../services/sansetat/jugement/obsolescence-retard.utils';
+import { StatutObsolescenceUtils } from '../../../services/sansetat/jugement/statut-obsolescence.utils';
 import { TriAlphabetiqueUtils } from '../../../services/sansetat/jugement/tri-alphabetique.utils';
 
 /**
@@ -284,15 +287,13 @@ export class SqmReferentielsParametrageComponent {
 
   /**
    * Statuts de borne de version bénéficiant d'une couleur dédiée à l'affichage (cf. texte d'aide du champ « Bornes
-   * de version »). Toute autre valeur reste acceptée par le cœur natif (champ libre, RG-022) mais déclenche un
-   * avertissement non bloquant à l'enregistrement (RG-043), comparaison strictement sensible à la casse.
+   * de version »), source unique {@link StatutObsolescenceUtils.STATUTS_CANONIQUES}. Depuis l'amendement de RG-043,
+   * la casse d'un statut correspondant, casse mise à part, à l'une de ces valeurs est corrigée automatiquement à
+   * l'analyse ({@link analyserVersions}) ; l'avertissement non bloquant ne concerne donc plus que les libellés
+   * réellement hors de cette liste (toujours acceptés, champ libre RG-022).
    */
-  private static readonly STATUTS_CONNUS: readonly string[] = [
-    'obsolete',
-    'maintenu',
-    'aJourM1',
-    'aJourM3',
-  ];
+  private static readonly STATUTS_CONNUS: readonly string[] =
+    StatutObsolescenceUtils.STATUTS_CANONIQUES;
 
   /**
    * Ouvre le formulaire pour la création d'une nouvelle règle de dépendances, pré-rempli d'une borne de repli
@@ -348,7 +349,11 @@ export class SqmReferentielsParametrageComponent {
   }
 
   /**
-   * Analyse le texte des bornes de version (une ligne `motifVersion=statut` par borne).
+   * Analyse le texte des bornes de version (une ligne `motifVersion=statut` par borne). La casse d'un `statut`
+   * correspondant, casse mise à part, à l'une des quatre valeurs canoniques est corrigée automatiquement
+   * ({@link StatutObsolescenceUtils.canoniserCasseStatut}, RG-043) ; tout autre libellé est conservé tel quel
+   * (champ libre RG-022). Ce point unique couvre à la fois l'avertissement de {@link demanderEnregistrementDependance}
+   * et l'entrée persistée par {@link confirmerEnregistrementDependance}.
    * @param texte - Texte saisi par l'utilisateur.
    * @returns Les bornes analysées, ou `undefined` si au moins une ligne non vide est malformée.
    */
@@ -365,7 +370,7 @@ export class SqmReferentielsParametrageComponent {
       }
       versions.push({
         motifVersion: ligne.slice(0, indexEgal).trim(),
-        statut: ligne.slice(indexEgal + 1).trim(),
+        statut: StatutObsolescenceUtils.canoniserCasseStatut(ligne.slice(indexEgal + 1).trim()),
       });
     }
     return versions;

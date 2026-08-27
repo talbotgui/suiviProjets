@@ -63,4 +63,22 @@ describe('StatutObsolescenceUtils', () => {
       ).toEqual({ type: 'nonReference' });
     });
   });
+
+  describe('canoniserCasseStatut (amendement RG-043)', () => {
+    it.each([
+      ['MAINTENU', 'maintenu'],
+      ['Maintenu', 'maintenu'],
+      ['maintenu', 'maintenu'],
+      ['OBSOLETE', 'obsolete'],
+      ['ajourm1', 'aJourM1'],
+      ['AJOURM3', 'aJourM3'],
+    ])('corrige la casse de « %s » en « %s »', (saisi, attendu) => {
+      expect(StatutObsolescenceUtils.canoniserCasseStatut(saisi)).toBe(attendu);
+    });
+
+    it('conserve tel quel un libellé hors des quatre valeurs canoniques (champ libre RG-022)', () => {
+      expect(StatutObsolescenceUtils.canoniserCasseStatut('aSurveiller')).toBe('aSurveiller');
+      expect(StatutObsolescenceUtils.canoniserCasseStatut('')).toBe('');
+    });
+  });
 });

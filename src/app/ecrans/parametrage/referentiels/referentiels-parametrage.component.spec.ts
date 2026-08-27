@@ -525,17 +525,31 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.avertissementStatutInconnu).toBeNull();
   });
 
-  it('l’avertissement de statut inconnu est déclenché par comparaison sensible à la casse (« Obsolete », RG-043)', () => {
+  it('corrige la casse d’un statut connu mal cassé (« Obsolete » → « obsolete »), sans avertissement, et persiste la forme canonique (amendement RG-043)', async () => {
     const composant = TestBed.createComponent(
       SqmReferentielsParametrageComponent,
     ).componentInstance;
     composant.ouvrirCreationDependance();
     composant.motifDependance = 'lodash';
-    composant.versionsDependanceTexte = '4.*=Obsolete';
+    composant.versionsDependanceTexte = '4.*=MAINTENU\n*=Obsolete';
+    invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
 
     composant.demanderEnregistrementDependance();
 
-    expect(composant.avertissementStatutInconnu).not.toBeNull();
+    expect(composant.avertissementStatutInconnu).toBeNull();
+
+    await composant.confirmerEnregistrementDependance('mot-de-passe');
+
+    expect(invokeSimule.mock.calls[0]?.[0]).toBe('definir_referentiel');
+    expect(invokeSimule.mock.calls[0]?.[1]).toMatchObject({
+      typeReferentiel: 'reglesDependances',
+      entree: {
+        versions: [
+          { motifVersion: '4.*', statut: 'maintenu' },
+          { motifVersion: '*', statut: 'obsolete' },
+        ],
+      },
+    });
   });
 
   it('avertit, sans bloquer, quand la première borne n’est pas la version majeure la plus récente (relecture N1, RG-050)', () => {

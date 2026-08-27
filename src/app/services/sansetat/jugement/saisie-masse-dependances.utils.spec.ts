@@ -29,6 +29,33 @@ describe('SaisieMasseDependancesUtils', () => {
       ]);
     });
 
+    it('corrige la casse d’un statut correspondant à l’une des quatre valeurs canoniques (amendement RG-043)', () => {
+      const resultat = SaisieMasseDependancesUtils.analyser(
+        'lodash;4.17.0=MAINTENU\nexpress;3.*=Obsolete',
+        [],
+      );
+
+      expect(resultat.erreurs).toEqual([]);
+      expect(resultat.groupes).toEqual([
+        {
+          motif: 'lodash',
+          versions: [
+            { motifVersion: '4.17.0', statut: 'maintenu' },
+            { motifVersion: '*', statut: 'obsolete' },
+          ],
+          lignesOriginales: ['lodash;4.17.0=MAINTENU'],
+        },
+        {
+          motif: 'express',
+          versions: [
+            { motifVersion: '3.*', statut: 'obsolete' },
+            { motifVersion: '*', statut: 'obsolete' },
+          ],
+          lignesOriginales: ['express;3.*=Obsolete'],
+        },
+      ]);
+    });
+
     it('ignore les espaces superflus autour du motif, du motif de version et du statut', () => {
       const resultat = SaisieMasseDependancesUtils.analyser('  lodash ; 4.17.0 = maintenu  ', []);
 

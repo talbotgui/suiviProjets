@@ -392,11 +392,13 @@ fn appliquer_ligne(donnees: &mut DonneesRacine, ligne: &LigneDifferentielImport)
         return;
     }
     if let Some(id) = ligne.chemin.strip_prefix("referentiels.reglesDependances/") {
-        upsert_par_id(
-            &mut donnees.referentiels.regles_dependances,
-            id,
-            ligne.apres.clone(),
-        );
+        // Amendement de RG-043 (Phase 16) : normalisation de la casse des statuts de bornes de version, à
+        // l'identique de `parametrage::definir_referentiel` (la voie d'import ne doit jamais diverger de la saisie
+        // manuelle sur la même donnée). Couvre le cas d'une configuration déjà en `versionSchema` courant mais
+        // éditée à la main ; une configuration antérieure est déjà normalisée en amont par la migration `6 → 7`.
+        let mut entree = ligne.apres.clone();
+        crate::modele::racine::canoniser_casse_statuts_regle_dependance(&mut entree);
+        upsert_par_id(&mut donnees.referentiels.regles_dependances, id, entree);
         return;
     }
     if let Some(id) = ligne.chemin.strip_prefix("referentiels.reglesMarqueursIA/") {
@@ -959,6 +961,48 @@ mod tests {
             racine.journal[0].detail_origine,
             Some("configuration.json".to_string())
         );
+        Ok(())
+    }
+
+    #[test]
+    fn importer_configuration_regle_dependance_corrige_la_casse_des_statuts()
+    -> Result<(), ErreurConfigurationPartageable> {
+        // Amendement de RG-043 (Phase 16) : une configuration déjà en `versionSchema` courant mais portant un
+        // statut de borne de version dans une casse non canonique (édition manuelle) voit ce statut normalisé à
+        // l'application de la ligne, comme le ferait la saisie manuelle via `definir_referentiel`.
+        let mut racine = racine_de_test();
+        let dossier = DossierTemporaire::nouveau("import-casse-statut");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [
+                        { "id": "d9", "motif": "lodash", "versions": [{ "motifVersion": "*", "statut": "MAINTENU" }] }
+                    ],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                },
+                "seuils": {}
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        importer_configuration(
+            &mut racine,
+            &chemin,
+            &["referentiels.reglesDependances/d9".to_string()],
+            "2026-07-28T09:00:00Z".to_string(),
+        )?;
+
+        let statut_d9 = racine
+            .referentiels
+            .regles_dependances
+            .iter()
+            .find(|regle| regle["id"] == json!("d9"))
+            .map(|regle| regle["versions"][0]["statut"].clone());
+        assert_eq!(statut_d9, Some(json!("maintenu")));
         Ok(())
     }
 

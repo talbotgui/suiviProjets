@@ -13,7 +13,9 @@
 //! première étape réelle, [`migration_1_vers_2`], complétée d'une seconde à la Phase 6, incrément 1,
 //! [`migration_2_vers_3`] (ajout de `referentiels.motifNommageBranches`, RG-030), puis étendue jusqu'à
 //! [`migration_5_vers_6`] (US-048 ajout de `referentiels.categoriesDependances` ; US-050 insertion de la règle de
-//! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`).
+//! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`) et
+//! [`migration_6_vers_7`] (Phase 16, amendement de RG-043 : normalisation de la casse du champ `statut` des bornes
+//! de version de `referentiels.reglesDependances`).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -101,6 +103,41 @@ fn migration_5_vers_6(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Sixième migration réelle du projet (Phase 16, amendement de RG-043), faisant progresser `versionSchema` de `6`
+/// à `7` : normalise la casse du champ `statut` des bornes de version de `referentiels.reglesDependances` — une
+/// valeur correspondant, casse mise à part, à l'un des quatre statuts canoniques
+/// ([`crate::modele::racine::STATUTS_OBSOLESCENCE_CANONIQUES`]) est réécrite dans sa forme canonique, toute autre
+/// valeur restant inchangée (champ libre, RG-022).
+///
+/// Comme [`migration_5_vers_6`], cette étape **mute** le document. Best-effort : si `referentiels`/
+/// `reglesDependances` a une forme inattendue (document édité à la main), la normalisation de l'entrée concernée
+/// est simplement ignorée plutôt que de faire échouer la migration.
+fn migration_6_vers_7(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        normaliser_casse_statuts_regles_dependances(objet);
+        objet.insert("versionSchema".to_string(), Value::from(7));
+    }
+    Ok(())
+}
+
+/// Normalise la casse du champ `statut` de toutes les bornes de version de `document.referentiels.reglesDependances`
+/// (cf. [`migration_6_vers_7`]), en déléguant chaque entrée à
+/// [`crate::modele::racine::canoniser_casse_statuts_regle_dependance`]. Best-effort, comme
+/// [`inserer_regle_java_si_absente`].
+fn normaliser_casse_statuts_regles_dependances(document: &mut serde_json::Map<String, Value>) {
+    let Some(regles) = document
+        .get_mut("referentiels")
+        .and_then(Value::as_object_mut)
+        .and_then(|referentiels| referentiels.get_mut("reglesDependances"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    for regle in regles {
+        crate::modele::racine::canoniser_casse_statuts_regle_dependance(regle);
+    }
+}
+
 /// Insère [`crate::modele::racine::regle_java_par_defaut`] dans `document.referentiels.reglesDependances` si aucune
 /// règle de motif `java` n'y figure déjà (US-050). Best-effort : si `referentiels`/`reglesDependances` a une forme
 /// inattendue (document édité à la main), l'insertion est simplement ignorée plutôt que de faire échouer la
@@ -124,13 +161,14 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
-/// [`migration_3_vers_4`], [`migration_4_vers_5`] et [`migration_5_vers_6`].
+/// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`] et [`migration_6_vers_7`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
     (3, migration_3_vers_4),
     (4, migration_4_vers_5),
     (5, migration_5_vers_6),
+    (6, migration_6_vers_7),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -533,6 +571,92 @@ mod tests {
             racine.referentiels.regles_dependances[0]["id"],
             json!("perso")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_6_vers_7_normalise_la_casse_des_statuts_sans_perte()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant l'amendement de RG-043 (Phase 16) : `versionSchema: 6`, bornes de version dont
+        // le `statut` est saisi dans une casse hétérogène. La migration doit réécrire chaque statut correspondant,
+        // casse mise à part, à l'un des quatre statuts canoniques dans sa forme canonique, sans toucher aux autres
+        // champs ni aux libellés réellement hors liste.
+        let mut valeur = json!({
+            "versionSchema": 6,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "referentiels": {
+                "reglesDependances": [
+                    { "id": "d1", "motif": "org.springframework:*", "versions": [
+                        { "motifVersion": "5.3.*", "statut": "MAINTENU" },
+                        { "motifVersion": "6.1.*", "statut": "Maintenu" },
+                        { "motifVersion": "7.*", "statut": "AJOURM1" },
+                        { "motifVersion": "3.*", "statut": "surveiller" },
+                        { "motifVersion": "*", "statut": "obsolete" }
+                    ] }
+                ],
+                "reglesMarqueursIA": [],
+                "motifNommageBranches": "^feature/.+$"
+            },
+            "groupes": []
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        let versions = &racine.referentiels.regles_dependances[0]["versions"];
+        assert_eq!(versions[0]["statut"], json!("maintenu"));
+        assert_eq!(versions[1]["statut"], json!("maintenu"));
+        assert_eq!(versions[2]["statut"], json!("aJourM1"));
+        // Libellé réellement hors des quatre valeurs : conservé tel quel (champ libre, RG-022).
+        assert_eq!(versions[3]["statut"], json!("surveiller"));
+        // Statut déjà canonique : inchangé. `motifVersion` et `id` intacts.
+        assert_eq!(versions[4]["statut"], json!("obsolete"));
+        assert_eq!(versions[0]["motifVersion"], json!("5.3.*"));
+        assert_eq!(racine.referentiels.regles_dependances[0]["id"], json!("d1"));
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_6_vers_7_tolere_une_forme_inattendue_de_regles_dependances()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Documents édités à la main : règle sans `versions`, borne sans `statut`, et `reglesDependances` qui n'est
+        // pas un tableau. Aucun ne doit faire paniquer ni échouer la migration ; `versionSchema` progresse en `7`.
+        for referentiels in [
+            json!({
+                "reglesDependances": [
+                    { "id": "d1", "motif": "sans-versions" },
+                    { "id": "d2", "motif": "borne-sans-statut", "versions": [{ "motifVersion": "1.*" }] }
+                ]
+            }),
+            json!({ "reglesDependances": "chaine-inattendue" }),
+        ] {
+            let mut valeur = json!({
+                "versionSchema": 6,
+                "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+                "referentiels": referentiels,
+                "groupes": []
+            });
+
+            appliquer_migrations(
+                &mut valeur,
+                crate::modele::racine::VERSION_SCHEMA_COURANTE,
+                ETAPES_MIGRATION_REELLES,
+            )?;
+
+            assert_eq!(
+                valeur["versionSchema"],
+                json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+            );
+        }
         Ok(())
     }
 }

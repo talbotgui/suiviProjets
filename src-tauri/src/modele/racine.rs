@@ -51,7 +51,14 @@ use std::collections::HashMap;
 /// différence des paliers précédents, cette étape **mute** le document : elle insère la règle de dépendances par
 /// défaut couvrant la version de Java ([`regle_java_par_defaut`], US-050) si aucune règle de motif `java` n'existe
 /// déjà — pour que le suivi de Java fonctionne sans configuration sur un fichier antérieur.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 6;
+///
+/// Passage de `6` à `7` (Phase 16, amendement de RG-043) : normalisation de la casse du champ `statut` des bornes
+/// de version de `referentiels.reglesDependances` — une valeur correspondant, casse mise à part, à l'un des quatre
+/// statuts canoniques ([`STATUTS_OBSOLESCENCE_CANONIQUES`]) est réécrite dans sa forme canonique, toute autre
+/// valeur restant inchangée (champ libre, RG-022). Voir la sixième étape réelle enregistrée dans
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_6_vers_7`) ; comme `migration_5_vers_6`,
+/// cette étape **mute** le document.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 7;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -152,6 +159,50 @@ pub(crate) fn regle_java_par_defaut() -> Value {
             { "motifVersion": "*", "statut": "obsolete" }
         ]
     })
+}
+
+/// Statuts d'obsolescence bénéficiant d'un traitement dédié à l'affichage (libellé + couleur) sur les écrans de
+/// restitution de l'interface, dans leur casse canonique. Miroir de
+/// `StatutObsolescenceUtils.STATUTS_CANONIQUES` (`src/app/services/sansetat/jugement/statut-obsolescence.utils.ts`).
+/// Le champ `statut` d'une borne de version reste une chaîne libre (RG-022) : toute autre valeur est acceptée.
+pub(crate) const STATUTS_OBSOLESCENCE_CANONIQUES: [&str; 4] =
+    ["obsolete", "maintenu", "aJourM1", "aJourM3"];
+
+/// Renvoie la forme canonique d'un statut d'obsolescence correspondant, casse mise à part, à l'un des quatre
+/// statuts de [`STATUTS_OBSOLESCENCE_CANONIQUES`] (`MAINTENU`/`Maintenu` → `maintenu`, `AJOURM1` → `aJourM1`, ...),
+/// ou `None` si aucune correspondance (l'appelant conserve alors la valeur d'origine : `statut` demeure un champ
+/// libre, RG-022, et un simple passage en minuscules casserait `aJourM1`/`aJourM3`). Amendement de RG-043
+/// (Phase 16).
+pub(crate) fn canoniser_casse_statut_obsolescence(statut: &str) -> Option<&'static str> {
+    STATUTS_OBSOLESCENCE_CANONIQUES
+        .into_iter()
+        .find(|canonique| canonique.eq_ignore_ascii_case(statut))
+}
+
+/// Normalise en place la casse du champ `statut` de chaque borne de version d'une entrée de
+/// `referentiels.reglesDependances` (`regle["versions"][*]["statut"]`), via
+/// [`canoniser_casse_statut_obsolescence`]. Best-effort : toute forme inattendue (`versions` absent ou non tableau,
+/// borne sans `statut` chaîne) est ignorée sans erreur. Point commun à la migration `6 → 7`
+/// (`crate::persistance::migration`), à `crate::persistance::parametrage::definir_referentiel` et à
+/// `crate::persistance::configuration_partageable::appliquer_ligne` (amendement de RG-043, Phase 16).
+pub(crate) fn canoniser_casse_statuts_regle_dependance(regle: &mut Value) {
+    let Some(versions) = regle.get_mut("versions").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for version in versions {
+        let Some(objet) = version.as_object_mut() else {
+            continue;
+        };
+        let Some(statut) = objet.get("statut").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(canonique) = canoniser_casse_statut_obsolescence(statut) else {
+            continue;
+        };
+        if canonique != statut {
+            objet.insert("statut".to_string(), Value::from(canonique));
+        }
+    }
 }
 
 /// Racine du document JSON en clair, avant compression puis chiffrement (cf. `Specification.md#61-vue-densemble`).
@@ -1160,6 +1211,47 @@ pub(crate) struct VueEnregistree {
 mod tests {
     use super::*;
     use regex::Regex;
+
+    #[test]
+    fn canoniser_casse_statut_obsolescence_remappe_les_quatre_valeurs_et_ignore_le_reste() {
+        assert_eq!(
+            canoniser_casse_statut_obsolescence("MAINTENU"),
+            Some("maintenu")
+        );
+        assert_eq!(
+            canoniser_casse_statut_obsolescence("Maintenu"),
+            Some("maintenu")
+        );
+        assert_eq!(
+            canoniser_casse_statut_obsolescence("ajourm1"),
+            Some("aJourM1")
+        );
+        assert_eq!(
+            canoniser_casse_statut_obsolescence("obsolete"),
+            Some("obsolete")
+        );
+        assert_eq!(canoniser_casse_statut_obsolescence("aSurveiller"), None);
+        assert_eq!(canoniser_casse_statut_obsolescence(""), None);
+    }
+
+    #[test]
+    fn canoniser_casse_statuts_regle_dependance_reecrit_uniquement_les_statuts_connus() {
+        let mut regle = serde_json::json!({
+            "id": "d1",
+            "motif": "lodash",
+            "versions": [
+                { "motifVersion": "5.*", "statut": "MAINTENU" },
+                { "motifVersion": "3.*", "statut": "libreInconnu" },
+                { "motifVersion": "1.*" }
+            ]
+        });
+
+        canoniser_casse_statuts_regle_dependance(&mut regle);
+
+        assert_eq!(regle["versions"][0]["statut"], Value::from("maintenu"));
+        assert_eq!(regle["versions"][1]["statut"], Value::from("libreInconnu"));
+        assert_eq!(regle["versions"][2]["motifVersion"], Value::from("1.*"));
+    }
 
     #[test]
     fn nouvelle_racine_est_vide_et_porte_la_version_courante() {

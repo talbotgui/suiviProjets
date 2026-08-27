@@ -288,11 +288,16 @@ pub(crate) fn upsert_par_id(regles: &mut Vec<Value>, id: &str, entree: Value) ->
 pub(crate) fn definir_referentiel(
     donnees: &mut DonneesRacine,
     type_referentiel: &str,
-    entree: Value,
+    mut entree: Value,
     horodatage: String,
 ) -> Result<(), ErreurParametrage> {
     let objet = match type_referentiel {
         "reglesDependances" => {
+            // Amendement de RG-043 (Phase 16) : la casse d'un statut de borne de version correspondant, casse mise
+            // à part, à l'un des quatre statuts canoniques est corrigée avant toute validation ou persistance, à
+            // l'identique de la saisie côté interface et de la migration `6 → 7`. Se propage à `entree.clone()`
+            // (upsert) et à `apres: entree` (journal).
+            crate::modele::racine::canoniser_casse_statuts_regle_dependance(&mut entree);
             let id = valider_entree_regles_dependances(&entree)?.to_string();
             // RG-042 (Phase 15, C15-10) : revalidation côté cœur natif du contrôle déjà effectué côté interface.
             // Aucune AUTRE entrée déjà présente (identifiant différent) ne doit porter le même motif, pour éviter
@@ -1000,6 +1005,65 @@ mod tests {
         )?;
 
         assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_corrige_la_casse_des_statuts_connus()
+    -> Result<(), ErreurParametrage> {
+        // Amendement de RG-043 (Phase 16) : la casse d'un statut correspondant, casse mise à part, à l'un des quatre
+        // statuts canoniques est corrigée à l'enregistrement, dans l'entrée persistée comme dans le journal ; un
+        // libellé réellement hors liste est conservé tel quel (champ libre, RG-022).
+        let mut racine = racine_de_test();
+
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [
+                { "motifVersion": "5.*", "statut": "MAINTENU" },
+                { "motifVersion": "6.*", "statut": "AJOURM1" },
+                { "motifVersion": "3.*", "statut": "aSurveiller" }
+            ] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        let versions = &racine.referentiels.regles_dependances[0]["versions"];
+        assert_eq!(versions[0]["statut"], json!("maintenu"));
+        assert_eq!(versions[1]["statut"], json!("aJourM1"));
+        assert_eq!(versions[2]["statut"], json!("aSurveiller"));
+        assert_eq!(
+            racine.journal[0].apres["versions"][0]["statut"],
+            json!("maintenu")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiels_corrige_la_casse_des_statuts_sur_tout_le_lot()
+    -> Result<(), ErreurParametrage> {
+        // La saisie en masse (US-043) délègue entrée par entrée à `definir_referentiel` : la normalisation de casse
+        // s'applique donc à chaque entrée du lot.
+        let mut racine = racine_de_test();
+
+        let resultats = definir_referentiels(
+            &mut racine,
+            "reglesDependances",
+            vec![
+                json!({ "id": "d1", "motif": "lodash", "versions": [{ "motifVersion": "*", "statut": "Obsolete" }] }),
+                json!({ "id": "d2", "motif": "express", "versions": [{ "motifVersion": "*", "statut": "Maintenu" }] }),
+            ],
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultats, vec![true, true]);
+        assert_eq!(
+            racine.referentiels.regles_dependances[0]["versions"][0]["statut"],
+            json!("obsolete")
+        );
+        assert_eq!(
+            racine.referentiels.regles_dependances[1]["versions"][0]["statut"],
+            json!("maintenu")
+        );
         Ok(())
     }
 

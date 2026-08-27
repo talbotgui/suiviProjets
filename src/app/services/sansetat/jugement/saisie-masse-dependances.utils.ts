@@ -29,6 +29,7 @@
 // borne synthétique n'est jamais ajoutée à `lignesOriginales`, qui doit rester le texte réellement saisi par
 // l'utilisateur (restitution fidèle du texte en cas d'échec partiel d'enregistrement d'un groupe).
 import type { VersionDependance } from './parametres-jugement.utils';
+import { StatutObsolescenceUtils } from './statut-obsolescence.utils';
 
 /**
  * Borne de repli injectée automatiquement dans un groupe nouvellement créé dépourvu de borne `*` (RG-044).
@@ -173,7 +174,10 @@ export class SaisieMasseDependancesUtils {
       return undefined;
     }
     const motifVersion = reste.slice(0, indexEgal).trim();
-    const statut = reste.slice(indexEgal + 1).trim();
+    // Casse d'un des quatre statuts canoniques corrigée automatiquement (RG-043), à l'identique du formulaire
+    // unitaire (`SqmReferentielsParametrageComponent.analyserVersions`) ; tout autre libellé conservé tel quel
+    // (champ libre RG-022).
+    const statut = StatutObsolescenceUtils.canoniserCasseStatut(reste.slice(indexEgal + 1).trim());
 
     return { motif, version: { motifVersion, statut } };
   }
