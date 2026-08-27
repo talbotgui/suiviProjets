@@ -218,6 +218,25 @@
             (modifiable ou supprimable).
           </span>
         </label>
+        <label class="champ">
+          Catégorie
+          <select
+            id="referentiels-parametrage-champ-categorie-dependance"
+            class="champ__controle"
+            name="categorieDependance"
+            [(ngModel)]="categorieDependance"
+            aria-describedby="referentiels-parametrage-champ-categorie-dependance-aide"
+          >
+            <option [ngValue]="null">Aucune</option>
+            @for (categorie of categoriesDependances(); track categorie.id) {
+              <option [ngValue]="categorie.id">{{ categorie.libelle }}</option>
+            }
+          </select>
+          <span id="referentiels-parametrage-champ-categorie-dependance-aide" class="champ__aide">
+            Facultative. Détermine dans quel indicateur de l'écran Obsolescence cette règle est
+            agrégée. Se gère dans le cadre « Catégories de dépendance » ci-dessus.
+          </span>
+        </label>
         @if (avertissementStatutInconnu) {
           <p class="referentiels-parametrage__avertissement texte-orange texte-sm" role="status">
             {{ avertissementStatutInconnu }}
@@ -278,6 +297,9 @@
           <span class="texte-discret texte-sm"
             >{{ regle.versions.length }} borne(s) de version</span
           >
+          @if (nomCategorie(regle.categorie); as libelle) {
+            <span class="texte-discret texte-sm">catégorie : {{ libelle }}</span>
+          }
           <button
             [id]="'referentiels-parametrage-dependance-' + i + '-bouton-modifier'"
             type="button"

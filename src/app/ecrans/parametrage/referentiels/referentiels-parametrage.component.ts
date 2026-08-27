@@ -248,6 +248,8 @@ export class SqmReferentielsParametrageComponent {
   public dependanceEnEditionId: string | null = null;
   public motifDependance = '';
   public versionsDependanceTexte = '';
+  /** Identifiant de la catégorie de dépendance rattachée à la règle en cours d'édition, `null` si aucune (US-049). */
+  public categorieDependance: string | null = null;
 
   /**
    * Ligne de borne de repli injectée automatiquement à la création ou à l'édition d'une règle de dépendances
@@ -278,6 +280,7 @@ export class SqmReferentielsParametrageComponent {
     this.dependanceEnEditionId = null;
     this.motifDependance = '';
     this.versionsDependanceTexte = SqmReferentielsParametrageComponent.BORNE_DE_REPLI_PAR_DEFAUT;
+    this.categorieDependance = null;
     this.messageErreur = null;
     this.avertissementStatutInconnu = null;
     this.formulaireDependanceVisible.set(true);
@@ -298,6 +301,7 @@ export class SqmReferentielsParametrageComponent {
     }
     this.dependanceEnEditionId = regle.id;
     this.motifDependance = regle.motif;
+    this.categorieDependance = regle.categorie ?? null;
     const lignes = regle.versions.map((version) => `${version.motifVersion}=${version.statut}`);
     const contientDejaUneBorneDeRepli = regle.versions.some(
       (version) => version.motifVersion === '*',
@@ -390,10 +394,12 @@ export class SqmReferentielsParametrageComponent {
   public async confirmerEnregistrementDependance(motDePasse: string): Promise<void> {
     const dependanceEnEditionId = this.dependanceEnEditionId;
     const versions = this.analyserVersions(this.versionsDependanceTexte) ?? [];
+    const categorie = this.categorieDependance ?? undefined;
     const entree: EntreeReglesDependances = {
       id: dependanceEnEditionId ?? crypto.randomUUID(),
       motif: this.motifDependance.trim(),
       versions,
+      ...(categorie === undefined ? {} : { categorie }),
     };
 
     this.enCours.set(true);
@@ -539,6 +545,19 @@ export class SqmReferentielsParametrageComponent {
    */
   public categoriesDependances(): readonly EntreeCategorieDependance[] {
     return this.donneesApplication.racine()?.referentiels.categoriesDependances ?? [];
+  }
+
+  /**
+   * Libellé de la catégorie de dépendance désignée par son identifiant (US-049).
+   * @param id - Identifiant de la catégorie, ou `undefined` si la règle n'en porte pas.
+   * @returns Le libellé de la catégorie, ou `null` si l'identifiant est absent ou ne désigne aucune catégorie
+   * connue (catégorie supprimée depuis : la règle est alors traitée comme sans catégorie, RG-049).
+   */
+  public nomCategorie(id: string | undefined): string | null {
+    if (id === undefined) {
+      return null;
+    }
+    return this.categoriesDependances().find((categorie) => categorie.id === id)?.libelle ?? null;
   }
 
   /**

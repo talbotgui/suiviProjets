@@ -37,6 +37,7 @@ class DonneesDeTest {
             id: 'd1',
             motif: 'moment',
             versions: [{ motifVersion: '*', statut: 'obsolete' }],
+            categorie: 'cat-front',
           },
         ],
         reglesMarqueursIA: [
@@ -50,7 +51,7 @@ class DonneesDeTest {
           },
         ],
         motifNommageBranches: '^(main|develop)$',
-        categoriesDependances: [],
+        categoriesDependances: [{ id: 'cat-front', libelle: 'fmkFront', sigle: 'FMF' }],
       },
       parametres: {
         seuils: {
@@ -128,9 +129,57 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.formulaireDependanceVisible()).toBe(true);
     expect(composant.motifDependance).toBe('moment');
     expect(composant.versionsDependanceTexte).toBe('*=obsolete');
+    expect(composant.categorieDependance).toBe('cat-front');
 
     composant.fermerFormulaireDependance();
     expect(composant.formulaireDependanceVisible()).toBe(false);
+  });
+
+  it('transmet la catégorie choisie à definirReferentiel et l’efface à la création (US-049)', async () => {
+    invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirCreationDependance();
+    expect(composant.categorieDependance).toBeNull();
+    composant.motifDependance = 'lodash';
+    composant.categorieDependance = 'cat-front';
+    composant.demanderEnregistrementDependance();
+    await composant.confirmerEnregistrementDependance('mot-de-passe');
+
+    expect(invokeSimule.mock.calls[0]?.[0]).toBe('definir_referentiel');
+    expect(invokeSimule.mock.calls[0]?.[1]).toMatchObject({
+      typeReferentiel: 'reglesDependances',
+      entree: { motif: 'lodash', categorie: 'cat-front' },
+    });
+  });
+
+  it('n’envoie aucun attribut categorie quand aucune catégorie n’est choisie (US-049)', async () => {
+    invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirCreationDependance();
+    composant.motifDependance = 'lodash';
+    composant.demanderEnregistrementDependance();
+    await composant.confirmerEnregistrementDependance('mot-de-passe');
+
+    const parametres = invokeSimule.mock.calls[0]?.[1];
+    expect(parametres).toBeDefined();
+    expect(parametres).toHaveProperty('entree.motif', 'lodash');
+    expect(parametres).not.toHaveProperty('entree.categorie');
+  });
+
+  it('résout le libellé d’une catégorie, null pour une catégorie inconnue ou absente (US-049)', () => {
+    const composant = TestBed.createComponent(
+      SqmReferentielsParametrageComponent,
+    ).componentInstance;
+
+    expect(composant.nomCategorie('cat-front')).toBe('fmkFront');
+    expect(composant.nomCategorie('cat-supprimee')).toBeNull();
+    expect(composant.nomCategorie(undefined)).toBeNull();
   });
 
   it('ouvre le formulaire de création de marqueur IA avec des valeurs par défaut, referme sans enregistrer', () => {

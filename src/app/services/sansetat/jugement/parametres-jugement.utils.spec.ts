@@ -322,6 +322,79 @@ describe('ParametresJugementUtils', () => {
         ],
       });
     });
+
+    it('conserve l’attribut categorie valide d’une règle (US-049)', () => {
+      const resultat = ParametresJugementUtils.lireReglesDependances({
+        reglesDependances: [{ motif: 'moment', versions: [], categorie: 'c1' }],
+      });
+      expect(resultat).toEqual({
+        type: 'valeur',
+        valeur: [{ motif: 'moment', versions: [], categorie: 'c1' }],
+      });
+    });
+
+    it('ignore un attribut categorie malformé sans disqualifier la règle (US-049)', () => {
+      const resultat = ParametresJugementUtils.lireReglesDependances({
+        reglesDependances: [
+          { motif: 'moment', versions: [], categorie: '' },
+          { motif: 'lodash', versions: [], categorie: 42 },
+        ],
+      });
+      expect(resultat).toEqual({
+        type: 'valeur',
+        valeur: [
+          { motif: 'moment', versions: [] },
+          { motif: 'lodash', versions: [] },
+        ],
+      });
+    });
+  });
+
+  describe('lireCategoriesDependances', () => {
+    it('lit les catégories de dépendance valides (US-048)', () => {
+      const resultat = ParametresJugementUtils.lireCategoriesDependances({
+        categoriesDependances: [{ id: 'c1', libelle: 'exec', sigle: 'EXE' }],
+      });
+      expect(resultat).toEqual({
+        type: 'valeur',
+        valeur: [{ id: 'c1', libelle: 'exec', sigle: 'EXE' }],
+      });
+    });
+
+    it('replie un sigle absent ou non-chaîne sur une chaîne vide', () => {
+      const resultat = ParametresJugementUtils.lireCategoriesDependances({
+        categoriesDependances: [
+          { id: 'c1', libelle: 'exec' },
+          { id: 'c2', libelle: 'os', sigle: 7 },
+        ],
+      });
+      expect(resultat).toEqual({
+        type: 'valeur',
+        valeur: [
+          { id: 'c1', libelle: 'exec', sigle: '' },
+          { id: 'c2', libelle: 'os', sigle: '' },
+        ],
+      });
+    });
+
+    it('écarte silencieusement une entrée sans id ou sans libellé, restitue un tableau vide si le référentiel est vide', () => {
+      expect(
+        ParametresJugementUtils.lireCategoriesDependances({
+          categoriesDependances: [{ id: 'c1' }, { libelle: 'exec' }, 'texte'],
+        }),
+      ).toEqual({ type: 'valeur', valeur: [] });
+      expect(
+        ParametresJugementUtils.lireCategoriesDependances({ categoriesDependances: [] }),
+      ).toEqual({ type: 'valeur', valeur: [] });
+    });
+
+    it('restitue absent si categoriesDependances n’est pas un tableau', () => {
+      expect(
+        ParametresJugementUtils.lireCategoriesDependances({ categoriesDependances: 'texte' }),
+      ).toEqual({ type: 'absent' });
+      expect(ParametresJugementUtils.lireCategoriesDependances({})).toEqual({ type: 'absent' });
+      expect(ParametresJugementUtils.lireCategoriesDependances(null)).toEqual({ type: 'absent' });
+    });
   });
 
   describe('lireReglesMarqueursIA', () => {

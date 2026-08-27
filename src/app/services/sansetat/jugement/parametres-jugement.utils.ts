@@ -25,6 +25,10 @@
 // `PorteeMarqueur`/`NatureMarqueur` déjà définis côté `services/sansetat/commandes/types-facade.ts` (import de
 // types uniquement, aucun couplage comportemental, les deux modules restant sous `services/sansetat/`) plutôt que
 // de les dupliquer structurellement comme le sont `RegleDependance`/`VersionDependance` ci-dessous.
+//
+// Ajout US-049 : `RegleDependance.categorie` (identifiant facultatif d'une catégorie du référentiel) et
+// `lireCategoriesDependances` complètent la lecture défensive de `referentiels` avec `categoriesDependances`
+// (US-048), consommé par l'écran Obsolescence et le calcul du retard par catégorie (RG-050, RG-051).
 import type {
   NatureMarqueur,
   PorteeMarqueur,
@@ -369,14 +373,21 @@ export class ParametresJugementUtils {
     if (!ParametresJugementUtils.estEnregistrement(brut)) {
       return undefined;
     }
-    const { motif, versions } = brut;
+    const { motif, versions, categorie } = brut;
     if (!ParametresJugementUtils.estChaineNonVide(motif) || !Array.isArray(versions)) {
       return undefined;
     }
     const versionsValidees = versions
       .map((version) => ParametresJugementUtils.validerVersionDependance(version))
       .filter((version): version is VersionDependance => version !== undefined);
-    return { motif, versions: versionsValidees };
+    // `categorie` est facultatif (US-049) : une valeur présente mais malformée (non chaîne non vide) est
+    // silencieusement ignorée plutôt que de disqualifier toute la règle, sur le même principe défensif que les
+    // bornes de version ci-dessus. Le cœur natif, lui, refuse une telle valeur à l'enregistrement (RG-049).
+    const regle: RegleDependance = { motif, versions: versionsValidees };
+    if (ParametresJugementUtils.estChaineNonVide(categorie)) {
+      return { ...regle, categorie };
+    }
+    return regle;
   }
 
   /**
@@ -484,6 +495,50 @@ export class ParametresJugementUtils {
       .map((regle) => ParametresJugementUtils.validerRegleMarqueurIA(regle))
       .filter((regle): regle is RegleMarqueurIA => regle !== undefined);
     return { type: 'valeur', valeur: regles };
+  }
+
+  /**
+   * Valide une entrée brute de `referentiels.categoriesDependances` (US-048) : `id` et `libelle` chaînes non
+   * vides, `sigle` chaîne (éventuellement vide) sinon repli sur chaîne vide.
+   * @param brut - Élément brut du tableau `categoriesDependances`.
+   * @returns L'entrée validée, ou `undefined` si elle est malformée (entrée silencieusement écartée).
+   */
+  private static validerCategorieDependance(brut: unknown): CategorieDependance | undefined {
+    if (!ParametresJugementUtils.estEnregistrement(brut)) {
+      return undefined;
+    }
+    const { id, libelle, sigle } = brut;
+    if (
+      !ParametresJugementUtils.estChaineNonVide(id) ||
+      !ParametresJugementUtils.estChaineNonVide(libelle)
+    ) {
+      return undefined;
+    }
+    return { id, libelle, sigle: typeof sigle === 'string' ? sigle : '' };
+  }
+
+  /**
+   * Lit défensivement le référentiel des catégories de dépendance (`referentiels.categoriesDependances`, US-048),
+   * consommé par l'écran Obsolescence (US-051) et le calcul du retard par catégorie (RG-050, RG-051). Symétrique
+   * de {@link lireReglesDependances} : chaque entrée malformée est silencieusement écartée, un référentiel vide
+   * restitue une lecture `valeur` avec un tableau vide (pas `absent`).
+   * @param referentielsBruts - Valeur brute de `referentiels`, non garantie conforme à la forme attendue.
+   * @returns Le résultat de la lecture, `absent` uniquement si `categoriesDependances` n'est pas un tableau.
+   */
+  public static lireCategoriesDependances(
+    referentielsBruts: unknown,
+  ): LectureDefensive<readonly CategorieDependance[]> {
+    if (!ParametresJugementUtils.estEnregistrement(referentielsBruts)) {
+      return { type: 'absent' };
+    }
+    const brut = referentielsBruts['categoriesDependances'];
+    if (!Array.isArray(brut)) {
+      return { type: 'absent' };
+    }
+    const categories = brut
+      .map((categorie) => ParametresJugementUtils.validerCategorieDependance(categorie))
+      .filter((categorie): categorie is CategorieDependance => categorie !== undefined);
+    return { type: 'valeur', valeur: categories };
   }
 
   /**
@@ -635,4 +690,24 @@ export interface RegleDependance {
   readonly motif: string;
   /** Règles de version, évaluées dans l'ordre déclaré, la première correspondance l'emportant. */
   readonly versions: readonly VersionDependance[];
+  /**
+   * Identifiant d'une {@link CategorieDependance} du référentiel (US-049), facultatif et sans valeur par défaut :
+   * une règle sans catégorie, ou dont la catégorie a été supprimée du référentiel, est ignorée par les indicateurs
+   * de l'écran Obsolescence (RG-049).
+   */
+  readonly categorie?: string;
+}
+
+/**
+ * Catégorie de dépendance administrable (`referentiels.categoriesDependances[]`, US-048). Forme minimale
+ * redéclarée ici, comme {@link RegleDependance}, pour ne pas dépendre de `services/avecetat/` (mirroir de
+ * `EntreeCategorieDependance` de `services/avecetat/etat/types-donnees.ts`).
+ */
+export interface CategorieDependance {
+  /** Identifiant UUID v4 de la catégorie, stable d'une édition à l'autre. */
+  readonly id: string;
+  /** Libellé affiché dans l'administration et les infobulles. */
+  readonly libelle: string;
+  /** Sigle de trois lettres au plus, colonne compacte de l'écran Obsolescence. */
+  readonly sigle: string;
 }

@@ -830,6 +830,45 @@ mod tests {
     }
 
     #[test]
+    fn previsualiser_import_configuration_regle_dependance_categorie_vide_est_signalee_invalide()
+    -> Result<(), ErreurConfigurationPartageable> {
+        // US-049 : `categorie` facultatif mais, si présent, chaîne non vide — même fonction de validation que la
+        // saisie manuelle, réutilisée telle quelle par la voie d'import.
+        let racine = racine_de_test();
+        let dossier = DossierTemporaire::nouveau("differentiel-categorie-regle-vide");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [
+                        { "id": "d9", "motif": "moment", "versions": [], "categorie": "" }
+                    ],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                },
+                "seuils": {},
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        let differentiel = previsualiser_import_configuration(&racine, &chemin)?;
+
+        assert!(
+            differentiel
+                .lignes
+                .iter()
+                .all(|ligne| ligne.chemin != "referentiels.reglesDependances/d9")
+        );
+        assert_eq!(
+            differentiel.lignes_invalides[0].chemin,
+            "referentiels.reglesDependances/d9"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn previsualiser_import_configuration_version_schema_superieure_est_rejetee()
     -> Result<(), std::io::Error> {
         let racine = racine_de_test();

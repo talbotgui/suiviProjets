@@ -138,8 +138,9 @@ fn lire_champ_chaine_non_vide<'a>(
 
 /// Valide la forme minimale attendue d'une entrée de `referentiels.reglesDependances` (`id`, `motif` non vides,
 /// `versions` tableau dont chaque élément est un objet portant `motifVersion`/`statut` non vides, RG-043, Phase 15
-/// C15-11), sans imposer de liste fermée de valeurs pour `statut` (champ libre, RG-022 : l'interprétation fine du
-/// contenu reste du seul ressort du Moteur de jugement, UI).
+/// C15-11 ; `categorie` facultatif mais, si présent, chaîne non vide, US-049/RG-049), sans imposer de liste fermée
+/// de valeurs pour `statut` (champ libre, RG-022 : l'interprétation fine du contenu reste du seul ressort du Moteur
+/// de jugement, UI).
 ///
 /// `pub(crate)` depuis la Phase 9, incrément 3 (correction post-relecture) : réutilisé tel quel par
 /// `persistance::configuration_partageable::calculer_differentiel` pour signaler comme lignes invalides, plutôt
@@ -163,6 +164,16 @@ pub(crate) fn valider_entree_regles_dependances(entree: &Value) -> Result<&str, 
             .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
         lire_champ_chaine_non_vide(version_objet, "motifVersion")?;
         lire_champ_chaine_non_vide(version_objet, "statut")?;
+    }
+    // `categorie` est facultatif (US-049, RG-049) : absent ou chaîne non vide (identifiant d'une entrée du
+    // référentiel des catégories de dépendance). Une valeur présente mais vide ou non-chaîne est rejetée, comme la
+    // saisie manuelle côté interface. L'existence effective de la catégorie n'est pas vérifiée ici (une catégorie
+    // peut être supprimée après coup : le Moteur de jugement ignore alors la règle, RG-049).
+    if let Some(categorie) = objet.get("categorie") {
+        let categorie_valide = categorie.as_str().is_some_and(|valeur| !valeur.is_empty());
+        if !categorie_valide {
+            return Err(ErreurParametrage::EntreeReferentielInvalide);
+        }
     }
     Ok(id)
 }
@@ -802,6 +813,40 @@ mod tests {
             &mut racine,
             "reglesDependances",
             json!({ "id": "d1", "versions": [] }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+        assert!(racine.referentiels.regles_dependances.is_empty());
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_avec_categorie_valide_est_accepte()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [], "categorie": "c1" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.referentiels.regles_dependances[0]["categorie"],
+            json!("c1")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_regles_dependances_avec_categorie_vide_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesDependances",
+            json!({ "id": "d1", "motif": "moment", "versions": [], "categorie": "" }),
             "2026-07-27T09:00:00Z".to_string(),
         );
 
