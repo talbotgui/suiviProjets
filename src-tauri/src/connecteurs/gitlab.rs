@@ -2086,6 +2086,79 @@ fn resoudre_dependances_pom(pom: &PomBrut, chaine_parents: &[&PomBrut]) -> Vec<D
         .collect()
 }
 
+/// Propriétés Maven consultées, dans cet ordre, pour déterminer la version de Java d'un `pom.xml` (US-050) : la
+/// première présente l'emporte au sein d'un pom donné.
+const PROPRIETES_VERSION_JAVA: [&str; 3] = [
+    "maven.compiler.source",
+    "maven.compiler.target",
+    "maven.compiler.release",
+];
+
+/// Référence de la dépendance synthétique portant la version de Java (US-050), alignée sur
+/// [`crate::modele::racine::REGLE_JAVA_MOTIF`].
+const REFERENCE_JAVA: &str = "java";
+
+/// Normalise une version de Java telle qu'écrite dans un `pom.xml` : les formes historiques `1.5` à `1.8` (Java 5
+/// à 8, JEP 223) sont ramenées à leur seul numéro majeur (`1.8` -> `8`), les formes modernes (`11`, `17`, `21`,
+/// `17.0.2`…) sont conservées telles quelles. Renvoie `None` pour une chaîne vide ou un token `${...}` non résolu.
+fn normaliser_version_java(brut: &str) -> Option<String> {
+    let brut = brut.trim();
+    if brut.is_empty() || brut.starts_with("${") {
+        return None;
+    }
+    if let Some(reste) = brut.strip_prefix("1.")
+        && reste.chars().next().is_some_and(|c| c.is_ascii_digit())
+    {
+        return Some(reste.to_string());
+    }
+    Some(brut.to_string())
+}
+
+/// Numéro majeur en tête d'une version normalisée (`"17.0.2"` -> `17`), `0` si non analysable — utilisé uniquement
+/// pour départager plusieurs `pom.xml` d'un même dépôt déclarant des versions de Java différentes
+/// ([`extraire_version_java`]).
+fn majeur_version_java(version: &str) -> u32 {
+    version
+        .split(['.', '-', '_'])
+        .next()
+        .and_then(|tete| tete.parse().ok())
+        .unwrap_or(0)
+}
+
+/// Détermine la version de Java du dépôt à partir de tous ses `pom.xml` (US-050) et la renvoie comme une
+/// [`Dependance`] synthétique de référence `java` (`manifeste: "pom.xml"`), ou `None` si aucun `pom.xml` ne déclare
+/// l'une des [`PROPRIETES_VERSION_JAVA`]. Pour chaque pom, les properties sont fusionnées avec sa chaîne de parents
+/// disponible (comme pour la résolution des dépendances) ; en présence de valeurs divergentes entre modules, la
+/// version majeure la plus élevée est retenue (départage stable par ordre de découverte), la version de Java d'un
+/// dépôt étant, en pratique, celle du module le plus exigeant.
+fn extraire_version_java(
+    poms_bruts_ordonnes: &[(String, PomBrut)],
+    poms_bruts: &HashMap<String, PomBrut>,
+) -> Option<Dependance> {
+    let mut meilleure: Option<String> = None;
+    for (chemin, pom) in poms_bruts_ordonnes {
+        let chaine_parents = construire_chaine_parents(chemin, poms_bruts);
+        let properties = fusionner_properties(pom, &chaine_parents);
+        let version = PROPRIETES_VERSION_JAVA
+            .iter()
+            .find_map(|cle| properties.get(*cle))
+            .map(|valeur| substituer_properties(valeur, &properties))
+            .and_then(|valeur| normaliser_version_java(&valeur));
+        if let Some(version) = version
+            && meilleure.as_deref().is_none_or(|actuelle| {
+                majeur_version_java(&version) > majeur_version_java(actuelle)
+            })
+        {
+            meilleure = Some(version);
+        }
+    }
+    meilleure.map(|version| Dependance {
+        reference: REFERENCE_JAVA.to_string(),
+        version,
+        manifeste: "pom.xml".to_string(),
+    })
+}
+
 /// Parseur d'un manifeste `package.json` (npm, périmètre V1 cf. en-tête de module) : extrait les dépendances de
 /// production déclarées sous la clé `dependencies` (`devDependencies` volontairement exclu, décision arbitraire
 /// signalée dans le rapport de développement de cette phase, sur le même principe que `<dependencyManagement>` du
@@ -2153,6 +2226,10 @@ fn parser_build_gradle(contenu: &str) -> Vec<Dependance> {
 /// par fichier, sans changement. Conséquence observable : dans `dependances`, les dépendances Maven apparaissent
 /// désormais regroupées après celles des autres écosystèmes plutôt qu'entrelacées selon l'ordre de découverte des
 /// fichiers dans l'arborescence — aucun consommateur connu ne dépend de cet ordre.
+///
+/// US-050 : si au moins un `pom.xml` du dépôt déclare l'une des [`PROPRIETES_VERSION_JAVA`], une dépendance
+/// synthétique de référence `java` portant la version de Java du dépôt ([`extraire_version_java`]) est ajoutée en
+/// fin de `dependances`.
 ///
 /// # Erreurs
 ///
@@ -2258,6 +2335,12 @@ pub(crate) async fn interroger_dependances(
     for (chemin, pom_brut) in &poms_bruts_ordonnes {
         let chaine_parents = construire_chaine_parents(chemin, &poms_bruts);
         dependances.extend(resoudre_dependances_pom(pom_brut, &chaine_parents));
+    }
+    // US-050 : la version de Java du dépôt, relevée dans les `<properties>` des `pom.xml`, est ajoutée comme une
+    // dépendance synthétique de référence `java` — traitée ensuite comme n'importe quelle dépendance (règle de
+    // dépendances, catégorie, retard d'obsolescence).
+    if let Some(dependance_java) = extraire_version_java(&poms_bruts_ordonnes, &poms_bruts) {
+        dependances.push(dependance_java);
     }
 
     Ok(ResultatGitlabDependances {
@@ -4448,6 +4531,92 @@ mod tests {
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "${spring.version}");
+    }
+
+    #[test]
+    fn normaliser_version_java_ramene_les_formes_historiques_au_majeur_seul() {
+        assert_eq!(normaliser_version_java("1.8").as_deref(), Some("8"));
+        assert_eq!(normaliser_version_java(" 1.5 ").as_deref(), Some("5"));
+        assert_eq!(normaliser_version_java("17").as_deref(), Some("17"));
+        assert_eq!(normaliser_version_java("21").as_deref(), Some("21"));
+        assert_eq!(normaliser_version_java("17.0.2").as_deref(), Some("17.0.2"));
+        assert_eq!(normaliser_version_java(""), None);
+        assert_eq!(normaliser_version_java("${java.version}"), None);
+    }
+
+    /// Aide de test : passe un ensemble de `pom.xml` (`chemin`, contenu) à [`extraire_version_java`].
+    fn version_java_de(poms: &[(&str, &str)]) -> Option<Dependance> {
+        let ordonnes: Vec<(String, PomBrut)> = poms
+            .iter()
+            .map(|(chemin, contenu)| ((*chemin).to_string(), parser_pom_xml_brut(contenu)))
+            .collect();
+        let map: HashMap<String, PomBrut> = ordonnes.iter().cloned().collect();
+        extraire_version_java(&ordonnes, &map)
+    }
+
+    #[test]
+    fn extraire_version_java_prend_la_premiere_propriete_presente_dans_lordre_source_target_release()
+     {
+        let pom = r#"<project><properties>
+            <maven.compiler.target>17</maven.compiler.target>
+            <maven.compiler.release>21</maven.compiler.release>
+        </properties></project>"#;
+
+        let dependance = version_java_de(&[("pom.xml", pom)]);
+        assert_eq!(
+            dependance.as_ref().map(|d| d.reference.as_str()),
+            Some("java")
+        );
+        assert_eq!(
+            dependance.as_ref().map(|d| d.manifeste.as_str()),
+            Some("pom.xml")
+        );
+        // `maven.compiler.source` absent -> `maven.compiler.target` (17) l'emporte sur `release` (21).
+        assert_eq!(dependance.map(|d| d.version), Some("17".to_string()));
+    }
+
+    #[test]
+    fn extraire_version_java_resout_un_token_property_et_normalise() {
+        let pom = r#"<project><properties>
+            <java.version>1.8</java.version>
+            <maven.compiler.source>${java.version}</maven.compiler.source>
+        </properties></project>"#;
+
+        assert_eq!(
+            version_java_de(&[("pom.xml", pom)]).map(|d| d.version),
+            Some("8".to_string())
+        );
+    }
+
+    #[test]
+    fn extraire_version_java_herite_de_la_propriete_du_parent_du_meme_depot() {
+        let parent = r#"<project><groupId>com.example</groupId><artifactId>parent</artifactId><version>1</version>
+            <properties><maven.compiler.release>17</maven.compiler.release></properties></project>"#;
+        let enfant = r#"<project><parent><groupId>com.example</groupId><artifactId>parent</artifactId><version>1</version></parent>
+            <artifactId>module-a</artifactId></project>"#;
+
+        assert_eq!(
+            version_java_de(&[("pom.xml", parent), ("module-a/pom.xml", enfant)])
+                .map(|d| d.version),
+            Some("17".to_string())
+        );
+    }
+
+    #[test]
+    fn extraire_version_java_retient_le_majeur_le_plus_eleve_entre_modules_divergents() {
+        let module_a = r#"<project><properties><maven.compiler.release>11</maven.compiler.release></properties></project>"#;
+        let module_b = r#"<project><properties><maven.compiler.release>21</maven.compiler.release></properties></project>"#;
+
+        assert_eq!(
+            version_java_de(&[("a/pom.xml", module_a), ("b/pom.xml", module_b)]).map(|d| d.version),
+            Some("21".to_string())
+        );
+    }
+
+    #[test]
+    fn extraire_version_java_absente_quand_aucun_pom_ne_declare_de_propriete() {
+        let pom = r#"<project><dependencies><dependency><groupId>a</groupId><artifactId>b</artifactId><version>1</version></dependency></dependencies></project>"#;
+        assert_eq!(version_java_de(&[("pom.xml", pom)]), None);
     }
 
     #[test]

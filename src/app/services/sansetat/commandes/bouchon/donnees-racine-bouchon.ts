@@ -66,6 +66,24 @@ const CATEGORIES_DEPENDANCES_PAR_DEFAUT: readonly { id: string; libelle: string;
   ];
 
 /**
+ * Règle de dépendances `java` par défaut (US-050), repli exact de
+ * `src-tauri/src/modele/racine.rs#regle_java_par_defaut` : rattache la version de Java (émise par le Connecteur
+ * GitLab comme une dépendance de référence `java`) à la catégorie `exec`.
+ */
+const REGLE_JAVA_PAR_DEFAUT: unknown = {
+  id: '50000000-0000-4000-8000-000000000001',
+  motif: 'java',
+  categorie: '40000000-0000-4000-8000-000000000001',
+  versions: [
+    { motifVersion: '21.*', statut: 'maintenu' },
+    { motifVersion: '17.*', statut: 'aJourM1' },
+    { motifVersion: '11.*', statut: 'aJourM3' },
+    { motifVersion: '8.*', statut: 'obsolete' },
+    { motifVersion: '*', statut: 'obsolete' },
+  ],
+};
+
+/**
  * Seuils et réglages applicatifs (`parametres`), partagés par les deux variantes de racine bouchonnée ci-dessous :
  * reprend les valeurs de `docs/01_besoin/exemple-donnees.json` (convention actée pour toute valeur par défaut non
  * fixée par un texte normatif, cf. `.claude/rules/09-normes-developpement.md#structure-et-nommage`).
@@ -113,7 +131,7 @@ export class RacineBouchonUtils {
       },
       groupes: [],
       referentiels: {
-        reglesDependances: [],
+        reglesDependances: [REGLE_JAVA_PAR_DEFAUT],
         reglesMarqueursIA: [],
         motifNommageBranches: MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT,
         categoriesDependances: CATEGORIES_DEPENDANCES_PAR_DEFAUT,

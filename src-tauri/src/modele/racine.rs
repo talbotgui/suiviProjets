@@ -44,12 +44,13 @@ use std::collections::HashMap;
 /// enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_4_vers_5`), sur le même
 /// modèle que les trois précédentes.
 ///
-/// Passage de `5` à `6` (US-048, catégorisation des dépendances) : ajout du champ `categoriesDependances` sur
-/// [`Referentiels`], reprenant sa liste par défaut ([`CATEGORIES_DEPENDANCES_PAR_DEFAUT`], `#[serde(default = "...")]`
-/// sur le modèle de `motifNommageBranches`) ; voir la cinquième étape réelle enregistrée dans
-/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_5_vers_6`), sur le même modèle que les
-/// quatre précédentes (bump de version seul : un document antérieur dépourvu du champ se désérialise nativement à
-/// la liste par défaut).
+/// Passage de `5` à `6` (US-048 catégorisation des dépendances, US-050 version de Java) : ajout du champ
+/// `categoriesDependances` sur [`Referentiels`], reprenant sa liste par défaut ([`CATEGORIES_DEPENDANCES_PAR_DEFAUT`],
+/// `#[serde(default = "...")]` sur le modèle de `motifNommageBranches`) ; voir la cinquième étape réelle
+/// enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_5_vers_6`). À la
+/// différence des paliers précédents, cette étape **mute** le document : elle insère la règle de dépendances par
+/// défaut couvrant la version de Java ([`regle_java_par_defaut`], US-050) si aucune règle de motif `java` n'existe
+/// déjà — pour que le suivi de Java fonctionne sans configuration sur un fichier antérieur.
 pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 6;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
@@ -122,6 +123,35 @@ fn categories_dependances_par_defaut() -> Vec<Value> {
             serde_json::json!({ "id": id, "libelle": libelle, "sigle": sigle })
         })
         .collect()
+}
+
+/// Identifiant stable de la règle de dépendances par défaut couvrant la version de Java (US-050) : le Connecteur
+/// GitLab émet la version de Java des `pom.xml` comme une dépendance de référence `java`
+/// ([`crate::connecteurs::gitlab`]), et cette règle la rattache par défaut à la catégorie `exec` pour qu'elle
+/// alimente l'écran Obsolescence sans configuration préalable.
+pub(crate) const REGLE_JAVA_ID: &str = "50000000-0000-4000-8000-000000000001";
+
+/// Motif de la règle de dépendances par défaut couvrant la version de Java (cf. [`REGLE_JAVA_ID`]).
+pub(crate) const REGLE_JAVA_MOTIF: &str = "java";
+
+/// Règle de dépendances par défaut rattachant la version de Java (`reference: "java"`, US-050) à la catégorie
+/// `exec`. Bornes de version (première ligne = version majeure la plus récente connue, cf. RG-050) : décision
+/// arbitraire à valider par un humain, faute de valeur fixée par un texte normatif — révisable comme toute règle
+/// de dépendances depuis l'écran de Paramétrage. `pub(crate)` : réutilisée par `migration_5_vers_6`, qui insère
+/// cette règle dans un document antérieur à US-050 dépourvu de toute règle de motif `java`.
+pub(crate) fn regle_java_par_defaut() -> Value {
+    serde_json::json!({
+        "id": REGLE_JAVA_ID,
+        "motif": REGLE_JAVA_MOTIF,
+        "categorie": CATEGORIES_DEPENDANCES_PAR_DEFAUT[0].0,
+        "versions": [
+            { "motifVersion": "21.*", "statut": "maintenu" },
+            { "motifVersion": "17.*", "statut": "aJourM1" },
+            { "motifVersion": "11.*", "statut": "aJourM3" },
+            { "motifVersion": "8.*", "statut": "obsolete" },
+            { "motifVersion": "*", "statut": "obsolete" }
+        ]
+    })
 }
 
 /// Racine du document JSON en clair, avant compression puis chiffrement (cf. `Specification.md#61-vue-densemble`).
@@ -828,7 +858,7 @@ pub(crate) struct Referentiels {
 impl Default for Referentiels {
     fn default() -> Self {
         Self {
-            regles_dependances: Vec::new(),
+            regles_dependances: vec![regle_java_par_defaut()],
             regles_marqueurs_ia: Vec::new(),
             motif_nommage_branches: motif_nommage_branches_par_defaut(),
             categories_dependances: categories_dependances_par_defaut(),

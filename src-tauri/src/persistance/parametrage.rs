@@ -685,6 +685,9 @@ mod tests {
             "vitalite": { "mourantJours": 180, "mortJours": 365 },
             "fraicheurAudit": { "ancienJours": 30 },
         });
+        // La règle `java` semée par défaut (US-050) est retirée ici : les tests de ce module portent sur le CRUD
+        // du référentiel et raisonnent sur un référentiel de dépendances initialement vide.
+        racine.referentiels.regles_dependances.clear();
         racine
     }
 

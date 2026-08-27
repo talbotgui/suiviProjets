@@ -12,7 +12,8 @@
 //! vide jusqu'à la Phase 5, incrément 7 (une seule version de schéma avait jamais existé) : il porte sa toute
 //! première étape réelle, [`migration_1_vers_2`], complétée d'une seconde à la Phase 6, incrément 1,
 //! [`migration_2_vers_3`] (ajout de `referentiels.motifNommageBranches`, RG-030), puis étendue jusqu'à
-//! [`migration_5_vers_6`] (US-048, ajout de `referentiels.categoriesDependances`).
+//! [`migration_5_vers_6`] (US-048 ajout de `referentiels.categoriesDependances` ; US-050 insertion de la règle de
+//! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -80,19 +81,45 @@ fn migration_4_vers_5(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
-/// Cinquième migration réelle du projet (US-048, catégorisation des dépendances), faisant progresser
-/// `versionSchema` de `5` à `6` suite à l'ajout du champ `categoriesDependances` sur `Referentiels` (cf.
+/// Cinquième migration réelle du projet (US-048 catégorisation des dépendances, US-050 version de Java), faisant
+/// progresser `versionSchema` de `5` à `6` suite à l'ajout du champ `categoriesDependances` sur `Referentiels` (cf.
 /// [`crate::modele::racine::Referentiels`]).
 ///
-/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_2_vers_3`] : le nouveau
-/// champ porte `#[serde(default = "...")]` (repli sur [`crate::modele::racine::CATEGORIES_DEPENDANCES_PAR_DEFAUT`]),
-/// donc son absence sur un document existant se désérialise directement à cette liste par défaut sans qu'aucune
-/// valeur n'ait à être recalculée ni déplacée ; seule la version de schéma progresse.
+/// Le champ `categoriesDependances` porte `#[serde(default = "...")]` (repli sur
+/// [`crate::modele::racine::CATEGORIES_DEPENDANCES_PAR_DEFAUT`]) : son absence sur un document existant se
+/// désérialise directement à la liste par défaut, aucune transformation n'est nécessaire pour lui (modèle de
+/// [`migration_2_vers_3`]). En revanche, à la différence des paliers précédents, cette étape **mute** le document :
+/// elle insère la règle de dépendances par défaut couvrant la version de Java
+/// ([`crate::modele::racine::regle_java_par_defaut`], US-050) si — et seulement si — `reglesDependances` ne contient
+/// encore aucune règle de motif `java`, pour que le suivi de Java fonctionne sans configuration sur un fichier
+/// antérieur sans jamais écraser ni dupliquer une règle `java` déjà saisie par l'utilisateur.
 fn migration_5_vers_6(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     if let Some(objet) = valeur.as_object_mut() {
+        inserer_regle_java_si_absente(objet);
         objet.insert("versionSchema".to_string(), Value::from(6));
     }
     Ok(())
+}
+
+/// Insère [`crate::modele::racine::regle_java_par_defaut`] dans `document.referentiels.reglesDependances` si aucune
+/// règle de motif `java` n'y figure déjà (US-050). Best-effort : si `referentiels`/`reglesDependances` a une forme
+/// inattendue (document édité à la main), l'insertion est simplement ignorée plutôt que de faire échouer la
+/// migration.
+fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) {
+    let Some(regles) = document
+        .get_mut("referentiels")
+        .and_then(Value::as_object_mut)
+        .and_then(|referentiels| referentiels.get_mut("reglesDependances"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    let deja_presente = regles.iter().any(|regle| {
+        regle.get("motif").and_then(Value::as_str) == Some(crate::modele::racine::REGLE_JAVA_MOTIF)
+    });
+    if !deja_presente {
+        regles.push(crate::modele::racine::regle_java_par_defaut());
+    }
 }
 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
@@ -457,7 +484,15 @@ mod tests {
         );
 
         let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
-        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        // La règle existante est conservée, la règle `java` par défaut (US-050) est ajoutée.
+        assert_eq!(racine.referentiels.regles_dependances.len(), 2);
+        assert!(
+            racine
+                .referentiels
+                .regles_dependances
+                .iter()
+                .any(|regle| regle["motif"] == json!(crate::modele::racine::REGLE_JAVA_MOTIF))
+        );
         let libelles: Vec<&str> = racine
             .referentiels
             .categories_dependances
@@ -465,6 +500,39 @@ mod tests {
             .filter_map(|entree| entree.get("libelle").and_then(Value::as_str))
             .collect();
         assert_eq!(libelles, vec!["exec", "os", "fmkBack", "fmkFront"]);
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_5_vers_6_ne_duplique_pas_une_regle_java_deja_saisie()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // US-050 : un fichier antérieur où l'utilisateur a déjà défini sa propre règle de motif `java` ne doit pas
+        // recevoir de seconde règle `java` par la migration (le Moteur de jugement ne retiendrait que la première).
+        let mut valeur = json!({
+            "versionSchema": 5,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "referentiels": {
+                "reglesDependances": [
+                    { "id": "perso", "motif": "java", "versions": [{ "motifVersion": "*", "statut": "maintenu" }] }
+                ],
+                "reglesMarqueursIA": [],
+                "motifNommageBranches": "^feature/.+$"
+            },
+            "groupes": []
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        assert_eq!(
+            racine.referentiels.regles_dependances[0]["id"],
+            json!("perso")
+        );
         Ok(())
     }
 }
