@@ -1373,7 +1373,9 @@ export class SqmFicheProjetComponent {
    * modifiable dans le texte pré-rempli le même complément automatique que {@link SaisieMasseDependancesUtils}
    * ajouterait sinon silencieusement en fin d'analyse si le groupe n'en porte encore aucune (RG-044, US-045),
    * cohérent avec le pré-remplissage déjà retenu par le formulaire unitaire de l'écran de Paramétrage pour la même
-   * borne de repli.
+   * borne de repli. Toute dépendance dont la référence ou la version contient « { » (motif de manifeste non
+   * résolu, ex. `${project.version}`) est écartée du pré-remplissage : elle ne fournit pas de motif de règle
+   * exploitable.
    * @param dependances - Lignes d'affichage des dépendances du projet.
    * @returns Le texte pré-rempli, deux lignes par dépendance non référencée distincte (version nettoyée, puis
    * borne `*=obsolete`), au format `motif;motifVersion=statut` de la grammaire retenue par
@@ -1387,6 +1389,13 @@ export class SqmFicheProjetComponent {
         continue;
       }
       const version = this.retirerPrefixeSemver(dependance.version);
+      // Une référence ou une version contenant « { » provient d'un motif de manifeste non résolu (ex. propriété
+      // Maven `${project.version}`, interpolation non substituée) : jamais un identifiant ou une borne de version
+      // exploitable comme motif de règle de dépendances. La ligne correspondante est écartée du pré-remplissage
+      // plutôt que de proposer une règle ingérable à l'utilisateur.
+      if (dependance.reference.includes('{') || version.includes('{')) {
+        continue;
+      }
       const cle = `${dependance.reference};${version}`;
       if (clesVues.has(cle)) {
         continue;

@@ -1206,6 +1206,38 @@ describe('SqmFicheProjetComponent', () => {
       },
     );
 
+    it('écarte du texte pré-rempli toute dépendance non référencée dont la référence ou la version contient « { » (motif de manifeste non résolu)', () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const composant = fixture.componentInstance;
+
+      const texte = composant.texteInitialSaisieMasseDependances([
+        {
+          reference: 'pkg-ok',
+          version: '1.0.0',
+          manifeste: 'pom.xml',
+          statut: { label: '—' },
+          nonReference: true,
+        },
+        {
+          reference: 'pkg-version-non-resolue',
+          version: '${project.version}',
+          manifeste: 'pom.xml',
+          statut: { label: '—' },
+          nonReference: true,
+        },
+        {
+          reference: '${dep.groupId}:artifact',
+          version: '2.0.0',
+          manifeste: 'pom.xml',
+          statut: { label: '—' },
+          nonReference: true,
+        },
+      ]);
+
+      expect(texte.split('\n')).toEqual(['pkg-ok;1.0.0=', 'pkg-ok;*=obsolete']);
+    });
+
     it('enregistre tous les groupes par un seul appel batch à definirReferentiels, notifie le succès total et referme la modale', async () => {
       const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
       const racine = DonneesDeTest.racine(projet);
