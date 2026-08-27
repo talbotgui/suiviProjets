@@ -41,7 +41,7 @@ type ReponseBouchonParametrage =
   | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
 
 /**
- * Bouchon TS des seize commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
+ * Bouchon TS des dix-sept commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
  * purges, réglages applicatifs), activé hors contexte Tauri par `InvocationCommandeUtils`.
  */
 export class BouchonParametrageUtils {
@@ -59,6 +59,7 @@ export class BouchonParametrageUtils {
     'executer_purge_age',
     'supprimer_regle_dependance',
     'supprimer_regle_marqueur_ia',
+    'supprimer_categorie_dependance',
     'definir_verrouillage',
     'definir_concurrence_audit',
     'definir_proxy',
@@ -129,6 +130,10 @@ export class BouchonParametrageUtils {
       case 'supprimer_regle_marqueur_ia':
         return BouchonParametrageUtils.horodater(
           BouchonParametrageUtils.supprimerEntreeReferentiel(parametres, 'reglesMarqueursIA'),
+        );
+      case 'supprimer_categorie_dependance':
+        return BouchonParametrageUtils.horodater(
+          BouchonParametrageUtils.supprimerEntreeReferentiel(parametres, 'categoriesDependances'),
         );
       case 'definir_verrouillage':
         return BouchonParametrageUtils.horodater(
@@ -257,12 +262,13 @@ export class BouchonParametrageUtils {
   /**
    * Supprime une entrée d'un référentiel-liste par identifiant (US-033, RG-035).
    * @param parametres - Paramètres reçus (`id`, `donnees`).
-   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances` ou `reglesMarqueursIA`).
+   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances`, `reglesMarqueursIA` ou
+   * `categoriesDependances`).
    * @returns La racine mise à jour (non encore horodatée).
    */
   private static supprimerEntreeReferentiel(
     parametres: Readonly<Record<string, unknown>>,
-    typeReferentiel: 'reglesDependances' | 'reglesMarqueursIA',
+    typeReferentiel: 'reglesDependances' | 'reglesMarqueursIA' | 'categoriesDependances',
   ): Record<string, unknown> {
     const donnees = BouchonParametrageUtils.exigerObjet(parametres['donnees']);
     const id = BouchonParametrageUtils.lireTexte(parametres, 'id');

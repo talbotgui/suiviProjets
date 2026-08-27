@@ -1021,6 +1021,33 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Supprime une entrée du référentiel des catégories de dépendance (US-048, RG-035) : invoque la commande native
+   * `supprimerCategorieDependance`, sur le même modèle que {@link supprimerRegleDependance}. Les ajouts et mises à
+   * jour d'une catégorie passent, eux, par {@link definirReferentiel} avec le type `'categoriesDependances'`.
+   * @param id - Identifiant de la catégorie de dépendance à supprimer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerCategorieDependance(
+    id: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.supprimerCategorieDependance<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, id, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Modifie les réglages de verrouillage de session (US-034, RG-031, Phase 10 incrément 8) : invoque la commande
    * native `definirVerrouillage`, qui consigne la modification au journal et sauvegarde effectivement le fichier
    * (RG-002, RG-023) avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
@@ -1662,6 +1689,7 @@ export class DonneesApplicationService {
       'reglageApplicatifInvalide',
       'entreeReferentielIntrouvable',
       'motifDependanceDejaExistant',
+      'libelleCategorieDependanceDejaExistant',
       'annotationIntrouvable',
       'annotationSystemeNonSupprimable',
       'modePurgeAgeInconnu',

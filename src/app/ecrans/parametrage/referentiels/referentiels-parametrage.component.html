@@ -9,6 +9,147 @@
     <header
       class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"
     >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Catégories de dépendance</h3>
+      <button
+        id="referentiels-parametrage-bouton-ajouter-categorie"
+        type="button"
+        class="bouton"
+        [disabled]="enCours()"
+        (click)="ouvrirCreationCategorie()"
+      >
+        Ajouter une catégorie
+      </button>
+    </header>
+    <p class="texte-discret texte-sm exterieur-bas-3">
+      Chaque règle de dépendances peut être rattachée à une catégorie. L'écran Obsolescence affiche
+      un indicateur de retard en versions majeures par catégorie.
+    </p>
+
+    @if (formulaireCategorieVisible()) {
+      <form
+        class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
+        (ngSubmit)="demanderEnregistrementCategorie()"
+      >
+        <h4 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+          {{ categorieEnEditionId ? 'Modifier la catégorie' : 'Créer une catégorie' }}
+        </h4>
+        <label class="champ">
+          Libellé
+          <input
+            #premierChampCategorie
+            id="referentiels-parametrage-champ-libelle-categorie"
+            type="text"
+            class="champ__controle"
+            name="libelleCategorie"
+            [(ngModel)]="libelleCategorie"
+            required
+            aria-describedby="referentiels-parametrage-champ-libelle-categorie-aide"
+          />
+          <span id="referentiels-parametrage-champ-libelle-categorie-aide" class="champ__aide">
+            Ex. <code class="police-mono">fmkBack</code>. Deux catégories ne peuvent pas porter le
+            même libellé.
+          </span>
+        </label>
+        <label class="champ">
+          Sigle
+          <input
+            id="referentiels-parametrage-champ-sigle-categorie"
+            type="text"
+            class="champ__controle"
+            name="sigleCategorie"
+            maxlength="3"
+            [(ngModel)]="sigleCategorie"
+            aria-describedby="referentiels-parametrage-champ-sigle-categorie-aide"
+          />
+          <span id="referentiels-parametrage-champ-sigle-categorie-aide" class="champ__aide">
+            Trois lettres au plus, utilisées comme en-tête de colonne compacte sur l'écran
+            Obsolescence. Laissé vide, il reprend les trois premières lettres du libellé.
+          </span>
+        </label>
+        <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
+          <button
+            id="referentiels-parametrage-bouton-annuler-categorie"
+            type="button"
+            class="bouton"
+            (click)="fermerFormulaireCategorie()"
+          >
+            Annuler
+          </button>
+          <button
+            id="referentiels-parametrage-bouton-enregistrer-categorie"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours()"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </form>
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'categorieDependance') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer cette catégorie de dépendance."
+        (confirmee)="confirmerEnregistrementCategorie($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (suppressionEnAttente()?.type === 'categorieDependance') {
+      <app-confirmation-suppression
+        message="Cette catégorie sera supprimée définitivement. Les règles qui l'utilisaient perdront leur catégorie."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'suppressionCategorieDependance') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette catégorie de dépendance."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    <ul
+      id="referentiels-parametrage-liste-categories"
+      class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2"
+    >
+      @for (categorie of categoriesDependances(); track categorie.id; let i = $index) {
+        <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
+          <span>{{ categorie.libelle }}</span>
+          <span class="texte-discret texte-sm police-mono">{{ categorie.sigle }}</span>
+          <button
+            [id]="'referentiels-parametrage-categorie-' + i + '-bouton-modifier'"
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours()"
+            (click)="ouvrirEditionCategorie(categorie.id)"
+          >
+            Modifier
+          </button>
+          <button
+            [id]="'referentiels-parametrage-categorie-' + i + '-bouton-supprimer'"
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours()"
+            (click)="demanderSuppressionCategorie(categorie.id)"
+          >
+            Supprimer
+          </button>
+        </li>
+      } @empty {
+        <li class="referentiels-parametrage__vide texte-discret">
+          Aucune catégorie de dépendance n'est définie.
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="referentiels-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"
+    >
       <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
         Référentiel des dépendances
       </h3>
@@ -78,10 +219,7 @@
           </span>
         </label>
         @if (avertissementStatutInconnu) {
-          <p
-            class="referentiels-parametrage__avertissement texte-orange texte-sm"
-            role="status"
-          >
+          <p class="referentiels-parametrage__avertissement texte-orange texte-sm" role="status">
             {{ avertissementStatutInconnu }}
           </p>
         }

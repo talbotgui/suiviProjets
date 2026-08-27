@@ -76,6 +76,7 @@ const REFERENTIELS_DE_TEST: Referentiels = {
   reglesDependances: [],
   reglesMarqueursIA: [],
   motifNommageBranches: '',
+  categoriesDependances: [],
 };
 
 /**

@@ -11,7 +11,8 @@
 //! moins un palier fictif pour prouver le mécanisme »). Le registre réel ([`ETAPES_MIGRATION_REELLES`]) est resté
 //! vide jusqu'à la Phase 5, incrément 7 (une seule version de schéma avait jamais existé) : il porte sa toute
 //! première étape réelle, [`migration_1_vers_2`], complétée d'une seconde à la Phase 6, incrément 1,
-//! [`migration_2_vers_3`] (ajout de `referentiels.motifNommageBranches`, RG-030).
+//! [`migration_2_vers_3`] (ajout de `referentiels.motifNommageBranches`, RG-030), puis étendue jusqu'à
+//! [`migration_5_vers_6`] (US-048, ajout de `referentiels.categoriesDependances`).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -79,14 +80,30 @@ fn migration_4_vers_5(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Cinquième migration réelle du projet (US-048, catégorisation des dépendances), faisant progresser
+/// `versionSchema` de `5` à `6` suite à l'ajout du champ `categoriesDependances` sur `Referentiels` (cf.
+/// [`crate::modele::racine::Referentiels`]).
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_2_vers_3`] : le nouveau
+/// champ porte `#[serde(default = "...")]` (repli sur [`crate::modele::racine::CATEGORIES_DEPENDANCES_PAR_DEFAUT`]),
+/// donc son absence sur un document existant se désérialise directement à cette liste par défaut sans qu'aucune
+/// valeur n'ait à être recalculée ni déplacée ; seule la version de schéma progresse.
+fn migration_5_vers_6(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(6));
+    }
+    Ok(())
+}
+
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
-/// [`migration_3_vers_4`] et [`migration_4_vers_5`].
+/// [`migration_3_vers_4`], [`migration_4_vers_5`] et [`migration_5_vers_6`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
     (3, migration_3_vers_4),
     (4, migration_4_vers_5),
+    (5, migration_5_vers_6),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -405,6 +422,49 @@ mod tests {
             crate::modele::racine::TypeAudit::Reguliere
         );
         assert_eq!(audit.date_execution, None);
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_5_vers_6_ne_perd_aucune_donnee_existante_et_ajoute_les_categories_par_defaut()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document historique typique d'avant US-048 : `versionSchema: 5`, `referentiels` sans le champ
+        // `categoriesDependances`. La migration ne doit ni échouer ni altérer les données existantes ; seul
+        // `versionSchema` progresse, `categoriesDependances` se désérialisant nativement à la liste par défaut
+        // (`#[serde(default = "...")]`), sur le modèle de `migration_reelle_2_vers_3_...`.
+        let mut valeur = json!({
+            "versionSchema": 5,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "referentiels": {
+                "reglesDependances": [
+                    { "id": "20000000-0000-4000-8000-000000000001", "motif": "org.springframework:*", "versions": [] }
+                ],
+                "reglesMarqueursIA": [],
+                "motifNommageBranches": "^feature/.+$"
+            },
+            "groupes": []
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        assert_eq!(racine.referentiels.regles_dependances.len(), 1);
+        let libelles: Vec<&str> = racine
+            .referentiels
+            .categories_dependances
+            .iter()
+            .filter_map(|entree| entree.get("libelle").and_then(Value::as_str))
+            .collect();
+        assert_eq!(libelles, vec!["exec", "os", "fmkBack", "fmkFront"]);
         Ok(())
     }
 }

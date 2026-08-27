@@ -139,6 +139,7 @@ export class SqmJournalParametrageComponent {
         return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'reglageApplicatifInvalide':
       case 'motifDependanceDejaExistant':
+      case 'libelleCategorieDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'entreeReferentielIntrouvable':
       case 'motifNommageBranchesInvalide':

@@ -214,6 +214,7 @@ export class SqmPurgeParametrageComponent {
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
       case 'motifDependanceDejaExistant':
+      case 'libelleCategorieDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'motifNommageBranchesInvalide':
       case 'groupeIntrouvable':

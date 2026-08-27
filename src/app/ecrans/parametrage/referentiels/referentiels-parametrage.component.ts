@@ -3,10 +3,11 @@
 //
 // Section « Référentiels » de l'onglet Seuils et référentiels de l'écran Paramétrage (US-033, Phase 7,
 // incrément 2 ; RG-023, RG-030) : ajout/modification d'une règle de dépendances (`referentiels.reglesDependances`)
-// ou d'une règle de marqueur IA (`referentiels.reglesMarqueursIA`), et remplacement du motif de nommage des
-// branches (`referentiels.motifNommageBranches`). Sur le patron CRUD + confirmation de mot de passe de
-// `SqmMembresConnusAdminComponent` (Phase 4), avec un unique discriminant d'action en attente pour les trois
-// sous-formulaires plutôt que trois indicateurs distincts (une seule action possible à la fois).
+// ou d'une règle de marqueur IA (`referentiels.reglesMarqueursIA`), CRUD des catégories de dépendance
+// (`referentiels.categoriesDependances`, US-048, RG-048), et remplacement du motif de nommage des branches
+// (`referentiels.motifNommageBranches`). Sur le patron CRUD + confirmation de mot de passe de
+// `SqmMembresConnusAdminComponent` (Phase 4), avec un unique discriminant d'action en attente pour les
+// sous-formulaires plutôt que des indicateurs distincts (une seule action possible à la fois).
 //
 // Suppression d'une entrée de référentiel (US-033, RG-035, Phase 10 incrément 8) : deux commandes dédiées
 // (`supprimerRegleDependance`/`supprimerRegleMarqueurIA`), retenues par arbitrage humain plutôt qu'une commande
@@ -64,9 +65,11 @@ import type {
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
+  EntreeCategorieDependance,
   EntreeReglesDependances,
   EntreeReglesMarqueursIA,
   ErreurAdministration,
+  ResultatMutationAdministration,
 } from '../../../services/avecetat/etat/types-donnees';
 import type { VersionDependance } from '../../../services/sansetat/jugement/parametres-jugement.utils';
 
@@ -79,17 +82,19 @@ import type { VersionDependance } from '../../../services/sansetat/jugement/para
 type ActionReferentielEnAttente =
   | 'dependance'
   | 'marqueurIA'
+  | 'categorieDependance'
   | 'motifNommage'
   | 'suppressionDependance'
   | 'suppressionMarqueurIA'
+  | 'suppressionCategorieDependance'
   | null;
 
 /**
  * Suppression d'entrée de référentiel en attente de confirmation (avant ressaisie du mot de passe), `null` si
- * aucune (US-033, RG-035, Phase 10 incrément 8).
+ * aucune (US-033, US-048, RG-035, Phase 10 incrément 8).
  */
 interface SuppressionEnAttente {
-  readonly type: 'dependance' | 'marqueurIA';
+  readonly type: 'dependance' | 'marqueurIA' | 'categorieDependance';
   readonly id: string;
 }
 
@@ -128,6 +133,13 @@ export class SqmReferentielsParametrageComponent {
    */
   private readonly premierChampMotifNommage: Signal<ElementRef<HTMLInputElement> | undefined> =
     viewChild<ElementRef<HTMLInputElement>>('premierChampMotifNommage');
+
+  /**
+   * Premier champ du formulaire de catégorie de dépendance (cf. {@link ouvrirCreationCategorie},
+   * {@link ouvrirEditionCategorie}, US-048).
+   */
+  private readonly premierChampCategorie: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('premierChampCategorie');
 
   /**
    * Pose le focus sur le champ désigné dès son rendu effectif (C15-02) : un appel direct à `.focus()` échouerait
@@ -519,6 +531,138 @@ export class SqmReferentielsParametrageComponent {
     );
   }
 
+  // --- Catégories de dépendance (US-048, RG-048) ---
+
+  /**
+   * Catégories de dépendance actuellement chargées (US-048).
+   * @returns Le tableau des catégories de dépendance de la racine courante.
+   */
+  public categoriesDependances(): readonly EntreeCategorieDependance[] {
+    return this.donneesApplication.racine()?.referentiels.categoriesDependances ?? [];
+  }
+
+  /**
+   * Visibilité du formulaire de catégorie de dépendance. Signal pour le même motif que
+   * {@link actionEnAttenteMotDePasse}.
+   */
+  public readonly formulaireCategorieVisible: WritableSignal<boolean> = signal(false);
+
+  public categorieEnEditionId: string | null = null;
+  public libelleCategorie = '';
+  public sigleCategorie = '';
+
+  /**
+   * Ouvre le formulaire pour la création d'une nouvelle catégorie de dépendance.
+   */
+  public ouvrirCreationCategorie(): void {
+    this.categorieEnEditionId = null;
+    this.libelleCategorie = '';
+    this.sigleCategorie = '';
+    this.messageErreur = null;
+    this.formulaireCategorieVisible.set(true);
+    this.focusApresRendu(this.premierChampCategorie);
+  }
+
+  /**
+   * Ouvre le formulaire pré-rempli pour la modification d'une catégorie de dépendance existante.
+   * @param id - Identifiant de la catégorie à modifier.
+   */
+  public ouvrirEditionCategorie(id: string): void {
+    const categorie = this.categoriesDependances().find((candidate) => candidate.id === id);
+    if (!categorie) {
+      return;
+    }
+    this.categorieEnEditionId = categorie.id;
+    this.libelleCategorie = categorie.libelle;
+    this.sigleCategorie = categorie.sigle;
+    this.messageErreur = null;
+    this.formulaireCategorieVisible.set(true);
+    this.focusApresRendu(this.premierChampCategorie);
+  }
+
+  /**
+   * Referme le formulaire de catégorie de dépendance sans enregistrer.
+   */
+  public fermerFormulaireCategorie(): void {
+    this.formulaireCategorieVisible.set(false);
+  }
+
+  /**
+   * Valide le formulaire de catégorie de dépendance puis, si valide, ouvre la ressaisie du mot de passe (RG-002).
+   * Bloque avec {@link messageErreur} si le libellé est vide, si le sigle dépasse trois caractères, ou si le
+   * libellé correspond déjà à une autre catégorie existante (RG-048, rejet strict revalidé côté cœur natif).
+   */
+  public demanderEnregistrementCategorie(): void {
+    const libelle = this.libelleCategorie.trim();
+    const sigle = this.sigleCategorie.trim();
+    if (libelle.length === 0) {
+      this.messageErreur = 'Le libellé est obligatoire.';
+      return;
+    }
+    if (sigle.length > 3) {
+      this.messageErreur = 'Le sigle ne peut pas dépasser trois caractères.';
+      return;
+    }
+    const libelleDejaExistant = this.categoriesDependances().some(
+      (categorie) => categorie.id !== this.categorieEnEditionId && categorie.libelle === libelle,
+    );
+    if (libelleDejaExistant) {
+      this.messageErreur =
+        'Une catégorie de dépendance porte déjà ce libellé : modifiez directement la catégorie existante plutôt que d’en créer une nouvelle (RG-048).';
+      return;
+    }
+    this.messageErreur = null;
+    this.actionEnAttenteMotDePasse.set('categorieDependance');
+  }
+
+  /**
+   * Enregistre la catégorie de dépendance après confirmation du mot de passe (US-048, RG-002, RG-023).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerEnregistrementCategorie(motDePasse: string): Promise<void> {
+    const categorieEnEditionId = this.categorieEnEditionId;
+    const libelle = this.libelleCategorie.trim();
+    const sigle =
+      this.sigleCategorie.trim().length > 0
+        ? this.sigleCategorie.trim().toUpperCase()
+        : libelle.slice(0, 3).toUpperCase();
+    const entree: EntreeCategorieDependance = {
+      id: categorieEnEditionId ?? crypto.randomUUID(),
+      libelle,
+      sigle,
+    };
+
+    this.enCours.set(true);
+    const resultat = await this.donneesApplication.definirReferentiel(
+      'categoriesDependances',
+      entree,
+      motDePasse,
+    );
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
+
+    if (resultat.type === 'echec') {
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
+      return;
+    }
+    this.formulaireCategorieVisible.set(false);
+    this.notification.succes(
+      categorieEnEditionId
+        ? 'La catégorie de dépendance a été modifiée.'
+        : 'La catégorie de dépendance a été ajoutée.',
+    );
+  }
+
+  /**
+   * Demande la suppression d'une catégorie de dépendance : ouvre la confirmation de suppression (avant ressaisie du
+   * mot de passe).
+   * @param id - Identifiant de la catégorie à supprimer.
+   */
+  public demanderSuppressionCategorie(id: string): void {
+    this.messageErreur = null;
+    this.suppressionEnAttente.set({ type: 'categorieDependance', id });
+  }
+
   // --- Motif de nommage des branches ---
 
   /**
@@ -641,11 +785,17 @@ export class SqmReferentielsParametrageComponent {
     if (!suppressionEnAttente) {
       return;
     }
-    this.actionEnAttenteMotDePasse.set(
-      suppressionEnAttente.type === 'dependance'
-        ? 'suppressionDependance'
-        : 'suppressionMarqueurIA',
-    );
+    switch (suppressionEnAttente.type) {
+      case 'dependance':
+        this.actionEnAttenteMotDePasse.set('suppressionDependance');
+        break;
+      case 'marqueurIA':
+        this.actionEnAttenteMotDePasse.set('suppressionMarqueurIA');
+        break;
+      case 'categorieDependance':
+        this.actionEnAttenteMotDePasse.set('suppressionCategorieDependance');
+        break;
+    }
   }
 
   /**
@@ -660,10 +810,18 @@ export class SqmReferentielsParametrageComponent {
     const { type, id } = suppressionEnAttente;
 
     this.enCours.set(true);
-    const resultat =
-      type === 'dependance'
-        ? await this.donneesApplication.supprimerRegleDependance(id, motDePasse)
-        : await this.donneesApplication.supprimerRegleMarqueurIA(id, motDePasse);
+    let resultat: ResultatMutationAdministration;
+    switch (type) {
+      case 'dependance':
+        resultat = await this.donneesApplication.supprimerRegleDependance(id, motDePasse);
+        break;
+      case 'marqueurIA':
+        resultat = await this.donneesApplication.supprimerRegleMarqueurIA(id, motDePasse);
+        break;
+      case 'categorieDependance':
+        resultat = await this.donneesApplication.supprimerCategorieDependance(id, motDePasse);
+        break;
+    }
     this.enCours.set(false);
     this.actionEnAttenteMotDePasse.set(null);
 
@@ -693,6 +851,8 @@ export class SqmReferentielsParametrageComponent {
         return "Cette entrée n'est pas valide : vérifiez les champs obligatoires.";
       case 'motifDependanceDejaExistant':
         return 'Une règle de dépendances existe déjà pour ce motif : modifiez directement la règle existante plutôt que d’en créer une nouvelle.';
+      case 'libelleCategorieDependanceDejaExistant':
+        return 'Une catégorie de dépendance porte déjà ce libellé : modifiez directement la catégorie existante plutôt que d’en créer une nouvelle.';
       case 'entreeReferentielIntrouvable':
         return "Cette entrée de référentiel n'existe plus (peut-être déjà supprimée).";
       case 'motifNommageBranchesInvalide':

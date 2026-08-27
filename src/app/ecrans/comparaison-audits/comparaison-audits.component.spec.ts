@@ -259,6 +259,7 @@ class DonneesDeTest {
         ],
         reglesMarqueursIA: [],
         motifNommageBranches: '',
+        categoriesDependances: [],
       },
       parametres: {
         seuils: {

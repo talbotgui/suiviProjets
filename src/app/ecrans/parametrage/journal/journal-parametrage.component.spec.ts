@@ -36,6 +36,7 @@ class DonneesDeTest {
         reglesDependances: [],
         reglesMarqueursIA: [],
         motifNommageBranches: '^(main|develop)$',
+        categoriesDependances: [],
       },
       parametres: {
         seuils: {

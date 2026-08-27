@@ -36,6 +36,7 @@ export interface RacineBouchon {
     readonly reglesDependances: readonly unknown[];
     readonly reglesMarqueursIA: readonly unknown[];
     readonly motifNommageBranches: string;
+    readonly categoriesDependances: readonly unknown[];
   };
   readonly parametres: Readonly<Record<string, unknown>>;
   readonly campagnes: readonly unknown[];
@@ -51,6 +52,18 @@ export interface RacineBouchon {
  * segment `bugfix/*` retiré par R10-11).
  */
 const MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT = '^(main|master|develop|feature/.+|release/.+|hotfix/.+)$';
+
+/**
+ * Catégories de dépendance par défaut (US-048), repli exact de
+ * `src-tauri/src/modele/racine.rs#CATEGORIES_DEPENDANCES_PAR_DEFAUT` : `exec`, `os`, `fmkBack`, `fmkFront`.
+ */
+const CATEGORIES_DEPENDANCES_PAR_DEFAUT: readonly { id: string; libelle: string; sigle: string }[] =
+  [
+    { id: '40000000-0000-4000-8000-000000000001', libelle: 'exec', sigle: 'EXE' },
+    { id: '40000000-0000-4000-8000-000000000002', libelle: 'os', sigle: 'OS' },
+    { id: '40000000-0000-4000-8000-000000000003', libelle: 'fmkBack', sigle: 'FMB' },
+    { id: '40000000-0000-4000-8000-000000000004', libelle: 'fmkFront', sigle: 'FMF' },
+  ];
 
 /**
  * Seuils et réglages applicatifs (`parametres`), partagés par les deux variantes de racine bouchonnée ci-dessous :
@@ -103,6 +116,7 @@ export class RacineBouchonUtils {
         reglesDependances: [],
         reglesMarqueursIA: [],
         motifNommageBranches: MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT,
+        categoriesDependances: CATEGORIES_DEPENDANCES_PAR_DEFAUT,
       },
       parametres: PARAMETRES_BOUCHON,
       campagnes: [],
@@ -1485,6 +1499,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
       },
     ],
     motifNommageBranches: MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT,
+    categoriesDependances: CATEGORIES_DEPENDANCES_PAR_DEFAUT,
   },
   parametres: PARAMETRES_BOUCHON,
   campagnes: [

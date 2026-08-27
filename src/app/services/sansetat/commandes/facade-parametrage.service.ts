@@ -141,8 +141,9 @@ export interface ParametresExecutionPurgeAge<TDonnees> {
 }
 
 /**
- * Paramètres transmis aux commandes natives `supprimerRegleDependance`/`supprimerRegleMarqueurIA` (US-033, RG-035,
- * Phase 10 incrément 8), génériques sur le type concret de la racine échangée (`TDonnees`).
+ * Paramètres transmis aux commandes natives
+ * `supprimerRegleDependance`/`supprimerRegleMarqueurIA`/`supprimerCategorieDependance` (US-033, US-048, RG-035),
+ * génériques sur le type concret de la racine échangée (`TDonnees`).
  */
 export interface ParametresSuppressionEntreeReferentiel<TDonnees> {
   /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
@@ -369,6 +370,20 @@ export class FacadeParametrageService {
     parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('supprimer_regle_marqueur_ia', {
+      ...parametres,
+    });
+  }
+
+  /**
+   * Supprime une entrée du référentiel des catégories de dépendance, sauvegarde le fichier et consigne la
+   * suppression au journal (US-048, RG-035).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresSuppressionEntreeReferentiel}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async supprimerCategorieDependance<TDonnees, TReponse>(
+    parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_categorie_dependance', {
       ...parametres,
     });
   }

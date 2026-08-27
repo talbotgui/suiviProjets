@@ -106,6 +106,21 @@ export interface EntreeReglesMarqueursIA extends RegleMarqueurIA {
 }
 
 /**
+ * Catégorie de dépendance administrable (`referentiels.categoriesDependances[]`, US-048), mirroir de l'entité
+ * homonyme de `docs/02_documentation/12_modeleDonnees.md#entités-attributs-et-relations`. Chaque règle de
+ * dépendance peut porter l'`id` d'une de ces catégories (US-049) ; l'écran Obsolescence (US-051) affiche un
+ * indicateur par catégorie.
+ */
+export interface EntreeCategorieDependance {
+  /** Identifiant UUID v4 de la catégorie, stable d'une édition à l'autre. */
+  readonly id: string;
+  /** Libellé affiché dans l'administration et les infobulles. */
+  readonly libelle: string;
+  /** Sigle de trois lettres au plus, colonne compacte de l'écran Obsolescence. */
+  readonly sigle: string;
+}
+
+/**
  * Grilles de lecture partageables (référentiels), mirroir strict de `Referentiels` côté cœur natif.
  */
 export interface Referentiels {
@@ -119,6 +134,11 @@ export interface Referentiels {
    * (`Resultat.GitlabBranches`), jamais stocké comme un constat.
    */
   readonly motifNommageBranches: string;
+  /**
+   * Catégories de dépendance administrables (US-048), amorcées par défaut à `exec`, `os`, `fmkBack`, `fmkFront`
+   * (cf. `CATEGORIES_DEPENDANCES_PAR_DEFAUT` côté cœur natif).
+   */
+  readonly categoriesDependances: readonly EntreeCategorieDependance[];
 }
 
 /**
@@ -752,6 +772,7 @@ export type CategorieErreurAdministration =
   | 'reglageApplicatifInvalide'
   | 'entreeReferentielIntrouvable'
   | 'motifDependanceDejaExistant'
+  | 'libelleCategorieDependanceDejaExistant'
   | 'annotationIntrouvable'
   | 'annotationSystemeNonSupprimable'
   | 'modePurgeAgeInconnu'

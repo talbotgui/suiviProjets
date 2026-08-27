@@ -46,7 +46,12 @@ class DonneesDeTest {
         application: 'Test',
       },
       groupes: [],
-      referentiels: { reglesDependances: [], reglesMarqueursIA: [], motifNommageBranches: '' },
+      referentiels: {
+        reglesDependances: [],
+        reglesMarqueursIA: [],
+        motifNommageBranches: '',
+        categoriesDependances: [],
+      },
       parametres: {
         seuils: {
           vitalite: { mourantJours: 180, mortJours: 365 },

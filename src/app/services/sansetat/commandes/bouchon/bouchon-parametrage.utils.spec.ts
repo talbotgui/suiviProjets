@@ -16,6 +16,7 @@ const DONNEES_DE_BASE = {
     reglesDependances: [{ id: 'd1', motif: 'org.exemple:*', versions: [] }],
     reglesMarqueursIA: [{ id: 'm1', motif: '*.env', outil: 'copilot' }],
     motifNommageBranches: 'main|master',
+    categoriesDependances: [],
   },
 };
 

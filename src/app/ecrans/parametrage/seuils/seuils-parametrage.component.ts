@@ -332,6 +332,7 @@ export class SqmSeuilsParametrageComponent {
         return 'Le mot de passe saisi ne correspond pas à celui de la session en cours.';
       case 'typeReferentielInconnu':
       case 'motifDependanceDejaExistant':
+      case 'libelleCategorieDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'motifNommageBranchesInvalide':
       case 'groupeIntrouvable':

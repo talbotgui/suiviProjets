@@ -144,6 +144,7 @@ export class SqmSecuriteParametrageComponent {
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':
       case 'motifDependanceDejaExistant':
+      case 'libelleCategorieDependanceDejaExistant':
       case 'entreeReferentielInvalide':
       case 'entreeReferentielIntrouvable':
       case 'motifNommageBranchesInvalide':

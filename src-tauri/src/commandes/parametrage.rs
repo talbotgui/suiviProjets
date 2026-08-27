@@ -217,6 +217,41 @@ pub(crate) fn supprimer_regle_marqueur_ia(
     resultat
 }
 
+/// Supprime une entrée du référentiel des catégories de dépendance, sauvegarde le fichier et consigne la
+/// suppression au journal (US-048, RG-035).
+///
+/// # Erreurs
+///
+/// Voir [`supprimer_regle_dependance`].
+#[tauri::command]
+pub(crate) fn supprimer_categorie_dependance(
+    chemin: String,
+    donnees: DonneesRacine,
+    id: String,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    crate::journalisation::consigner_debut_commande("supprimerCategorieDependance");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::supprimer_categorie_dependance(&mut donnees, &id, horodatage)?;
+
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerCategorieDependance",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
+
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerCategorieDependance");
+    resultat
+}
+
 /// Modifie les réglages de verrouillage de session, sauvegarde le fichier et consigne la modification au journal
 /// (US-034, RG-031, Phase 10 incrément 8).
 ///

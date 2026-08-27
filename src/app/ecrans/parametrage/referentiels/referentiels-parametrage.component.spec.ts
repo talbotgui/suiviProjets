@@ -50,6 +50,7 @@ class DonneesDeTest {
           },
         ],
         motifNommageBranches: '^(main|develop)$',
+        categoriesDependances: [],
       },
       parametres: {
         seuils: {
@@ -189,6 +190,10 @@ describe('SqmReferentielsParametrageComponent', () => {
     [
       'motifDependanceDejaExistant',
       'Une règle de dépendances existe déjà pour ce motif : modifiez directement la règle existante plutôt que d’en créer une nouvelle.',
+    ],
+    [
+      'libelleCategorieDependanceDejaExistant',
+      'Une catégorie de dépendance porte déjà ce libellé : modifiez directement la catégorie existante plutôt que d’en créer une nouvelle.',
     ],
     ['motDePasseOuFichierInvalide', 'Mot de passe incorrect.'],
     ['fichierVerrouille', 'Le fichier de données est verrouillé par un autre processus.'],

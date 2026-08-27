@@ -43,7 +43,14 @@ use std::collections::HashMap;
 /// (cf. `migration_1_vers_2`/`migration_2_vers_3`/`migration_3_vers_4` ci-dessus) ; voir la quatrième étape réelle
 /// enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_4_vers_5`), sur le même
 /// modèle que les trois précédentes.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 5;
+///
+/// Passage de `5` à `6` (US-048, catégorisation des dépendances) : ajout du champ `categoriesDependances` sur
+/// [`Referentiels`], reprenant sa liste par défaut ([`CATEGORIES_DEPENDANCES_PAR_DEFAUT`], `#[serde(default = "...")]`
+/// sur le modèle de `motifNommageBranches`) ; voir la cinquième étape réelle enregistrée dans
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_5_vers_6`), sur le même modèle que les
+/// quatre précédentes (bump de version seul : un document antérieur dépourvu du champ se désérialise nativement à
+/// la liste par défaut).
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 6;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -88,6 +95,33 @@ pub(crate) const MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT: &str =
 /// implicitement en `String` via cet attribut).
 fn motif_nommage_branches_par_defaut() -> String {
     MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT.to_string()
+}
+
+/// Catégories de dépendance par défaut (US-048), appliquées en l'absence de valeur explicite dans
+/// `referentiels.categoriesDependances` : `exec`, `os`, `fmkBack`, `fmkFront`, valeurs reprises telles quelles de la
+/// demande fonctionnelle (aucune valeur chiffrée ou libellé imposé par un texte normatif — décision arbitraire à
+/// valider par un humain, cf. rapport de développement de cet incrément). Chaque entrée porte un `id` (UUID stable),
+/// un `libelle` (affiché dans l'administration et les infobulles) et un `sigle` de trois lettres (colonne compacte
+/// de l'écran Obsolescence, US-051). Champ absent de tout document antérieur à US-048, y compris
+/// `docs/01_besoin/exemple-donnees.json` (jamais modifié, cf. `.claude/rules/09-normes-developpement.md`) : sans ce
+/// repli, la liste serait silencieusement vidée à chaque sauvegarde d'un document créé avant ce champ.
+pub(crate) const CATEGORIES_DEPENDANCES_PAR_DEFAUT: &[(&str, &str, &str)] = &[
+    ("40000000-0000-4000-8000-000000000001", "exec", "EXE"),
+    ("40000000-0000-4000-8000-000000000002", "os", "OS"),
+    ("40000000-0000-4000-8000-000000000003", "fmkBack", "FMB"),
+    ("40000000-0000-4000-8000-000000000004", "fmkFront", "FMF"),
+];
+
+/// Fonction de repli pour `#[serde(default = "...")]` sur [`Referentiels::categories_dependances`], sur le modèle de
+/// [`motif_nommage_branches_par_defaut`] : reconstruit la liste par défaut ([`CATEGORIES_DEPENDANCES_PAR_DEFAUT`])
+/// sous la même forme JSON générique que les entrées saisies (`{ id, libelle, sigle }`).
+fn categories_dependances_par_defaut() -> Vec<Value> {
+    CATEGORIES_DEPENDANCES_PAR_DEFAUT
+        .iter()
+        .map(|(id, libelle, sigle)| {
+            serde_json::json!({ "id": id, "libelle": libelle, "sigle": sigle })
+        })
+        .collect()
 }
 
 /// Racine du document JSON en clair, avant compression puis chiffrement (cf. `Specification.md#61-vue-densemble`).
@@ -780,6 +814,15 @@ pub(crate) struct Referentiels {
     /// [`Referentiels::default`] ci-dessous, qui applique le même repli qu'à la désérialisation).
     #[serde(default = "motif_nommage_branches_par_defaut")]
     pub(crate) motif_nommage_branches: String,
+    /// Catégories de dépendance administrables (US-048), consommées par le Moteur de jugement (RG-049, RG-050) et
+    /// l'écran Obsolescence (US-051) : chaque règle de dépendance peut porter l'`id` d'une de ces catégories.
+    /// Représentées en `Value` générique, comme [`Self::regles_dependances`], le cœur natif n'effectuant qu'un
+    /// round-trip fidèle et une validation de forme minimale (cf.
+    /// `crate::persistance::parametrage::valider_entree_categorie_dependance`). `#[serde(default = "...")]` plutôt
+    /// que `#[serde(default)]` seul : un document antérieur à US-048 doit récupérer la liste par défaut
+    /// ([`CATEGORIES_DEPENDANCES_PAR_DEFAUT`]) et non une liste vide (même choix que `motif_nommage_branches`).
+    #[serde(default = "categories_dependances_par_defaut")]
+    pub(crate) categories_dependances: Vec<Value>,
 }
 
 impl Default for Referentiels {
@@ -788,6 +831,7 @@ impl Default for Referentiels {
             regles_dependances: Vec::new(),
             regles_marqueurs_ia: Vec::new(),
             motif_nommage_branches: motif_nommage_branches_par_defaut(),
+            categories_dependances: categories_dependances_par_defaut(),
         }
     }
 }
@@ -1251,6 +1295,7 @@ mod tests {
             regles_dependances: vec![],
             regles_marqueurs_ia: vec![],
             motif_nommage_branches: r"^feature/.+$".to_string(),
+            categories_dependances: categories_dependances_par_defaut(),
         };
 
         let json = serde_json::to_string(&referentiels)?;
@@ -1259,6 +1304,63 @@ mod tests {
         assert_eq!(referentiels, relu);
         assert_eq!(relu.motif_nommage_branches, r"^feature/.+$");
         assert!(json.contains("\"motifNommageBranches\":\"^feature/.+$\""));
+        Ok(())
+    }
+
+    #[test]
+    fn referentiels_categories_dependances_par_defaut_porte_les_quatre_valeurs_de_la_demande() {
+        // US-048 : un fichier neuf démarre avec les catégories `exec`, `os`, `fmkBack`, `fmkFront` (à la
+        // différence de `reglesDependances`/`reglesMarqueursIA`, listes vides à la création). Chaque entrée porte
+        // `id`, `libelle` et `sigle`.
+        let referentiels = Referentiels::default();
+        let libelles: Vec<&str> = referentiels
+            .categories_dependances
+            .iter()
+            .filter_map(|entree| entree.get("libelle").and_then(Value::as_str))
+            .collect();
+        assert_eq!(libelles, vec!["exec", "os", "fmkBack", "fmkFront"]);
+        for entree in &referentiels.categories_dependances {
+            assert!(entree.get("id").and_then(Value::as_str).is_some());
+            assert!(entree.get("sigle").and_then(Value::as_str).is_some());
+        }
+    }
+
+    #[test]
+    fn referentiels_document_historique_sans_categories_dependances_se_desserialise_a_la_liste_par_defaut()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Non-régression (US-048), sur le modèle du test de non-régression de `motifNommageBranches` : le champ
+        // absent du JSON doit se désérialiser à la liste par défaut (`#[serde(default = "...")]`) plutôt que d'être
+        // silencieusement vidé.
+        let referentiels: Referentiels = serde_json::from_str(
+            r#"{
+                "reglesDependances": [],
+                "reglesMarqueursIA": [],
+                "motifNommageBranches": "^feature/.+$"
+            }"#,
+        )?;
+
+        assert_eq!(
+            referentiels.categories_dependances,
+            categories_dependances_par_defaut()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn referentiels_categories_dependances_videes_par_ladministrateur_ne_sont_pas_reamorcees()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Le repli ne s'applique qu'à un champ absent : une liste explicitement vide (l'administrateur a supprimé
+        // toutes les catégories) doit survivre à un aller-retour JSON sans être ré-amorcée aux quatre valeurs.
+        let referentiels: Referentiels = serde_json::from_str(
+            r#"{
+                "reglesDependances": [],
+                "reglesMarqueursIA": [],
+                "motifNommageBranches": "^feature/.+$",
+                "categoriesDependances": []
+            }"#,
+        )?;
+
+        assert!(referentiels.categories_dependances.is_empty());
         Ok(())
     }
 

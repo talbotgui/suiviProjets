@@ -89,6 +89,9 @@ pub(crate) enum ErreurFacade {
     /// Le motif soumis à `definirReferentiel` pour une règle de dépendances correspond déjà au motif d'une autre
     /// entrée existante du référentiel (Phase 15, C15-10, RG-042) : rejet strict, jamais de fusion implicite.
     MotifDependanceDejaExistant,
+    /// Le libellé soumis à `definirReferentiel` pour une catégorie de dépendance correspond déjà au libellé d'une
+    /// autre entrée existante du référentiel (US-048, RG-048) : rejet strict, jamais de doublon silencieux.
+    LibelleCategorieDependanceDejaExistant,
     /// L'annotation désignée n'existe pas dans la portée demandée (Phase 10, incrément 8, US-019,
     /// `supprimerAnnotation`).
     AnnotationIntrouvable,
@@ -225,6 +228,9 @@ impl From<crate::persistance::parametrage::ErreurParametrage> for ErreurFacade {
             ErreurParametrage::ReglageApplicatifInvalide => Self::ReglageApplicatifInvalide,
             ErreurParametrage::EntreeReferentielIntrouvable => Self::EntreeReferentielIntrouvable,
             ErreurParametrage::MotifDependanceDejaExistant => Self::MotifDependanceDejaExistant,
+            ErreurParametrage::LibelleCategorieDependanceDejaExistant => {
+                Self::LibelleCategorieDependanceDejaExistant
+            }
         }
     }
 }

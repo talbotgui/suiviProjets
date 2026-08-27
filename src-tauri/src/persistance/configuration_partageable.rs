@@ -18,7 +18,8 @@
 //! `docs/02_documentation/13_conceptionDetaillee.md` pour cette fonctionnalité (décision arbitraire, cf. rapport de
 //! développement de cet incrément) : le différentiel à trois catégories (ajout, modification, identique) reprend le
 //! vocabulaire exact de `Specification.md#523-f23` (« différentiel à trois colonnes »), une ligne par entrée de
-//! référentiel-liste (`reglesDependances`/`reglesMarqueursIA`, identifiée par son `id`), par le motif de nommage de
+//! référentiel-liste (`reglesDependances`/`reglesMarqueursIA`/`categoriesDependances`, identifiée par son `id`),
+//! par le motif de nommage de
 //! branche (valeur scalaire) et par feuille de `parametres.seuils` (chemin pointé obtenu par aplanissement
 //! récursif de l'objet JSON, sur le même principe que le chemin pointé déjà utilisé par `definir_seuil`).
 //!
@@ -31,7 +32,8 @@
 //!
 //! Correction post-relecture (Phase 9, incrément 3, arbitrage humain explicite) : la voie d'import réutilise
 //! désormais les mêmes validateurs que la saisie manuelle de `parametrage::definir_referentiel`
-//! (`valider_entree_regles_dependances`, `valider_entree_regles_marqueurs_ia`, `valider_motif_nommage_branches`)
+//! (`valider_entree_regles_dependances`, `valider_entree_regles_marqueurs_ia`,
+//! `valider_entree_categorie_dependance`, `valider_motif_nommage_branches`)
 //! pour ne jamais être moins stricte qu'elle sur les mêmes données ; une entrée importée qui échoue à cette
 //! validation (motif de nommage syntaxiquement invalide, champ obligatoire manquant, `id` absent compris) n'est
 //! jamais proposée à l'acceptation, mais reste explicitement signalée à l'utilisateur (`lignes_invalides`) plutôt
@@ -41,8 +43,9 @@ use crate::modele::racine::{DonneesRacine, EntreeJournal, Referentiels, VERSION_
 use crate::persistance::erreurs::ErreurPersistance;
 use crate::persistance::migration::{ETAPES_MIGRATION_REELLES, appliquer_migrations};
 use crate::persistance::parametrage::{
-    ErreurParametrage, upsert_par_id, valider_entree_regles_dependances,
-    valider_entree_regles_marqueurs_ia, valider_motif_nommage_branches,
+    ErreurParametrage, upsert_par_id, valider_entree_categorie_dependance,
+    valider_entree_regles_dependances, valider_entree_regles_marqueurs_ia,
+    valider_motif_nommage_branches,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -138,7 +141,7 @@ pub(crate) struct LigneInvalideImport {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DifferentielImportConfiguration {
     /// Lignes du différentiel, dans l'ordre : motif de nommage de branche, règles de dépendances, règles de
-    /// marqueurs IA, puis feuilles de `parametres.seuils`.
+    /// marqueurs IA, catégories de dépendance, puis feuilles de `parametres.seuils`.
     pub(crate) lignes: Vec<LigneDifferentielImport>,
     /// Lignes importées structurellement invalides, jamais proposées à l'acceptation (cf. [`LigneInvalideImport`]).
     #[serde(default)]
@@ -247,7 +250,8 @@ fn ligne_scalaire(
     });
 }
 
-/// Ajoute une ligne par entrée importée d'un référentiel-liste (`reglesDependances`/`reglesMarqueursIA`), validée
+/// Ajoute une ligne par entrée importée d'un référentiel-liste
+/// (`reglesDependances`/`reglesMarqueursIA`/`categoriesDependances`), validée
 /// au préalable par `valider` (la même fonction que celle appliquée par `parametrage::definir_referentiel` à la
 /// saisie manuelle, RG-023 : la voie d'import ne doit jamais être moins stricte), puis appariée à l'entrée
 /// courante de même `id`. Une entrée importée invalide (`id` manquant compris) est signalée dans
@@ -332,6 +336,14 @@ fn calculer_differentiel(
         configuration_importee.pointer("/referentiels/reglesMarqueursIA"),
         valider_entree_regles_marqueurs_ia,
     );
+    ajouter_lignes_referentiel_liste(
+        &mut lignes,
+        &mut lignes_invalides,
+        "referentiels.categoriesDependances",
+        &donnees.referentiels.categories_dependances,
+        configuration_importee.pointer("/referentiels/categoriesDependances"),
+        valider_entree_categorie_dependance,
+    );
 
     let mut feuilles_importees = Vec::new();
     if let Some(seuils_importes) = configuration_importee.pointer("/seuils") {
@@ -385,6 +397,17 @@ fn appliquer_ligne(donnees: &mut DonneesRacine, ligne: &LigneDifferentielImport)
     if let Some(id) = ligne.chemin.strip_prefix("referentiels.reglesMarqueursIA/") {
         upsert_par_id(
             &mut donnees.referentiels.regles_marqueurs_ia,
+            id,
+            ligne.apres.clone(),
+        );
+        return;
+    }
+    if let Some(id) = ligne
+        .chemin
+        .strip_prefix("referentiels.categoriesDependances/")
+    {
+        upsert_par_id(
+            &mut donnees.referentiels.categories_dependances,
             id,
             ligne.apres.clone(),
         );
@@ -1031,6 +1054,140 @@ mod tests {
         assert_eq!(racine.referentiels.regles_dependances.len(), 1);
         assert_eq!(racine.referentiels.regles_dependances[0]["id"], json!("d1"));
         assert!(racine.journal.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn previsualiser_import_configuration_categories_dependances_detecte_ajout_et_modification()
+    -> Result<(), ErreurConfigurationPartageable> {
+        // US-048 : le référentiel-liste `categoriesDependances` est diffé comme les deux autres. Le fichier
+        // importé modifie le sigle de la catégorie `exec` (id `...001`) et ajoute une catégorie `fmkMobile`.
+        let racine = racine_de_test();
+        let dossier = DossierTemporaire::nouveau("differentiel-categories");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                    "categoriesDependances": [
+                        { "id": "40000000-0000-4000-8000-000000000001", "libelle": "exec", "sigle": "EXC" },
+                        { "id": "c9", "libelle": "fmkMobile", "sigle": "FMM" }
+                    ],
+                },
+                "seuils": {},
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        let differentiel = previsualiser_import_configuration(&racine, &chemin)?;
+        let ligne = |chemin: &str| {
+            differentiel
+                .lignes
+                .iter()
+                .find(|ligne| ligne.chemin == chemin)
+                .unwrap_or_else(|| panic!("ligne {chemin} attendue dans le différentiel"))
+        };
+
+        assert_eq!(
+            ligne("referentiels.categoriesDependances/40000000-0000-4000-8000-000000000001")
+                .categorie,
+            CategorieLigneDifferentiel::Modification
+        );
+        assert_eq!(
+            ligne("referentiels.categoriesDependances/c9").categorie,
+            CategorieLigneDifferentiel::Ajout
+        );
+        assert!(differentiel.lignes_invalides.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn importer_configuration_applique_une_categorie_dependance_acceptee_et_journalise()
+    -> Result<(), ErreurConfigurationPartageable> {
+        let mut racine = racine_de_test();
+        let categories_avant = racine.referentiels.categories_dependances.len();
+        let dossier = DossierTemporaire::nouveau("import-categorie");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                    "categoriesDependances": [
+                        { "id": "c9", "libelle": "fmkMobile", "sigle": "FMM" }
+                    ],
+                },
+                "seuils": {},
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        importer_configuration(
+            &mut racine,
+            &chemin,
+            &["referentiels.categoriesDependances/c9".to_string()],
+            "2026-07-28T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.referentiels.categories_dependances.len(),
+            categories_avant + 1
+        );
+        assert!(
+            racine
+                .referentiels
+                .categories_dependances
+                .iter()
+                .any(|categorie| categorie["id"] == json!("c9"))
+        );
+        assert_eq!(
+            racine.journal[0].objet,
+            "referentiels.categoriesDependances/c9"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn previsualiser_import_configuration_categorie_dependance_sans_libelle_est_signalee_invalide()
+    -> Result<(), ErreurConfigurationPartageable> {
+        let racine = racine_de_test();
+        let dossier = DossierTemporaire::nouveau("categorie-invalide");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                    "categoriesDependances": [{ "id": "c9" }],
+                },
+                "seuils": {},
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        let differentiel = previsualiser_import_configuration(&racine, &chemin)?;
+
+        assert!(
+            differentiel
+                .lignes
+                .iter()
+                .all(|ligne| ligne.chemin != "referentiels.categoriesDependances/c9"),
+            "une entrée invalide ne doit jamais être proposée à l'acceptation"
+        );
+        assert_eq!(
+            differentiel.lignes_invalides[0].chemin,
+            "referentiels.categoriesDependances/c9"
+        );
         Ok(())
     }
 }

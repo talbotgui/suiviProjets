@@ -61,6 +61,12 @@ pub(crate) enum ErreurParametrage {
     /// l'utilisateur doit modifier directement la règle existante.
     #[error("le motif soumis correspond déjà à une règle de dépendances existante")]
     MotifDependanceDejaExistant,
+    /// Le libellé soumis pour une entrée de `referentiels.categoriesDependances` correspond déjà, à l'identique, au
+    /// `libelle` d'une autre entrée existante du référentiel (US-048, RG-048) : rejet strict symétrique de
+    /// [`Self::MotifDependanceDejaExistant`], jamais de doublon silencieux, l'utilisateur doit modifier directement
+    /// la catégorie existante.
+    #[error("le libellé soumis correspond déjà à une catégorie de dépendance existante")]
+    LibelleCategorieDependanceDejaExistant,
 }
 
 /// Modifie un seuil de couleur (`parametres.seuils`), désigné par un chemin pointé (segments séparés par `.`, ex.
@@ -161,6 +167,32 @@ pub(crate) fn valider_entree_regles_dependances(entree: &Value) -> Result<&str, 
     Ok(id)
 }
 
+/// Valide la forme minimale attendue d'une entrée de `referentiels.categoriesDependances` (US-048) : `id` et
+/// `libelle` non vides ; `sigle` facultatif mais, s'il est présent, chaîne non vide d'au plus trois caractères
+/// (colonne compacte de l'écran Obsolescence, US-051). Sur le modèle de [`valider_entree_regles_dependances`], sans
+/// imposer d'autre contrainte de contenu — l'interprétation fine reste du ressort du Moteur de jugement (UI).
+///
+/// `pub(crate)` : réutilisé par `persistance::configuration_partageable::calculer_differentiel` afin que la voie
+/// d'import ne soit jamais moins stricte que la saisie manuelle sur la même donnée.
+pub(crate) fn valider_entree_categorie_dependance(
+    entree: &Value,
+) -> Result<&str, ErreurParametrage> {
+    let objet = entree
+        .as_object()
+        .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
+    let id = lire_champ_chaine_non_vide(objet, "id")?;
+    lire_champ_chaine_non_vide(objet, "libelle")?;
+    if let Some(sigle) = objet.get("sigle") {
+        let sigle_valide = sigle
+            .as_str()
+            .is_some_and(|valeur| !valeur.is_empty() && valeur.chars().count() <= 3);
+        if !sigle_valide {
+            return Err(ErreurParametrage::EntreeReferentielInvalide);
+        }
+    }
+    Ok(id)
+}
+
 /// Valide la forme minimale attendue d'une entrée de `referentiels.reglesMarqueursIA` (F18) : `id`, `motif`,
 /// `outil` non vides, `typeCorrespondance`/`portee`/`nature` parmi leurs valeurs closes respectives (mêmes
 /// ensembles que `ParametresJugementUtils` côté UI, `services/sansetat/jugement/parametres-jugement.utils.ts`).
@@ -228,16 +260,19 @@ pub(crate) fn upsert_par_id(regles: &mut Vec<Value>, id: &str, entree: Value) ->
 /// Ajoute ou met à jour une entrée d'un référentiel (`referentiels`), ou remplace intégralement le motif de
 /// nommage de branche, puis consigne la modification au journal (RG-023, RG-030).
 ///
-/// `type_referentiel` désigne la branche concernée : `"reglesDependances"`, `"reglesMarqueursIA"` (ajout/mise à
-/// jour d'une entrée par `id`, cf. [`upsert_par_id`]) ou `"motifNommageBranches"` (remplacement scalaire).
+/// `type_referentiel` désigne la branche concernée : `"reglesDependances"`, `"reglesMarqueursIA"`,
+/// `"categoriesDependances"` (ajout/mise à jour d'une entrée par `id`, cf. [`upsert_par_id`]) ou
+/// `"motifNommageBranches"` (remplacement scalaire).
 ///
 /// # Erreurs
 ///
-/// [`ErreurParametrage::TypeReferentielInconnu`] si `type_referentiel` ne désigne aucune des trois branches
+/// [`ErreurParametrage::TypeReferentielInconnu`] si `type_referentiel` ne désigne aucune des quatre branches
 /// ci-dessus ; [`ErreurParametrage::EntreeReferentielInvalide`] si `entree` ne porte pas la forme minimale requise
 /// pour un référentiel-liste ; [`ErreurParametrage::MotifDependanceDejaExistant`] si `type_referentiel` vaut
 /// `"reglesDependances"` et que le `motif` soumis correspond déjà à une autre entrée existante du référentiel
-/// (RG-042) ; [`ErreurParametrage::MotifNommageBranchesInvalide`] si `entree` n'est pas une chaîne non vide et
+/// (RG-042) ; [`ErreurParametrage::LibelleCategorieDependanceDejaExistant`] si `type_referentiel` vaut
+/// `"categoriesDependances"` et que le `libelle` soumis correspond déjà à une autre entrée existante (US-048,
+/// RG-048) ; [`ErreurParametrage::MotifNommageBranchesInvalide`] si `entree` n'est pas une chaîne non vide et
 /// syntaxiquement valide comme expression régulière (RG-030).
 pub(crate) fn definir_referentiel(
     donnees: &mut DonneesRacine,
@@ -284,6 +319,39 @@ pub(crate) fn definir_referentiel(
                 entree.clone(),
             );
             (format!("referentiels.reglesMarqueursIA/{id}"), avant)
+        }
+        "categoriesDependances" => {
+            let id = valider_entree_categorie_dependance(&entree)?.to_string();
+            // US-048 / RG-048 : rejet strict d'un libellé déjà porté par une AUTRE entrée (identifiant différent),
+            // symétrique de RG-042 sur le `motif` d'une règle de dépendance — jamais de doublon silencieux.
+            let libelle = entree
+                .get("libelle")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let libelle_deja_existant =
+                donnees
+                    .referentiels
+                    .categories_dependances
+                    .iter()
+                    .any(|categorie| {
+                        let categorie_objet = categorie.as_object();
+                        let id_categorie = categorie_objet
+                            .and_then(|objet| objet.get("id"))
+                            .and_then(Value::as_str);
+                        let libelle_categorie = categorie_objet
+                            .and_then(|objet| objet.get("libelle"))
+                            .and_then(Value::as_str);
+                        id_categorie != Some(id.as_str()) && libelle_categorie == Some(libelle)
+                    });
+            if libelle_deja_existant {
+                return Err(ErreurParametrage::LibelleCategorieDependanceDejaExistant);
+            }
+            let avant = upsert_par_id(
+                &mut donnees.referentiels.categories_dependances,
+                &id,
+                entree.clone(),
+            );
+            (format!("referentiels.categoriesDependances/{id}"), avant)
         }
         "motifNommageBranches" => {
             let motif = valider_motif_nommage_branches(&entree)?.to_string();
@@ -563,6 +631,31 @@ pub(crate) fn supprimer_regle_marqueur_ia(
     consigner_modification(
         donnees,
         &format!("referentiels.reglesMarqueursIA/{id}"),
+        supprimee,
+        Value::Null,
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Supprime une entrée du référentiel des catégories de dépendance (`referentiels.categoriesDependances`), par son
+/// identifiant, puis consigne la suppression au journal (US-048, RG-035). Cf. [`supprimer_regle_dependance`] pour la
+/// justification du choix de fonctions dédiées plutôt qu'une commande générique.
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::EntreeReferentielIntrouvable`] si `id` ne désigne aucune entrée existante.
+pub(crate) fn supprimer_categorie_dependance(
+    donnees: &mut DonneesRacine,
+    id: &str,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    let position = position_par_id(&donnees.referentiels.categories_dependances, id)
+        .ok_or(ErreurParametrage::EntreeReferentielIntrouvable)?;
+    let supprimee = donnees.referentiels.categories_dependances.remove(position);
+    consigner_modification(
+        donnees,
+        &format!("referentiels.categoriesDependances/{id}"),
         supprimee,
         Value::Null,
         horodatage,
@@ -1288,6 +1381,179 @@ mod tests {
         let mut racine = racine_de_test();
 
         let resultat = supprimer_regle_marqueur_ia(
+            &mut racine,
+            "inexistante",
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurParametrage::EntreeReferentielIntrouvable)
+        );
+    }
+
+    #[test]
+    fn definir_referentiel_categories_dependances_cree_une_entree() -> Result<(), ErreurParametrage>
+    {
+        let mut racine = racine_de_test();
+        let nombre_par_defaut = racine.referentiels.categories_dependances.len();
+
+        definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile", "sigle": "FMM" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.referentiels.categories_dependances.len(),
+            nombre_par_defaut + 1
+        );
+        let entree = &racine.journal[0];
+        assert_eq!(entree.objet, "referentiels.categoriesDependances/c1");
+        assert_eq!(entree.avant, Value::Null);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_categories_dependances_libelle_manquant_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "sigle": "FMM" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_categories_dependances_sigle_trop_long_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile", "sigle": "TROP" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_categories_dependances_sigle_absent_est_accepte()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+
+        definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        assert!(
+            racine
+                .referentiels
+                .categories_dependances
+                .iter()
+                .any(|categorie| categorie["id"] == json!("c1"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_categories_dependances_libelle_deja_existant_est_rejete()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile", "sigle": "FMM" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+        let journal_avant = racine.journal.len();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c2", "libelle": "fmkMobile", "sigle": "FM2" }),
+            "2026-07-27T10:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurParametrage::LibelleCategorieDependanceDejaExistant)
+        );
+        assert_eq!(racine.journal.len(), journal_avant);
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_categories_dependances_mise_a_jour_sans_changer_le_libelle_est_acceptee()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile", "sigle": "FMM" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile", "sigle": "MOB" }),
+            "2026-07-27T10:00:00Z".to_string(),
+        )?;
+
+        let sigle = racine
+            .referentiels
+            .categories_dependances
+            .iter()
+            .find(|categorie| categorie["id"] == json!("c1"))
+            .map(|categorie| categorie["sigle"].clone());
+        assert_eq!(sigle, Some(json!("MOB")));
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_categorie_dependance_retire_lentree_et_consigne_le_journal()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        definir_referentiel(
+            &mut racine,
+            "categoriesDependances",
+            json!({ "id": "c1", "libelle": "fmkMobile", "sigle": "FMM" }),
+            "2026-07-27T09:00:00Z".to_string(),
+        )?;
+
+        supprimer_categorie_dependance(&mut racine, "c1", "2026-07-27T10:00:00Z".to_string())?;
+
+        assert!(
+            !racine
+                .referentiels
+                .categories_dependances
+                .iter()
+                .any(|categorie| categorie["id"] == json!("c1"))
+        );
+        let derniere_entree = &racine.journal[racine.journal.len() - 1];
+        assert_eq!(
+            derniere_entree.objet,
+            "referentiels.categoriesDependances/c1"
+        );
+        assert_eq!(derniere_entree.apres, Value::Null);
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_categorie_dependance_introuvable_est_rejetee() {
+        let mut racine = racine_de_test();
+
+        let resultat = supprimer_categorie_dependance(
             &mut racine,
             "inexistante",
             "2026-07-27T09:00:00Z".to_string(),
