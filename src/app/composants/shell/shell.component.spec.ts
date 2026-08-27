@@ -135,7 +135,7 @@ describe('SqmShellComponent', () => {
     expect(lienListeTravail?.getAttribute('href')).toBe('/liste-travail');
   });
 
-  it('présente les sept entrées de sidebar dans l’ordre fixe retenu par C11-03', () => {
+  it('présente les huit entrées de sidebar dans l’ordre fixe retenu (C11-03, étendu US-051)', () => {
     const fixture = TestBed.createComponent(SqmShellComponent);
     fixture.detectChanges();
     const element = DomTestUtils.obtenirElementNatif(fixture);
@@ -149,6 +149,7 @@ describe('SqmShellComponent', () => {
       'shell-lien-audits',
       'shell-lien-synthese-audits',
       'shell-lien-synthese-graphique',
+      'shell-lien-obsolescence',
       'shell-lien-liste-travail',
       'shell-lien-accueil',
       'shell-lien-parametrage',

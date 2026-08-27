@@ -1,0 +1,35 @@
+:host {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 2rem;
+  align-items: center;
+  gap: var(--sqm-espace-2);
+}
+
+.barre-mesure__sigle {
+  color: var(--sqm-neutre-600);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.barre-mesure__rail {
+  position: relative;
+  display: block;
+  height: 0.5rem;
+  border-radius: var(--sqm-rayon-pilule);
+  background-color: var(--sqm-neutre-800);
+  overflow: hidden;
+}
+
+.barre-mesure__remplissage {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--sqm-rayon-pilule);
+  min-width: 2px;
+  transition: width 120ms ease-out;
+}
+
+.barre-mesure__valeur {
+  text-align: right;
+  color: var(--sqm-neutre-800);
+  font-variant-numeric: tabular-nums;
+}

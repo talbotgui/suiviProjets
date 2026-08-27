@@ -1,0 +1,194 @@
+<section class="obsolescence d-flex direction-colonne ecart-4">
+  <header class="obsolescence__entete d-flex direction-colonne ecart-2">
+    <h1 class="texte-2xl poids-gras exterieur-0">Obsolescence</h1>
+    <p class="obsolescence__intro texte-sm texte-discret exterieur-0">
+      Chaque indicateur est le retard maximal, en versions majeures, d'une dépendance de la
+      catégorie concernée au dernier audit retenu du projet ; <strong>0</strong> signifie « à jour
+      ». Les projets et catégories sans dépendance concernée ne sont pas comptés.
+    </p>
+  </header>
+
+  <div class="obsolescence__filtres d-flex retour-ligne aligne-fin ecart-3">
+    <select
+      #selectGroupe
+      id="obsolescence-filtre-groupe"
+      class="champ__controle"
+      aria-label="Filtrer par groupe"
+      (change)="onChangerGroupe(selectGroupe.value)"
+    >
+      <option value="">Tous les groupes</option>
+      @for (groupe of groupesDisponibles(); track groupe.id) {
+        <option [value]="groupe.id" [selected]="groupe.id === filtreGroupeId()">
+          {{ groupe.nom }}
+        </option>
+      }
+    </select>
+
+    <input
+      #champDate
+      id="obsolescence-filtre-date"
+      type="date"
+      class="champ__controle"
+      aria-label="Audit au plus tard à cette date"
+      [value]="filtreDate()"
+      (change)="onChangerDate(champDate.value)"
+    />
+
+    @for (categorie of categories(); track categorie.id) {
+      <fieldset class="obsolescence__filtre-categorie">
+        <legend class="texte-xs texte-discret">{{ categorie.libelle }}</legend>
+        <div class="d-flex aligne-centre ecart-2">
+          <input
+            #champMin
+            [id]="'obsolescence-filtre-min-' + categorie.id"
+            type="number"
+            class="champ__controle obsolescence__champ-borne"
+            [attr.aria-label]="'Retard minimal ' + categorie.libelle"
+            min="0"
+            [max]="maxParCategorie().get(categorie.id) ?? 0"
+            [value]="minFiltre(categorie.id)"
+            (change)="onChangerBorne(categorie.id, 'min', champMin.value)"
+          />
+          <span class="texte-xs texte-discret" aria-hidden="true">–</span>
+          <input
+            #champMax
+            [id]="'obsolescence-filtre-max-' + categorie.id"
+            type="number"
+            class="champ__controle obsolescence__champ-borne"
+            [attr.aria-label]="'Retard maximal ' + categorie.libelle"
+            min="0"
+            [max]="maxParCategorie().get(categorie.id) ?? 0"
+            [value]="maxFiltre(categorie.id)"
+            (change)="onChangerBorne(categorie.id, 'max', champMax.value)"
+          />
+        </div>
+      </fieldset>
+    }
+
+    <button
+      id="obsolescence-bouton-export"
+      type="button"
+      class="bouton bouton--marque exterieur-haut-auto"
+      (click)="exporterPng()"
+    >
+      Exporter en PNG
+    </button>
+  </div>
+
+  <div #conteneurExport class="obsolescence__panneau carte d-flex direction-colonne">
+    <div
+      class="obsolescence__bandeau d-flex retour-ligne aligne-centre justifie-espace ecart-3 interieur-3 bordure-bas"
+    >
+      <ul class="obsolescence__legende sans-liste d-flex retour-ligne ecart-4 exterieur-0">
+        @for (categorie of categories(); track categorie.id) {
+          <li class="d-flex aligne-centre ecart-2 texte-sm">
+            <span
+              class="obsolescence__pastille"
+              aria-hidden="true"
+              [style.background-color]="couleurCategorie(categorie.id)"
+            ></span>
+            <span>{{ categorie.libelle }}</span>
+            <span class="texte-discret police-mono">
+              méd.
+              {{
+                medianeParCategorie().has(categorie.id)
+                  ? medianeParCategorie().get(categorie.id)
+                  : '—'
+              }}
+            </span>
+          </li>
+        }
+      </ul>
+      <span class="obsolescence__total texte-sm poids-demi-gras">{{ total() }} projet(s)</span>
+    </div>
+
+    @if (categories().length === 0) {
+      <p class="obsolescence__vide texte-discret interieur-4">
+        Aucune catégorie de dépendance n'est définie : ajoutez-en depuis l'écran de Paramétrage
+        (onglet « Seuils et référentiels ») pour faire apparaître des indicateurs.
+      </p>
+    } @else {
+      <div class="obsolescence__grille">
+        @for (ligne of projetsAffiches(); track ligne.projetId) {
+          <button
+            type="button"
+            class="obsolescence__tuile d-flex direction-colonne ecart-2"
+            [title]="infobulleProjet(ligne)"
+            (click)="ouvrirDetail(ligne.projetId)"
+          >
+            <span class="obsolescence__nom-projet poids-demi-gras texte-sm">{{
+              ligne.nomProjet
+            }}</span>
+            @for (categorie of categories(); track categorie.id) {
+              <app-barre-mesure
+                [sigle]="categorie.sigle"
+                [valeur]="valeurProjet(ligne, categorie.id)"
+                [valeurMax]="maxParCategorie().get(categorie.id) ?? 0"
+                [couleur]="couleurCategorie(categorie.id)"
+              />
+            }
+          </button>
+        } @empty {
+          <p class="obsolescence__vide texte-discret interieur-4">
+            Aucun projet ne correspond aux filtres.
+          </p>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+@if (detailProjetSelectionne(); as detail) {
+  <div class="superposition">
+    <div
+      class="obsolescence-detail superposition__panneau superposition__panneau--large carte d-flex direction-colonne ecart-3"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="obsolescence-detail-titre"
+    >
+      <header class="d-flex aligne-centre justifie-espace ecart-2">
+        <h2 id="obsolescence-detail-titre" class="texte-lg poids-gras exterieur-0">
+          {{ detail.nomProjet }}
+        </h2>
+        <button
+          id="obsolescence-detail-fermer"
+          type="button"
+          class="bouton bouton--discret"
+          (click)="fermerDetail()"
+        >
+          Fermer
+        </button>
+      </header>
+      <p class="texte-sm texte-discret exterieur-0">
+        Dernier audit retenu : {{ detail.dateAudit }}
+      </p>
+
+      @if (detail.lignes.length === 0) {
+        <p class="texte-discret exterieur-0">Aucune dépendance relevée pour cet audit.</p>
+      } @else {
+        <div class="obsolescence-detail__tableau">
+          <table class="tableau texte-sm">
+            <thead>
+              <tr>
+                <th scope="col">Dépendance</th>
+                <th scope="col">Catégorie</th>
+                <th scope="col">Version</th>
+                <th scope="col">Retard</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (dep of detail.lignes; track dep.reference) {
+                <tr [class.obsolescence-detail__java]="dep.estJava">
+                  <td class="police-mono">{{ dep.reference }}</td>
+                  <td>{{ dep.categorie }}</td>
+                  <td class="police-mono">{{ dep.version }}</td>
+                  <td class="police-mono">{{ dep.retard }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+}

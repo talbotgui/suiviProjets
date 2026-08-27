@@ -79,6 +79,19 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | Synthèse graphique | Graphique | Zoom temporel, séries superposables, lignes verticales pour les annotations et les changements de seuils, signaux affichés en séries binaires |
 | Synthèse graphique | Export | Export natif du graphique en image PNG |
 
+### Obsolescence
+
+Écran de pilotage dense (US-051), sans maquette haute-fidélité de référence : fond identique aux autres écrans, panneau légèrement plus foncé délimité par des filets fins, aucun effet décoratif. Chaque catégorie de dépendance du référentiel donne un indicateur ; chaque indicateur porte une teinte propre constante d'une vue à l'autre, la valeur étant encodée par la longueur d'une barre (la valeur numérique restant toujours affichée, RNF-020).
+
+| écran | zone | composants / actions |
+|---|---|---|
+| Obsolescence | Entête | Titre de page, paragraphe d'introduction (largeur bornée) précisant l'échelle des indicateurs (retard en versions majeures, 0 = à jour) |
+| Obsolescence | Barre de filtres | Sélecteur de groupe, filtre de date d'audit (dernier audit régulier à cette date ou avant, initialisé à aujourd'hui), un couple valeur min / valeur max par catégorie (minimum toujours à 0, maximum adapté à la valeur maximale de l'indicateur tous filtres ignorés), bouton d'export PNG |
+| Obsolescence | Bandeau du panneau | Légende des indicateurs (pastille de teinte, libellé, médiane par catégorie sur les projets affichés), décompte total de projets à droite |
+| Obsolescence | Grille de tuiles | Colonnes fluides (nombre adapté à la largeur), quadrillage continu de 1 px ; chaque tuile : nom du projet sur deux lignes à hauteur réservée, puis une ligne de mesure par catégorie (sigle de 3 lettres, barre sur rail sombre, valeur numérique alignée à droite) ; survol éclaircissant le fond, infobulle native donnant le détail complet |
+| Obsolescence | Détail d'un projet | Au clic sur une tuile, modale résumant le dernier audit retenu du projet : date de l'audit, tableau des dépendances (référence, catégorie, version, retard calculé), ligne Java mise en évidence ; fermeture par bouton ou touche Échap |
+| Obsolescence | Export | Export de la grille (bandeau inclus) en image PNG |
+
 ### Fiche projet
 
 | écran | zone | composants / actions |
@@ -136,6 +149,9 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | Brouillon | Aucun brouillon en attente : accès direct autorisé vers la constitution d'une nouvelle campagne |
 | Synthèse des audits | Aucun audit intégré pour un projet : ligne grisée avec mention « jamais audité », sans seuil de couleur applicable |
 | Synthèse graphique | Aucune donnée sur la période ou le filtre sélectionné : message explicite invitant à élargir le filtre |
+| Obsolescence | Aucune catégorie de dépendance définie : message renvoyant vers l'écran de Paramétrage plutôt qu'une grille sans indicateur |
+| Obsolescence | Aucun projet ne correspond aux filtres : message explicite plutôt qu'une grille vide silencieuse |
+| Obsolescence | Projet sans audit retenu : indicateurs absents (jamais `0`), modale mentionnant « jamais audité » |
 | Fiche projet | Dernière campagne en échec : encart d'anomalie technique affiché en tête, indicateurs de la campagne précédente conservés |
 | Fiche projet | SONAR_KO actif : bloc Indicateurs Sonar grisé avec légende explicative de l'écart |
 | Liste de travail | Aucune alerte active : message de confirmation explicite, pas de tableau vide silencieux |

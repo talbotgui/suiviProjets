@@ -30,9 +30,7 @@ export class StatutObsolescenceUtils {
     dependance: DependanceConstatee,
     regles: readonly RegleDependance[],
   ): ResultatObsolescence {
-    const regleCorrespondante = regles.find((regle) =>
-      ParametresJugementUtils.correspondMotifGlob(regle.motif, dependance.reference),
-    );
+    const regleCorrespondante = StatutObsolescenceUtils.trouverRegle(dependance.reference, regles);
     if (regleCorrespondante === undefined) {
       return { type: 'nonReference' };
     }
@@ -43,6 +41,23 @@ export class StatutObsolescenceUtils {
       return { type: 'nonReference' };
     }
     return { type: 'statut', statut: versionCorrespondante.statut };
+  }
+
+  /**
+   * Retrouve la première règle de dépendances dont le motif (glob) correspond à la référence donnée (précédence par
+   * ordre de déclaration du référentiel, cf. {@link calculerStatutObsolescence}). Extrait pour être réutilisé par
+   * `ObsolescenceRetardUtils` (`obsolescence-retard.utils.ts`, RG-050) sans dupliquer cette sélection.
+   * @param reference - Référence de la dépendance constatée (`Dependance.reference`).
+   * @param regles - Règles de dépendances courantes (`referentiels.reglesDependances`).
+   * @returns La règle correspondante, ou `undefined` si aucune ne correspond.
+   */
+  public static trouverRegle(
+    reference: string,
+    regles: readonly RegleDependance[],
+  ): RegleDependance | undefined {
+    return regles.find((regle) =>
+      ParametresJugementUtils.correspondMotifGlob(regle.motif, reference),
+    );
   }
 }
 

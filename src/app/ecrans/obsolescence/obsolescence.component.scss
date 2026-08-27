@@ -1,0 +1,82 @@
+@use 'points-de-rupture' as pr;
+
+.obsolescence__intro {
+  max-width: 70ch;
+}
+
+.obsolescence__filtres {
+  align-items: end;
+}
+
+.obsolescence__filtre-categorie {
+  border: 1px solid var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-md);
+  padding: var(--sqm-espace-1) var(--sqm-espace-2) var(--sqm-espace-2);
+}
+
+.obsolescence__champ-borne {
+  width: 4rem;
+}
+
+.obsolescence__panneau {
+  padding: 0;
+  overflow: hidden;
+}
+
+.obsolescence__pastille {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--sqm-rayon-sm);
+}
+
+// Quadrillage continu : le fond neutre du conteneur transparaît dans les gouttières de 1 px entre tuiles.
+.obsolescence__grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1px;
+  background-color: var(--sqm-neutre-300);
+  border-top: 1px solid var(--sqm-neutre-300);
+
+  @include pr.jusqua(pr.$sqm-pr-576) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.obsolescence__tuile {
+  appearance: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  background-color: var(--sqm-neutre-0);
+  padding: var(--sqm-espace-3);
+  min-height: 44px;
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--sqm-neutre-100);
+  }
+}
+
+// Hauteur réservée pour deux lignes de nom : toutes les tuiles s'alignent, quel que soit le nom du projet.
+.obsolescence__nom-projet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+}
+
+.obsolescence__vide {
+  margin: 0;
+}
+
+.obsolescence-detail__tableau {
+  overflow-x: auto;
+}
+
+.obsolescence-detail__java td {
+  background-color: var(--sqm-marque-fond-douce);
+  font-weight: var(--sqm-poids-demi-gras);
+}

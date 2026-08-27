@@ -1,0 +1,9 @@
+<span class="barre-mesure__sigle police-mono texte-xs" aria-hidden="true">{{ sigle() }}</span>
+<span class="barre-mesure__rail">
+  <span
+    class="barre-mesure__remplissage"
+    [style.width.%]="pourcentage()"
+    [style.background-color]="couleur()"
+  ></span>
+</span>
+<span class="barre-mesure__valeur police-mono texte-xs">{{ valeurAffichee() }}</span>
