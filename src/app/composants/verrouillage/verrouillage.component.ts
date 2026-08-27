@@ -4,9 +4,10 @@
 // Superposition de Verrouillage (US-026, RG-004, RG-005), montée par `SqmShellComponent` uniquement lorsque
 // `EtatSessionService.etatFichier()` vaut `Verrouille`, sur le même modèle que `SqmRechercheTransversaleComponent`
 // (`08_arborescenceNavigation.md` : « se superpose à l'écran courant... sans le démonter »). Réutilise
-// `SqmConfirmationMotDePasseComponent` pour le champ de mot de passe (bouton « Annuler » sans effet ici au-delà de
-// vider le champ saisi, la superposition restant affichée tant que la session n'est pas déverrouillée ou le
-// fichier fermé : aucune action d'annulation légitime sur un écran de verrouillage).
+// `SqmConfirmationMotDePasseComponent` pour le champ de mot de passe (bouton « Annuler » et touche Échap sans
+// effet ici au-delà de vider le champ saisi — `(annulee)` volontairement non lié —, la superposition restant
+// affichée tant que la session n'est pas déverrouillée ou le fichier fermé : aucune action d'annulation légitime
+// sur un écran de verrouillage).
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { Router } from '@angular/router';

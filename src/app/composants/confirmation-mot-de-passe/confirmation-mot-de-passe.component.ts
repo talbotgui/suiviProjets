@@ -29,6 +29,11 @@ import { FormsModule } from '@angular/forms';
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './confirmation-mot-de-passe.component.html',
+  // Fermeture par Échap de la superposition modale, comme la recherche globale (charte d'ergonomie) et la
+  // modale de détail d'obsolescence, en cohérence avec RNF-019. `annuler()` reste sans effet pendant le
+  // traitement d'une confirmation (`enCours()`), donc Échap l'est aussi à ce moment-là. Le listener n'existe
+  // que pendant l'affichage de la modale (rendu conditionnel côté appelant).
+  host: { '(document:keydown.escape)': 'annuler()' },
 })
 export class SqmConfirmationMotDePasseComponent implements AfterViewInit {
   private readonly champMotDePasse: Signal<ElementRef<HTMLInputElement> | undefined> =

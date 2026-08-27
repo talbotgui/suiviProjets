@@ -172,6 +172,51 @@ describe('SqmModaleSaisieMasseComponent', () => {
     expect(fixture.componentInstance.enCours()).toBe(false);
   });
 
+  it('ferme la modale (émet annulee) lorsque la touche Échap est pressée', () => {
+    const fixture = TestBed.createComponent(SqmModaleSaisieMasseComponent);
+    fixture.componentRef.setInput('titre', 'Titre');
+    fixture.componentRef.setInput('traiter', () => Promise.resolve(resultat()));
+    fixture.detectChanges();
+    let annulee = false;
+    fixture.componentInstance.annulee.subscribe(() => {
+      annulee = true;
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(annulee).toBe(true);
+  });
+
+  it('ignore la touche Échap pendant le traitement d’une soumission (enCours)', async () => {
+    const fixture = TestBed.createComponent(SqmModaleSaisieMasseComponent);
+    let resoudre: ((valeur: ResultatTraitementSaisieMasse) => void) | undefined;
+    fixture.componentRef.setInput('titre', 'Titre');
+    fixture.componentRef.setInput(
+      'traiter',
+      () =>
+        new Promise<ResultatTraitementSaisieMasse>((resolve) => {
+          resoudre = resolve;
+        }),
+    );
+    fixture.detectChanges();
+    fixture.componentInstance.texte.set('lodash;4.17.0=maintenu');
+    fixture.componentInstance.motDePasse.set('secret-1234');
+
+    const promesse = fixture.componentInstance.valider();
+    expect(fixture.componentInstance.enCours()).toBe(true);
+    let annulee = false;
+    fixture.componentInstance.annulee.subscribe(() => {
+      annulee = true;
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(annulee).toBe(false);
+
+    resoudre?.(resultat());
+    await promesse;
+  });
+
   it("émet annulee lors de l'annulation hors traitement", () => {
     const fixture = TestBed.createComponent(SqmModaleSaisieMasseComponent);
     fixture.componentRef.setInput('titre', 'Titre');

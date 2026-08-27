@@ -38,6 +38,20 @@ describe('SqmConfirmationSuppressionComponent', () => {
     expect(annulee).toBe(true);
   });
 
+  it('ferme la modale (émet annulee) lorsque la touche Échap est pressée', () => {
+    const fixture = TestBed.createComponent(SqmConfirmationSuppressionComponent);
+    fixture.componentRef.setInput('message', 'Cette suppression est irréversible.');
+    fixture.detectChanges();
+    let annulee = false;
+    fixture.componentInstance.annulee.subscribe(() => {
+      annulee = true;
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(annulee).toBe(true);
+  });
+
   it('utilise « Supprimer » comme libellé de confirmation par défaut', () => {
     const fixture = TestBed.createComponent(SqmConfirmationSuppressionComponent);
     fixture.componentRef.setInput('message', 'Cette suppression est irréversible.');

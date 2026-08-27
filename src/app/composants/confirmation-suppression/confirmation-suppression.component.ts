@@ -16,6 +16,12 @@ import type { InputSignal, OutputEmitterRef } from '@angular/core';
   selector: 'app-confirmation-suppression',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './confirmation-suppression.component.html',
+  // Fermeture par Échap de la superposition modale, comme la recherche globale (charte d'ergonomie) et
+  // la modale de détail d'obsolescence (`SqmObsolescenceComponent`), en cohérence avec RNF-019 (navigation
+  // clavier complète). Écouté sur `document:` car ce composant, à la différence de `SqmConfirmationMotDePasse`,
+  // ne déplace pas le focus à l'ouverture : celui-ci peut rester sur l'élément déclencheur, hors du panneau.
+  // Le listener n'existe que pendant l'affichage de la modale (rendu conditionnel côté appelant).
+  host: { '(document:keydown.escape)': 'annuler()' },
 })
 export class SqmConfirmationSuppressionComponent {
   /**

@@ -96,6 +96,11 @@ export type StrategieTraitementSaisieMasse = (
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './modale-saisie-masse.component.html',
+  // Fermeture par Échap de la superposition modale, comme la recherche globale (charte d'ergonomie) et la
+  // modale de détail d'obsolescence, en cohérence avec RNF-019. `annuler()` reste sans effet pendant le
+  // traitement d'une soumission (`enCours()`), donc Échap l'est aussi à ce moment-là. Le listener n'existe
+  // que pendant l'affichage de la modale (rendu conditionnel côté appelant).
+  host: { '(document:keydown.escape)': 'annuler()' },
 })
 export class SqmModaleSaisieMasseComponent implements AfterViewInit {
   private readonly champTexte: Signal<ElementRef<HTMLTextAreaElement> | undefined> =

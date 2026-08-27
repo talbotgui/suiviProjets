@@ -109,6 +109,38 @@ describe('SqmConfirmationMotDePasseComponent', () => {
     expect(groupement?.disabled).toBe(true);
   });
 
+  it('ferme la modale (émet annulee) lorsque la touche Échap est pressée', () => {
+    const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
+    fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
+    fixture.detectChanges();
+    let annulee = false;
+    fixture.componentInstance.annulee.subscribe(() => {
+      annulee = true;
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(annulee).toBe(true);
+  });
+
+  it('ignore la touche Échap pendant le traitement d’une confirmation (enCours)', () => {
+    const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
+    fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
+    const composant = fixture.componentInstance;
+    fixture.detectChanges();
+    composant.motDePasse.set('secret-1234');
+    composant.confirmer();
+    expect(composant.enCours()).toBe(true);
+    let annulee = false;
+    composant.annulee.subscribe(() => {
+      annulee = true;
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(annulee).toBe(false);
+  });
+
   it('émet annulee et réinitialise le champ lors de l’annulation', () => {
     const fixture = TestBed.createComponent(SqmConfirmationMotDePasseComponent);
     fixture.componentRef.setInput('message', 'Ressaisissez le mot de passe.');
