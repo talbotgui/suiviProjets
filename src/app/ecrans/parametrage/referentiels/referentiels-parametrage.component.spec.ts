@@ -106,6 +106,41 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(composant.motifNommageBranchesActuel()).toBe('^(main|develop)$');
   });
 
+  it('trie les règles de dépendances affichées par identifiant d’artefact sans réordonner le référentiel', () => {
+    const base = DonneesDeTest.racineVide();
+    const racine: DonneesRacine = {
+      ...base,
+      referentiels: {
+        ...base.referentiels,
+        reglesDependances: [
+          { id: 'd-c', motif: 'org.springframework:*', versions: [] },
+          { id: 'd-a', motif: 'CLAUDE.md', versions: [] },
+          { id: 'd-b', motif: 'moment', versions: [] },
+        ],
+      },
+    };
+    donneesApplication.chargerRacine(racine);
+
+    const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.reglesDependancesTriees().map((regle) => regle.motif)).toEqual(
+      ['CLAUDE.md', 'moment', 'org.springframework:*'],
+    );
+    expect(fixture.componentInstance.reglesDependances().map((regle) => regle.id)).toEqual([
+      'd-c',
+      'd-a',
+      'd-b',
+    ]);
+
+    const libelles = Array.from(
+      DomTestUtils.obtenirElementNatif(fixture).querySelectorAll(
+        '#referentiels-parametrage-liste-dependances .referentiels-parametrage__ligne > span:first-child',
+      ),
+    ).map((element) => element.textContent?.trim());
+    expect(libelles).toEqual(['CLAUDE.md', 'moment', 'org.springframework:*']);
+  });
+
   it('distingue le moment de prise en compte des dépendances et des marqueurs IA (US-040)', () => {
     const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
     fixture.detectChanges();

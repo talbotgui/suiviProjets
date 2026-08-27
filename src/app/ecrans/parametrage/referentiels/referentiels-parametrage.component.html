@@ -296,7 +296,7 @@
       id="referentiels-parametrage-liste-dependances"
       class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2"
     >
-      @for (regle of reglesDependances(); track regle.id; let i = $index) {
+      @for (regle of reglesDependancesTriees(); track regle.id; let i = $index) {
         <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
           <span>{{ regle.motif }}</span>
           <span class="texte-discret texte-sm"

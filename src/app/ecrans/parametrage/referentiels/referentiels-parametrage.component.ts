@@ -73,6 +73,7 @@ import type {
 } from '../../../services/avecetat/etat/types-donnees';
 import type { VersionDependance } from '../../../services/sansetat/jugement/parametres-jugement.utils';
 import { ObsolescenceRetardUtils } from '../../../services/sansetat/jugement/obsolescence-retard.utils';
+import { TriAlphabetiqueUtils } from '../../../services/sansetat/jugement/tri-alphabetique.utils';
 
 /**
  * Action de référentiel actuellement en attente de ressaisie du mot de passe (RG-002), `null` si aucune. Les deux
@@ -245,6 +246,19 @@ export class SqmReferentielsParametrageComponent {
    */
   public reglesDependances(): readonly EntreeReglesDependances[] {
     return this.donneesApplication.racine()?.referentiels.reglesDependances ?? [];
+  }
+
+  /**
+   * Règles de dépendances triées par identifiant d'artefact (`motif`, ordre alphabétique insensible à la casse)
+   * pour l'affichage de la liste. Copie ne mutant pas le tableau d'origine : l'ordre de déclaration reste porteur
+   * de sens pour l'évaluation par le Moteur de jugement (« première correspondance déclarée l'emporte »), seul
+   * l'ordre visuel de cet écran d'administration est concerné.
+   * @returns Nouveau tableau des règles de dépendances trié par `motif`.
+   */
+  public reglesDependancesTriees(): readonly EntreeReglesDependances[] {
+    return this.reglesDependances()
+      .slice()
+      .sort((a, b) => TriAlphabetiqueUtils.comparerTextes(a.motif, b.motif));
   }
 
   /**
