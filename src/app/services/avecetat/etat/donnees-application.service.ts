@@ -42,6 +42,7 @@ import { FacadeFichierService } from '../../sansetat/commandes/facade-fichier.se
 import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
 import { FacadeVuesService } from '../../sansetat/commandes/facade-vues.service';
 import type { Instance } from '../../sansetat/commandes/types-facade';
+import { TriAlphabetiqueUtils } from '../../sansetat/jugement/tri-alphabetique.utils';
 import { EtatSessionService } from './etat-session.service';
 import type {
   CategorieErreurAdministration,
@@ -185,10 +186,11 @@ export class DonneesApplicationService {
   public readonly racine: Signal<DonneesRacine | null> = this.racineInterne.asReadonly();
 
   /**
-   * Groupes de la racine courante, tableau vide si aucun fichier n'est ouvert.
+   * Groupes de la racine courante, triés par nom (ordre alphabétique insensible à la casse), tableau vide si aucun
+   * fichier n'est ouvert. Les projets de chaque groupe sont triés de la même façon.
    */
-  public readonly groupes: Signal<readonly Groupe[]> = computed(
-    () => this.racineInterne()?.groupes ?? [],
+  public readonly groupes: Signal<readonly Groupe[]> = computed(() =>
+    DonneesApplicationService.trierGroupesParNom(this.racineInterne()?.groupes ?? []),
   );
 
   /**
@@ -205,6 +207,19 @@ export class DonneesApplicationService {
    */
   public reinitialiser(): void {
     this.racineInterne.set(null);
+  }
+
+  /**
+   * Trie une liste de groupes par nom (ordre alphabétique insensible à la casse), ainsi que les projets de chacun
+   * de ces groupes selon le même critère, sans muter les tableaux ni objets d'origine.
+   * @param groupes - Groupes à trier.
+   * @returns Nouveau tableau de groupes triés, chacun porteur de son tableau de projets trié.
+   */
+  private static trierGroupesParNom(groupes: readonly Groupe[]): readonly Groupe[] {
+    return TriAlphabetiqueUtils.trierParNom(groupes).map((groupe) => ({
+      ...groupe,
+      projets: TriAlphabetiqueUtils.trierParNom(groupe.projets),
+    }));
   }
 
   /**

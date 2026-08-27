@@ -198,6 +198,24 @@ describe('DonneesApplicationService', () => {
 
       expect(service.groupes()).toEqual([]);
     });
+
+    it('trie les groupes par nom, ordre alphabétique insensible à la casse', () => {
+      service.creerGroupe({ ...DONNEES_GROUPE, nom: 'zoo' });
+      service.creerGroupe({ ...DONNEES_GROUPE, nom: 'Alpha' });
+      service.creerGroupe({ ...DONNEES_GROUPE, nom: 'buffle' });
+
+      expect(service.groupes().map((groupe) => groupe.nom)).toEqual(['Alpha', 'buffle', 'zoo']);
+    });
+
+    it('trie les projets de chaque groupe par nom, ordre alphabétique insensible à la casse', () => {
+      const id = service.creerGroupe(DONNEES_GROUPE);
+      service.creerProjet(id, { ...DONNEES_PROJET, nom: 'zoo' });
+      service.creerProjet(id, { ...DONNEES_PROJET, nom: 'Alpha' });
+      service.creerProjet(id, { ...DONNEES_PROJET, nom: 'buffle' });
+
+      const projets = service.groupes()[0].projets.map((projet) => projet.nom);
+      expect(projets).toEqual(['Alpha', 'buffle', 'zoo']);
+    });
   });
 
   describe('projets (US-007)', () => {

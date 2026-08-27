@@ -22,6 +22,7 @@ import { NotificationService } from '../../../services/avecetat/etat/notificatio
 import { TypeSource } from '../../../services/avecetat/etat/types-donnees';
 import type { Groupe, Projet, Source } from '../../../services/avecetat/etat/types-donnees';
 import { LienExterneSourceUtils } from '../../../services/sansetat/jugement/lien-externe-source.utils';
+import { TriAlphabetiqueUtils } from '../../../services/sansetat/jugement/tri-alphabetique.utils';
 
 /**
  * Ligne agrégée de la liste des sources : porte la source ainsi que les identifiants et noms de son groupe et de
@@ -144,11 +145,13 @@ export class SqmSourcesAdminComponent {
    * @returns Le tableau des projets proposés.
    */
   public projets(): readonly Projet[] {
-    return this.groupes()
-      .filter(
-        (groupe) => this.groupeSelectionneId === null || groupe.id === this.groupeSelectionneId,
-      )
-      .flatMap((groupe) => groupe.projets);
+    return TriAlphabetiqueUtils.trierParNom(
+      this.groupes()
+        .filter(
+          (groupe) => this.groupeSelectionneId === null || groupe.id === this.groupeSelectionneId,
+        )
+        .flatMap((groupe) => groupe.projets),
+    );
   }
 
   /**

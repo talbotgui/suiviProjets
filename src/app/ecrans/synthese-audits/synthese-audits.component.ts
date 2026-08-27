@@ -28,6 +28,12 @@
 // combinaison de filtres de cet écran (groupe, indicateur, recherche texte) ni aucun tri interne du tableau dense
 // ne peut donc faire disparaître le signal, qui reste au moins signalé globalement (RG-009) même si la ligne
 // concernée est filtrée hors du tableau visible.
+//
+// Tri par défaut par nom de projet (demande directe de l'utilisateur, Phase 15) : `construireLignes` trie le
+// tableau construit avant tout tri utilisateur des en-têtes (`TriAlphabetiqueUtils.comparerTextes`, ordre
+// alphabétique insensible à la casse), plutôt que de se reposer sur l'ordre brut de `DonneesRacine.groupes`/
+// `Groupe.projets` — cet ordre brut n'a jamais été garanti alphabétique (contrairement à `DonneesApplicationService.
+// groupes`, non utilisé ici : cette synthèse trie explicitement par projet, pas par groupe puis projet).
 import {
   Component,
   ElementRef,
@@ -102,6 +108,7 @@ import {
 import { StatutIaUtils } from '../../services/sansetat/jugement/statut-ia.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 import { StatutObsolescenceUtils } from '../../services/sansetat/jugement/statut-obsolescence.utils';
+import { TriAlphabetiqueUtils } from '../../services/sansetat/jugement/tri-alphabetique.utils';
 
 const MILLISECONDES_PAR_JOUR = 24 * 60 * 60 * 1000;
 
@@ -998,7 +1005,9 @@ export class SqmSyntheseAuditsComponent {
 
   /**
    * Construit l'ensemble des lignes de la Synthèse des audits, une par projet, en lisant les seuils courants une
-   * seule fois (RG-022).
+   * seule fois (RG-022), triées par défaut par nom de projet (ordre alphabétique insensible à la casse) : ce tri
+   * initial ne fait que fixer l'ordre affiché avant toute interaction de l'utilisateur avec les en-têtes triables
+   * de `SqmTableauDenseComponent`, qui restent libres de trier sur n'importe quelle autre colonne ensuite.
    * @returns Les lignes construites, tableau vide si aucun fichier n'est chargé.
    */
   private construireLignes(): readonly LigneSyntheseAudit[] {
@@ -1035,7 +1044,7 @@ export class SqmSyntheseAuditsComponent {
         );
       }
     }
-    return lignes;
+    return lignes.sort((a, b) => TriAlphabetiqueUtils.comparerTextes(a.nomProjet, b.nomProjet));
   }
 
   /**

@@ -412,6 +412,27 @@ describe('SqmSyntheseAuditsComponent', () => {
   });
 
   it(
+    'trie les lignes par défaut par nom de projet (ordre alphabétique insensible à la casse), avant tout tri ' +
+      'utilisateur des en-têtes, quel que soit l’ordre brut des groupes/projets dans le fichier de données',
+    () => {
+      const fixture = creerFixture(DonneesDeTest.racineDeBase());
+
+      expect(fixture.componentInstance.toutesLesLignes().map((ligne) => ligne.nomProjet)).toEqual([
+        'Jamais Audité',
+        'Projet Sain',
+        'Projet SonarKO',
+      ]);
+
+      const premiereColonneParLigne = Array.from(
+        DomTestUtils.obtenirElementNatif(fixture).querySelectorAll('tbody tr'),
+      ).map((ligne) => ligne.querySelector('td')?.textContent?.trim());
+      expect(premiereColonneParLigne[0]).toContain('Jamais Audité');
+      expect(premiereColonneParLigne[1]).toContain('Projet Sain');
+      expect(premiereColonneParLigne[2]).toContain('Projet SonarKO');
+    },
+  );
+
+  it(
     'compte les dépendances par statut (inconnue/obsolète/maintenue, RG-011), fusionnées entre plusieurs ' +
       'sources GitLab du même projet plutôt que de ne retenir que la première (R15-06)',
     () => {
@@ -509,7 +530,12 @@ describe('SqmSyntheseAuditsComponent', () => {
       const colonneCouverture = composant
         .colonnes()
         .find((colonne) => colonne.cle === 'couverture');
-      const ligneProjetSain = composant.toutesLesLignes()[0];
+      const ligneProjetSain = composant
+        .toutesLesLignes()
+        .find((ligne) => ligne.nomProjet === 'Projet Sain');
+      if (ligneProjetSain === undefined) {
+        throw new Error('Ligne « Projet Sain » introuvable.');
+      }
 
       expect(ligneProjetSain.couverture?.label).toBe('80.0 %');
       expect(colonneCouverture?.extraireValeurTri?.(ligneProjetSain)).toBe(80);

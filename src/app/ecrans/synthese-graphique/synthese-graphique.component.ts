@@ -45,6 +45,7 @@ import { NotificationService } from '../../services/avecetat/etat/notification.s
 import type { Audit, Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { ChangementSeuilUtils } from '../../services/sansetat/jugement/changement-seuil.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
+import { TriAlphabetiqueUtils } from '../../services/sansetat/jugement/tri-alphabetique.utils';
 import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import type {
   ResultatFiltrageVues,
@@ -255,10 +256,7 @@ export class SqmSyntheseGraphiqueComponent {
     const groupeId = this.filtreGroupeId();
     const groupes = this.donneesApplication.groupes();
     const groupesRetenus = groupeId === null ? groupes : groupes.filter((g) => g.id === groupeId);
-    return groupesRetenus
-      .flatMap((groupe) => groupe.projets)
-      .slice()
-      .sort((a, b) => a.nom.localeCompare(b.nom));
+    return TriAlphabetiqueUtils.trierParNom(groupesRetenus.flatMap((groupe) => groupe.projets));
   });
 
   /**
