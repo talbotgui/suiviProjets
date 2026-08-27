@@ -345,16 +345,16 @@ describe('SqmCredentialsComponent', () => {
       expect(composant.aucunCredentialEnMemoire()).toBe(true);
     });
 
-    it('copie les credentials enregistrés au format JSON et démarre le compte à rebours de 10 secondes', async () => {
+    it('copie les credentials enregistrés au format JSON compact sur une seule ligne (compatibilité KeePass) et démarre le compte à rebours de 10 secondes', async () => {
       TestBed.inject(EtatSessionService).definirCredentials({ i1: 'glpat-xxxx' });
       const composant = TestBed.createComponent(SqmCredentialsComponent).componentInstance;
       expect(composant.aucunCredentialEnMemoire()).toBe(false);
 
       await composant.copierCredentialsJson();
 
-      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(
-        JSON.stringify({ i1: 'glpat-xxxx' }, null, 2),
-      );
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(JSON.stringify({ i1: 'glpat-xxxx' }));
+      const jsonCopie = ecrireDansPressePapiers.mock.calls[0][0];
+      expect(jsonCopie).not.toContain('\n');
       expect(composant.secondesRestantesCopie()).toBe(10);
       expect(TestBed.inject(NotificationService).liste()).toEqual([]);
     });
@@ -429,9 +429,7 @@ describe('SqmCredentialsComponent', () => {
 
       await composant.copierCredentialsJson();
 
-      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(
-        JSON.stringify({ i1: 'glpat-xxxx' }, null, 2),
-      );
+      expect(ecrireDansPressePapiers).toHaveBeenCalledWith(JSON.stringify({ i1: 'glpat-xxxx' }));
     });
 
     it('affiche un message explicite si la copie dans le presse-papiers échoue', async () => {

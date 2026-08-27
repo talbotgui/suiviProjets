@@ -295,7 +295,10 @@ export class SqmCredentialsComponent {
    * standard `navigator.clipboard` plutôt que le greffon Tauri dédié (décision arbitraire à valider par un humain,
    * aucune autre fonctionnalité de l'application ne nécessitant jusqu'ici d'accès au presse-papiers) : la copie
    * est déclenchée par un geste utilisateur explicite (clic), condition suffisante pour cette API dans les
-   * environnements webview ciblés, sans configuration Tauri supplémentaire. Par mesure de sécurité, le
+   * environnements webview ciblés, sans configuration Tauri supplémentaire. Le JSON produit est compact (pas
+   * d'indentation), sur une seule ligne, pour rester collable tel quel dans un champ de gestionnaire de mots de
+   * passe tel que KeePass (cf. [guide utilisateur](../../../../docs/02_documentation/20_guideUtilisateur.md)),
+   * dont les champs ne gèrent pas les retours à la ligne. Par mesure de sécurité, le
    * presse-papiers est effacé automatiquement {@link DUREE_EXPIRATION_PRESSE_PAPIERS_SECONDES} secondes après la
    * copie (cf. {@link demarrerExpirationPressePapiers}), pour limiter la fenêtre d'exposition d'un credential en
    * clair dans le presse-papiers système.
@@ -305,7 +308,7 @@ export class SqmCredentialsComponent {
     if (credentials === null || Object.keys(credentials).length === 0) {
       return;
     }
-    const json = JSON.stringify(credentials, null, 2);
+    const json = JSON.stringify(credentials);
     try {
       await navigator.clipboard.writeText(json);
       this.demarrerExpirationPressePapiers();
