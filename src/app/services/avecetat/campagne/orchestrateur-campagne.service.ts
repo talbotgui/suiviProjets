@@ -55,6 +55,7 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { EMPTY, firstValueFrom, from } from 'rxjs';
 import { mergeMap, toArray } from 'rxjs/operators';
 import type {
+  CategorieErreurConnecteur,
   ErreurConnecteur,
   Instance,
   RegleMarqueurIA,
@@ -111,6 +112,21 @@ export interface ConstitutionCampagne {
   readonly nombreInstances: number;
   /** Identifiants des instances référencées par le périmètre mais sans credential en mémoire. */
   readonly credentialsManquants: readonly string[];
+}
+
+/**
+ * Dernier échec rencontré lors de l'audit d'un projet, conservé le temps de décider du statut final (Phase 5,
+ * incrément 5) : motif court affiché tel quel en repli, plus, lorsque l'échec provient d'un appel de connecteur,
+ * le tag de l'indicateur concerné et la catégorie d'anomalie RG-021 associée, pour que le Tableau de bord
+ * d'exécution restitue un libellé lisible (`ErreurConnecteurUtils.libelleCategorie`) plutôt que le code technique.
+ */
+interface DernierEchecProjet {
+  /** Motif court, déjà formaté (`<indicateur> : <détail>`), affiché en repli si aucune catégorie n'est connue. */
+  readonly motif: string;
+  /** Tag `Resultat['type']` de l'indicateur à l'origine de l'échec, absent si non identifié. */
+  readonly indicateur?: string;
+  /** Catégorie d'anomalie de connecteur (RG-021), absente pour un motif déjà en clair ou hors nomenclature. */
+  readonly categorie?: CategorieErreurConnecteur;
 }
 
 /**
@@ -271,7 +287,7 @@ export class OrchestrateurCampagneService {
 
     const resultats: Resultat[] = [];
     const anomalies: unknown[] = [];
-    let dernierMotifEchec: string | undefined;
+    let dernierEchec: DernierEchecProjet | undefined;
     let vitalite: ResultatGitlabVitalite | undefined;
     let tailleDepot: ResultatGitlabTailleDepot | undefined;
     let contributeurs: ResultatGitlabContributeurs | undefined;
@@ -311,7 +327,11 @@ export class OrchestrateurCampagneService {
         );
         if (verificationRef.exclue) {
           anomalies.push(verificationRef.anomalieEntree);
-          dernierMotifEchec = verificationRef.motif;
+          dernierEchec = {
+            motif: verificationRef.motif,
+            indicateur: 'gitlab.refFigee',
+            categorie: verificationRef.categorie,
+          };
           continue;
         }
 
@@ -328,8 +348,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseVitalite, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseVitalite, resultats, anomalies) ?? dernierEchec;
         vitalite = reponseVitalite.resultatBrut;
 
         // `gitlab.taille_depot` n'est jamais interrogé en mode historique (RG-046 : absence tolérée, un audit à
@@ -349,8 +368,7 @@ export class OrchestrateurCampagneService {
                 source.refAuditee,
               ),
           );
-          dernierMotifEchec =
-            this.integrer(reponseTaille, resultats, anomalies) ?? dernierMotifEchec;
+          dernierEchec = this.integrer(reponseTaille, resultats, anomalies) ?? dernierEchec;
           tailleDepot = reponseTaille.resultatBrut;
           comptesTailleDepot = reponseTaille.resultatBrut === undefined ? 0 : 1;
         }
@@ -368,8 +386,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseContributeurs, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseContributeurs, resultats, anomalies) ?? dernierEchec;
         contributeurs = reponseContributeurs.resultatBrut;
 
         const reponseMergeRequests = await this.executerIndicateur(
@@ -385,8 +402,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseMergeRequests, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseMergeRequests, resultats, anomalies) ?? dernierEchec;
 
         // `gitlab.membres` n'est jamais interrogé en mode historique (RG-046 : absence tolérée, même principe que
         // `gitlab.taille_depot` ci-dessus).
@@ -404,8 +420,7 @@ export class OrchestrateurCampagneService {
                 source.refAuditee,
               ),
           );
-          dernierMotifEchec =
-            this.integrer(reponseMembres, resultats, anomalies) ?? dernierMotifEchec;
+          dernierEchec = this.integrer(reponseMembres, resultats, anomalies) ?? dernierEchec;
           comptesMembres = reponseMembres.resultatBrut?.membres.length ?? 0;
         }
 
@@ -422,8 +437,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseBranches, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseBranches, resultats, anomalies) ?? dernierEchec;
 
         const reponseDependances = await this.executerIndicateur(
           'gitlab.dependances',
@@ -438,8 +452,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseDependances, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseDependances, resultats, anomalies) ?? dernierEchec;
 
         const reponseMarqueursIa = await this.executerIndicateur(
           'gitlab.marqueurs_ia',
@@ -455,8 +468,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseMarqueursIa, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseMarqueursIa, resultats, anomalies) ?? dernierEchec;
         marqueursIa = reponseMarqueursIa.resultatBrut;
 
         // Diagnostic de R15-06 (un projet à deux sources GitLab n'affichant les dépendances que d'un seul des deux
@@ -486,8 +498,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseViolations, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseViolations, resultats, anomalies) ?? dernierEchec;
         violations = reponseViolations.resultatBrut;
 
         const reponseDette = await this.executerIndicateur(
@@ -497,7 +508,7 @@ export class OrchestrateurCampagneService {
           () =>
             this.facadeCommandes.interrogerDette(instance, source.id, source.idExterne, dateCiblee),
         );
-        dernierMotifEchec = this.integrer(reponseDette, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseDette, resultats, anomalies) ?? dernierEchec;
 
         const reponseCouverture = await this.executerIndicateur(
           'sonar.couverture',
@@ -511,8 +522,7 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
-        dernierMotifEchec =
-          this.integrer(reponseCouverture, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseCouverture, resultats, anomalies) ?? dernierEchec;
         couverture = reponseCouverture.resultatBrut;
 
         const reponseNotes = await this.executerIndicateur(
@@ -522,7 +532,7 @@ export class OrchestrateurCampagneService {
           () =>
             this.facadeCommandes.interrogerNotes(instance, source.id, source.idExterne, dateCiblee),
         );
-        dernierMotifEchec = this.integrer(reponseNotes, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseNotes, resultats, anomalies) ?? dernierEchec;
 
         const reponseNcloc = await this.executerIndicateur(
           'sonar.ncloc',
@@ -531,7 +541,7 @@ export class OrchestrateurCampagneService {
           () =>
             this.facadeCommandes.interrogerNcloc(instance, source.id, source.idExterne, dateCiblee),
         );
-        dernierMotifEchec = this.integrer(reponseNcloc, resultats, anomalies) ?? dernierMotifEchec;
+        dernierEchec = this.integrer(reponseNcloc, resultats, anomalies) ?? dernierEchec;
         ncloc = reponseNcloc.resultatBrut;
 
         let derniereAnalyseObtenueCetteSource = false;
@@ -550,7 +560,11 @@ export class OrchestrateurCampagneService {
               sourceId: source.id,
               anomalie: reponseDerniereAnalyse.anomalie,
             });
-            dernierMotifEchec = `croise.fraicheur_sonar : ${reponseDerniereAnalyse.anomalie.type}`;
+            dernierEchec = {
+              motif: `croise.fraicheur_sonar : ${reponseDerniereAnalyse.anomalie.type}`,
+              indicateur: 'croise.fraicheur_sonar',
+              categorie: reponseDerniereAnalyse.anomalie.type,
+            };
           }
         }
 
@@ -616,7 +630,9 @@ export class OrchestrateurCampagneService {
       this.etatSession.mettreAJourProgressionProjet(projetId, {
         statut: 'echoue',
         dureeMs: Date.now() - debut,
-        motifEchec: dernierMotifEchec ?? 'Aucun résultat obtenu',
+        motifEchec: dernierEchec?.motif ?? 'Aucun résultat obtenu',
+        indicateurEchec: dernierEchec?.indicateur,
+        categorieEchec: dernierEchec?.categorie,
       });
       return { projetId, verdict: { projetId, statut: 'echec', anomalies } };
     }
@@ -705,6 +721,7 @@ export class OrchestrateurCampagneService {
         readonly exclue: true;
         readonly anomalieEntree: Record<string, unknown>;
         readonly motif: string;
+        readonly categorie?: CategorieErreurConnecteur;
       }
   > {
     if (dateCiblee === undefined || source.refAuditee === undefined) {
@@ -724,6 +741,7 @@ export class OrchestrateurCampagneService {
           anomalie: reponse.anomalie,
         },
         motif: `gitlab.refFigee : ${reponse.anomalie.type}`,
+        categorie: reponse.anomalie.type,
       };
     }
     if (!reponse.branches.includes(source.refAuditee)) {
@@ -773,7 +791,7 @@ export class OrchestrateurCampagneService {
     readonly resultatBrut?: Omit<Extract<Resultat, { readonly type: TTag }>, 'type'>;
     readonly resultatTague?: Record<string, unknown>;
     readonly anomalieEntree?: Record<string, unknown>;
-    readonly motif?: string;
+    readonly echec?: DernierEchecProjet;
   }> {
     if (indicateursDesactives.includes(tag)) {
       return {};
@@ -784,7 +802,11 @@ export class OrchestrateurCampagneService {
     }
     return {
       anomalieEntree: { indicateur: tag, sourceId, anomalie: reponse.anomalie },
-      motif: `${tag} : ${reponse.anomalie.type}`,
+      echec: {
+        motif: `${tag} : ${reponse.anomalie.type}`,
+        indicateur: tag,
+        categorie: reponse.anomalie.type,
+      },
     };
   }
 
@@ -808,27 +830,29 @@ export class OrchestrateurCampagneService {
    * @param reponse - Résultat retourné par {@link executerIndicateur}.
    * @param reponse.resultatTague - Résultat tagué à ajouter, absent si désactivé ou en échec.
    * @param reponse.anomalieEntree - Anomalie à ajouter, absente si désactivé ou en succès.
-   * @param reponse.motif - Motif court de l'échec, absent si désactivé ou en succès.
+   * @param reponse.echec - Description structurée de l'échec (motif court, indicateur, catégorie RG-021), absente
+   * si désactivé ou en succès.
    * @param resultats - Tableau local des résultats typés déjà obtenus pour ce projet.
    * @param anomalies - Tableau local des anomalies déjà rencontrées pour ce projet.
-   * @returns Le motif court de cet appel s'il a échoué, `undefined` sinon (désactivé ou succès).
+   * @returns La description structurée de l'échec de cet appel s'il a échoué, `undefined` sinon (désactivé ou
+   * succès).
    */
   private integrer(
     reponse: {
       readonly resultatTague?: Record<string, unknown>;
       readonly anomalieEntree?: Record<string, unknown>;
-      readonly motif?: string;
+      readonly echec?: DernierEchecProjet;
     },
     resultats: Resultat[],
     anomalies: unknown[],
-  ): string | undefined {
+  ): DernierEchecProjet | undefined {
     if (reponse.resultatTague !== undefined && this.estResultatTypeConnu(reponse.resultatTague)) {
       resultats.push(reponse.resultatTague);
     }
     if (reponse.anomalieEntree !== undefined) {
       anomalies.push(reponse.anomalieEntree);
     }
-    return reponse.motif;
+    return reponse.echec;
   }
 
   /**

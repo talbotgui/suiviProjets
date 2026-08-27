@@ -10,6 +10,7 @@
 import { Injectable, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import type { ErreurAdministration } from './types-donnees';
+import type { CategorieErreurConnecteur } from '../../sansetat/commandes/types-facade';
 
 /**
  * État courant du fichier de données au sein de la session applicative (US-026).
@@ -55,6 +56,18 @@ export interface ProgressionProjet {
   readonly nombreResultats?: number;
   /** Motif court du dernier échec rencontré, connu une fois `statut` à `echoue`. */
   readonly motifEchec?: string;
+  /**
+   * Tag `Resultat['type']` de l'indicateur à l'origine du dernier échec (ex. `gitlab.marqueurs_ia`,
+   * `croise.fraicheur_sonar`, `gitlab.refFigee`), conservé brut pour l'affichage. Absent quand l'échec ne provient
+   * pas d'un indicateur identifié (ex. projet introuvable dans les groupes actuels).
+   */
+  readonly indicateurEchec?: string;
+  /**
+   * Catégorie d'anomalie de connecteur (RG-021) du dernier échec, quand celui-ci provient d'un appel de connecteur :
+   * permet au Tableau de bord d'exécution de restituer un libellé lisible via `ErreurConnecteurUtils.libelleCategorie`
+   * plutôt que le code technique. Absente pour les motifs d'échec déjà rédigés en clair ou hors `CategorieErreurConnecteur`.
+   */
+  readonly categorieEchec?: CategorieErreurConnecteur;
 }
 
 /**

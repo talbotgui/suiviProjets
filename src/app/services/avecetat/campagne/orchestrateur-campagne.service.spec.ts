@@ -654,6 +654,8 @@ describe('OrchestrateurCampagneService', () => {
       expect(progressionProjet?.statut).toBe('echoue');
       expect(progressionProjet?.dureeMs).toBeGreaterThanOrEqual(0);
       expect(progressionProjet?.motifEchec).toBe('gitlab.marqueurs_ia : instanceInjoignable');
+      expect(progressionProjet?.indicateurEchec).toBe('gitlab.marqueurs_ia');
+      expect(progressionProjet?.categorieEchec).toBe('instanceInjoignable');
     });
 
     it('doit consigner une anomalie « instanceIntrouvable » plutôt que d’ignorer silencieusement une source dont l’instance n’existe plus dans le groupe (R10-09)', async () => {

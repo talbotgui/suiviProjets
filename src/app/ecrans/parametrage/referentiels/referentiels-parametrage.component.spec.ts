@@ -141,6 +141,78 @@ describe('SqmReferentielsParametrageComponent', () => {
     expect(libelles).toEqual(['CLAUDE.md', 'moment', 'org.springframework:*']);
   });
 
+  it('n’affiche pas le bouton « Voir tout » quand le référentiel des dépendances tient dans le plafond par défaut', () => {
+    const base = DonneesDeTest.racineVide();
+    const racine: DonneesRacine = {
+      ...base,
+      referentiels: {
+        ...base.referentiels,
+        reglesDependances: Array.from({ length: 10 }, (_, index) => ({
+          id: `d-${index}`,
+          motif: `dep-${index.toString().padStart(2, '0')}`,
+          versions: [],
+        })),
+      },
+    };
+    donneesApplication.chargerRacine(racine);
+
+    const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(
+      element.querySelector('#referentiels-parametrage-bouton-voir-tout-dependances'),
+    ).toBeNull();
+    expect(
+      element.querySelectorAll(
+        '#referentiels-parametrage-liste-dependances .referentiels-parametrage__ligne',
+      ),
+    ).toHaveLength(10);
+  });
+
+  it('limite l’affichage aux 10 premières règles de dépendances puis bascule via « Voir tout » / « Voir moins »', () => {
+    const base = DonneesDeTest.racineVide();
+    const racine: DonneesRacine = {
+      ...base,
+      referentiels: {
+        ...base.referentiels,
+        reglesDependances: Array.from({ length: 12 }, (_, index) => ({
+          id: `d-${index}`,
+          motif: `dep-${index.toString().padStart(2, '0')}`,
+          versions: [],
+        })),
+      },
+    };
+    donneesApplication.chargerRacine(racine);
+
+    const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const lignes = (): NodeListOf<Element> =>
+      element.querySelectorAll(
+        '#referentiels-parametrage-liste-dependances .referentiels-parametrage__ligne',
+      );
+    const boutonVoirTout = (): HTMLButtonElement | null =>
+      element.querySelector<HTMLButtonElement>(
+        '#referentiels-parametrage-bouton-voir-tout-dependances',
+      );
+
+    expect(lignes()).toHaveLength(10);
+    expect(boutonVoirTout()?.textContent?.trim()).toBe('Voir tout');
+
+    boutonVoirTout()?.click();
+    fixture.detectChanges();
+
+    expect(lignes()).toHaveLength(12);
+    expect(boutonVoirTout()?.textContent?.trim()).toBe('Voir moins');
+
+    boutonVoirTout()?.click();
+    fixture.detectChanges();
+
+    expect(lignes()).toHaveLength(10);
+    expect(boutonVoirTout()?.textContent?.trim()).toBe('Voir tout');
+  });
+
   it('distingue le moment de prise en compte des dépendances et des marqueurs IA (US-040)', () => {
     const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
     fixture.detectChanges();

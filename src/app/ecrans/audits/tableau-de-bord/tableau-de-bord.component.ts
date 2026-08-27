@@ -20,6 +20,7 @@ import type {
   StatutExecutionProjet,
 } from '../../../services/avecetat/etat/etat-session.service';
 import { OrchestrateurCampagneService } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
+import { ErreurConnecteurUtils } from '../../../services/sansetat/commandes/erreur-connecteur.utils';
 
 /**
  * Écran Tableau de bord d'exécution : progression réactive locale d'une campagne en cours, annulation propre.
@@ -144,7 +145,10 @@ export class SqmTableauDeBordComponent {
   /**
    * Contenu de la colonne « Connecteur/détail » du tableau (US-010, F06) : connecteur actif si le projet est en
    * cours, nombre de résultats obtenus s'il est terminé, motif court s'il a échoué, chaîne vide sinon (en attente,
-   * ignoré).
+   * ignoré). Pour un échec issu d'un appel de connecteur, le code technique RG-021 (`refIntrouvable`, …) est
+   * restitué via le libellé lisible partagé {@link ErreurConnecteurUtils.libelleCategorie} (ex.
+   * `gitlab.marqueurs_ia : Référence introuvable`), le tag de l'indicateur restant affiché tel quel en préfixe ;
+   * à défaut de catégorie connue (motif déjà rédigé en clair), le motif court est affiché sans transformation.
    * @param progressionProjet - Progression du projet concerné.
    * @returns Le texte à afficher dans cette colonne.
    */
@@ -154,8 +158,14 @@ export class SqmTableauDeBordComponent {
         return this.libelleConnecteur(progressionProjet.connecteurActif);
       case 'termine':
         return `${progressionProjet.nombreResultats ?? 0} résultat(s)`;
-      case 'echoue':
-        return progressionProjet.motifEchec ?? '';
+      case 'echoue': {
+        const { indicateurEchec, categorieEchec, motifEchec } = progressionProjet;
+        if (categorieEchec === undefined) {
+          return motifEchec ?? '';
+        }
+        const libelle = ErreurConnecteurUtils.libelleCategorie(categorieEchec);
+        return indicateurEchec === undefined ? libelle : `${indicateurEchec} : ${libelle}`;
+      }
       case 'enAttente':
       case 'ignore':
         return '';

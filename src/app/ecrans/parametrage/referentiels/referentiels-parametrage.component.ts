@@ -265,10 +265,51 @@ export class SqmReferentielsParametrageComponent {
   }
 
   /**
+   * Sous-ensemble des règles de dépendances réellement affiché dans le bloc d'administration : les
+   * {@link NOMBRE_DEPENDANCES_AFFICHEES_PAR_DEFAUT} premières (dans l'ordre de {@link reglesDependancesTriees})
+   * tant que {@link toutesDependancesAffichees} est faux, la totalité une fois le bouton « Voir tout » activé.
+   * Plafond purement visuel, local à cet écran : sans impact sur l'ordre du référentiel ni sur l'évaluation.
+   * @returns Le tableau des règles de dépendances à afficher.
+   */
+  public reglesDependancesAffichees(): readonly EntreeReglesDependances[] {
+    const triees: readonly EntreeReglesDependances[] = this.reglesDependancesTriees();
+    return this.toutesDependancesAffichees()
+      ? triees
+      : triees.slice(
+          0,
+          SqmReferentielsParametrageComponent.NOMBRE_DEPENDANCES_AFFICHEES_PAR_DEFAUT,
+        );
+  }
+
+  /**
+   * Indique si le nombre de règles de dépendances dépasse le plafond d'affichage par défaut, donc si le bouton
+   * de bascule « Voir tout » / « Voir moins » doit apparaître dans l'entête du bloc.
+   * @returns `true` si un dépliage de la liste est pertinent.
+   */
+  public depliageDependancesPertinent(): boolean {
+    return (
+      this.reglesDependancesTriees().length >
+      SqmReferentielsParametrageComponent.NOMBRE_DEPENDANCES_AFFICHEES_PAR_DEFAUT
+    );
+  }
+
+  /** Bascule l'affichage de la liste des règles de dépendances entre les premières règles et la totalité. */
+  public basculerAffichageDependances(): void {
+    this.toutesDependancesAffichees.update((affichees) => !affichees);
+  }
+
+  /**
    * Visibilité du formulaire de règle de dépendances. Signal pour le même motif que
    * {@link actionEnAttenteMotDePasse}.
    */
   public readonly formulaireDependanceVisible: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Indique que l'intégralité des règles de dépendances est dépliée dans le bloc d'administration (bouton
+   * « Voir tout » / « Voir moins »). État purement visuel et local à cet écran ; signal pour le même motif que
+   * {@link formulaireDependanceVisible} (mutation d'état volatile en application zoneless).
+   */
+  public readonly toutesDependancesAffichees: WritableSignal<boolean> = signal(false);
 
   public dependanceEnEditionId: string | null = null;
   public motifDependance = '';
@@ -284,6 +325,15 @@ export class SqmReferentielsParametrageComponent {
    * `.claude/rules/09-normes-developpement.md#structure-et-nommage`, nombre de sauvegardes de sécurité).
    */
   private static readonly BORNE_DE_REPLI_PAR_DEFAUT = '*=obsolete';
+
+  /**
+   * Nombre de règles de dépendances affichées par défaut dans le bloc d'administration avant dépliage explicite
+   * via le bouton « Voir tout ». Plafond d'affichage purement local à cet écran, sans aucun impact sur
+   * l'évaluation : valeur arbitraire faute de texte normatif la fixant, sur le modèle de `TAILLE_PAGE` de
+   * `SqmJournalParametrageComponent` et de `NOMBRE_ALERTES_PRINCIPALES` de `SqmAccueilComponent`. Décision
+   * arbitraire à valider par un humain.
+   */
+  private static readonly NOMBRE_DEPENDANCES_AFFICHEES_PAR_DEFAUT = 10;
 
   /**
    * Statuts de borne de version bénéficiant d'une couleur dédiée à l'affichage (cf. texte d'aide du champ « Bornes

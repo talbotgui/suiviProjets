@@ -171,13 +171,34 @@ describe('SqmTableauDeBordComponent', () => {
       );
     });
 
-    it('doit afficher le motif court pour un projet échoué', () => {
+    it('doit traduire le code de connecteur en libellé lisible pour un projet échoué, préfixe indicateur conservé', () => {
+      expect(
+        composant.detailColonne({
+          statut: 'echoue',
+          motifEchec: 'gitlab.marqueurs_ia : refIntrouvable',
+          indicateurEchec: 'gitlab.marqueurs_ia',
+          categorieEchec: 'refIntrouvable',
+        }),
+      ).toBe('gitlab.marqueurs_ia : Référence introuvable');
+    });
+
+    it('doit afficher le libellé seul quand aucun indicateur n’est associé à l’échec', () => {
       expect(
         composant.detailColonne({
           statut: 'echoue',
           motifEchec: 'gitlab.vitalite : instanceInjoignable',
+          categorieEchec: 'instanceInjoignable',
         }),
-      ).toBe('gitlab.vitalite : instanceInjoignable');
+      ).toBe('Instance injoignable');
+    });
+
+    it('doit afficher le motif court brut quand l’échec n’a pas de catégorie de connecteur', () => {
+      expect(
+        composant.detailColonne({
+          statut: 'echoue',
+          motifEchec: 'Projet introuvable dans les groupes actuels',
+        }),
+      ).toBe('Projet introuvable dans les groupes actuels');
     });
 
     it('doit rester vide pour un projet en attente ou ignoré', () => {
