@@ -611,7 +611,13 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await page.locator('#shell-lien-parametrage').click();
     await page.locator('#parametrage-onglet-seuils-referentiels').click();
 
-    await page.locator('#referentiels-parametrage-dependance-0-bouton-modifier').click();
+    // La liste des règles de dépendances est triée par motif (`reglesDependancesTriees`) et contient aussi la règle
+    // `java` par défaut de la racine bouchonnée : l'index `dependance-0` ne désigne donc pas la règle créée à
+    // l'étape 10. On cible la ligne par son motif pour modifier la bonne règle.
+    await page
+      .locator('.referentiels-parametrage__ligne', { hasText: REGLE_DEPENDANCE.motif })
+      .getByRole('button', { name: 'Modifier' })
+      .click();
     await page
       .locator('#referentiels-parametrage-champ-versions-dependance')
       .fill(REGLE_DEPENDANCE.versionsRevues);
