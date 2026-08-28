@@ -89,14 +89,22 @@ impl EtatSession {
         Self::default()
     }
 
-    /// Enregistre le fichier ouvert et sa clé dérivée courante, remplaçant tout état précédent. Purge également
-    /// les credentials d'une éventuelle session précédente : ouvrir un nouveau fichier ne doit jamais laisser
-    /// fuiter les credentials du fichier précédemment ouvert (défense en profondeur, cohérent avec RG-004).
+    /// Enregistre le fichier ouvert et sa clé dérivée courante, remplaçant tout état précédent. La clé dérivée est
+    /// systématiquement rafraîchie (le sel KDF tourne à chaque sauvegarde du fichier, cette méthode est donc
+    /// rappelée après chaque écriture du fichier courant, pas seulement à l'ouverture). Les credentials en mémoire
+    /// ne sont purgés que si le chemin fourni désigne un **fichier différent** de celui déjà ouvert : ouvrir un
+    /// autre fichier ne doit jamais laisser fuiter les credentials du précédent (défense en profondeur, cohérent
+    /// avec RG-004), mais une simple sauvegarde du fichier courant (fin de campagne via `enregistrerBrouillon`,
+    /// `integrerBrouillon`, modification d'un paramètre, etc.) doit les conserver — RG-004 ne prévoit leur purge
+    /// qu'à la fermeture, au verrouillage et après inactivité.
     pub(crate) fn definir(&self, chemin_fichier: PathBuf, cle_derivee: [u8; TAILLE_CLE]) {
         let mut interieur = deverrouiller_mutex(self.interieur.lock());
+        let fichier_change = interieur.chemin_fichier.as_deref() != Some(chemin_fichier.as_path());
         interieur.chemin_fichier = Some(chemin_fichier);
         interieur.cle_derivee = Some(CleSession(cle_derivee));
-        interieur.credentials.clear();
+        if fichier_change {
+            interieur.credentials.clear();
+        }
     }
 
     /// Remplace intégralement les credentials détenus en mémoire pour la session courante (US-003), mirroir côté
@@ -265,6 +273,29 @@ mod tests {
         etat.definir(PathBuf::from("/tmp/second.sqm"), [2u8; TAILLE_CLE]);
 
         assert_eq!(etat.nombre_credentials(), 0);
+    }
+
+    #[test]
+    fn definir_sur_le_meme_fichier_conserve_les_credentials() {
+        // Une sauvegarde du fichier courant (fin de campagne, intégration de brouillon, modification d'un
+        // paramètre) rappelle `definir` sur le même chemin avec une nouvelle clé dérivée : les credentials
+        // saisis pour la session doivent survivre, RG-004 ne prévoyant leur purge qu'à la
+        // fermeture/verrouillage/inactivité.
+        let etat = EtatSession::nouveau();
+        etat.definir(PathBuf::from("/tmp/donnees-test.sqm"), [1u8; TAILLE_CLE]);
+        etat.definir_credentials(HashMap::from([(
+            "instance-1".to_string(),
+            "jeton-secret".to_string(),
+        )]));
+        assert_eq!(etat.nombre_credentials(), 1);
+
+        etat.definir(PathBuf::from("/tmp/donnees-test.sqm"), [2u8; TAILLE_CLE]);
+
+        assert_eq!(etat.nombre_credentials(), 1);
+        assert_eq!(
+            etat.credential("instance-1"),
+            Some("jeton-secret".to_string())
+        );
     }
 
     #[test]
