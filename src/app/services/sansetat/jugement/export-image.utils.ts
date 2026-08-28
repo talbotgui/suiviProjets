@@ -8,21 +8,20 @@
 // `SqmSyntheseAuditsComponent`/`SqmSyntheseGraphiqueComponent` inclus, qui conservent en revanche leur préfixe
 // générique sans nom d'entité).
 //
-// Suppression des diacritiques : reprise à l'identique du patron déjà établi par `IndexRechercheUtils.
-// replierAccents` (`services/avecetat/recherche/index-recherche.utils.ts`, ligne ~333, décomposition Unicode NFD
-// puis filtrage des marques diacritiques combinantes U+0300–U+036F), dupliquée ici plutôt qu'importée : ce module
-// relève du Moteur de jugement (`services/sansetat/jugement/`), qui ne dépend jamais de `services/avecetat/`
-// (`docs/02_documentation/14_normesDeveloppement.md#structuration-du-code-et-découpage-en-couches`).
+// Suppression des diacritiques : même principe que `IndexRechercheUtils.replierAccents`
+// (`services/avecetat/recherche/index-recherche.utils.ts`, ligne ~333) — décomposition Unicode NFD puis
+// suppression des marques diacritiques combinantes U+0300–U+036F — mais exprimée ici par un remplacement direct
+// par expression régulière plutôt que par un filtrage caractère par caractère : résultat strictement identique,
+// sans branche défensive non atteignable (`codePointAt` sur une chaîne toujours non vide). Logique dupliquée ici
+// plutôt qu'importée : ce module relève du Moteur de jugement (`services/sansetat/jugement/`), qui ne dépend
+// jamais de `services/avecetat/` (`docs/02_documentation/14_normesDeveloppement.md#structuration-du-code-et-découpage-en-couches`).
 
 /**
  * Utilitaires purs de construction du nom de fichier suggéré lors de l'export PNG d'un écran (US-047/RG-047).
  */
 export class ExportImageUtils {
-  /** Borne inférieure (incluse) du bloc Unicode des marques diacritiques combinantes (U+0300). */
-  private static readonly DEBUT_MARQUES_DIACRITIQUES = 0x0300;
-
-  /** Borne supérieure (incluse) du bloc Unicode des marques diacritiques combinantes (U+036F). */
-  private static readonly FIN_MARQUES_DIACRITIQUES = 0x036f;
+  /** Marques diacritiques combinantes (bloc Unicode U+0300–U+036F) isolées par la décomposition NFD. */
+  private static readonly MARQUES_DIACRITIQUES = /[\u0300-\u036f]/g;
 
   /**
    * Caractères interdits ou déconseillés dans un nom de fichier multiplateforme (`/ \ : * ? " < > |`), ainsi que
@@ -43,22 +42,15 @@ export class ExportImageUtils {
   private static readonly NOM_PROJET_REPLI = 'projet';
 
   /**
-   * Replie les accents d'une chaîne (décomposition Unicode NFD, qui sépare chaque lettre accentuée en une lettre de
-   * base suivie d'une marque diacritique combinante, puis suppression de ces seules marques). Reprise à l'identique
-   * du patron de `IndexRechercheUtils.replierAccents` (cf. commentaire d'en-tête de ce fichier).
+   * Replie les accents d'une chaîne : décomposition Unicode NFD (qui sépare chaque lettre accentuée en une lettre
+   * de base suivie d'une marque diacritique combinante), puis suppression de ces seules marques via
+   * {@link MARQUES_DIACRITIQUES}. Équivalent fonctionnel de `IndexRechercheUtils.replierAccents` (cf. commentaire
+   * d'en-tête de ce fichier).
    * @param valeur - Chaîne à traiter.
    * @returns La chaîne sans accents.
    */
   private static replierAccents(valeur: string): string {
-    return Array.from(valeur.normalize('NFD'))
-      .filter((caractere) => {
-        const codePoint = caractere.codePointAt(0) ?? 0;
-        return (
-          codePoint < ExportImageUtils.DEBUT_MARQUES_DIACRITIQUES ||
-          codePoint > ExportImageUtils.FIN_MARQUES_DIACRITIQUES
-        );
-      })
-      .join('');
+    return valeur.normalize('NFD').replace(ExportImageUtils.MARQUES_DIACRITIQUES, '');
   }
 
   /**
