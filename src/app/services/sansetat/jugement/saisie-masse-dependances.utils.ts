@@ -83,6 +83,47 @@ export interface ResultatAnalyseSaisieMasseDependances {
  */
 export class SaisieMasseDependancesUtils {
   /**
+   * Exemple de prompt destiné à un assistant IA, proposé à la copie depuis la modale de saisie en masse de règles
+   * de dépendances (bouton d'aide de la Fiche projet, US-043) : l'utilisateur le colle dans l'IA de son choix,
+   * complète le dernier bloc avec les lignes pré-remplies de la modale, et récupère des lignes directement
+   * exploitables. Le texte décrit volontairement la grammaire réellement acceptée par {@link analyser} (motif de
+   * version à joker `*`, jamais une expression régulière ; statuts canoniques `maintenu`/`obsolete` de
+   * {@link StatutObsolescenceUtils.STATUTS_CANONIQUES}) et non une variante approchante, pour que la sortie de l'IA
+   * soit recollable telle quelle sans erreur de format. Décision arbitraire de ce développement (formulation exacte
+   * du prompt, à valider par un humain, aucune source documentaire ne la fixant).
+   */
+  public static readonly EXEMPLE_PROMPT_IA: string = [
+    'Je dois alimenter un référentiel applicatif des dépendances MAVEN et NODE utilisées par mes nombreux projets. Il permet de définir, pour chaque artefact, quelle version majeure est la dernière publiée et donc « maintenue » (même si la réalité est parfois plus complexe pour certaines dépendances).',
+    '',
+    'Ce référentiel est constitué de lignes au format suivant, une ligne par borne de version :',
+    "'''",
+    'idArtefact;motifVersion=statut',
+    "'''",
+    'où :',
+    "- « idArtefact » est l'identifiant de l'artefact (« groupId:artifactId » pour MAVEN, nom du paquet pour NODE) ;",
+    "- « motifVersion » est un motif de version où « * » est un joker (« 7.* » désigne toute la branche majeure 7, « * » désigne n'importe quelle version) ; ce n'est jamais une expression régulière ;",
+    '- « statut » vaut « maintenu » ou « obsolete ».',
+    '',
+    "La règle d'évaluation associée : pour la version d'une dépendance constatée sur un projet, le premier motif de version qui correspond, dans l'ordre des lignes d'un même artefact, fixe son statut « maintenu » ou « obsolete ».",
+    '',
+    'Voici un exemple valide :',
+    "'''",
+    'org.hibernate.orm:hibernate-core;7.*=maintenu',
+    'org.hibernate.orm:hibernate-core;*=obsolete',
+    "'''",
+    '',
+    'Le traitement que tu dois appliquer est le suivant :',
+    '- laisser inchangée toute ligne se terminant déjà par « =obsolete » ;',
+    '- pour chaque ligne sans statut (se terminant par « = »), remplacer son motif de version par celui de la dernière version majeure réellement publiée de cet artefact, sous la forme « <majeure>.* », puis ajouter « =maintenu ». Ne te fie pas à la version indiquée dans la ligne fournie : vérifie la dernière version majeure publiée sur les dépôts publics de référence (Maven Central pour MAVEN, le registre npm pour NODE).',
+    '',
+    'Ne produis que les lignes résultantes, dans le même ordre, sans commentaire ni ligne supplémentaire.',
+    '',
+    'Voici les lignes que je veux que tu traites :',
+    "'''",
+    "'''",
+  ].join('\n');
+
+  /**
    * Analyse le texte collé d'une soumission de saisie en masse de règles de dépendances : ignore les lignes vides,
    * rejette les lignes malformées ou en conflit avec une règle déjà existante (sans bloquer les autres lignes),
    * puis regroupe les lignes valides restantes par motif (RG-040). Complète ensuite chaque groupe résultant d'une

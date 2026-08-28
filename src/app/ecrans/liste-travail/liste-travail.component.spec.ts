@@ -67,7 +67,7 @@ class DonneesDeTest {
    * @returns Le membre de test.
    */
   public static membreGitlab(username: string, niveauAcces: number): MembreGitlab {
-    return { username, nom: username, niveauAcces, herite: false };
+    return { username, nom: username, niveauAcces, direct: true, groupesInvites: [] };
   }
 
   /**

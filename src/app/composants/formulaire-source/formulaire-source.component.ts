@@ -48,8 +48,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Subject, from, of } from 'rxjs';
 import type { Observable } from 'rxjs';
-import { catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
-import type { OptionRechercheRiche } from '../champ-recherche-riche/champ-recherche-riche.component';
+import { catchError, debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs/operators';
+import type {
+  EtatRechercheRiche,
+  OptionRechercheRiche,
+} from '../champ-recherche-riche/champ-recherche-riche.component';
 import { SqmChampRechercheRicheComponent } from '../champ-recherche-riche/champ-recherche-riche.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import type { DonneesSource } from '../../services/avecetat/etat/donnees-application.service';
@@ -69,6 +72,17 @@ import type {
  * l'interrogation des branches (US-008), pour éviter un appel réseau à chaque frappe.
  */
 const DELAI_DEBOUNCE_RECHERCHE_MS = 300;
+
+/**
+ * Issue d'une recherche des dépôts/projets disponibles (US-008, RG-036), distinguant les trois cas que
+ * `catchError(() => of(null))` confondait auparavant en un seul `null` : recherche non lancée (aucune instance
+ * sélectionnée ou terme vide), résultat effectivement reçu du cœur natif (succès ou échec typé), ou appel en
+ * erreur (rejet de la promesse). Cette distinction pilote l'état affiché par le champ de recherche riche.
+ */
+type IssueRechercheSource =
+  | { readonly type: 'nonLancee' }
+  | { readonly type: 'resultat'; readonly resultat: ResultatListerSourcesDisponibles }
+  | { readonly type: 'erreur' };
 
 /**
  * Formulaire réutilisable de création/modification d'une source (US-008) : cascade Type→Instance, autocomplétion
@@ -206,6 +220,13 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
    */
   public readonly credentialAbsent: WritableSignal<boolean> = signal(false);
 
+  /**
+   * État de la recherche serveur des dépôts/projets disponibles pour l'identifiant externe (US-008, RG-036),
+   * transmis au champ de recherche riche pour qu'il affiche « Recherche en cours… » pendant l'appel débouncé et
+   * « Erreur de chargement… » en cas d'échec, plutôt que le seul message d'absence de correspondance.
+   */
+  public readonly etatRechercheSource: WritableSignal<EtatRechercheRiche> = signal('inactif');
+
   public constructor() {
     effect(() => {
       const source = this.sourceAModifier();
@@ -229,15 +250,19 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
         this.appliquerResultatBranches(resultat);
       });
 
+    // Pas de `distinctUntilChanged` ici, à la différence de `rechercheBranche$` : chaque frappe vide les
+    // suggestions et repasse en « recherche en cours » (cf. {@link modifierIdExterne}) ; escamoter une relance
+    // pour un terme identique au précédent laisserait alors la liste vide et l'état bloqué sur « recherche en
+    // cours » (ex. saisie « abc » → « abcd » → retour à « abc »). `debounceTime` + `switchMap` suffisent à éviter
+    // les appels réseau redondants pendant une rafale de frappe.
     this.rechercheSource$
       .pipe(
         debounceTime(DELAI_DEBOUNCE_RECHERCHE_MS),
-        distinctUntilChanged(),
         switchMap((terme) => this.rechercherSourcesDisponibles(terme)),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((resultat) => {
-        this.appliquerResultatSourcesDisponibles(resultat);
+      .subscribe((issue) => {
+        this.appliquerResultatSourcesDisponibles(issue);
       });
   }
 
@@ -289,6 +314,7 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
     this.instanceId.set('');
     this.suggestionsBranches.set([]);
     this.sourcesDisponibles.set([]);
+    this.etatRechercheSource.set('inactif');
   }
 
   /**
@@ -301,6 +327,7 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
     this.instanceId.set(instanceId);
     this.sourcesDisponibles.set([]);
     this.credentialAbsent.set(false);
+    this.etatRechercheSource.set('inactif');
   }
 
   /**
@@ -310,6 +337,15 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
    */
   public modifierIdExterne(valeur: string): void {
     this.idExterne.set(valeur);
+    const instanceSelectionnee = this.instancesCompatibles().some(
+      (candidat) => candidat.id === this.instanceId(),
+    );
+    // Vidage des suggestions précédentes dès la frappe et passage synchrone à « recherche en cours » (avant le
+    // debounce) pour que le champ affiche cet état sans transiter par un « aucun résultat » trompeur.
+    this.sourcesDisponibles.set([]);
+    this.etatRechercheSource.set(
+      instanceSelectionnee && valeur.trim().length > 0 ? 'enCours' : 'inactif',
+    );
     this.rechercherSourceExterne();
   }
 
@@ -399,6 +435,7 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
     this.suggestionsBranches.set([]);
     this.sourcesDisponibles.set([]);
     this.credentialAbsent.set(false);
+    this.etatRechercheSource.set('inactif');
   }
 
   /**
@@ -426,40 +463,54 @@ export class SqmFormulaireSourceComponent implements AfterViewInit {
    * aucune instance n'est sélectionnée ou si le terme est vide, sur le même principe que
    * {@link interrogerBranchesPourInstance}.
    * @param terme - Terme de recherche saisi par l'utilisateur.
-   * @returns Un flux résolvant le résultat de la recherche, ou `null` si elle n'a pas pu être lancée.
+   * @returns Un flux résolvant l'issue de la recherche ({@link IssueRechercheSource}).
    */
-  private rechercherSourcesDisponibles(
-    terme: string,
-  ): Observable<ResultatListerSourcesDisponibles | null> {
+  private rechercherSourcesDisponibles(terme: string): Observable<IssueRechercheSource> {
     const instance = this.instancesCompatibles().find(
       (candidat) => candidat.id === this.instanceId(),
     );
     if (!instance || terme.trim().length === 0) {
-      return of(null);
+      return of<IssueRechercheSource>({ type: 'nonLancee' });
     }
     return from(this.facadeCommandes.listerSourcesDisponibles(instance, terme)).pipe(
-      catchError(() => of(null)),
+      map((resultat): IssueRechercheSource => ({ type: 'resultat', resultat })),
+      catchError(() => of<IssueRechercheSource>({ type: 'erreur' })),
     );
   }
 
   /**
-   * Applique le résultat d'une recherche de dépôts/projets disponibles à l'état du formulaire.
-   * @param resultat - Résultat de la recherche, `null` si elle n'a pas pu être lancée.
+   * Applique l'issue d'une recherche de dépôts/projets disponibles à l'état du formulaire, en positionnant
+   * {@link etatRechercheSource} pour le message affiché par le champ de recherche riche.
+   * @param issue - Issue de la recherche ({@link IssueRechercheSource}).
    */
-  private appliquerResultatSourcesDisponibles(
-    resultat: ResultatListerSourcesDisponibles | null,
-  ): void {
-    if (!resultat) {
-      this.sourcesDisponibles.set([]);
-      return;
+  private appliquerResultatSourcesDisponibles(issue: IssueRechercheSource): void {
+    switch (issue.type) {
+      case 'nonLancee':
+        this.sourcesDisponibles.set([]);
+        this.etatRechercheSource.set('inactif');
+        return;
+      case 'erreur':
+        this.sourcesDisponibles.set([]);
+        this.etatRechercheSource.set('erreur');
+        return;
+      case 'resultat': {
+        const resultat = issue.resultat;
+        if (resultat.type === 'succes') {
+          this.sourcesDisponibles.set(resultat.sourcesDisponibles);
+          this.credentialAbsent.set(false);
+          this.etatRechercheSource.set('inactif');
+          return;
+        }
+        const credentialAbsent = resultat.anomalie.type === 'credentialAbsent';
+        this.sourcesDisponibles.set([]);
+        this.credentialAbsent.set(credentialAbsent);
+        // Un credential absent est déjà signalé par l'avertissement orange dédié : inutile de doubler d'un message
+        // d'erreur dans la liste. Toute autre anomalie typée (droits insuffisants, réponse inattendue…) reste
+        // invisible par ailleurs et justifie le message « Erreur de chargement… ».
+        this.etatRechercheSource.set(credentialAbsent ? 'inactif' : 'erreur');
+        return;
+      }
     }
-    if (resultat.type === 'succes') {
-      this.sourcesDisponibles.set(resultat.sourcesDisponibles);
-      this.credentialAbsent.set(false);
-      return;
-    }
-    this.sourcesDisponibles.set([]);
-    this.credentialAbsent.set(resultat.anomalie.type === 'credentialAbsent');
   }
 
   /**

@@ -38,14 +38,27 @@ describe('SqmBarreMesureComponent', () => {
     expect(creer('EXE', 4, 0).componentInstance.pourcentage()).toBe(0);
   });
 
-  it('affiche la valeur numérique, un tiret si elle est absente', () => {
+  it('formate la valeur numérique quand elle est présente', () => {
     expect(creer('EXE', 4, 10).componentInstance.valeurAffichee()).toBe('4');
-    expect(creer('EXE', null, 10).componentInstance.valeurAffichee()).toBe('—');
+    expect(creer('EXE', 0, 10).componentInstance.valeurAffichee()).toBe('0');
   });
 
   it('rend le sigle et la valeur dans le DOM', () => {
     const element = DomTestUtils.obtenirElementNatif(creer('FMB', 2, 8));
     expect(element.textContent).toContain('FMB');
     expect(element.textContent).toContain('2');
+  });
+
+  it('rend la barre et le « 0 » pour une valeur nulle mais présente (« à jour »)', () => {
+    const element = DomTestUtils.obtenirElementNatif(creer('EXE', 0, 10));
+    expect(element.querySelector('.barre-mesure__rail')).not.toBeNull();
+    expect(element.querySelector('.barre-mesure__valeur')?.textContent).toContain('0');
+  });
+
+  it('n’affiche que le sigle, sans barre ni valeur, quand la valeur est absente', () => {
+    const element = DomTestUtils.obtenirElementNatif(creer('EXE', null, 10));
+    expect(element.textContent).toContain('EXE');
+    expect(element.querySelector('.barre-mesure__rail')).toBeNull();
+    expect(element.querySelector('.barre-mesure__valeur')).toBeNull();
   });
 });

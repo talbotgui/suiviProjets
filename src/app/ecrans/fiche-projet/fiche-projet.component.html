@@ -281,7 +281,7 @@
                   <tbody>
                     @for (
                       dependance of donnees.dependances;
-                      track dependance.reference + dependance.manifeste
+                      track dependance.reference + dependance.version + dependance.manifeste
                     ) {
                       <tr>
                         <td>
@@ -333,6 +333,14 @@
                   le même motif sont regroupées en une seule règle multi-bornes. Une ligne dont le
                   motif correspond à une règle déjà existante est rejetée (saisie strictement
                   additive).
+                </p>
+                <p slotAide class="champ__aide exterieur-haut-1">
+                  <app-bouton-copie
+                    [valeur]="exemplePromptSaisieMasseDependances"
+                    libelle="Copier un exemple de prompt IA"
+                    libelleAccessible="Copier un exemple de prompt IA pour renseigner le champ de saisie en masse"
+                    infobulle="cliquer pour copier un exemple de prompt utilisable pour renseigner facilement et correctement le champ de saisie"
+                  />
                 </p>
               </app-modale-saisie-masse>
             }
@@ -387,35 +395,143 @@
             @if (donnees.membres.length === 0) {
               <p>Aucun membre constaté sur ce dernier audit.</p>
             } @else {
-              <ul class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm">
-                @for (membre of donnees.membres; track membre.username) {
-                  <li [class.fiche-projet__ligne--inconnu]="membre.inconnu">
-                    <span>{{
-                      membre.nom === membre.username
-                        ? membre.nom
-                        : membre.nom + ' (' + membre.username + ')'
-                    }}</span
-                    >{{ ' ' }}<span>{{ membre.niveauAccesLabel }}</span>
+              @let sections = donnees.sectionsMembres;
+
+              <!-- US-017 : ventilation en trois sections repliables, fermées par défaut, décompte par statut
+                   (statuts à zéro omis) dans la barre de titre. Les trois portent la classe
+                   `fiche-projet__section-membres` : `exporterPng()` s'en sert pour les déplier le temps de la
+                   capture PNG. -->
+              <details class="fiche-projet__section-membres">
+                <summary class="fiche-projet__section-membres-resume texte-sm">
+                  <span class="poids-demi-gras">Membres directs</span> ({{
+                    sections.directs.total
+                  }})
+                  @for (decompte of sections.directs.decompteParStatut; track decompte.label) {
                     <app-badge
-                      [couleur]="membre.statut.couleur ?? 'rouge'"
-                      [libelle]="membre.statut.label"
+                      [couleur]="decompte.couleur ?? 'rouge'"
+                      [libelle]="decompte.nombre + ' ' + decompte.label"
                     />
-                    @if (membre.graviteAlerte; as gravite) {
-                      <span
-                        class="fiche-projet__gravite"
-                        [class.fiche-projet__gravite--elevee]="gravite === 'elevee'"
-                        [class.fiche-projet__gravite--moderee]="gravite === 'moderee'"
-                        >gravité {{ gravite }}</span
-                      >
-                      <a
-                        routerLink="/administration"
-                        [queryParams]="queryParamsQualification(donnees.groupeId, membre)"
-                        >Qualifier ce membre</a
-                      >
+                  }
+                </summary>
+                @if (sections.directs.membres.length === 0) {
+                  <p class="texte-sm">Aucun membre nominatif direct.</p>
+                } @else {
+                  <ul
+                    class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm"
+                  >
+                    @for (membre of sections.directs.membres; track membre.username) {
+                      <ng-container
+                        [ngTemplateOutlet]="ligneMembre"
+                        [ngTemplateOutletContext]="{
+                          $implicit: membre,
+                          groupeId: donnees.groupeId,
+                        }"
+                      />
                     }
-                  </li>
+                  </ul>
                 }
-              </ul>
+              </details>
+
+              <details class="fiche-projet__section-membres">
+                <summary class="fiche-projet__section-membres-resume texte-sm">
+                  <span class="poids-demi-gras">Membres des groupes invités</span>
+                  ({{ sections.groupesInvites.total }})
+                  @for (
+                    decompte of sections.groupesInvites.decompteParStatut;
+                    track decompte.label
+                  ) {
+                    <app-badge
+                      [couleur]="decompte.couleur ?? 'rouge'"
+                      [libelle]="decompte.nombre + ' ' + decompte.label"
+                    />
+                  }
+                </summary>
+                @if (sections.groupesInvites.groupes.length === 0) {
+                  <p class="texte-sm">Aucun groupe invité à ce projet.</p>
+                } @else {
+                  @for (groupe of sections.groupesInvites.groupes; track groupe.cheminGroupe) {
+                    <p
+                      class="fiche-projet__groupe-invite-titre texte-sm poids-demi-gras exterieur-bas-0"
+                    >
+                      {{ groupe.cheminGroupe }} :
+                    </p>
+                    <ul
+                      class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm"
+                    >
+                      @for (membre of groupe.membres; track membre.username) {
+                        <ng-container
+                          [ngTemplateOutlet]="ligneMembre"
+                          [ngTemplateOutletContext]="{
+                            $implicit: membre,
+                            groupeId: donnees.groupeId,
+                          }"
+                        />
+                      }
+                    </ul>
+                  }
+                }
+              </details>
+
+              <details class="fiche-projet__section-membres">
+                <summary class="fiche-projet__section-membres-resume texte-sm">
+                  <span class="poids-demi-gras">Membres hérités de l'arborescence</span>
+                  ({{ sections.herites.total }})
+                  @for (decompte of sections.herites.decompteParStatut; track decompte.label) {
+                    <app-badge
+                      [couleur]="decompte.couleur ?? 'rouge'"
+                      [libelle]="decompte.nombre + ' ' + decompte.label"
+                    />
+                  }
+                </summary>
+                @if (sections.herites.membres.length === 0) {
+                  <p class="texte-sm">Aucun membre hérité de l'arborescence.</p>
+                } @else {
+                  <ul
+                    class="fiche-projet__liste sans-liste d-flex direction-colonne ecart-2 texte-sm"
+                  >
+                    @for (membre of sections.herites.membres; track membre.username) {
+                      <ng-container
+                        [ngTemplateOutlet]="ligneMembre"
+                        [ngTemplateOutletContext]="{
+                          $implicit: membre,
+                          groupeId: donnees.groupeId,
+                        }"
+                      />
+                    }
+                  </ul>
+                }
+              </details>
+
+              <!-- Gabarit unique d'une ligne de membre, partagé par les trois sections (US-017) : contenu
+                   strictement identique d'une section à l'autre (nom, niveau d'accès, badge de statut, gravité et
+                   lien « Qualifier ce membre » pour un membre inconnu). -->
+              <ng-template #ligneMembre let-membre let-groupeId="groupeId">
+                <li [class.fiche-projet__ligne--inconnu]="membre.inconnu">
+                  <span>{{
+                    membre.nom === membre.username
+                      ? membre.nom
+                      : membre.nom + ' (' + membre.username + ')'
+                  }}</span
+                  >{{ ' ' }}<span>{{ membre.niveauAccesLabel }}</span>
+                  <app-badge
+                    [couleur]="membre.statut.couleur ?? 'rouge'"
+                    [libelle]="membre.statut.label"
+                  />
+                  @if (membre.graviteAlerte; as gravite) {
+                    <span
+                      class="fiche-projet__gravite"
+                      [class.fiche-projet__gravite--elevee]="gravite === 'elevee'"
+                      [class.fiche-projet__gravite--moderee]="gravite === 'moderee'"
+                      >gravité {{ gravite }}</span
+                    >
+                    <a
+                      routerLink="/administration"
+                      [queryParams]="queryParamsQualification(groupeId, membre)"
+                      >Qualifier ce membre</a
+                    >
+                  }
+                </li>
+              </ng-template>
             }
 
             @if (modaleSaisieMasseMembresVisible()) {

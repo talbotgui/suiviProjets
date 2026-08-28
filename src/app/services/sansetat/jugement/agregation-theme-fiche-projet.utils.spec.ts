@@ -102,7 +102,15 @@ describe('AgregationThemeFicheProjetUtils', () => {
           sourceId: 's1',
           refEffective: 'main',
           shaTete: 'abc',
-          membres: [{ username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false }],
+          membres: [
+            {
+              username: 'jdupont',
+              nom: 'Jean Dupont',
+              niveauAcces: 30,
+              direct: true,
+              groupesInvites: [],
+            },
+          ],
         },
       ];
 
@@ -163,7 +171,7 @@ describe('AgregationThemeFicheProjetUtils', () => {
       );
     });
 
-    it('fusionne en une seule ligne les dépendances de couple référence/manifeste identique entre deux sources (R15-04)', () => {
+    it('fusionne en une seule ligne les dépendances de triplet référence/version/manifeste identique entre deux sources (R15-04)', () => {
       const dependance = {
         reference: 'org.projectlombok:lombok',
         version: '1.18.30',
@@ -182,7 +190,7 @@ describe('AgregationThemeFicheProjetUtils', () => {
           sourceId: 'front',
           refEffective: 'main',
           shaTete: 'def',
-          dependances: [{ ...dependance, version: '1.18.28' }],
+          dependances: [{ ...dependance }],
         },
       ];
 
@@ -192,6 +200,44 @@ describe('AgregationThemeFicheProjetUtils', () => {
       expect(resultat.dependances[0].version).toBe('1.18.30');
     });
 
+    it('conserve deux lignes quand la même dépendance apparaît en versions différentes (modules ou sources distincts)', () => {
+      const resultats: readonly ResultatThemeFicheProjet[] = [
+        {
+          type: 'gitlab.dependances',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          dependances: [
+            {
+              reference: 'com.google.guava:guava',
+              version: '32.0.0',
+              manifeste: 'module-a/pom.xml',
+            },
+          ],
+        },
+        {
+          type: 'gitlab.dependances',
+          sourceId: 'back',
+          refEffective: 'main',
+          shaTete: 'abc',
+          dependances: [
+            {
+              reference: 'com.google.guava:guava',
+              version: '33.0.0',
+              manifeste: 'module-b/pom.xml',
+            },
+          ],
+        },
+      ];
+
+      const resultat = AgregationThemeFicheProjetUtils.regrouper(resultats);
+
+      expect(resultat.dependances).toHaveLength(2);
+      expect(resultat.dependances.map((dependance) => dependance.version)).toEqual(
+        expect.arrayContaining(['32.0.0', '33.0.0']),
+      );
+    });
+
     it('fusionne les membres de plusieurs sources GitLab sans perdre ceux de la seconde (R15-06)', () => {
       const resultats: readonly ResultatThemeFicheProjet[] = [
         {
@@ -199,14 +245,30 @@ describe('AgregationThemeFicheProjetUtils', () => {
           sourceId: 'back',
           refEffective: 'main',
           shaTete: 'abc',
-          membres: [{ username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false }],
+          membres: [
+            {
+              username: 'jdupont',
+              nom: 'Jean Dupont',
+              niveauAcces: 30,
+              direct: true,
+              groupesInvites: [],
+            },
+          ],
         },
         {
           type: 'gitlab.membres',
           sourceId: 'front',
           refEffective: 'main',
           shaTete: 'def',
-          membres: [{ username: 'mmartin', nom: 'Marie Martin', niveauAcces: 40, herite: true }],
+          membres: [
+            {
+              username: 'mmartin',
+              nom: 'Marie Martin',
+              niveauAcces: 40,
+              direct: false,
+              groupesInvites: [],
+            },
+          ],
         },
       ];
 
@@ -218,7 +280,7 @@ describe('AgregationThemeFicheProjetUtils', () => {
       );
     });
 
-    it('fusionne en une seule ligne un même membre présent sur deux sources, avec le niveau d’accès le plus élevé et herite=false si direct sur au moins une source (R15-04)', () => {
+    it('fusionne en une seule ligne un même membre présent sur deux sources, avec le niveau d’accès le plus élevé, direct=true dès une source directe et l’union des groupes invités (US-017, R15-04)', () => {
       const resultats: readonly ResultatThemeFicheProjet[] = [
         {
           type: 'gitlab.membres',
@@ -230,7 +292,8 @@ describe('AgregationThemeFicheProjetUtils', () => {
               username: 'guillaume.talbot',
               nom: 'Guillaume Talbot',
               niveauAcces: 30,
-              herite: true,
+              direct: false,
+              groupesInvites: ['org/transverse'],
             },
           ],
         },
@@ -244,7 +307,8 @@ describe('AgregationThemeFicheProjetUtils', () => {
               username: 'guillaume.talbot',
               nom: 'Guillaume Talbot',
               niveauAcces: 40,
-              herite: false,
+              direct: true,
+              groupesInvites: ['org/paiements'],
             },
           ],
         },
@@ -254,7 +318,8 @@ describe('AgregationThemeFicheProjetUtils', () => {
 
       expect(resultat.membres).toHaveLength(1);
       expect(resultat.membres[0].niveauAcces).toBe(40);
-      expect(resultat.membres[0].herite).toBe(false);
+      expect(resultat.membres[0].direct).toBe(true);
+      expect(resultat.membres[0].groupesInvites).toEqual(['org/transverse', 'org/paiements']);
     });
 
     it('fusionne les marqueurs IA de plusieurs sources GitLab, sans doublon de couple chemin/outil (R15-06/R15-04)', () => {

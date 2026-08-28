@@ -233,4 +233,35 @@ describe('SaisieMasseDependancesUtils', () => {
       ]);
     });
   });
+
+  describe('EXEMPLE_PROMPT_IA', () => {
+    it('décrit la grammaire réellement acceptée : joker « * » et non une expression régulière, statuts canoniques', () => {
+      const prompt = SaisieMasseDependancesUtils.EXEMPLE_PROMPT_IA;
+
+      // Le joker « toute version » de la grammaire s'écrit « ;* », jamais la forme regex « ;.* ».
+      expect(prompt).not.toContain(';.*=');
+      expect(prompt).toContain('7.*=maintenu');
+      expect(prompt).toContain('org.hibernate.orm:hibernate-core;*=obsolete');
+      expect(prompt).toContain('maintenu');
+      expect(prompt).toContain('obsolete');
+    });
+
+    it('se termine par un bloc vide où coller les lignes à traiter', () => {
+      expect(SaisieMasseDependancesUtils.EXEMPLE_PROMPT_IA).toMatch(
+        /Voici les lignes que je veux que tu traites :\n'''\n'''$/,
+      );
+    });
+
+    it('produit des lignes d’exemple valides pour analyser (aucune erreur de format)', () => {
+      const lignesExemple = [
+        'org.hibernate.orm:hibernate-core;7.*=maintenu',
+        'org.hibernate.orm:hibernate-core;*=obsolete',
+      ];
+      expect(SaisieMasseDependancesUtils.EXEMPLE_PROMPT_IA).toContain(lignesExemple.join('\n'));
+
+      const resultat = SaisieMasseDependancesUtils.analyser(lignesExemple.join('\n'), []);
+      expect(resultat.erreurs).toEqual([]);
+      expect(resultat.groupes).toHaveLength(1);
+    });
+  });
 });

@@ -22,6 +22,7 @@ import type {
   Projet,
 } from '../../services/avecetat/etat/types-donnees';
 import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
+import type { MembreGitlab } from '../../services/sansetat/commandes/types-facade';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmFicheProjetComponent } from './fiche-projet.component';
 
@@ -93,12 +94,19 @@ class DonneesDeTest {
           refEffective: 'develop',
           shaTete: 'abc123',
           membres: [
-            { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
+            {
+              username: 'jdupont',
+              nom: 'Jean Dupont',
+              niveauAcces: 30,
+              direct: true,
+              groupesInvites: [],
+            },
             {
               username: 'inconnu1',
               nom: 'Inconnu Un',
               niveauAcces: options.niveauAccesInconnu ?? 40,
-              herite: false,
+              direct: true,
+              groupesInvites: [],
             },
           ],
         },
@@ -372,14 +380,7 @@ describe('SqmFicheProjetComponent', () => {
    * @param membres - Membres à substituer au résultat `gitlab.membres` par défaut.
    * @returns L'audit de test avec ses membres remplacés, tous les autres résultats inchangés.
    */
-  function auditAvecMembres(
-    membres: readonly {
-      readonly username: string;
-      readonly nom: string;
-      readonly niveauAcces: number;
-      readonly herite: boolean;
-    }[],
-  ): Audit {
+  function auditAvecMembres(membres: readonly MembreGitlab[]): Audit {
     const audit = DonneesDeTest.auditComplet({});
     return {
       ...audit,
@@ -396,17 +397,13 @@ describe('SqmFicheProjetComponent', () => {
    * @param nombre - Nombre de membres distincts à construire.
    * @returns Les membres construits (`inconnu1`, `inconnu2`, ...).
    */
-  function membresInconnus(nombre: number): readonly {
-    readonly username: string;
-    readonly nom: string;
-    readonly niveauAcces: number;
-    readonly herite: boolean;
-  }[] {
+  function membresInconnus(nombre: number): readonly MembreGitlab[] {
     return Array.from({ length: nombre }, (_, index) => ({
       username: `inconnu${index + 1}`,
       nom: `Inconnu ${index + 1}`,
       niveauAcces: 30,
-      herite: false,
+      direct: true,
+      groupesInvites: [],
     }));
   }
 
@@ -780,7 +777,8 @@ describe('SqmFicheProjetComponent', () => {
                       username: 'conflit1',
                       nom: 'Conflit Un',
                       niveauAcces: 40,
-                      herite: false,
+                      direct: true,
+                      groupesInvites: [],
                       emailPublic: 'conflit1@exemple.fr',
                     },
                   ],
@@ -922,8 +920,20 @@ describe('SqmFicheProjetComponent', () => {
               ? {
                   ...resultat,
                   membres: [
-                    { username: 'zdupont', nom: 'zdupont', niveauAcces: 30, herite: false },
-                    { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
+                    {
+                      username: 'zdupont',
+                      nom: 'zdupont',
+                      niveauAcces: 30,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'jdupont',
+                      nom: 'Jean Dupont',
+                      niveauAcces: 30,
+                      direct: true,
+                      groupesInvites: [],
+                    },
                   ],
                 }
               : resultat,
@@ -939,6 +949,261 @@ describe('SqmFicheProjetComponent', () => {
       expect(lignes[1]).toBe('zdupont');
     },
   );
+
+  describe('ventilation des membres du dépôt en trois sections repliables (US-017)', () => {
+    /**
+     * Retrouve la section repliable de membres dont la barre de titre contient le libellé donné.
+     * @param element - Élément natif de la fixture rendue.
+     * @param libelle - Fragment de libellé attendu dans le `<summary>` de la section.
+     * @returns L'élément `<details>` de la section.
+     */
+    function sectionMembres(element: HTMLElement, libelle: string): HTMLDetailsElement {
+      const section = Array.from(
+        element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-membres'),
+      ).find((candidat) => candidat.querySelector('summary')?.textContent?.includes(libelle));
+      if (section === undefined) {
+        throw new Error(`Section de membres « ${libelle} » introuvable`);
+      }
+      return section;
+    }
+
+    it('rend trois sections repliables, toutes fermées par défaut', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+          {
+            username: 'ginvite',
+            nom: 'Gaël Invité',
+            niveauAcces: 30,
+            direct: false,
+            groupesInvites: ['org/equipe'],
+          },
+          {
+            username: 'gherite',
+            nom: 'Gwen Héritée',
+            niveauAcces: 20,
+            direct: false,
+            groupesInvites: [],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const sections = element.querySelectorAll<HTMLDetailsElement>(
+        '.fiche-projet__section-membres',
+      );
+      expect(sections).toHaveLength(3);
+      sections.forEach((section) => expect(section.hasAttribute('open')).toBe(false));
+
+      expect(
+        sectionMembres(element, 'Membres directs').querySelector('summary')?.textContent,
+      ).toContain('(1)');
+      expect(
+        sectionMembres(element, 'Membres des groupes invités').querySelector('summary')
+          ?.textContent,
+      ).toContain('(1)');
+      expect(
+        sectionMembres(element, "Membres hérités de l'arborescence").querySelector('summary')
+          ?.textContent,
+      ).toContain('(1)');
+    });
+
+    it('ventile chaque membre dans la section correspondant à sa provenance', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+          {
+            username: 'ginvite',
+            nom: 'Gaël Invité',
+            niveauAcces: 30,
+            direct: false,
+            groupesInvites: ['org/equipe'],
+          },
+          {
+            username: 'gherite',
+            nom: 'Gwen Héritée',
+            niveauAcces: 20,
+            direct: false,
+            groupesInvites: [],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const directs = sectionMembres(element, 'Membres directs');
+      expect(directs.textContent).toContain('Jean Dupont');
+      expect(directs.textContent).not.toContain('Gaël Invité');
+
+      const invites = sectionMembres(element, 'Membres des groupes invités');
+      expect(invites.querySelector('.fiche-projet__groupe-invite-titre')?.textContent?.trim()).toBe(
+        'org/equipe :',
+      );
+      expect(invites.textContent).toContain('Gaël Invité');
+
+      const herites = sectionMembres(element, "Membres hérités de l'arborescence");
+      expect(herites.textContent).toContain('Gwen Héritée');
+      expect(herites.textContent).not.toContain('Gaël Invité');
+    });
+
+    it('affiche un membre à la fois direct et membre d’un groupe invité dans les deux sections', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'bob',
+            nom: 'Bob Transverse',
+            niveauAcces: 40,
+            direct: true,
+            groupesInvites: ['org/equipe'],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(sectionMembres(element, 'Membres directs').textContent).toContain('Bob Transverse');
+      expect(sectionMembres(element, 'Membres des groupes invités').textContent).toContain(
+        'Bob Transverse',
+      );
+    });
+
+    it('trie les groupes invités du chemin le plus précis vers la racine, départage alphabétique', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'm1',
+            nom: 'M Un',
+            niveauAcces: 30,
+            direct: false,
+            groupesInvites: ['org/z'],
+          },
+          {
+            username: 'm2',
+            nom: 'M Deux',
+            niveauAcces: 30,
+            direct: false,
+            groupesInvites: ['org/a/b/c'],
+          },
+          {
+            username: 'm3',
+            nom: 'M Trois',
+            niveauAcces: 30,
+            direct: false,
+            groupesInvites: ['org/a'],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const titres = Array.from(
+        sectionMembres(element, 'Membres des groupes invités').querySelectorAll(
+          '.fiche-projet__groupe-invite-titre',
+        ),
+      ).map((titre) => titre.textContent?.trim());
+      expect(titres).toEqual(['org/a/b/c :', 'org/a :', 'org/z :']);
+    });
+
+    it('affiche le décompte par statut dans la barre de titre, statuts à zéro omis', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+          {
+            username: 'inconnu1',
+            nom: 'Inconnu Un',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const resume = sectionMembres(element, 'Membres directs').querySelector(
+        'summary',
+      )?.textContent;
+      expect(resume).toContain('1 interne');
+      expect(resume).toContain('1 inconnu');
+      expect(resume).not.toContain('client');
+      expect(resume).not.toContain('partenaire');
+    });
+
+    it('affiche un message explicite pour une section sans aucun membre', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(sectionMembres(element, 'Membres des groupes invités').textContent).toContain(
+        'Aucun groupe invité à ce projet.',
+      );
+      expect(sectionMembres(element, "Membres hérités de l'arborescence").textContent).toContain(
+        "Aucun membre hérité de l'arborescence.",
+      );
+    });
+
+    it('exporterPng déplie les trois sections le temps de la capture puis restaure leur état', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecMembres([
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+        ]),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+      let replisPendantCapture: boolean[] = [];
+      jest.mocked(toPng).mockImplementation(() => {
+        replisPendantCapture = Array.from(
+          element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-membres'),
+        ).map((section) => section.open);
+        return Promise.resolve('data:image/png;base64,test');
+      });
+
+      await fixture.componentInstance.exporterPng();
+
+      expect(replisPendantCapture).toEqual([true, true, true]);
+      const replisApres = Array.from(
+        element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-membres'),
+      ).map((section) => section.open);
+      expect(replisApres).toEqual([false, false, false]);
+    });
+  });
 
   it(
     'exporterPng déclenche toPng sur le conteneur, provoque un téléchargement nommé ' +
@@ -1134,6 +1399,27 @@ describe('SqmFicheProjetComponent', () => {
         expect(modale.texte().split('\n').sort()).toEqual([...lignesAttendues].sort());
       },
     );
+
+    it('propose dans la modale un bouton d’aide copiant un exemple de prompt IA', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances(dependancesNonReferencees(6)),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const composant = fixture.componentInstance;
+
+      composant.ouvrirSaisieMasseDependances();
+      fixture.detectChanges();
+
+      const boutonAide = DomTestUtils.obtenirElementNatif(fixture).querySelector(
+        'app-modale-saisie-masse app-bouton-copie button',
+      );
+      expect(boutonAide?.getAttribute('title')).toBe(
+        'cliquer pour copier un exemple de prompt utilisable pour renseigner facilement et correctement le champ de saisie',
+      );
+      expect(composant.exemplePromptSaisieMasseDependances).toContain(
+        'idArtefact;motifVersion=statut',
+      );
+    });
 
     it(
       'place la ligne de borne « * » immédiatement sous chaque ligne de version, et retire un préfixe de ' +

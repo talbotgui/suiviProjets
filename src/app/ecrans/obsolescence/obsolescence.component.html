@@ -182,7 +182,10 @@
               </tr>
             </thead>
             <tbody>
-              @for (dep of detail.lignes; track dep.reference + ' ' + dep.manifeste) {
+              @for (
+                dep of detail.lignes;
+                track dep.reference + ' ' + dep.version + ' ' + dep.manifeste
+              ) {
                 <tr [class.obsolescence-detail__java]="dep.estJava">
                   <td class="police-mono">{{ dep.reference }}</td>
                   <td class="police-mono texte-discret">{{ dep.manifeste }}</td>

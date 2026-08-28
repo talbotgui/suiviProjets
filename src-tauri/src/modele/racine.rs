@@ -65,7 +65,16 @@ use std::collections::HashMap;
 /// de nouveau code — sur le modèle de `duplicationNouveauCode` déjà optionnel. Champ purement additif à valeur de
 /// repli (`#[serde(default)]`), aucune transformation de donnée : voir `migration_7_vers_8` enregistrée dans
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`, sur le modèle de `migration_1_vers_2`.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 8;
+///
+/// Passage de `8` à `9` (US-017, ventilation des membres du dépôt sur la Fiche projet) : sur [`MembreGitlab`]
+/// (`gitlab.membres`), le champ booléen `herite` est remplacé par `direct` (`#[serde(default = "..."` → `true`) et
+/// `groupesInvites` (`Vec<String>`, `#[serde(default)]` → vide). Décision fonctionnelle validée par un humain : un
+/// audit déjà stocké (sans ces deux champs) restitue tous ses membres dans la section « Membres directs » (`direct`
+/// vaut `true` par repli, `groupesInvites` reste vide), l'ancien `herite` étant simplement ignoré à la
+/// désérialisation. Champ purement additif à valeur de repli, aucune transformation de donnée : voir
+/// `migration_8_vers_9` enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`, sur le modèle
+/// de `migration_1_vers_2`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 9;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -636,15 +645,34 @@ pub(crate) struct ResultatGitlabMarqueursIa {
 }
 
 /// Membre du dépôt (droits d'accès GitLab, distinct des membres connus RG-006 à RG-008).
+///
+/// US-017 : la Fiche projet ventile ces membres en trois sections — nominatifs directs, membres des groupes invités
+/// au projet, membres hérités de l'arborescence. `direct` distingue la première ; `groupes_invites` porte les
+/// chemins complets des groupes invités (`shared_with_groups`) dont le membre relève, triés du plus précis vers la
+/// racine ; la section « hérités » est déduite (`!direct && groupes_invites.is_empty()`). Un même membre peut être à
+/// la fois `direct` et rattaché à un ou plusieurs groupes invités (il figure alors dans plusieurs sections).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MembreGitlab {
     pub(crate) username: String,
     pub(crate) nom: String,
     pub(crate) niveau_acces: u32,
-    pub(crate) herite: bool,
+    /// `true` si le membre est nominativement membre direct du dépôt (`GET /projects/{id}/members`).
+    #[serde(default = "membre_gitlab_direct_par_defaut")]
+    pub(crate) direct: bool,
+    /// Chemins complets (`group_full_path`) des groupes invités au projet dont ce membre est membre direct, triés du
+    /// plus précis vers la racine ; vide si le membre ne relève d'aucun groupe invité.
+    #[serde(default)]
+    pub(crate) groupes_invites: Vec<String>,
     #[serde(default)]
     pub(crate) email_public: Option<String>,
+}
+
+/// Valeur de repli du champ [`MembreGitlab::direct`] pour un audit stocké avant `versionSchema` 9 (US-017) : tous
+/// les membres d'un audit antérieur sont restitués dans la section « Membres directs » (décision fonctionnelle
+/// validée par un humain, cf. [`VERSION_SCHEMA_COURANTE`]).
+fn membre_gitlab_direct_par_defaut() -> bool {
+    true
 }
 
 /// Constat brut de `gitlab.membres`.

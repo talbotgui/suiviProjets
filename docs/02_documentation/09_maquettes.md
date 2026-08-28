@@ -88,7 +88,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | Obsolescence | Entête | Titre de page, paragraphe d'introduction (largeur bornée) précisant l'échelle des indicateurs (retard en versions majeures, 0 = à jour) |
 | Obsolescence | Barre de filtres | Sélecteur de groupe, filtre de date d'audit (dernier audit régulier à cette date ou avant, initialisé à aujourd'hui), un couple valeur min / valeur max par catégorie (minimum toujours à 0, maximum adapté à la valeur maximale de l'indicateur tous filtres ignorés), bouton d'export PNG |
 | Obsolescence | Bandeau du panneau | Légende des indicateurs (pastille de teinte, libellé, médiane par catégorie sur les projets affichés), décompte total de projets à droite |
-| Obsolescence | Grille de tuiles | Colonnes fluides (nombre adapté à la largeur), quadrillage continu de 1 px ; chaque tuile : nom du projet sur deux lignes à hauteur réservée, puis une ligne de mesure par catégorie (sigle de 3 lettres, barre sur rail sombre, valeur numérique alignée à droite) ; survol éclaircissant le fond, infobulle native donnant le détail complet |
+| Obsolescence | Grille de tuiles | Colonnes fluides (nombre adapté à la largeur), quadrillage continu de 1 px ; chaque tuile : nom du projet sur deux lignes à hauteur réservée, puis une ligne de mesure par catégorie (sigle de 3 lettres, barre sur rail sombre, valeur numérique alignée à droite) ; une catégorie sans dépendance concernée pour le projet n'affiche que son sigle, sans barre ni valeur, pour rendre repérables les catégories manquantes (la valeur `0`, « à jour », garde sa barre) ; survol éclaircissant le fond, infobulle native donnant le détail complet |
 | Obsolescence | Détail d'un projet | Au clic sur une tuile, modale résumant le dernier audit retenu du projet : date de l'audit, tableau des dépendances (référence, catégorie, version, retard calculé), ligne Java mise en évidence ; fermeture par bouton ou touche Échap |
 | Obsolescence | Export | Export de la grille (bandeau inclus) en image PNG |
 
@@ -100,7 +100,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | Fiche projet | Métadonnées | Âge chez nous, dernier audit, dernière campagne (mise en évidence si échec), taille/classe |
 | Fiche projet | Anomalie technique | Encart si la dernière campagne a échoué, avec action suggérée |
 | Fiche projet | Colonne gauche | Indicateurs Sonar (grisés si SONAR_KO), dépendances (référence/version/statut), merge requests ouvertes |
-| Fiche projet | Colonne droite | Membres et statuts (mis en évidence si membre inconnu, lien « Qualifier ce membre »), marqueurs IA détectés, annotations et journal |
+| Fiche projet | Colonne droite | Membres et statuts ventilés en trois sections repliables fermées par défaut — (1) membres nominatifs directs, (2) membres des groupes invités au projet regroupés par groupe (chemin complet mentionné une fois, groupes du plus précis vers la racine), (3) membres hérités de l'arborescence — chaque barre de titre portant le décompte par statut (statuts sans membre omis) ; ligne de membre identique d'une section à l'autre (mise en évidence si membre inconnu, lien « Qualifier ce membre ») ; marqueurs IA détectés, annotations et journal |
 | Fiche projet | Actions | Accès à la comparaison entre deux audits, export PNG de la fiche |
 
 ### Comparaison entre deux audits
@@ -152,8 +152,11 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | Obsolescence | Aucune catégorie de dépendance définie : message renvoyant vers l'écran de Paramétrage plutôt qu'une grille sans indicateur |
 | Obsolescence | Aucun projet ne correspond aux filtres : message explicite plutôt qu'une grille vide silencieuse |
 | Obsolescence | Projet sans audit retenu : indicateurs absents (jamais `0`), modale mentionnant « jamais audité » |
+| Obsolescence | Catégorie sans dépendance concernée pour un projet : seul le sigle est affiché sur la tuile, sans barre ni valeur, pour repérer les catégories manquantes (distinct de la valeur `0`, « à jour », qui conserve sa barre) |
 | Fiche projet | Dernière campagne en échec : encart d'anomalie technique affiché en tête, indicateurs de la campagne précédente conservés |
 | Fiche projet | SONAR_KO actif : bloc Indicateurs Sonar grisé avec légende explicative de l'écart |
+| Fiche projet | Section de membres sans membre : message explicite (« Aucun membre nominatif direct. » / « Aucun groupe invité à ce projet. » / « Aucun membre hérité de l'arborescence. »), jamais une section vide muette ; l'export PNG déplie toujours les trois sections |
+| Fiche projet | Détail des groupes invités ou ancêtres inaccessible : les membres concernés sont restitués dans la section « hérités de l'arborescence », sans erreur affichée |
 | Liste de travail | Aucune alerte active : message de confirmation explicite, pas de tableau vide silencieux |
 | Recherche transversale | Aucun résultat : message explicite avec suggestion d'étendre la recherche à l'historique |
 | Gestion des credentials | Instance sans credential saisi : listée explicitement, jamais masquée, avec statut « — » |

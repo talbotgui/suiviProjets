@@ -204,6 +204,25 @@ describe('SqmObsolescenceComponent', () => {
     expect(composant.total()).toBe(1);
   });
 
+  it('n’affiche que le sigle pour une catégorie sans dépendance concernée sur la tuile (repérage des catégories manquantes)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'Projet 1', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '17', manifeste: 'pom.xml' },
+        ]),
+      ]),
+    ]);
+    const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+      '.obsolescence__tuile',
+    );
+
+    expect(tuile?.textContent).toContain('EXE');
+    expect(tuile?.textContent).toContain('FMB');
+    // cat-exec porte une valeur (java) -> une seule barre ; cat-back n'a aucune dépendance -> sigle seul.
+    expect(tuile?.querySelectorAll('.barre-mesure__rail')).toHaveLength(1);
+    expect(tuile?.querySelectorAll('app-barre-mesure')).toHaveLength(2);
+  });
+
   it('borne le maximum de chaque catégorie sur tous les projets, filtres ignorés', () => {
     const racine = DonneesDeTest.racine([
       DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'Projet 1', [

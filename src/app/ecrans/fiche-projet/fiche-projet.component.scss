@@ -68,3 +68,28 @@
   color: var(--sqm-orange-texte);
   background-color: var(--sqm-orange-fond);
 }
+
+// US-017 : sections repliables de la ventilation des membres du dépôt (directs, groupes invités, hérités de
+// l'arborescence). Résidu propre au composant : le triangle natif de `<summary>` et l'agencement inline du décompte
+// par statut ne sont pas exprimables par les classes utilitaires génériques.
+.fiche-projet__section-membres {
+  border: 1px solid var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-md);
+  padding: var(--sqm-espace-1) var(--sqm-espace-2);
+}
+
+.fiche-projet__section-membres + .fiche-projet__section-membres {
+  margin-top: var(--sqm-espace-2);
+}
+
+.fiche-projet__section-membres-resume {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sqm-espace-1);
+}
+
+.fiche-projet__groupe-invite-titre {
+  margin-top: var(--sqm-espace-2);
+}

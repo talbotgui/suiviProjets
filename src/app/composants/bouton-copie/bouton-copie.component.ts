@@ -17,6 +17,12 @@
 // (US-017, fiche-projet.component.html), documenté ici comme gabarit destiné à être réutilisé tel quel pour tout
 // futur identifiant technique affiché ailleurs dans l'application (ex. motif d'une règle de dépendance), sans que
 // cette réutilisation ne soit réalisée par ce développement (périmètre strictement limité à la Fiche projet).
+//
+// Généralisé ensuite (US-043) au-delà du seul identifiant technique : le texte visible du bouton ({@link
+// SqmBoutonCopieComponent.libelle}) et une infobulle survolable facultative ({@link
+// SqmBoutonCopieComponent.infobulle}) sont désormais paramétrables, pour servir aussi de bouton d'aide « copier un
+// exemple de prompt » dans la modale de saisie en masse de règles de dépendances. Le mécanisme (copie
+// `navigator.clipboard` + confirmation visuelle inline) reste strictement identique.
 import {
   Component,
   DestroyRef,
@@ -68,6 +74,20 @@ export class SqmBoutonCopieComponent {
    * lecteur d'écran (RNF-020, WCAG 2.1 AA).
    */
   public readonly libelleAccessible: InputSignal<string> = input.required<string>();
+
+  /**
+   * Texte visible du bouton. Valeur par défaut « Copier » (usage historique : copie d'un identifiant technique) ;
+   * un appelant peut le remplacer par un libellé plus explicite lorsque la valeur copiée n'est pas un simple
+   * identifiant (ex. « Copier un exemple de prompt IA » dans la modale de saisie en masse, US-043).
+   */
+  public readonly libelle: InputSignal<string> = input<string>('Copier');
+
+  /**
+   * Infobulle survolable facultative (`title`), affichée au survol du bouton. Absente par défaut (aucun attribut
+   * `title` rendu) : n'a d'intérêt que lorsque le libellé visible ne suffit pas à lui seul à expliquer l'action
+   * (ex. bouton d'aide de la modale de saisie en masse, US-043).
+   */
+  public readonly infobulle: InputSignal<string | undefined> = input<string | undefined>(undefined);
 
   /**
    * État d'affichage courant du bouton (`inactif` par défaut, temporairement `copie` ou `echec` après un clic).

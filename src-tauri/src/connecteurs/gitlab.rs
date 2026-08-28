@@ -1263,17 +1263,25 @@ struct ReponseMembre {
 }
 
 /// Interroge les membres d'un dépôt GitLab (US-009, `gitlab.membres`) : un premier appel liste les membres
-/// directs (`/members`), un second la totalité y compris hérités (`/members/all`) ; un membre présent dans le
-/// second ensemble sans figurer dans le premier est marqué hérité. L'API GitLab n'exposant pas l'email public d'un
-/// membre arbitraire à ce point d'entrée, `emailPublic` reste toujours absent.
+/// directs (`/members`), un second la totalité y compris hérités (`/members/all`). L'API GitLab n'exposant pas
+/// l'email public d'un membre arbitraire à ce point d'entrée, `emailPublic` reste toujours absent.
 ///
-/// Chacun des deux appels pagine sur les pages de résultats successives, jusqu'à épuisement ou
-/// [`MAX_PAGES_CONTRIBUTEURS`] (R10-02 : un dépôt de plus de cent membres voyait jusqu'ici sa liste silencieusement
-/// tronquée par un unique appel non paginé), sur le même principe que [`interroger_contributeurs`].
+/// US-017 (ventilation des membres sur la Fiche projet) : chaque membre porte `direct` (présent dans `/members`)
+/// et `groupes_invites` (chemins complets des groupes invités au projet — `shared_with_groups` de
+/// `GET /projects/{id}` — dont il est membre direct, cf. [`recuperer_membres_groupes_invites`]). Le groupe ancêtre
+/// précis d'un membre hérité n'est **pas** recherché (décision fonctionnelle validée par un humain, pour limiter
+/// les appels et les problèmes de droits) : un membre ni `direct` ni rattaché à un groupe invité relève, par
+/// déduction, de l'arborescence du projet. Toute anomalie sur les appels propres à cette ventilation est absorbée
+/// silencieusement (les membres concernés retombent alors en « hérités »), sans faire échouer l'interrogation.
+///
+/// Chacun des deux appels de liste de membres du dépôt pagine sur les pages de résultats successives, jusqu'à
+/// épuisement ou [`MAX_PAGES_CONTRIBUTEURS`] (R10-02 : un dépôt de plus de cent membres voyait jusqu'ici sa liste
+/// silencieusement tronquée par un unique appel non paginé), sur le même principe que [`interroger_contributeurs`].
 ///
 /// # Erreurs
 ///
-/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux deux appels paginés de liste de membres.
+/// Voir [`resoudre_ref_effective`] ; les mêmes catégories s'appliquent aux deux appels paginés de liste de membres
+/// du dépôt (jamais aux appels de la ventilation US-017, dont les anomalies sont absorbées).
 pub(crate) async fn interroger_membres(
     url_base: &str,
     credential: &str,
@@ -1346,14 +1354,35 @@ pub(crate) async fn interroger_membres(
         .map(|membre| membre.username)
         .collect();
 
+    // US-017 : `(chemin_complet_du_groupe_invité, usernames_de_ses_membres_directs)`, dégradation silencieuse en
+    // liste vide en cas d'anomalie (les membres concernés seront alors classés « hérités »).
+    let groupes_invites =
+        recuperer_membres_groupes_invites(url_base, credential, id_externe, client).await;
+
     let membres = membres_tous
         .into_iter()
-        .map(|membre| MembreGitlab {
-            herite: !usernames_directs.contains(&membre.username),
-            username: membre.username,
-            nom: membre.name,
-            niveau_acces: membre.access_level,
-            email_public: None,
+        .map(|membre| {
+            let mut chemins_groupes: Vec<String> = groupes_invites
+                .iter()
+                .filter(|(_, usernames)| usernames.contains(&membre.username))
+                .map(|(chemin, _)| chemin.clone())
+                .collect();
+            // Tri du plus précis (le plus de segments de chemin) vers la racine ; départage alphabétique pour un
+            // rendu stable entre deux interrogations.
+            chemins_groupes.sort_by(|a, b| {
+                b.split('/')
+                    .count()
+                    .cmp(&a.split('/').count())
+                    .then_with(|| a.cmp(b))
+            });
+            MembreGitlab {
+                direct: usernames_directs.contains(&membre.username),
+                groupes_invites: chemins_groupes,
+                username: membre.username,
+                nom: membre.name,
+                niveau_acces: membre.access_level,
+                email_public: None,
+            }
         })
         .collect();
 
@@ -1363,6 +1392,141 @@ pub(crate) async fn interroger_membres(
         sha_tete: resolue.sha_tete,
         membres,
     })
+}
+
+/// Groupe invité au projet (`shared_with_groups` de `GET /projects/{id}`), réduit aux seuls champs exploités par la
+/// ventilation des membres de la Fiche projet (US-017).
+#[derive(Debug, Deserialize)]
+struct ReponseGroupePartage {
+    group_id: u64,
+    group_full_path: String,
+}
+
+/// Réponse de `GET /projects/{id}` réduite à la seule liste des groupes invités (US-017), distincte de
+/// [`ReponseProjet`] (résolution de branche par défaut et statistiques) pour ne pas coupler les deux usages.
+#[derive(Debug, Deserialize)]
+struct ReponseProjetPartages {
+    #[serde(default)]
+    shared_with_groups: Vec<ReponseGroupePartage>,
+}
+
+/// Récupère, pour chaque groupe invité au projet (`shared_with_groups`), l'ensemble des noms d'utilisateur de ses
+/// membres directs (`GET /groups/{id}/members`, paginé), pour la ventilation des membres du dépôt sur la Fiche
+/// projet (US-017).
+///
+/// Dégradation silencieuse (décision fonctionnelle validée par un humain, cf. [`interroger_membres`]) : une anomalie
+/// sur `GET /projects/{id}` rend la liste entièrement vide ; une anomalie sur un groupe invité donné ignore ce seul
+/// groupe. Les membres non rattachés à un groupe invité résolu seront classés « hérités de l'arborescence ».
+///
+/// Chaque entrée retournée est `(group_full_path, usernames)` ; l'ordre de `shared_with_groups` est préservé (le
+/// tri du plus précis vers la racine relève de l'affichage, cf. [`interroger_membres`]).
+async fn recuperer_membres_groupes_invites(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    client: &reqwest::Client,
+) -> Vec<(String, HashSet<String>)> {
+    let Ok(groupes) = recuperer_groupes_invites(url_base, credential, id_externe, client).await
+    else {
+        return Vec::new();
+    };
+    let mut resultat = Vec::new();
+    for groupe in groupes {
+        if let Ok(usernames) =
+            recuperer_usernames_membres_groupe(url_base, credential, groupe.group_id, client).await
+        {
+            resultat.push((groupe.group_full_path, usernames));
+        }
+        // Groupe invité inaccessible : silencieusement ignoré, ses membres retomberont en « hérités » (US-017).
+    }
+    resultat
+}
+
+/// Liste les groupes invités au projet via `GET /projects/{id}` (US-017).
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::ReponseInattendue`] pour tout statut non 2xx ou toute réponse non désérialisable — les
+/// catégories précises importent peu, l'appelant absorbant l'erreur (cf. [`recuperer_membres_groupes_invites`]).
+async fn recuperer_groupes_invites(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<ReponseGroupePartage>, ErreurConnecteur> {
+    let url = format!(
+        "{}/api/v4/projects/{}",
+        url_base.trim_end_matches('/'),
+        id_externe
+    );
+    let reponse = client
+        .get(url)
+        .header("PRIVATE-TOKEN", credential)
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+    if !reponse.status().is_success() {
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", reponse.status().as_u16()),
+        });
+    }
+    let projet = reponse
+        .json::<ReponseProjetPartages>()
+        .await
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
+    Ok(projet.shared_with_groups)
+}
+
+/// Récupère les noms d'utilisateur des membres directs d'un groupe (`GET /groups/{id}/members`, paginé jusqu'à
+/// épuisement ou [`MAX_PAGES_CONTRIBUTEURS`], sur le modèle de [`interroger_membres`]), pour la ventilation US-017.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::ReponseInattendue`] pour tout statut non 2xx ou toute page non désérialisable ; l'erreur
+/// réseau brute est mappée par [`erreur_depuis_reqwest`]. L'appelant absorbe l'erreur (cf.
+/// [`recuperer_membres_groupes_invites`]).
+async fn recuperer_usernames_membres_groupe(
+    url_base: &str,
+    credential: &str,
+    group_id: u64,
+    client: &reqwest::Client,
+) -> Result<HashSet<String>, ErreurConnecteur> {
+    let url = format!(
+        "{}/api/v4/groups/{}/members",
+        url_base.trim_end_matches('/'),
+        group_id
+    );
+    let mut usernames = HashSet::new();
+    for page in 1..=MAX_PAGES_CONTRIBUTEURS {
+        let reponse = client
+            .get(url.as_str())
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        if !reponse.status().is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", reponse.status().as_u16()),
+            });
+        }
+        let page_membres = reponse
+            .json::<Vec<ReponseMembre>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_membres.is_empty() {
+            break;
+        }
+        usernames.extend(page_membres.into_iter().map(|membre| membre.username));
+    }
+    Ok(usernames)
 }
 
 /// Nombre maximal de pages parcourues lors de la liste complète des branches ou des demandes de fusion ouvertes
@@ -1909,15 +2073,38 @@ fn resoudre_chemin_parent(chemin_pom_courant: &str, chemin_relatif: &str) -> Str
 /// dénormalisation) : au-delà, la résolution s'arrête silencieusement, jamais en erreur d'audit.
 const PROFONDEUR_MAX_CHAINE_PARENTS: usize = 10;
 
-/// Reconstitue la chaîne des ancêtres disponibles d'un pom.xml du dépôt, du plus proche au plus lointain, en
-/// suivant `<parent><relativePath>` (ou son défaut Maven `../pom.xml`) résolu via [`resoudre_chemin_parent`].
-/// S'arrête dès que : le pom courant ne déclare pas de `<parent>` ; `<relativePath>` est explicitement vide
-/// (sémantique Maven « résoudre via le dépôt d'artefacts », hors périmètre — traité comme parent introuvable) ; le
-/// chemin résolu ne correspond à aucune entrée de `poms_bruts` (parent hors du dépôt audité, jamais une anomalie) ;
-/// le chemin résolu a déjà été visité (cycle) ; ou [`PROFONDEUR_MAX_CHAINE_PARENTS`] est atteinte.
+/// Index `(groupId, artifactId) -> chemin de dépôt` des `pom.xml` parsés déclarant une identité complète
+/// (`<groupId>` et `<artifactId>` explicitement présents dans le pom lui-même). Permet de rattacher un `<parent>`
+/// à son `pom.xml` du dépôt par ses **coordonnées** plutôt que par `<parent><relativePath>` — plus robuste en
+/// multi-modules où les modules ne sont pas tous exactement un cran sous la racine, ou déclarent un
+/// `<relativePath>` inexact, ou n'en déclarent pas (le défaut Maven `../pom.xml` ne menant alors nulle part). En
+/// cas de doublon de coordonnées (rare : deux `pom.xml` de même `groupId:artifactId`), la première occurrence dans
+/// l'ordre de découverte de l'arborescence est conservée.
+fn indexer_poms_par_coordonnees(
+    poms_bruts_ordonnes: &[(String, PomBrut)],
+) -> HashMap<(String, String), String> {
+    let mut index = HashMap::new();
+    for (chemin, pom) in poms_bruts_ordonnes {
+        if let (Some(groupe), Some(artefact)) = (pom.group_id.as_ref(), pom.artifact_id.as_ref()) {
+            index
+                .entry((groupe.clone(), artefact.clone()))
+                .or_insert_with(|| chemin.clone());
+        }
+    }
+    index
+}
+
+/// Reconstitue la chaîne des ancêtres disponibles d'un pom.xml du dépôt, du plus proche au plus lointain. Le pom
+/// parent est cherché d'abord par les **coordonnées `<parent>`** (`groupId` + `artifactId`) dans
+/// `index_coordonnees` ([`indexer_poms_par_coordonnees`]), puis, en repli seulement, par le chemin résolu depuis
+/// `<parent><relativePath>` (ou son défaut Maven `../pom.xml`) via [`resoudre_chemin_parent`]. S'arrête dès que :
+/// le pom courant ne déclare pas de `<parent>` ; ni les coordonnées ni un `<relativePath>` non vide ne désignent
+/// un `pom.xml` connu (parent hors du dépôt audité, jamais une anomalie) ; le chemin résolu a déjà été visité
+/// (cycle) ; ou [`PROFONDEUR_MAX_CHAINE_PARENTS`] est atteinte.
 fn construire_chaine_parents<'a>(
     chemin_pom: &str,
     poms_bruts: &'a HashMap<String, PomBrut>,
+    index_coordonnees: &HashMap<(String, String), String>,
 ) -> Vec<&'a PomBrut> {
     let mut chaine = Vec::new();
     let mut visites: HashSet<String> = HashSet::new();
@@ -1931,11 +2118,16 @@ fn construire_chaine_parents<'a>(
         let Some(parent) = pom_courant.parent.as_ref() else {
             break;
         };
-        let relatif = parent.chemin_relatif.as_deref().unwrap_or("../pom.xml");
-        if relatif.is_empty() {
+        let Some(chemin_parent) = index_coordonnees
+            .get(&(parent.group_id.clone(), parent.artifact_id.clone()))
+            .cloned()
+            .or_else(|| {
+                let relatif = parent.chemin_relatif.as_deref().unwrap_or("../pom.xml");
+                (!relatif.is_empty()).then(|| resoudre_chemin_parent(&chemin_courant, relatif))
+            })
+        else {
             break;
-        }
-        let chemin_parent = resoudre_chemin_parent(&chemin_courant, relatif);
+        };
         if visites.contains(&chemin_parent) {
             break;
         }
@@ -2073,7 +2265,15 @@ fn fusionner_gestion_dependances(
 /// fusionné pour la même coordonnée, sinon exclut silencieusement la dépendance (aucune version déterminable,
 /// comportement V1 préservé) ; substitue enfin les tokens `${...}` de la version retenue (token non résolu laissé
 /// littéral, cf. [`substituer_properties`]).
-fn resoudre_dependances_pom(pom: &PomBrut, chaine_parents: &[&PomBrut]) -> Vec<Dependance> {
+///
+/// `chemin_manifeste` est le chemin réel du `pom.xml` dans le dépôt (ex. `module-a/pom.xml`), reporté tel quel
+/// dans [`Dependance::manifeste`] : il distingue les modules d'un même dépôt en aval (notamment la déduplication
+/// de la fiche projet), là où l'ancien littéral `"pom.xml"` les confondait.
+fn resoudre_dependances_pom(
+    pom: &PomBrut,
+    chaine_parents: &[&PomBrut],
+    chemin_manifeste: &str,
+) -> Vec<Dependance> {
     let properties = fusionner_properties(pom, chaine_parents);
     let gestion = fusionner_gestion_dependances(pom, chaine_parents, &properties);
 
@@ -2093,7 +2293,7 @@ fn resoudre_dependances_pom(pom: &PomBrut, chaine_parents: &[&PomBrut]) -> Vec<D
             Some(Dependance {
                 reference: format!("{groupe}:{artefact}"),
                 version: substituer_properties(&version_brute, &properties),
-                manifeste: "pom.xml".to_string(),
+                manifeste: chemin_manifeste.to_string(),
             })
         })
         .collect()
@@ -2152,10 +2352,11 @@ fn majeur_version_java(version: &str) -> u32 {
 fn extraire_version_java(
     poms_bruts_ordonnes: &[(String, PomBrut)],
     poms_bruts: &HashMap<String, PomBrut>,
+    index_coordonnees: &HashMap<(String, String), String>,
 ) -> Option<Dependance> {
     let mut meilleure: Option<String> = None;
     for (chemin, pom) in poms_bruts_ordonnes {
-        let chaine_parents = construire_chaine_parents(chemin, poms_bruts);
+        let chaine_parents = construire_chaine_parents(chemin, poms_bruts, index_coordonnees);
         let properties = fusionner_properties(pom, &chaine_parents);
         let version = PROPRIETES_VERSION_JAVA
             .iter()
@@ -2182,7 +2383,10 @@ fn extraire_version_java(
 /// signalée dans le rapport de développement de cette phase, sur le même principe que `<dependencyManagement>` du
 /// parseur `pom.xml` — une dépendance de développement n'est pas une dépendance effectivement embarquée). Un JSON
 /// malformé ou sans clé `dependencies` ne fait jamais échouer l'audit : retourne simplement une liste vide.
-fn parser_package_json(contenu: &str) -> Vec<Dependance> {
+///
+/// `chemin_manifeste` est le chemin réel du fichier dans le dépôt, reporté dans [`Dependance::manifeste`] (cf.
+/// [`resoudre_dependances_pom`]).
+fn parser_package_json(contenu: &str, chemin_manifeste: &str) -> Vec<Dependance> {
     let Ok(valeur) = serde_json::from_str::<serde_json::Value>(contenu) else {
         return Vec::new();
     };
@@ -2196,7 +2400,7 @@ fn parser_package_json(contenu: &str) -> Vec<Dependance> {
             Some(Dependance {
                 reference: reference.clone(),
                 version: version.to_string(),
-                manifeste: "package.json".to_string(),
+                manifeste: chemin_manifeste.to_string(),
             })
         })
         .collect()
@@ -2216,7 +2420,10 @@ const MOTIF_DEPENDANCE_GRADLE: &str = r#"(?m)^\s*(?:implementation|api|compile|t
 /// version: '...'`) et toute déclaration résultant d'une variable ou d'une résolution de version dynamique
 /// (catalogue de versions, `libs.versions.toml`) ne sont pas reconnus, silencieusement ignorés plutôt que de faire
 /// échouer l'audit.
-fn parser_build_gradle(contenu: &str) -> Vec<Dependance> {
+///
+/// `chemin_manifeste` est le chemin réel du fichier dans le dépôt, reporté dans [`Dependance::manifeste`] (cf.
+/// [`resoudre_dependances_pom`]).
+fn parser_build_gradle(contenu: &str, chemin_manifeste: &str) -> Vec<Dependance> {
     let Ok(motif) = Regex::new(MOTIF_DEPENDANCE_GRADLE) else {
         return Vec::new();
     };
@@ -2225,7 +2432,7 @@ fn parser_build_gradle(contenu: &str) -> Vec<Dependance> {
         .map(|captures| Dependance {
             reference: format!("{}:{}", &captures[1], &captures[2]),
             version: captures[3].to_string(),
-            manifeste: "build.gradle".to_string(),
+            manifeste: chemin_manifeste.to_string(),
         })
         .collect()
 }
@@ -2237,13 +2444,16 @@ fn parser_build_gradle(contenu: &str) -> Vec<Dependance> {
 /// L'absence de tout manifeste dans le dépôt n'est jamais une anomalie : `dependances` est alors simplement vide.
 ///
 /// Pour l'écosystème Maven, le traitement se fait en deux passes : tous les `pom.xml` du dépôt sont d'abord parsés
-/// en forme brute non résolue ([`parser_pom_xml_brut`]), puis chacun est résolu ([`resoudre_dependances_pom`]) en
-/// tenant compte de sa chaîne de `<parent>` disponible parmi les autres `pom.xml` déjà parsés
-/// ([`construire_chaine_parents`]) — nécessaire pour résoudre les properties Maven et le `dependencyManagement`
-/// hérités (cf. leur documentation respective). `package.json`/`build.gradle` restent traités à la volée, fichier
-/// par fichier, sans changement. Conséquence observable : dans `dependances`, les dépendances Maven apparaissent
-/// désormais regroupées après celles des autres écosystèmes plutôt qu'entrelacées selon l'ordre de découverte des
-/// fichiers dans l'arborescence — aucun consommateur connu ne dépend de cet ordre.
+/// en forme brute non résolue ([`parser_pom_xml_brut`]) et indexés par leurs coordonnées
+/// ([`indexer_poms_par_coordonnees`]), puis chacun est résolu ([`resoudre_dependances_pom`]) en tenant compte de sa
+/// chaîne de `<parent>` disponible parmi les autres `pom.xml` déjà parsés ([`construire_chaine_parents`], qui
+/// rattache un parent par ses coordonnées d'abord, `<relativePath>` seulement en repli) — nécessaire pour résoudre
+/// les properties Maven et le `dependencyManagement` hérités (cf. leur documentation respective).
+/// `package.json`/`build.gradle` restent traités à la volée, fichier par fichier, sans changement. Chaque
+/// [`Dependance`] porte dans `manifeste` le chemin réel de son fichier d'origine dans le dépôt (ex.
+/// `module-a/pom.xml`), pas un simple nom d'écosystème. Conséquence observable : dans `dependances`, les
+/// dépendances Maven apparaissent regroupées après celles des autres écosystèmes plutôt qu'entrelacées selon
+/// l'ordre de découverte des fichiers dans l'arborescence — aucun consommateur connu ne dépend de cet ordre.
 ///
 /// US-050 : si au moins un `pom.xml` du dépôt déclare l'une des [`PROPRIETES_VERSION_JAVA`], une dépendance
 /// synthétique de référence `java` portant la version de Java du dépôt ([`extraire_version_java`]) est ajoutée en
@@ -2343,21 +2553,24 @@ pub(crate) async fn interroger_dependances(
         };
         match basename(&chemin) {
             "pom.xml" => poms_bruts_ordonnes.push((chemin.clone(), parser_pom_xml_brut(&contenu))),
-            "package.json" => dependances.extend(parser_package_json(&contenu)),
-            "build.gradle" => dependances.extend(parser_build_gradle(&contenu)),
+            "package.json" => dependances.extend(parser_package_json(&contenu, &chemin)),
+            "build.gradle" => dependances.extend(parser_build_gradle(&contenu, &chemin)),
             _ => {}
         }
     }
 
     let poms_bruts: HashMap<String, PomBrut> = poms_bruts_ordonnes.iter().cloned().collect();
+    let index_coordonnees = indexer_poms_par_coordonnees(&poms_bruts_ordonnes);
     for (chemin, pom_brut) in &poms_bruts_ordonnes {
-        let chaine_parents = construire_chaine_parents(chemin, &poms_bruts);
-        dependances.extend(resoudre_dependances_pom(pom_brut, &chaine_parents));
+        let chaine_parents = construire_chaine_parents(chemin, &poms_bruts, &index_coordonnees);
+        dependances.extend(resoudre_dependances_pom(pom_brut, &chaine_parents, chemin));
     }
     // US-050 : la version de Java du dépôt, relevée dans les `<properties>` des `pom.xml`, est ajoutée comme une
     // dépendance synthétique de référence `java` — traitée ensuite comme n'importe quelle dépendance (règle de
     // dépendances, catégorie, retard d'obsolescence).
-    if let Some(dependance_java) = extraire_version_java(&poms_bruts_ordonnes, &poms_bruts) {
+    if let Some(dependance_java) =
+        extraire_version_java(&poms_bruts_ordonnes, &poms_bruts, &index_coordonnees)
+    {
         dependances.push(dependance_java);
     }
 
@@ -3602,7 +3815,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn interroger_membres_marque_herite_les_membres_absents_des_membres_directs()
+    async fn interroger_membres_marque_non_direct_les_membres_absents_des_membres_directs()
     -> Result<(), ErreurConnecteur> {
         use wiremock::matchers::query_param;
 
@@ -3659,16 +3872,216 @@ mod tests {
             resultat
                 .membres
                 .iter()
-                .any(|membre| membre.username == "mdurand" && !membre.herite)
+                .any(|membre| membre.username == "mdurand"
+                    && membre.direct
+                    && membre.groupes_invites.is_empty())
         );
         assert!(
             resultat
                 .membres
                 .iter()
                 .any(|membre| membre.username == "alopez-ext"
-                    && membre.herite
+                    && !membre.direct
+                    && membre.groupes_invites.is_empty()
                     && membre.email_public.is_none())
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_membres_ventile_les_membres_des_groupes_invites_du_plus_precis_a_la_racine()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        // US-017 : `mdurand` est membre direct du dépôt ; `bnoms` relève de deux groupes invités (le chemin le plus
+        // profond en premier) ; `cherite` n'est ni direct ni dans un groupe invité résolu → hérité de
+        // l'arborescence.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits/develop"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "8c1d0e44",
+                "committed_date": "2026-06-05T10:00:00Z"
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "mdurand", "name": "Marie Durand", "access_level": 40 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "mdurand", "name": "Marie Durand", "access_level": 40 },
+                { "username": "bnoms", "name": "Bernard Noms", "access_level": 30 },
+                { "username": "cherite", "name": "Chloé Hérité", "access_level": 20 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "default_branch": "develop",
+                "shared_with_groups": [
+                    { "group_id": 10, "group_full_path": "org/equipe" },
+                    { "group_id": 11, "group_full_path": "org/equipe/paiements" }
+                ]
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/10/members"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "bnoms", "name": "Bernard Noms", "access_level": 30 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/10/members"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/11/members"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "bnoms", "name": "Bernard Noms", "access_level": 30 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/11/members"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_membres(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        let mdurand = resultat
+            .membres
+            .iter()
+            .find(|membre| membre.username == "mdurand")
+            .ok_or(ErreurConnecteur::ReponseInattendue {
+                message: "mdurand attendu".to_string(),
+            })?;
+        assert!(mdurand.direct);
+        assert!(mdurand.groupes_invites.is_empty());
+
+        let bnoms = resultat
+            .membres
+            .iter()
+            .find(|membre| membre.username == "bnoms")
+            .ok_or(ErreurConnecteur::ReponseInattendue {
+                message: "bnoms attendu".to_string(),
+            })?;
+        assert!(!bnoms.direct);
+        assert_eq!(
+            bnoms.groupes_invites,
+            vec!["org/equipe/paiements".to_string(), "org/equipe".to_string()]
+        );
+
+        let cherite = resultat
+            .membres
+            .iter()
+            .find(|membre| membre.username == "cherite")
+            .ok_or(ErreurConnecteur::ReponseInattendue {
+                message: "cherite attendu".to_string(),
+            })?;
+        assert!(!cherite.direct);
+        assert!(cherite.groupes_invites.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_membres_absorbe_silencieusement_une_anomalie_de_ventilation_us017()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        // US-017 : `GET /projects/1234` renvoie 403 (droits insuffisants sur le détail du projet) — l'interrogation
+        // des membres du dépôt aboutit malgré tout, tous les membres non directs retombant en « hérités ».
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits/develop"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "8c1d0e44",
+                "committed_date": "2026-06-05T10:00:00Z"
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "username": "bnoms", "name": "Bernard Noms", "access_level": 30 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/members/all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(serde_json::json!({
+                "message": "403 Forbidden"
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_membres(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        let bnoms = resultat
+            .membres
+            .iter()
+            .find(|membre| membre.username == "bnoms")
+            .ok_or(ErreurConnecteur::ReponseInattendue {
+                message: "bnoms attendu".to_string(),
+            })?;
+        assert!(!bnoms.direct);
+        assert!(bnoms.groupes_invites.is_empty());
         Ok(())
     }
 
@@ -4372,6 +4785,85 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn interroger_dependances_porte_le_chemin_reel_du_module_et_resout_via_le_parent_racine()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::path_regex;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        monter_mock_arborescence(
+            &serveur,
+            serde_json::json!([
+                { "path": "pom.xml", "type": "blob" },
+                { "path": "back/service-a/pom.xml", "type": "blob" }
+            ]),
+        )
+        .await;
+
+        // Racine à la racine du dépôt : porte la property et le `<dependencyManagement>`.
+        let racine = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>racine</artifactId>
+            <version>1.0.0</version>
+            <properties><guava.version>33.0.0-jre</guava.version></properties>
+        </project>"#;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/files/pom.xml/raw"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(racine))
+            .mount(&serveur)
+            .await;
+
+        // Module deux niveaux plus bas, sans `<relativePath>` : rattaché à la racine par coordonnées.
+        let module = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>racine</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <artifactId>service-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>${guava.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+        Mock::given(method("GET"))
+            .and(path_regex(
+                r"/api/v4/projects/1234/repository/files/back.*service-a.*pom\.xml/raw",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_string(module))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        // Property de la racine substituée malgré l'absence de `<relativePath>` et la profondeur du module ;
+        // `manifeste` porte le chemin réel du module, pas le littéral « pom.xml ».
+        assert!(
+            resultat
+                .dependances
+                .iter()
+                .any(|d| d.reference == "com.google.guava:guava"
+                    && d.version == "33.0.0-jre"
+                    && d.manifeste == "back/service-a/pom.xml"),
+            "guava du module doit remonter résolue et avec son chemin réel : {:?}",
+            resultat.dependances
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn interroger_dependances_sans_manifeste_nest_pas_une_anomalie()
     -> Result<(), ErreurConnecteur> {
         let serveur = MockServer::start().await;
@@ -4493,7 +4985,7 @@ mod tests {
         </project>"#;
 
         let brut = parser_pom_xml_brut(pom);
-        let dependances = resoudre_dependances_pom(&brut, &[]);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(
@@ -4511,7 +5003,7 @@ mod tests {
         let pom = r#"<project><dependencies><dependency><groupId>a</groupId><artifactId>b</artifactId><version>1</version></dependency><dependency><groupId>c</groupId>"#;
 
         let brut = parser_pom_xml_brut(pom);
-        let dependances = resoudre_dependances_pom(&brut, &[]);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].reference, "a:b");
@@ -4533,7 +5025,7 @@ mod tests {
         </project>"#;
 
         let brut = parser_pom_xml_brut(pom);
-        let dependances = resoudre_dependances_pom(&brut, &[]);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "5.3.12");
@@ -4570,8 +5062,8 @@ mod tests {
         poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
         poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
 
-        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
-        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine, "module-a/pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "5.3.12");
@@ -4598,9 +5090,9 @@ mod tests {
         let mut poms_bruts = HashMap::new();
         poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
 
-        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
         assert!(chaine.is_empty());
-        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine, "module-a/pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "${spring.version}");
@@ -4624,7 +5116,22 @@ mod tests {
             .map(|(chemin, contenu)| ((*chemin).to_string(), parser_pom_xml_brut(contenu)))
             .collect();
         let map: HashMap<String, PomBrut> = ordonnes.iter().cloned().collect();
-        extraire_version_java(&ordonnes, &map)
+        let index = indexer_poms_par_coordonnees(&ordonnes);
+        extraire_version_java(&ordonnes, &map, &index)
+    }
+
+    /// Aide de test : chaîne de parents d'un `pom.xml`, l'index de coordonnées étant dérivé de `poms_bruts`
+    /// (l'ordre n'importe pas pour ces tests).
+    fn chaine_parents_de<'a>(
+        chemin: &str,
+        poms_bruts: &'a HashMap<String, PomBrut>,
+    ) -> Vec<&'a PomBrut> {
+        let ordonnes: Vec<(String, PomBrut)> = poms_bruts
+            .iter()
+            .map(|(chemin, pom)| (chemin.clone(), pom.clone()))
+            .collect();
+        let index = indexer_poms_par_coordonnees(&ordonnes);
+        construire_chaine_parents(chemin, poms_bruts, &index)
     }
 
     #[test]
@@ -4728,8 +5235,8 @@ mod tests {
         poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
         poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
 
-        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
-        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine, "module-a/pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "5.3.12");
@@ -4768,7 +5275,7 @@ mod tests {
 
         let parent_brut = parser_pom_xml_brut(parent);
         let enfant = parser_pom_xml_brut(enfant_brut);
-        let dependances = resoudre_dependances_pom(&enfant, &[&parent_brut]);
+        let dependances = resoudre_dependances_pom(&enfant, &[&parent_brut], "module-a/pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "5.3.20");
@@ -4797,7 +5304,7 @@ mod tests {
         poms_bruts.insert("a/pom.xml".to_string(), parser_pom_xml_brut(pom_a));
         poms_bruts.insert("b/pom.xml".to_string(), parser_pom_xml_brut(pom_b));
 
-        let chaine = construire_chaine_parents("a/pom.xml", &poms_bruts);
+        let chaine = chaine_parents_de("a/pom.xml", &poms_bruts);
 
         assert_eq!(chaine.len(), 1);
     }
@@ -4827,7 +5334,7 @@ mod tests {
         }
 
         let chemin_depart = format!("niveau-{}/pom.xml", PROFONDEUR_MAX_CHAINE_PARENTS + 4);
-        let chaine = construire_chaine_parents(&chemin_depart, &poms_bruts);
+        let chaine = chaine_parents_de(&chemin_depart, &poms_bruts);
 
         assert_eq!(chaine.len(), PROFONDEUR_MAX_CHAINE_PARENTS);
     }
@@ -4875,15 +5382,119 @@ mod tests {
         poms_bruts.insert("module-a/pom.xml".to_string(), module_a_brut.clone());
         poms_bruts.insert("module-b/pom.xml".to_string(), module_b_brut.clone());
 
-        let chaine_a = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
-        let dependances_a = resoudre_dependances_pom(&module_a_brut, &chaine_a);
-        let chaine_b = construire_chaine_parents("module-b/pom.xml", &poms_bruts);
-        let dependances_b = resoudre_dependances_pom(&module_b_brut, &chaine_b);
+        let chaine_a = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        let dependances_a = resoudre_dependances_pom(&module_a_brut, &chaine_a, "module-a/pom.xml");
+        let chaine_b = chaine_parents_de("module-b/pom.xml", &poms_bruts);
+        let dependances_b = resoudre_dependances_pom(&module_b_brut, &chaine_b, "module-b/pom.xml");
 
         assert_eq!(dependances_a.len(), 1);
         assert_eq!(dependances_a[0].version, "5.3.12");
         assert_eq!(dependances_b.len(), 1);
         assert_eq!(dependances_b[0].version, "5.3.12");
+    }
+
+    #[test]
+    fn construire_chaine_parents_rattache_par_coordonnees_quand_le_relative_path_par_defaut_ne_mene_nulle_part()
+     {
+        // Module deux niveaux sous la racine, sans `<relativePath>` : le défaut Maven `../pom.xml` résout vers
+        // `apps/pom.xml`, absent du dépôt. Le rattachement par coordonnées `<parent>` retrouve quand même la racine,
+        // ce que la résolution purement par chemin ne faisait pas.
+        let racine = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>racine</artifactId>
+            <version>1.0.0</version>
+            <properties><spring.version>6.1.0</spring.version></properties>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-tx</artifactId>
+                        <version>${spring.version}</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+        </project>"#;
+        let module = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>racine</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <artifactId>service-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-core</artifactId>
+                    <version>${spring.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-tx</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let module_brut = parser_pom_xml_brut(module);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(racine));
+        poms_bruts.insert("apps/service-a/pom.xml".to_string(), module_brut.clone());
+
+        let chaine = chaine_parents_de("apps/service-a/pom.xml", &poms_bruts);
+        assert_eq!(chaine.len(), 1);
+        let dependances = resoudre_dependances_pom(&module_brut, &chaine, "apps/service-a/pom.xml");
+
+        // `${spring.version}` substituée depuis les properties de la racine...
+        assert!(
+            dependances
+                .iter()
+                .any(|d| d.reference == "org.springframework:spring-core" && d.version == "6.1.0")
+        );
+        // ...et version héritée du `<dependencyManagement>` de la racine pour la dépendance sans `<version>`.
+        assert!(
+            dependances
+                .iter()
+                .any(|d| d.reference == "org.springframework:spring-tx" && d.version == "6.1.0")
+        );
+        // Chemin réel du module porté par `manifeste`.
+        assert!(
+            dependances
+                .iter()
+                .all(|d| d.manifeste == "apps/service-a/pom.xml")
+        );
+    }
+
+    #[test]
+    fn construire_chaine_parents_retombe_sur_le_relative_path_quand_les_coordonnees_sont_inconnues()
+    {
+        // Parent sans identité explicite (agrégateur minimal) : absent de l'index de coordonnées, il reste
+        // atteignable par le `<relativePath>` par défaut — le repli est conservé.
+        let parent = r#"<project>
+            <properties><lib.version>2.0</lib.version></properties>
+        </project>"#;
+        let enfant = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <dependencies>
+                <dependency>
+                    <groupId>com.acme</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>${lib.version}</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let enfant_brut = parser_pom_xml_brut(enfant);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
+        poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
+
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        assert_eq!(chaine.len(), 1);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine, "module-a/pom.xml");
+        assert_eq!(dependances[0].version, "2.0");
     }
 
     #[test]
@@ -4914,8 +5525,8 @@ mod tests {
         poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(parent));
         poms_bruts.insert("module-a/pom.xml".to_string(), enfant_brut.clone());
 
-        let chaine = construire_chaine_parents("module-a/pom.xml", &poms_bruts);
-        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine);
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&enfant_brut, &chaine, "module-a/pom.xml");
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "3.2.1");
@@ -4956,7 +5567,7 @@ mod tests {
             "devDependencies": { "jest": "29.0.0" }
         }"#;
 
-        let dependances = parser_package_json(contenu);
+        let dependances = parser_package_json(contenu, "package.json");
 
         assert_eq!(dependances.len(), 2);
         assert!(
@@ -4969,19 +5580,19 @@ mod tests {
 
     #[test]
     fn parser_package_json_malforme_retourne_une_liste_vide() {
-        assert!(parser_package_json("pas du json").is_empty());
+        assert!(parser_package_json("pas du json", "package.json").is_empty());
     }
 
     #[test]
     fn parser_package_json_sans_cle_dependencies_retourne_une_liste_vide() {
-        assert!(parser_package_json(r#"{ "name": "app" }"#).is_empty());
+        assert!(parser_package_json(r#"{ "name": "app" }"#, "package.json").is_empty());
     }
 
     #[test]
     fn parser_build_gradle_reconnait_les_formes_courtes_avec_et_sans_parentheses() {
         let contenu = "dependencies {\n    implementation 'com.squareup.retrofit2:retrofit:2.11.0'\n    testImplementation(\"junit:junit:4.13.2\")\n    implementation group: 'org.other', name: 'thing', version: '1.0'\n}\n";
 
-        let dependances = parser_build_gradle(contenu);
+        let dependances = parser_build_gradle(contenu, "build.gradle");
 
         assert_eq!(dependances.len(), 2);
         assert!(
@@ -4999,6 +5610,6 @@ mod tests {
 
     #[test]
     fn parser_build_gradle_sans_declaration_reconnue_retourne_une_liste_vide() {
-        assert!(parser_build_gradle("// rien à voir ici\n").is_empty());
+        assert!(parser_build_gradle("// rien à voir ici\n", "build.gradle").is_empty());
     }
 }

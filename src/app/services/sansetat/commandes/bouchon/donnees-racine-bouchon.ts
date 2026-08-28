@@ -363,9 +363,27 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'develop',
                   shaTete: '8c1d0e44',
                   membres: [
-                    { username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: false },
-                    { username: 'jpetit', nom: 'Julien Petit', niveauAcces: 30, herite: false },
-                    { username: 'alopez-ext', nom: 'Ana Lopez', niveauAcces: 30, herite: true },
+                    {
+                      username: 'mdurand',
+                      nom: 'Marie Durand',
+                      niveauAcces: 40,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'jpetit',
+                      nom: 'Julien Petit',
+                      niveauAcces: 30,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'alopez-ext',
+                      nom: 'Ana Lopez',
+                      niveauAcces: 30,
+                      direct: false,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -515,9 +533,27 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'develop',
                   shaTete: '3fa2b91c',
                   membres: [
-                    { username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: false },
-                    { username: 'jpetit', nom: 'Julien Petit', niveauAcces: 30, herite: false },
-                    { username: 'alopez-ext', nom: 'Ana Lopez', niveauAcces: 30, herite: true },
+                    {
+                      username: 'mdurand',
+                      nom: 'Marie Durand',
+                      niveauAcces: 40,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'jpetit',
+                      nom: 'Julien Petit',
+                      niveauAcces: 30,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'alopez-ext',
+                      nom: 'Ana Lopez',
+                      niveauAcces: 30,
+                      direct: false,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -672,7 +708,13 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'main',
                   shaTete: '77aa19d0',
                   membres: [
-                    { username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: true },
+                    {
+                      username: 'mdurand',
+                      nom: 'Marie Durand',
+                      niveauAcces: 40,
+                      direct: false,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -812,7 +854,13 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'master',
                   shaTete: 'b2c3d4e5',
                   membres: [
-                    { username: 'jpetit', nom: 'Julien Petit', niveauAcces: 40, herite: true },
+                    {
+                      username: 'jpetit',
+                      nom: 'Julien Petit',
+                      niveauAcces: 40,
+                      direct: false,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -995,8 +1043,20 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'develop',
                   shaTete: '9e8f7a6b',
                   membres: [
-                    { username: 'smartin', nom: 'Sofia Martin', niveauAcces: 40, herite: false },
-                    { username: 'kbenali', nom: 'Karim Benali', niveauAcces: 30, herite: false },
+                    {
+                      username: 'smartin',
+                      nom: 'Sofia Martin',
+                      niveauAcces: 40,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'kbenali',
+                      nom: 'Karim Benali',
+                      niveauAcces: 30,
+                      direct: true,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -1113,8 +1173,20 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'develop',
                   shaTete: '9e8f7a6b',
                   membres: [
-                    { username: 'smartin', nom: 'Sofia Martin', niveauAcces: 40, herite: false },
-                    { username: 'kbenali', nom: 'Karim Benali', niveauAcces: 30, herite: false },
+                    {
+                      username: 'smartin',
+                      nom: 'Sofia Martin',
+                      niveauAcces: 40,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'kbenali',
+                      nom: 'Karim Benali',
+                      niveauAcces: 30,
+                      direct: true,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -1254,8 +1326,20 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'main',
                   shaTete: 'c4d5e6f7',
                   membres: [
-                    { username: 'kbenali', nom: 'Karim Benali', niveauAcces: 40, herite: false },
-                    { username: 'dmx-dev', nom: 'dmx', niveauAcces: 40, herite: false },
+                    {
+                      username: 'kbenali',
+                      nom: 'Karim Benali',
+                      niveauAcces: 40,
+                      direct: true,
+                      groupesInvites: [],
+                    },
+                    {
+                      username: 'dmx-dev',
+                      nom: 'dmx',
+                      niveauAcces: 40,
+                      direct: true,
+                      groupesInvites: [],
+                    },
                   ],
                 },
                 {
@@ -1386,7 +1470,13 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   refEffective: 'main',
                   shaTete: 'd5e6f7a8',
                   membres: [
-                    { username: 'smartin', nom: 'Sofia Martin', niveauAcces: 50, herite: false },
+                    {
+                      username: 'smartin',
+                      nom: 'Sofia Martin',
+                      niveauAcces: 50,
+                      direct: true,
+                      groupesInvites: [],
+                    },
                   ],
                 },
               ],

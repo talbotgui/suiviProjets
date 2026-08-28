@@ -103,7 +103,15 @@ class DonneesDeTest {
           sourceId: 'source-1',
           refEffective: 'main',
           shaTete: 'abc123',
-          membres: [{ username: 'inconnu', nom: 'Inconnu', niveauAcces: 30, herite: false }],
+          membres: [
+            {
+              username: 'inconnu',
+              nom: 'Inconnu',
+              niveauAcces: 30,
+              direct: true,
+              groupesInvites: [],
+            },
+          ],
         },
       ],
     };

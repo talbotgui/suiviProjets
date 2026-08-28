@@ -3,10 +3,12 @@
 //
 // Champ de recherche riche transverse (C11-02, RG-036) : remplace le couple `<input>`+`<datalist>` HTML natif
 // (champ texte libre sans surlignage, sans message explicite d'absence de correspondance, cf. constat C11-02) par
-// une superposition de suggestions filtrées, avec surlignage du texte recherché, message explicite en l'absence de
-// correspondance et navigation complète au clavier (flèches, Entrée, Échap), sur le modèle du motif ARIA
-// « combobox » et du pattern déjà en place dans `composants/recherche-transversale/`. Premier usage :
-// `composants/formulaire-source/` (identifiant externe d'une source), conçu pour rester réutilisable au-delà.
+// une superposition de suggestions filtrées, avec surlignage du texte recherché, message explicite quand aucune
+// suggestion n'est affichée — distinguant recherche en cours, erreur de chargement et absence réelle de
+// correspondance via {@link etatRecherche}, piloté par l'appelant — et navigation complète au clavier (flèches,
+// Entrée, Échap), sur le modèle du motif ARIA « combobox » et du pattern déjà en place dans
+// `composants/recherche-transversale/`. Premier usage : `composants/formulaire-source/` (identifiant externe d'une
+// source), conçu pour rester réutilisable au-delà.
 //
 // État porté par des signals plutôt que des propriétés simples (R11-07, application zoneless) : toute mutation doit
 // déclencher un nouveau rendu, y compris depuis un gestionnaire clavier ou souris.
@@ -33,6 +35,13 @@ export interface OptionRechercheRiche {
   /** Libellé affiché dans la liste de suggestions. */
   readonly libelle: string;
 }
+
+/**
+ * État de la recherche asynchrone alimentant les suggestions du champ, piloté par le composant appelant (C11-02) :
+ * `'inactif'` (aucune recherche en cours, message d'absence de correspondance historique), `'enCours'` (recherche
+ * serveur débouncée en cours, cf. `SqmFormulaireSourceComponent`) ou `'erreur'` (dernière recherche en échec).
+ */
+export type EtatRechercheRiche = 'inactif' | 'enCours' | 'erreur';
 
 /**
  * Segmentation du libellé d'une suggestion autour de la portion correspondant au terme recherché, pour un
@@ -89,6 +98,21 @@ export class SqmChampRechercheRicheComponent {
    * Valeur actuellement saisie, contrôlée par le composant appelant.
    */
   public readonly valeur: InputSignal<string> = input.required<string>();
+
+  /**
+   * État de la recherche asynchrone alimentant {@link options}, piloté par le composant appelant : conditionne le
+   * message affiché lorsque la liste de suggestions est vide (« Recherche en cours… », « Erreur de chargement… »
+   * ou message d'absence de correspondance historique). `'inactif'` par défaut (aucune recherche asynchrone).
+   */
+  public readonly etatRecherche: InputSignal<EtatRechercheRiche> =
+    input<EtatRechercheRiche>('inactif');
+
+  /**
+   * Nom des entités recherchées, inséré dans le message d'erreur affiché quand {@link etatRecherche} vaut
+   * `'erreur'` (« Erreur de chargement de la liste des <libellé>… »). `'projets'` par défaut (dépôts GitLab ou
+   * projets Sonar de l'usage actuel), paramétrable pour les usages ultérieurs du composant.
+   */
+  public readonly libelleEntitesRecherchees: InputSignal<string> = input<string>('projets');
 
   /**
    * Texte indicatif affiché en l'absence de saisie.

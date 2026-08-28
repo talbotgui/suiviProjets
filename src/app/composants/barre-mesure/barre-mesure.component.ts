@@ -3,9 +3,11 @@
 //
 // Composant transverse « Barre de mesure » de l'écran Obsolescence (US-051) : une ligne compacte associant un sigle
 // de trois lettres, une barre horizontale sur rail sombre dont la longueur encode la valeur, et la valeur numérique
-// alignée à droite. La valeur numérique est TOUJOURS affichée (jamais la seule longueur/teinte porteuse de sens,
-// RNF-020) ; une valeur absente est rendue par un tiret et une barre vide. N'effectue aucun calcul d'indicateur :
-// la valeur, son maximum et la teinte lui sont fournis tels quels par l'écran appelant.
+// alignée à droite. Quand une valeur est présente, elle est TOUJOURS affichée en clair (jamais la seule
+// longueur/teinte porteuse de sens, RNF-020). Quand la valeur est absente (`null`), seul le sigle est rendu — ni
+// barre, ni valeur — afin de rendre repérable, sur une tuile, une catégorie de dépendance sans dépendance concernée
+// pour le projet (RG-051, distinct du cas « à jour » où la valeur vaut `0` et la barre reste tracée). N'effectue
+// aucun calcul d'indicateur : la valeur, son maximum et la teinte lui sont fournis tels quels par l'écran appelant.
 import { Component, computed, input, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, Signal } from '@angular/core';
 
@@ -45,11 +47,10 @@ export class SqmBarreMesureComponent {
   });
 
   /**
-   * Texte de la valeur affichée à droite de la barre.
-   * @returns La valeur formatée, ou un tiret si elle est absente.
+   * Texte de la valeur affichée à droite de la barre. N'est rendu que lorsqu'une valeur est présente (le gabarit
+   * masque entièrement barre et valeur quand `valeur()` vaut `null`) ; le repli sur chaîne vide n'est donc qu'une
+   * sécurité de typage.
+   * @returns La valeur formatée.
    */
-  public readonly valeurAffichee: Signal<string> = computed(() => {
-    const valeur = this.valeur();
-    return valeur === null ? '—' : String(valeur);
-  });
+  public readonly valeurAffichee: Signal<string> = computed(() => String(this.valeur() ?? ''));
 }

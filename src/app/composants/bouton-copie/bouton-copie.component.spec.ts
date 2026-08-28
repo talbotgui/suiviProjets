@@ -29,6 +29,30 @@ describe('SqmBoutonCopieComponent', () => {
     expect(bouton?.textContent?.trim()).toBe('Copier');
   });
 
+  it('n’expose aucun attribut title par défaut et affiche le libellé « Copier »', () => {
+    const fixture = TestBed.createComponent(SqmBoutonCopieComponent);
+    fixture.componentRef.setInput('valeur', 'lodash');
+    fixture.componentRef.setInput('libelleAccessible', 'Copier la référence lodash');
+    fixture.detectChanges();
+
+    const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector('button');
+    expect(bouton?.hasAttribute('title')).toBe(false);
+    expect(bouton?.textContent?.trim()).toBe('Copier');
+  });
+
+  it('affiche le libellé visible et l’infobulle survolable fournis par l’appelant', () => {
+    const fixture = TestBed.createComponent(SqmBoutonCopieComponent);
+    fixture.componentRef.setInput('valeur', 'prompt');
+    fixture.componentRef.setInput('libelleAccessible', 'Copier un exemple de prompt IA');
+    fixture.componentRef.setInput('libelle', 'Copier un exemple de prompt IA');
+    fixture.componentRef.setInput('infobulle', 'cliquer pour copier un exemple de prompt');
+    fixture.detectChanges();
+
+    const bouton = DomTestUtils.obtenirElementNatif(fixture).querySelector('button');
+    expect(bouton?.textContent?.trim()).toBe('Copier un exemple de prompt IA');
+    expect(bouton?.getAttribute('title')).toBe('cliquer pour copier un exemple de prompt');
+  });
+
   it('copie la valeur fournie dans le presse-papiers au clic', async () => {
     const fixture = TestBed.createComponent(SqmBoutonCopieComponent);
     fixture.componentRef.setInput('valeur', 'lodash');

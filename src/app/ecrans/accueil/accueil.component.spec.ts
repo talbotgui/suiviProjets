@@ -51,7 +51,8 @@ class DonneesDeTest {
             username,
             nom: username,
             niveauAcces: 30,
-            herite: false,
+            direct: true,
+            groupesInvites: [],
           })),
         },
       ],
@@ -216,14 +217,30 @@ describe('SqmAccueilComponent', () => {
             sourceId: 'source-back',
             refEffective: 'main',
             shaTete: 'abc123',
-            membres: [{ username: 'inconnu1', nom: 'inconnu1', niveauAcces: 30, herite: false }],
+            membres: [
+              {
+                username: 'inconnu1',
+                nom: 'inconnu1',
+                niveauAcces: 30,
+                direct: true,
+                groupesInvites: [],
+              },
+            ],
           },
           {
             type: 'gitlab.membres',
             sourceId: 'source-front',
             refEffective: 'main',
             shaTete: 'def456',
-            membres: [{ username: 'inconnu1', nom: 'inconnu1', niveauAcces: 30, herite: false }],
+            membres: [
+              {
+                username: 'inconnu1',
+                nom: 'inconnu1',
+                niveauAcces: 30,
+                direct: true,
+                groupesInvites: [],
+              },
+            ],
           },
         ],
       };

@@ -70,7 +70,10 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page).toHaveURL(/\/fiche-projet\//);
   }
 
-  /** Crée un groupe (nom, description, deux instances GitLab/Sonar) depuis l'onglet Groupes déjà actif. */
+  /**
+   * Crée un groupe (nom, description, deux instances GitLab/Sonar) depuis l'onglet Groupes déjà actif.
+   * @param groupe - Données du groupe à créer (nom, description, instances GitLab et Sonar).
+   */
   async function creerGroupe(groupe: typeof GROUPE_A): Promise<void> {
     await page.locator('#groupes-admin-bouton-creer').click();
     await page.locator('#groupes-admin-champ-nom').fill(groupe.nom);
@@ -94,7 +97,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#groupes-admin-liste')).toContainText(groupe.nom);
   }
 
-  /** Crée un projet (nom, description) pour le groupe déjà sélectionné dans l'onglet Projets. */
+  /**
+   * Crée un projet (nom, description) pour le groupe déjà sélectionné dans l'onglet Projets.
+   * @param projet - Données du projet à créer.
+   * @param projet.nom - Nom du projet.
+   * @param projet.description - Description du projet.
+   */
   async function creerProjet(projet: {
     readonly nom: string;
     readonly description: string;
@@ -108,7 +116,13 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#projets-admin-liste')).toContainText(projet.nom);
   }
 
-  /** Crée une source (GitLab ou Sonar) pour le groupe/projet déjà sélectionnés dans l'onglet Sources. */
+  /**
+   * Crée une source (GitLab ou Sonar) pour le groupe/projet déjà sélectionnés dans l'onglet Sources.
+   * @param type - Type de source à créer (`depotGitlab` ou `projetSonar`).
+   * @param instanceNom - Nom de l'instance à sélectionner dans le formulaire.
+   * @param idExterne - Identifiant externe du dépôt GitLab ou du projet Sonar.
+   * @param refAuditee - Ref auditée à renseigner (dépôt GitLab uniquement) ; omise pour un projet Sonar.
+   */
   async function creerSource(
     type: 'depotGitlab' | 'projetSonar',
     instanceNom: string,
@@ -419,7 +433,7 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     const couverture = page.locator('#fiche-projet-couverture');
     await expect(couverture).toBeVisible();
     const texteCouverture = (await couverture.textContent()) ?? '';
-    const valeurCouverture = Number(texteCouverture.match(/[\d.,]+/)?.[0]?.replace(',', '.'));
+    const valeurCouverture = Number(/[\d.,]+/.exec(texteCouverture)?.[0]?.replace(',', '.'));
     if (!Number.isNaN(valeurCouverture)) {
       expect(valeurCouverture).toBeGreaterThanOrEqual(60 * 0.9);
       expect(valeurCouverture).toBeLessThanOrEqual(60 * 1.1);
@@ -438,6 +452,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await page.locator('#tableau-dense-ligne-0').click();
     await page.locator('#liste-travail-bouton-ouvrir-fiche-projet').click();
     await expect(page).toHaveURL(/\/fiche-projet\//);
+
+    // US-017 : les trois sections de membres de la Fiche projet sont repliées par défaut ; on les déplie toutes
+    // avant de chercher le lien « Qualifier ce membre » (sinon l'élément existe dans le DOM mais reste masqué).
+    for (const resume of await page.locator('.fiche-projet__section-membres-resume').all()) {
+      await resume.click();
+    }
 
     const lienQualifier = page.getByRole('link', { name: 'Qualifier ce membre' }).first();
     if (await lienQualifier.count()) {

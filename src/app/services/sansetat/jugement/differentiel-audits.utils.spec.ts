@@ -309,7 +309,13 @@ describe('DifferentielAuditsUtils', () => {
      * @returns Le résultat de test.
      */
     function resultatMembres(
-      membres: readonly { username: string; nom: string; niveauAcces: number; herite: boolean }[],
+      membres: readonly {
+        username: string;
+        nom: string;
+        niveauAcces: number;
+        direct: boolean;
+        groupesInvites: readonly string[];
+      }[],
     ): readonly ResultatDifferentielAudits[] {
       return [
         { type: 'gitlab.membres', sourceId: 's', refEffective: 'main', shaTete: 'a', membres },
@@ -319,7 +325,13 @@ describe('DifferentielAuditsUtils', () => {
     it('détecte un ajout de membre, avec son statut résolu côté audit le plus récent', () => {
       const resultatsAvant = resultatMembres([]);
       const resultatsApres = resultatMembres([
-        { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
+        {
+          username: 'jdupont',
+          nom: 'Jean Dupont',
+          niveauAcces: 30,
+          direct: true,
+          groupesInvites: [],
+        },
       ]);
       const differentiel = DifferentielAuditsUtils.calculerDifferentiel(
         resultatsAvant,
@@ -341,7 +353,13 @@ describe('DifferentielAuditsUtils', () => {
 
     it('détecte un retrait de membre, avec son statut résolu côté audit le plus ancien', () => {
       const resultatsAvant = resultatMembres([
-        { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
+        {
+          username: 'jdupont',
+          nom: 'Jean Dupont',
+          niveauAcces: 30,
+          direct: true,
+          groupesInvites: [],
+        },
       ]);
       const resultatsApres = resultatMembres([]);
       const differentiel = DifferentielAuditsUtils.calculerDifferentiel(
@@ -364,7 +382,13 @@ describe('DifferentielAuditsUtils', () => {
 
     it('détecte un changement de statut de rattachement (membre inconnu qualifié entre les deux audits)', () => {
       const resultatsAvant = resultatMembres([
-        { username: 'inconnu1', nom: 'Personne Inconnue', niveauAcces: 30, herite: false },
+        {
+          username: 'inconnu1',
+          nom: 'Personne Inconnue',
+          niveauAcces: 30,
+          direct: true,
+          groupesInvites: [],
+        },
       ]);
       const membresConnusApresQualification: readonly RegleMembreConnu<StatutTest>[] = [
         { critere: 'inconnu1', typeCritere: 'username', statut: 'interne' },
@@ -374,7 +398,13 @@ describe('DifferentielAuditsUtils', () => {
       // que d'un changement de la donnée constatée elle-même (ex. username), jamais de la qualification.
       // Ce test illustre plutôt le cas où le username change entre les deux constats.
       const resultatsApresUsernameChange = resultatMembres([
-        { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
+        {
+          username: 'jdupont',
+          nom: 'Jean Dupont',
+          niveauAcces: 30,
+          direct: true,
+          groupesInvites: [],
+        },
       ]);
       const differentiel = DifferentielAuditsUtils.calculerDifferentiel(
         resultatsAvant,
@@ -398,7 +428,13 @@ describe('DifferentielAuditsUtils', () => {
           { critere: '*@entreprise.fr', typeCritere: 'domaineEmail', statut: 'client' },
         ];
         const resultatsAvant = resultatMembres([
-          { username: 'jmartin', nom: 'Jean Martin', niveauAcces: 20, herite: false },
+          {
+            username: 'jmartin',
+            nom: 'Jean Martin',
+            niveauAcces: 20,
+            direct: true,
+            groupesInvites: [],
+          },
         ]);
         const resultatsApresAvecEmail: readonly ResultatDifferentielAudits[] = [
           {
@@ -411,7 +447,8 @@ describe('DifferentielAuditsUtils', () => {
                 username: 'jmartin',
                 nom: 'Jean Martin',
                 niveauAcces: 20,
-                herite: false,
+                direct: true,
+                groupesInvites: [],
                 emailPublic: 'jean.martin@entreprise.fr',
               },
             ],
@@ -437,7 +474,13 @@ describe('DifferentielAuditsUtils', () => {
     );
 
     it('n’inclut pas un membre dont le statut résolu reste identique aux deux bords', () => {
-      const membre = { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false };
+      const membre = {
+        username: 'jdupont',
+        nom: 'Jean Dupont',
+        niveauAcces: 30,
+        direct: true,
+        groupesInvites: [],
+      };
       const resultatsAvant = resultatMembres([membre]);
       const resultatsApres = resultatMembres([membre]);
       const differentiel = DifferentielAuditsUtils.calculerDifferentiel(
@@ -457,10 +500,10 @@ describe('DifferentielAuditsUtils', () => {
       // deux côtés, donc pas de changement de statut malgré des niveaux d'accès différents (le niveau d'accès
       // n'entre pas dans le calcul du statut de rattachement, RG-006 à RG-008).
       const resultatsAvant = resultatMembres([
-        { username: 'inconnu2', nom: 'X', niveauAcces: 10, herite: false },
+        { username: 'inconnu2', nom: 'X', niveauAcces: 10, direct: true, groupesInvites: [] },
       ]);
       const resultatsApres = resultatMembres([
-        { username: 'inconnu2', nom: 'X', niveauAcces: 40, herite: false },
+        { username: 'inconnu2', nom: 'X', niveauAcces: 40, direct: true, groupesInvites: [] },
       ]);
       const differentiel = DifferentielAuditsUtils.calculerDifferentiel(
         resultatsAvant,
@@ -586,7 +629,15 @@ describe('DifferentielAuditsUtils', () => {
         sourceId: 's',
         refEffective: 'main',
         shaTete: 'a',
-        membres: [{ username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false }],
+        membres: [
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+        ],
       },
       {
         type: 'gitlab.marqueurs_ia',
@@ -635,8 +686,20 @@ describe('DifferentielAuditsUtils', () => {
         refEffective: 'main',
         shaTete: 'b',
         membres: [
-          { username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30, herite: false },
-          { username: 'inconnu1', nom: 'Inconnu', niveauAcces: 40, herite: false },
+          {
+            username: 'jdupont',
+            nom: 'Jean Dupont',
+            niveauAcces: 30,
+            direct: true,
+            groupesInvites: [],
+          },
+          {
+            username: 'inconnu1',
+            nom: 'Inconnu',
+            niveauAcces: 40,
+            direct: true,
+            groupesInvites: [],
+          },
         ],
       },
       {

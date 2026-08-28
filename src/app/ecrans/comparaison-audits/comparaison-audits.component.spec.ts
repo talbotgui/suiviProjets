@@ -157,7 +157,7 @@ class DonneesDeTest {
           sourceId: 'source-gitlab',
           refEffective: 'develop',
           shaTete: 'abc',
-          membres: options.membres.map((m) => ({ ...m, herite: false })),
+          membres: options.membres.map((m) => ({ ...m, direct: true, groupesInvites: [] })),
         },
         {
           type: 'gitlab.marqueurs_ia',

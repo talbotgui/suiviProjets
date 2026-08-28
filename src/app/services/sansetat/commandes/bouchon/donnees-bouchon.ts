@@ -107,9 +107,27 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         },
       ],
       membres: [
-        { username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: false },
-        { username: 'jpetit', nom: 'Julien Petit', niveauAcces: 30, herite: false },
-        { username: 'alopez-ext', nom: 'Ana Lopez', niveauAcces: 30, herite: true },
+        {
+          username: 'mdurand',
+          nom: 'Marie Durand',
+          niveauAcces: 40,
+          direct: true,
+          groupesInvites: [],
+        },
+        {
+          username: 'jpetit',
+          nom: 'Julien Petit',
+          niveauAcces: 30,
+          direct: true,
+          groupesInvites: [],
+        },
+        {
+          username: 'alopez-ext',
+          nom: 'Ana Lopez',
+          niveauAcces: 30,
+          direct: false,
+          groupesInvites: [],
+        },
       ],
       marqueurs: [],
       dependances: [
@@ -145,7 +163,15 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         { email: 'marie.durand@entreprise.fr', nom: 'Marie Durand', nombreCommits: 55 },
       ],
       mrOuvertes: [],
-      membres: [{ username: 'mdurand', nom: 'Marie Durand', niveauAcces: 40, herite: true }],
+      membres: [
+        {
+          username: 'mdurand',
+          nom: 'Marie Durand',
+          niveauAcces: 40,
+          direct: false,
+          groupesInvites: [],
+        },
+      ],
       marqueurs: [],
       dependances: [
         { reference: 'java', version: '17', manifeste: 'pom.xml' },
@@ -177,7 +203,15 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
           webUrl: 'https://gitlab.entreprise.fr/legacy/referentiel-tiers/-/merge_requests/45',
         },
       ],
-      membres: [{ username: 'jpetit', nom: 'Julien Petit', niveauAcces: 40, herite: true }],
+      membres: [
+        {
+          username: 'jpetit',
+          nom: 'Julien Petit',
+          niveauAcces: 40,
+          direct: false,
+          groupesInvites: [],
+        },
+      ],
       marqueurs: [],
       dependances: [
         { reference: 'java', version: '8', manifeste: 'pom.xml' },
@@ -209,8 +243,20 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         },
       ],
       membres: [
-        { username: 'smartin', nom: 'Sofia Martin', niveauAcces: 40, herite: false },
-        { username: 'kbenali', nom: 'Karim Benali', niveauAcces: 30, herite: false },
+        {
+          username: 'smartin',
+          nom: 'Sofia Martin',
+          niveauAcces: 40,
+          direct: true,
+          groupesInvites: [],
+        },
+        {
+          username: 'kbenali',
+          nom: 'Karim Benali',
+          niveauAcces: 30,
+          direct: true,
+          groupesInvites: [],
+        },
       ],
       marqueurs: [
         { chemin: 'CLAUDE.md', nature: 'fichier', outil: 'claude' },
@@ -262,8 +308,14 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         },
       ],
       membres: [
-        { username: 'kbenali', nom: 'Karim Benali', niveauAcces: 40, herite: false },
-        { username: 'dmx-dev', nom: 'dmx', niveauAcces: 40, herite: false },
+        {
+          username: 'kbenali',
+          nom: 'Karim Benali',
+          niveauAcces: 40,
+          direct: true,
+          groupesInvites: [],
+        },
+        { username: 'dmx-dev', nom: 'dmx', niveauAcces: 40, direct: true, groupesInvites: [] },
       ],
       marqueurs: [{ chemin: '.cursorrules', nature: 'fichier', outil: 'cursor' }],
       dependances: [
@@ -285,7 +337,15 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         { email: 'sofia.martin@entreprise.fr', nom: 'Sofia Martin', nombreCommits: 12 },
       ],
       mrOuvertes: [],
-      membres: [{ username: 'smartin', nom: 'Sofia Martin', niveauAcces: 50, herite: false }],
+      membres: [
+        {
+          username: 'smartin',
+          nom: 'Sofia Martin',
+          niveauAcces: 50,
+          direct: true,
+          groupesInvites: [],
+        },
+      ],
       marqueurs: [],
       dependances: [
         {
@@ -400,15 +460,33 @@ export const CONSTAT_GITLAB_REPLI: ConstatGitlabBouchon = {
       username: 'mdurand-e2e',
       nom: 'Marie Durand E2E',
       niveauAcces: 40,
-      herite: false,
+      direct: true,
+      groupesInvites: [],
       emailPublic: 'mdurand@entreprise-e2e.fr',
     },
     {
       username: 'kbenali-e2e',
       nom: 'Karim Benali E2E',
       niveauAcces: 40,
-      herite: false,
+      direct: true,
+      groupesInvites: [],
       emailPublic: 'kbenali@externe-e2e.fr',
+    },
+    // US-017 : un membre issu d'un groupe invité au projet et un membre hérité de l'arborescence, pour que les
+    // trois sections repliables de la Fiche projet soient non vides pendant le test manuel et le parcours E2E.
+    {
+      username: 'ninvite-e2e',
+      nom: 'Noé Invité E2E',
+      niveauAcces: 30,
+      direct: false,
+      groupesInvites: ['e2e-alpha/equipe-transverse'],
+    },
+    {
+      username: 'hherite-e2e',
+      nom: 'Hana Héritée E2E',
+      niveauAcces: 20,
+      direct: false,
+      groupesInvites: [],
     },
   ],
   marqueurs: [],

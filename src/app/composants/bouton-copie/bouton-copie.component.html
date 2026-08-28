@@ -1,15 +1,17 @@
-<!-- Interpolation Angular systématique, jamais d'injection HTML dynamique ([innerHTML]) : `libelleAccessible()`
-     provient du composant appelant et peut inclure un identifiant technique externe (référence de dépendance),
-     toujours échappé (docs/02_documentation/15_normesSecurite.md). Confirmation visuelle explicite (US-042) reprise
-     du motif déjà retenu par `credentials.component.html` : texte visible, `role="status"`, `aria-live="polite"`. -->
+<!-- Interpolation Angular systématique, jamais d'injection HTML dynamique ([innerHTML]) : `libelleAccessible()`,
+     `libelle()` et `infobulle()` proviennent du composant appelant et peuvent inclure un identifiant technique
+     externe (référence de dépendance), toujours échappé (docs/02_documentation/15_normesSecurite.md). Confirmation
+     visuelle explicite (US-042) reprise du motif déjà retenu par `credentials.component.html` : texte visible,
+     `role="status"`, `aria-live="polite"`. -->
 <span class="bouton-copie d-inline-flex aligne-centre ecart-2">
   <button
     type="button"
     class="bouton bouton--discret"
     [attr.aria-label]="libelleAccessible()"
+    [attr.title]="infobulle() ?? null"
     (click)="copier()"
   >
-    Copier
+    {{ libelle() }}
   </button>
   @if (etat() === 'copie') {
     <span class="texte-sm texte-discret" role="status" aria-live="polite">Copié</span>

@@ -43,10 +43,21 @@
         </li>
       } @empty {
         <li class="champ-recherche-riche__vide" role="presentation">
-          @if (valeur().trim().length > 0) {
-            Aucun résultat pour « {{ valeur() }} ».
-          } @else {
-            Aucun résultat.
+          @switch (etatRecherche()) {
+            @case ('enCours') {
+              Recherche en cours pour « {{ valeur() }} »…
+            }
+            @case ('erreur') {
+              Erreur de chargement de la liste des {{ libelleEntitesRecherchees() }} correspondant à
+              votre recherche « {{ valeur() }} ».
+            }
+            @default {
+              @if (valeur().trim().length > 0) {
+                Aucun résultat pour « {{ valeur() }} ».
+              } @else {
+                Aucun résultat.
+              }
+            }
           }
         </li>
       }

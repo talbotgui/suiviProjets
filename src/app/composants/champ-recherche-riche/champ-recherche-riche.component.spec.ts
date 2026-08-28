@@ -79,6 +79,55 @@ describe('SqmChampRechercheRicheComponent', () => {
     expect(element.textContent).toContain('inexistant');
   });
 
+  it('affiche « Recherche en cours » quand etatRecherche vaut enCours', () => {
+    const fixture = TestBed.createComponent(SqmChampRechercheRicheComponent);
+    fixture.componentRef.setInput('id', 'champ-test');
+    fixture.componentRef.setInput('libelle', 'Identifiant externe');
+    fixture.componentRef.setInput('options', []);
+    fixture.componentRef.setInput('valeur', 'entreprise');
+    fixture.componentRef.setInput('etatRecherche', 'enCours');
+    fixture.detectChanges();
+    fixture.componentInstance.ouvrir();
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain('Recherche en cours pour');
+    expect(element.textContent).toContain('entreprise');
+    expect(element.textContent).not.toContain('Aucun résultat');
+  });
+
+  it('affiche un message d’erreur de chargement quand etatRecherche vaut erreur', () => {
+    const fixture = TestBed.createComponent(SqmChampRechercheRicheComponent);
+    fixture.componentRef.setInput('id', 'champ-test');
+    fixture.componentRef.setInput('libelle', 'Identifiant externe');
+    fixture.componentRef.setInput('options', []);
+    fixture.componentRef.setInput('valeur', 'entreprise');
+    fixture.componentRef.setInput('etatRecherche', 'erreur');
+    fixture.detectChanges();
+    fixture.componentInstance.ouvrir();
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain('Erreur de chargement de la liste des projets');
+    expect(element.textContent).toContain('entreprise');
+  });
+
+  it('insère le libellé d’entités personnalisé dans le message d’erreur', () => {
+    const fixture = TestBed.createComponent(SqmChampRechercheRicheComponent);
+    fixture.componentRef.setInput('id', 'champ-test');
+    fixture.componentRef.setInput('libelle', 'Identifiant externe');
+    fixture.componentRef.setInput('options', []);
+    fixture.componentRef.setInput('valeur', 'entreprise');
+    fixture.componentRef.setInput('etatRecherche', 'erreur');
+    fixture.componentRef.setInput('libelleEntitesRecherchees', 'dépôts');
+    fixture.detectChanges();
+    fixture.componentInstance.ouvrir();
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    expect(element.textContent).toContain('Erreur de chargement de la liste des dépôts');
+  });
+
   it('sélectionne une suggestion à la souris : émet valeurChange et referme la liste', () => {
     const fixture = TestBed.createComponent(SqmChampRechercheRicheComponent);
     fixture.componentRef.setInput('id', 'champ-test');

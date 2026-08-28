@@ -30,6 +30,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Params } from '@angular/router';
@@ -238,6 +239,80 @@ interface LigneMembre {
    */
   readonly critereParDefautQualification:
     { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
+  /** `true` si le membre est nominativement membre direct du dépôt (US-017, première section). */
+  readonly direct: boolean;
+  /**
+   * Chemins complets des groupes invités au projet dont ce membre relève (US-017, deuxième section), triés du plus
+   * précis vers la racine ; vide si le membre ne relève d'aucun groupe invité.
+   */
+  readonly groupesInvites: readonly string[];
+}
+
+/**
+ * Décompte des membres d'une section de la ventilation (US-017) portant un même statut de rattachement, affiché
+ * dans la barre de titre de la section repliable. Les statuts sans aucun membre ne produisent aucune entrée.
+ */
+interface DecompteStatutMembres {
+  /** Libellé du statut de rattachement (`interne`, `client`, `partenaire`, `inconnu`, `conflit de règles`). */
+  readonly label: string;
+  /** Couleur sémantique du statut, absente si non calculable (RG-022). */
+  readonly couleur?: Couleur;
+  /** Nombre de membres de la section portant ce statut (toujours strictement positif). */
+  readonly nombre: number;
+}
+
+/**
+ * Un groupe invité au projet et ses membres (US-017, deuxième section repliable) : le chemin complet du groupe est
+ * mentionné une seule fois, au-dessus de la liste de ses membres.
+ */
+interface GroupeInviteMembres {
+  /** Chemin complet du groupe invité (`group_full_path`). */
+  readonly cheminGroupe: string;
+  /** Membres du dépôt relevant de ce groupe invité, triés par nom (cf. {@link SqmFicheProjetComponent}). */
+  readonly membres: readonly LigneMembre[];
+}
+
+/**
+ * Section repliable de la ventilation des membres portant une liste plate (US-017, sections « directs » et
+ * « hérités de l'arborescence »).
+ */
+interface SectionMembresSimple {
+  /** Membres de la section, triés par nom. */
+  readonly membres: readonly LigneMembre[];
+  /** Nombre de membres distincts de la section (identique à `membres.length`, exposé pour la barre de titre). */
+  readonly total: number;
+  /** Décompte par statut affiché dans la barre de titre (statuts à zéro omis). */
+  readonly decompteParStatut: readonly DecompteStatutMembres[];
+}
+
+/**
+ * Section repliable de la ventilation des membres regroupant les membres par groupe invité (US-017, deuxième
+ * section).
+ */
+interface SectionMembresGroupes {
+  /** Groupes invités au projet et leurs membres, triés du chemin le plus précis vers la racine. */
+  readonly groupes: readonly GroupeInviteMembres[];
+  /**
+   * Nombre de membres **distincts** relevant d'au moins un groupe invité (un membre rattaché à deux groupes
+   * invités n'est compté qu'une fois ici, bien qu'il apparaisse sous chacun de ces groupes).
+   */
+  readonly total: number;
+  /** Décompte par statut affiché dans la barre de titre, sur l'ensemble distinct des membres (statuts à zéro omis). */
+  readonly decompteParStatut: readonly DecompteStatutMembres[];
+}
+
+/**
+ * Ventilation des membres du dépôt en trois sections repliables (US-017, colonne droite de la Fiche projet) :
+ * nominatifs directs, membres des groupes invités au projet, membres hérités de l'arborescence. Un même membre peut
+ * figurer dans plusieurs sections (ex. direct **et** membre d'un groupe invité).
+ */
+interface SectionsMembres {
+  /** Première section : membres nominatifs directs du dépôt. */
+  readonly directs: SectionMembresSimple;
+  /** Deuxième section : membres des groupes invités au projet, regroupés par groupe. */
+  readonly groupesInvites: SectionMembresGroupes;
+  /** Troisième section : membres hérités de l'arborescence du projet (ni directs, ni d'un groupe invité). */
+  readonly herites: SectionMembresSimple;
 }
 
 /**
@@ -333,8 +408,14 @@ interface DonneesFicheProjet {
   readonly mrResume: EtiquetteCouleur | undefined;
   /** Demandes de fusion ouvertes constatées, détaillées ligne par ligne. */
   readonly mrOuvertes: readonly LigneMr[];
-  /** Membres du dépôt constatés, avec leur statut de rattachement déjà résolu. */
+  /**
+   * Membres du dépôt constatés, liste à plat dédoublonnée par nom d'utilisateur (union de toutes les provenances),
+   * avec leur statut de rattachement déjà résolu — support des traitements transverses (badge « membre inconnu »,
+   * lien de saisie en masse, pré-remplissage de la modale).
+   */
   readonly membres: readonly LigneMembre[];
+  /** Ventilation des membres du dépôt en trois sections repliables (US-017). */
+  readonly sectionsMembres: SectionsMembres;
   /** Marqueurs d'outils IA détectés dans l'arborescence par le dernier audit intégré. */
   readonly marqueursIa: readonly Marqueur[];
   /** Annotations du projet (US-019, Phase 8), triées de la plus récente à la plus ancienne. */
@@ -381,6 +462,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
   imports: [
     RouterLink,
     FormsModule,
+    NgTemplateOutlet,
     SqmBadgeComponent,
     SqmBoutonCopieComponent,
     SqmExplicationJugementComponent,
@@ -638,8 +720,20 @@ export class SqmFicheProjetComponent {
     if (conteneur === undefined || etatCourant.type !== 'trouve') {
       return;
     }
-    const dataUrl = await toPng(conteneur);
-    this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
+    // US-017 : les trois sections de membres sont repliées par défaut mais doivent toujours apparaître dépliées
+    // dans l'export PNG (décision fonctionnelle validée par un humain). Dépliage impératif le temps de la capture,
+    // état de repli de chaque section restauré ensuite pour ne pas modifier ce que voit l'utilisateur à l'écran.
+    const sectionsMembres = [
+      ...conteneur.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-membres'),
+    ];
+    const replisInitiaux = sectionsMembres.map((section) => section.open);
+    sectionsMembres.forEach((section) => (section.open = true));
+    try {
+      const dataUrl = await toPng(conteneur);
+      this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
+    } finally {
+      sectionsMembres.forEach((section, index) => (section.open = replisInitiaux[index] ?? false));
+    }
   }
 
   /**
@@ -780,6 +874,7 @@ export class SqmFicheProjetComponent {
     const membres = themes.membres
       .map((membre) => this.construireLigneMembre(membre, groupe.membresConnus))
       .sort((a, b) => a.nom.localeCompare(b.nom));
+    const sectionsMembres = this.construireSectionsMembres(membres);
 
     const refAuditeeSource = projet.sources.find(
       (source) => source.type === TypeSource.DepotGitlab,
@@ -846,6 +941,7 @@ export class SqmFicheProjetComponent {
       mrResume: this.construireResumeMr(mrOuvertesToutesSources, seuilsMrOuvertes, maintenant),
       mrOuvertes: mrOuvertesToutesSources.map((mr) => this.construireLigneMr(mr, maintenant)),
       membres,
+      sectionsMembres,
       marqueursIa: themes.marqueursIa,
       annotations: [...projet.annotations].sort((a, b) => (a.date < b.date ? 1 : -1)),
       journal: this.filtrerJournalProjet(journal, projet.id),
@@ -1261,7 +1357,119 @@ export class SqmFicheProjetComponent {
         resolution.type === 'inconnu'
           ? this.calculerCritereParDefautQualification(membre)
           : undefined,
+      direct: membre.direct,
+      groupesInvites: membre.groupesInvites,
     };
+  }
+
+  /**
+   * Ventile les membres du dépôt (liste à plat déjà triée par nom, US-017) en trois sections repliables : membres
+   * nominatifs directs, membres des groupes invités au projet (regroupés par groupe, du chemin le plus précis vers
+   * la racine), membres hérités de l'arborescence (ni directs, ni rattachés à un groupe invité résolu). Un même
+   * membre peut relever de plusieurs sections (ex. direct **et** membre d'un groupe invité) : il est alors compté et
+   * affiché dans chacune.
+   * @param membres - Lignes d'affichage des membres du dépôt, dédoublonnées par nom d'utilisateur et triées par nom.
+   * @returns La ventilation en trois sections.
+   */
+  private construireSectionsMembres(membres: readonly LigneMembre[]): SectionsMembres {
+    const directs = membres.filter((membre) => membre.direct);
+
+    const cheminsGroupes = [...new Set(membres.flatMap((membre) => membre.groupesInvites))].sort(
+      (a, b) => SqmFicheProjetComponent.comparerCheminsGroupes(a, b),
+    );
+    const groupes: readonly GroupeInviteMembres[] = cheminsGroupes.map((chemin) => ({
+      cheminGroupe: chemin,
+      membres: membres.filter((membre) => membre.groupesInvites.includes(chemin)),
+    }));
+    const membresInvitesDistincts = membres.filter((membre) => membre.groupesInvites.length > 0);
+
+    const herites = membres.filter(
+      (membre) => !membre.direct && membre.groupesInvites.length === 0,
+    );
+
+    return {
+      directs: {
+        membres: directs,
+        total: directs.length,
+        decompteParStatut: this.construireDecompteStatutMembres(directs),
+      },
+      groupesInvites: {
+        groupes,
+        total: membresInvitesDistincts.length,
+        decompteParStatut: this.construireDecompteStatutMembres(membresInvitesDistincts),
+      },
+      herites: {
+        membres: herites,
+        total: herites.length,
+        decompteParStatut: this.construireDecompteStatutMembres(herites),
+      },
+    };
+  }
+
+  /**
+   * Ordre d'affichage canonique des statuts de rattachement dans les décomptes de barre de titre (US-017), aligné
+   * sur l'ordre de résolution des règles de membres connus (RG-006 à RG-009) : internes d'abord, cas d'alerte
+   * (`inconnu`, `conflit de règles`) en fin.
+   */
+  private static readonly ORDRE_STATUTS_DECOMPTE: readonly string[] = [
+    'interne',
+    'client',
+    'partenaire',
+    'inconnu',
+    'conflit de règles',
+  ];
+
+  /**
+   * Construit le décompte des membres d'une section par statut de rattachement (US-017), pour affichage dans la
+   * barre de titre de la section repliable. Les statuts sans aucun membre ne produisent aucune entrée ; les entrées
+   * sont ordonnées selon {@link ORDRE_STATUTS_DECOMPTE}.
+   * @param membres - Membres de la section.
+   * @returns Le décompte par statut, statuts à zéro omis.
+   */
+  private construireDecompteStatutMembres(
+    membres: readonly LigneMembre[],
+  ): readonly DecompteStatutMembres[] {
+    const parLabel = new Map<string, DecompteStatutMembres>();
+    for (const membre of membres) {
+      const existant = parLabel.get(membre.statut.label);
+      if (existant === undefined) {
+        parLabel.set(membre.statut.label, {
+          label: membre.statut.label,
+          couleur: membre.statut.couleur,
+          nombre: 1,
+        });
+      } else {
+        parLabel.set(membre.statut.label, { ...existant, nombre: existant.nombre + 1 });
+      }
+    }
+    return [...parLabel.values()].sort(
+      (a, b) =>
+        SqmFicheProjetComponent.rangStatutDecompte(a.label) -
+        SqmFicheProjetComponent.rangStatutDecompte(b.label),
+    );
+  }
+
+  /**
+   * Rang d'un libellé de statut dans {@link ORDRE_STATUTS_DECOMPTE} ; un libellé absent de la liste (jamais attendu)
+   * est trié en fin plutôt que de faire échouer le tri.
+   * @param label - Libellé de statut à classer.
+   * @returns Le rang de tri.
+   */
+  private static rangStatutDecompte(label: string): number {
+    const rang = SqmFicheProjetComponent.ORDRE_STATUTS_DECOMPTE.indexOf(label);
+    return rang === -1 ? SqmFicheProjetComponent.ORDRE_STATUTS_DECOMPTE.length : rang;
+  }
+
+  /**
+   * Compare deux chemins complets de groupe invité pour un tri du plus précis (le plus de segments) vers la racine,
+   * avec départage alphabétique à profondeur égale (US-017).
+   * @param a - Premier chemin complet.
+   * @param b - Second chemin complet.
+   * @returns Un ordre négatif, nul ou positif au sens de `Array.prototype.sort`.
+   */
+  private static comparerCheminsGroupes(a: string, b: string): number {
+    const profondeur = b.split('/').length - a.split('/').length;
+    return profondeur !== 0 ? profondeur : a.localeCompare(b);
   }
 
   /**
@@ -1349,6 +1557,14 @@ export class SqmFicheProjetComponent {
    * Visibilité de la modale de saisie en masse de règles de dépendances.
    */
   public readonly modaleSaisieMasseDependancesVisible: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Exemple de prompt IA proposé à la copie par le bouton d'aide de la modale de saisie en masse de règles de
+   * dépendances (US-043), décrivant la grammaire réellement acceptée par {@link SaisieMasseDependancesUtils}. Simple
+   * réexposition de la constante du module de jugement pour la liaison de gabarit.
+   */
+  public readonly exemplePromptSaisieMasseDependances: string =
+    SaisieMasseDependancesUtils.EXEMPLE_PROMPT_IA;
 
   /**
    * Ouvre la modale de saisie en masse de règles de dépendances.

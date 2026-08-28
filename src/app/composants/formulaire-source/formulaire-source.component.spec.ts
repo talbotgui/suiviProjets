@@ -439,7 +439,39 @@ describe('SqmFormulaireSourceComponent', () => {
       jest.useRealTimers();
     });
 
-    it("n'invoque qu'un seul appel quand le terme recherché est inchangé (distinctUntilChanged)", async () => {
+    it('collapse une rafale de frappe en un seul appel réseau pour le dernier terme (debounce + switchMap)', async () => {
+      jest.useFakeTimers();
+      const facade = TestBed.inject(FacadeCommandesService);
+      const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'succes',
+        sourcesDisponibles: [{ idExterne: '1234', libelle: 'entreprise/api-facturation' }],
+      });
+
+      const fixture = TestBed.createComponent(SqmFormulaireSourceComponent);
+      fixture.componentRef.setInput('groupeId', groupeId);
+      fixture.componentRef.setInput('projetId', projetId);
+      const composant = fixture.componentInstance;
+      composant.selectionnerInstance('instance-gitlab');
+
+      composant.modifierIdExterne('e');
+      composant.modifierIdExterne('ent');
+      composant.modifierIdExterne('entreprise');
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(lister).toHaveBeenCalledTimes(1);
+      expect(lister).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'instance-gitlab' }),
+        'entreprise',
+      );
+      expect(composant.sourcesDisponibles()).toEqual([
+        { idExterne: '1234', libelle: 'entreprise/api-facturation' },
+      ]);
+      jest.useRealTimers();
+    });
+
+    it('relance une recherche quand la saisie revient à un terme déjà recherché (pas de distinctUntilChanged)', async () => {
       jest.useFakeTimers();
       const facade = TestBed.inject(FacadeCommandesService);
       const lister = jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
@@ -457,12 +489,15 @@ describe('SqmFormulaireSourceComponent', () => {
       jest.advanceTimersByTime(300);
       await Promise.resolve();
       await Promise.resolve();
-      composant.rechercherSourceExterne();
+
+      composant.modifierIdExterne('entreprise-api');
+      composant.modifierIdExterne('entreprise');
       jest.advanceTimersByTime(300);
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(lister).toHaveBeenCalledTimes(1);
+      expect(lister).toHaveBeenCalledTimes(2);
+      expect(composant.etatRechercheSource()).toBe('inactif');
       expect(composant.sourcesDisponibles()).toEqual([
         { idExterne: '1234', libelle: 'entreprise/api-facturation' },
       ]);
@@ -493,7 +528,92 @@ describe('SqmFormulaireSourceComponent', () => {
 
       expect(composant.credentialAbsent()).toBe(true);
       expect(composant.sourcesDisponibles()).toEqual([]);
+      expect(composant.etatRechercheSource()).toBe('inactif');
       jest.useRealTimers();
+    });
+
+    it('passe à « recherche en cours » dès la frappe puis revient à « inactif » au succès', async () => {
+      jest.useFakeTimers();
+      const facade = TestBed.inject(FacadeCommandesService);
+      jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'succes',
+        sourcesDisponibles: [{ idExterne: '1234', libelle: 'entreprise/api-facturation' }],
+      });
+
+      const fixture = TestBed.createComponent(SqmFormulaireSourceComponent);
+      fixture.componentRef.setInput('groupeId', groupeId);
+      fixture.componentRef.setInput('projetId', projetId);
+      const composant = fixture.componentInstance;
+      composant.selectionnerInstance('instance-gitlab');
+
+      composant.modifierIdExterne('entreprise');
+      expect(composant.etatRechercheSource()).toBe('enCours');
+      expect(composant.sourcesDisponibles()).toEqual([]);
+
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(composant.etatRechercheSource()).toBe('inactif');
+      jest.useRealTimers();
+    });
+
+    it('bascule en « erreur » quand l’appel de recherche échoue (rejet de la promesse)', async () => {
+      jest.useFakeTimers();
+      const facade = TestBed.inject(FacadeCommandesService);
+      jest
+        .spyOn(facade, 'listerSourcesDisponibles')
+        .mockRejectedValue(new Error('instance injoignable'));
+
+      const fixture = TestBed.createComponent(SqmFormulaireSourceComponent);
+      fixture.componentRef.setInput('groupeId', groupeId);
+      fixture.componentRef.setInput('projetId', projetId);
+      const composant = fixture.componentInstance;
+      composant.selectionnerInstance('instance-gitlab');
+
+      composant.modifierIdExterne('entreprise');
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(composant.etatRechercheSource()).toBe('erreur');
+      expect(composant.sourcesDisponibles()).toEqual([]);
+      jest.useRealTimers();
+    });
+
+    it('bascule en « erreur » sur un échec typé autre que credentialAbsent (droits insuffisants)', async () => {
+      jest.useFakeTimers();
+      const facade = TestBed.inject(FacadeCommandesService);
+      jest.spyOn(facade, 'listerSourcesDisponibles').mockResolvedValue({
+        type: 'echec',
+        anomalie: { type: 'droitsInsuffisants', message: 'HTTP 403' },
+      });
+
+      const fixture = TestBed.createComponent(SqmFormulaireSourceComponent);
+      fixture.componentRef.setInput('groupeId', groupeId);
+      fixture.componentRef.setInput('projetId', projetId);
+      const composant = fixture.componentInstance;
+      composant.selectionnerInstance('instance-gitlab');
+
+      composant.modifierIdExterne('entreprise');
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(composant.etatRechercheSource()).toBe('erreur');
+      expect(composant.credentialAbsent()).toBe(false);
+      jest.useRealTimers();
+    });
+
+    it('reste « inactif » tant qu’aucune instance n’est sélectionnée', () => {
+      const fixture = TestBed.createComponent(SqmFormulaireSourceComponent);
+      fixture.componentRef.setInput('groupeId', groupeId);
+      fixture.componentRef.setInput('projetId', projetId);
+      const composant = fixture.componentInstance;
+
+      composant.modifierIdExterne('entreprise');
+
+      expect(composant.etatRechercheSource()).toBe('inactif');
     });
 
     it('ne précharge plus la liste des sources disponibles à l’instanciation en mode édition (RG-036, évolution du 2026-08-25)', () => {

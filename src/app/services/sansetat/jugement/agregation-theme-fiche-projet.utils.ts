@@ -154,18 +154,21 @@ export class AgregationThemeFicheProjetUtils {
 
   /**
    * Fusionne les dépendances de toutes les sources GitLab d'un projet en une seule liste, sans doublon apparent :
-   * deux sources déclarant la même dépendance dans un manifeste de même nom (ex. `pom.xml` d'un dépôt back et d'un
-   * dépôt front) sont fusionnées en une seule ligne plutôt que montrées deux fois, cet écran ne portant aucune
+   * deux sources déclarant la même dépendance, dans le même chemin de manifeste et la même version (ex. `pom.xml`
+   * racine d'un dépôt back et d'un dépôt front), sont fusionnées en une seule ligne plutôt que montrées deux fois,
+   * cet écran ne portant aucune
    * colonne « source » permettant de les distinguer visuellement (corrige, avec {@link fusionnerMembres}/{@link
-   * fusionnerMarqueurs}, le doublon de clé de suivi R15-04 constaté à l'export PNG). La première occurrence
-   * rencontrée est conservée telle quelle en cas de désaccord de version entre sources.
+   * fusionnerMarqueurs}, le doublon de clé de suivi R15-04 constaté à l'export PNG). La version fait partie de la
+   * clé : deux modules d'un même dépôt (chemins de manifeste distincts désormais portés par le cœur natif, ex.
+   * `module-a/pom.xml`), ou deux sources déclarant la même dépendance en versions différentes, produisent deux
+   * lignes distinctes plutôt qu'un choix silencieux de l'une d'elles.
    * @param dependances - Dépendances de toutes les sources GitLab du projet, à plat.
-   * @returns Les dépendances fusionnées, sans doublon de couple référence/manifeste.
+   * @returns Les dépendances fusionnées, sans doublon de triplet référence/version/manifeste.
    */
   private static fusionnerDependances(dependances: readonly Dependance[]): readonly Dependance[] {
     const parCle = new Map<string, Dependance>();
     for (const dependance of dependances) {
-      const cle = `${dependance.reference} ${dependance.manifeste}`;
+      const cle = `${dependance.reference} ${dependance.version} ${dependance.manifeste}`;
       if (!parCle.has(cle)) {
         parCle.set(cle, dependance);
       }
@@ -175,8 +178,10 @@ export class AgregationThemeFicheProjetUtils {
 
   /**
    * Fusionne les membres de toutes les sources GitLab d'un projet en une seule liste : une même personne membre de
-   * plusieurs dépôts n'apparaît qu'une seule fois, avec le niveau d'accès le plus élevé constaté et `herite` à
-   * `true` seulement si elle n'est directement membre d'aucun des dépôts (cf. {@link fusionnerDependances}).
+   * plusieurs dépôts n'apparaît qu'une seule fois, avec le niveau d'accès le plus élevé constaté, `direct` à `true`
+   * dès qu'elle est membre direct d'au moins un des dépôts, et `groupesInvites` égal à l'union (sans doublon, ordre
+   * de première apparition) des groupes invités constatés sur chaque source (US-017, cf. {@link
+   * fusionnerDependances}).
    * @param membres - Membres de toutes les sources GitLab du projet, à plat.
    * @returns Les membres fusionnés, sans doublon de nom d'utilisateur.
    */
@@ -192,7 +197,10 @@ export class AgregationThemeFicheProjetUtils {
         username: membre.username,
         nom: existant.nom,
         niveauAcces: Math.max(existant.niveauAcces, membre.niveauAcces),
-        herite: existant.herite && membre.herite,
+        direct: existant.direct || membre.direct,
+        groupesInvites: [
+          ...new Set<string>([...existant.groupesInvites, ...membre.groupesInvites]),
+        ],
         emailPublic: existant.emailPublic ?? membre.emailPublic,
       });
     }

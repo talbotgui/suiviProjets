@@ -288,12 +288,19 @@ export type ResultatInterrogationMergeRequests =
 /**
  * Membre du dépôt GitLab (mirroir de `MembreGitlab` côté cœur natif), distinct des membres connus (RG-006 à
  * RG-008).
+ *
+ * US-017 : la Fiche projet ventile ces membres en trois sections — nominatifs directs, membres des groupes invités
+ * au projet, membres hérités de l'arborescence. `direct` distingue la première ; `groupesInvites` porte les chemins
+ * complets des groupes invités (`shared_with_groups`) dont le membre relève, triés du plus précis vers la racine ;
+ * la section « hérités » est déduite (`!direct && groupesInvites` vide). Un même membre peut être à la fois `direct`
+ * et rattaché à un ou plusieurs groupes invités (il figure alors dans plusieurs sections).
  */
 export interface MembreGitlab {
   readonly username: string;
   readonly nom: string;
   readonly niveauAcces: number;
-  readonly herite: boolean;
+  readonly direct: boolean;
+  readonly groupesInvites: readonly string[];
   readonly emailPublic?: string;
 }
 

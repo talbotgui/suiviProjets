@@ -15,8 +15,9 @@
 //! [`migration_5_vers_6`] (US-048 ajout de `referentiels.categoriesDependances` ; US-050 insertion de la règle de
 //! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`),
 //! [`migration_6_vers_7`] (Phase 16, amendement de RG-043 : normalisation de la casse du champ `statut` des bornes
-//! de version de `referentiels.reglesDependances`) et [`migration_7_vers_8`] (correction du bug Sonar
-//! `new_coverage` : `ResultatSonarCouverture.couvertureNouveauCode` devient optionnel).
+//! de version de `referentiels.reglesDependances`), [`migration_7_vers_8`] (correction du bug Sonar
+//! `new_coverage` : `ResultatSonarCouverture.couvertureNouveauCode` devient optionnel) et [`migration_8_vers_9`]
+//! (US-017 : `MembreGitlab.herite` remplacé par `direct` + `groupesInvites`).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -136,6 +137,24 @@ fn migration_7_vers_8(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Huitième migration réelle du projet (US-017, ventilation des membres du dépôt sur la Fiche projet), faisant
+/// progresser `versionSchema` de `8` à `9` : sur [`crate::modele::racine::MembreGitlab`] (`gitlab.membres`), le
+/// champ booléen `herite` cède la place à `direct` (`#[serde(default = "...")]` → `true`) et `groupesInvites`
+/// (`Vec<String>`, `#[serde(default)]` → vide).
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : les deux
+/// nouveaux champs sont additifs à valeur de repli, l'ancien `herite` est simplement ignoré à la désérialisation
+/// (aucun `deny_unknown_fields` sur le modèle). Conséquence fonctionnelle **assumée et validée par un humain**
+/// (cf. [`crate::modele::racine::VERSION_SCHEMA_COURANTE`]) : un audit déjà stocké restitue tous ses membres dans
+/// la section « Membres directs » de la Fiche projet, quelle que soit la valeur qu'avait `herite`. Seule la version
+/// de schéma progresse.
+fn migration_8_vers_9(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(9));
+    }
+    Ok(())
+}
+
 /// Normalise la casse du champ `statut` de toutes les bornes de version de `document.referentiels.reglesDependances`
 /// (cf. [`migration_6_vers_7`]), en déléguant chaque entrée à
 /// [`crate::modele::racine::canoniser_casse_statuts_regle_dependance`]. Best-effort, comme
@@ -177,8 +196,8 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
-/// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`] et
-/// [`migration_7_vers_8`].
+/// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`],
+/// [`migration_7_vers_8`] et [`migration_8_vers_9`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
@@ -187,6 +206,7 @@ pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (5, migration_5_vers_6),
     (6, migration_6_vers_7),
     (7, migration_7_vers_8),
+    (8, migration_8_vers_9),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -478,6 +498,88 @@ mod tests {
         };
         assert_eq!(avec.couverture_nouveau_code, Some(71.0));
         assert_eq!(sans.couverture_nouveau_code, None);
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_8_vers_9_restitue_les_membres_dans_la_section_directs_sans_perte()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant US-017 : `versionSchema: 8`, un constat `gitlab.membres` dont chaque membre
+        // porte l'ancien champ `herite` (jamais `direct` ni `groupesInvites`). La migration ne doit ni échouer ni
+        // altérer les données ; `versionSchema` progresse, `herite` est ignoré à la désérialisation, `direct` se
+        // désérialise à `true` (repli) et `groupesInvites` à un vecteur vide — tous les membres retombent donc dans
+        // la section « Membres directs » de la Fiche projet (décision fonctionnelle validée par un humain).
+        let mut valeur = json!({
+            "versionSchema": 8,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "groupes": [
+                {
+                    "id": "a0000000-0000-4000-8000-000000000001",
+                    "nom": "Groupe historique",
+                    "description": "",
+                    "instances": [],
+                    "membresConnus": [],
+                    "annotations": [],
+                    "indicateursDesactives": [],
+                    "projets": [
+                        {
+                            "id": "d0000000-0000-4000-8000-000000000001",
+                            "nom": "Projet historique",
+                            "description": "",
+                            "iaAutorisee": false,
+                            "sources": [],
+                            "annotations": [],
+                            "audits": [
+                                {
+                                    "id": "10000000-0000-4000-8000-000000000001",
+                                    "date": "2026-01-01",
+                                    "campagneId": "e0000000-0000-4000-8000-000000000001",
+                                    "resultats": [
+                                        {
+                                            "type": "gitlab.membres",
+                                            "sourceId": "source-1",
+                                            "refEffective": "main",
+                                            "shaTete": "abc123",
+                                            "membres": [
+                                                { "username": "mdurand", "nom": "Marie Durand", "niveauAcces": 40, "herite": false },
+                                                { "username": "alopez", "nom": "Ana Lopez", "niveauAcces": 30, "herite": true }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        let crate::modele::racine::Resultat::GitlabMembres(constat) =
+            &racine.groupes[0].projets[0].audits[0].resultats[0]
+        else {
+            return Err("variante GitlabMembres attendue".into());
+        };
+        assert_eq!(constat.membres.len(), 2);
+        for membre in &constat.membres {
+            assert!(
+                membre.direct,
+                "{} doit retomber en membre direct",
+                membre.username
+            );
+            assert!(membre.groupes_invites.is_empty());
+        }
         Ok(())
     }
 

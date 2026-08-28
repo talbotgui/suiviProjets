@@ -118,7 +118,8 @@ class DonneesDeTest {
             username,
             nom: username,
             niveauAcces: 30,
-            herite: false,
+            direct: true,
+            groupesInvites: [],
           })),
         },
         {

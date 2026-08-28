@@ -412,7 +412,9 @@ export class SqmObsolescenceComponent {
         .slice()
         .sort(
           (a, b) =>
-            a.reference.localeCompare(b.reference) || a.manifeste.localeCompare(b.manifeste),
+            a.reference.localeCompare(b.reference) ||
+            a.manifeste.localeCompare(b.manifeste) ||
+            a.version.localeCompare(b.version),
         ),
     };
   });
