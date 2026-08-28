@@ -737,7 +737,11 @@ export class FacadeCommandesService {
         categorie === 'delaiDepasse' ||
         categorie === 'reponseInattendue' ||
         categorie === 'droitsInsuffisants' ||
-        categorie === 'credentialAbsent')
+        categorie === 'credentialAbsent' ||
+        // `depotVide` est renvoyé par le cœur natif (résolution de branche par défaut d'un dépôt sans commit) et
+        // franchit donc la frontière IPC, contrairement à `instanceIntrouvable` forgé côté interface : il doit
+        // être reconnu ici pour ne pas être requalifié en « réponse inattendue de la frontière IPC ».
+        categorie === 'depotVide')
     );
   }
 }

@@ -11,7 +11,7 @@ Synthèse actionnable de [16_normesTests.md](../../docs/02_documentation/16_norm
 
 ## Tests des clients d'API
 
-- En CI : uniquement des réponses HTTP simulées, jamais un appel réel ; chaque catégorie d'anomalie RG-021 (auth refusée, ref introuvable, instance injoignable, délai dépassé, réponse inattendue, droits insuffisants) testée explicitement ([source](../../docs/02_documentation/16_normesTests.md#tests-automatisés-exécutés-en-intégration-continue)).
+- En CI : uniquement des réponses HTTP simulées, jamais un appel réel ; chaque catégorie d'anomalie RG-021 (auth refusée, ref introuvable, instance injoignable, délai dépassé, réponse inattendue, droits insuffisants) testée explicitement, de même que l'extension `depotVide` (dépôt GitLab sans commit, ajoutée le 2026-08-27) ([source](../../docs/02_documentation/16_normesTests.md#tests-automatisés-exécutés-en-intégration-continue)).
 - Tests d'intégration contre de vraies instances GitLab/Sonar : marqués `#[ignore]`/tag équivalent, **jamais exécutés en CI**, déclenchés manuellement, credentials via variables d'environnement locales uniquement, jamais en dur ([source](../../docs/02_documentation/16_normesTests.md#tests-dintégration-hors-intégration-continue-contre-des-instances-réelles)).
 
 ## Tests de bout en bout

@@ -201,5 +201,24 @@ describe('ConnecteurCroiseUtils', () => {
         duplicationNouveauCode: undefined,
       });
     });
+
+    it('doit laisser couvertureNouveauCode indéfini si la métrique new_coverage est absente du constat', () => {
+      // Correction du 2026-08-27 : `couvertureNouveauCode` est optionnel (Sonar peut omettre `new_coverage` quand
+      // le projet n'a aucune ligne de nouveau code). La juxtaposition ne doit ni échouer ni forcer une valeur.
+      const couvertureSansNouveauCode: ResultatSonarCouverture = {
+        sourceId: 'source-2',
+        couverture: 51,
+      };
+
+      const resultat = ConnecteurCroiseUtils.calculerIaNouveauCode(
+        MARQUEURS,
+        couvertureSansNouveauCode,
+        VIOLATIONS,
+      );
+
+      expect(resultat.couvertureNouveauCode).toBeUndefined();
+      expect(resultat.duplicationNouveauCode).toBeUndefined();
+      expect(resultat.nouvellesViolations).toBe(9);
+    });
   });
 });

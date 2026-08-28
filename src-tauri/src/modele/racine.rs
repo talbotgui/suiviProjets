@@ -58,7 +58,14 @@ use std::collections::HashMap;
 /// valeur restant inchangée (champ libre, RG-022). Voir la sixième étape réelle enregistrée dans
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES` (`migration_6_vers_7`) ; comme `migration_5_vers_6`,
 /// cette étape **mute** le document.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 7;
+///
+/// Passage de `7` à `8` (correction du bug Sonar `new_coverage`, 2026-08-27) : le champ `couvertureNouveauCode`
+/// de [`ResultatSonarCouverture`] (`sonar.couverture`) devient optionnel (`Option<f64>`), la métrique Sonar
+/// `new_coverage` pouvant être absente de la réponse `api/measures/component` quand le projet n'a aucune ligne
+/// de nouveau code — sur le modèle de `duplicationNouveauCode` déjà optionnel. Champ purement additif à valeur de
+/// repli (`#[serde(default)]`), aucune transformation de donnée : voir `migration_7_vers_8` enregistrée dans
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`, sur le modèle de `migration_1_vers_2`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 8;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -686,7 +693,13 @@ pub(crate) struct ResultatSonarDette {
 pub(crate) struct ResultatSonarCouverture {
     pub(crate) source_id: String,
     pub(crate) couverture: f64,
-    pub(crate) couverture_nouveau_code: f64,
+    /// Couverture de tests du nouveau code (métrique Sonar `new_coverage`), l'une des données combinées par
+    /// `croise.ia_nouveau_code` (cf. `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`).
+    /// Optionnelle : `None` si Sonar ne retourne pas cette métrique (aucune nouvelle ligne de code sur la fenêtre
+    /// de référence, ou mode historique C15-14), sur le modèle de `duplication_nouveau_code` ci-dessous ; son
+    /// absence n'est jamais une anomalie « réponse inattendue » (bug corrigé le 2026-08-27, schéma `7` → `8`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) couverture_nouveau_code: Option<f64>,
     /// Densité de duplication du nouveau code (métrique Sonar `new_duplicated_lines_density`), l'une des données
     /// combinées par `croise.ia_nouveau_code` (Phase 5, incrément 7, cf.
     /// `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`). Optionnelle : `None` si
@@ -1546,7 +1559,8 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         // Document historique antérieur à la migration 1 -> 2 (Phase 5, incrément 7) : le champ
         // `duplicationNouveauCode` est absent, la désérialisation ne doit ni échouer ni le confondre avec une
-        // anomalie, mais produire `None` (cf. `#[serde(default)]`).
+        // anomalie, mais produire `None` (cf. `#[serde(default)]`). La valeur `f64` de `couvertureNouveauCode`
+        // (champ devenu `Option<f64>` au palier 7 -> 8) se désérialise en `Some(_)`.
         let resultat: ResultatSonarCouverture = serde_json::from_str(
             r#"{
                 "sourceId": "source-2",
@@ -1555,6 +1569,25 @@ mod tests {
             }"#,
         )?;
 
+        assert_eq!(resultat.couverture_nouveau_code, Some(71.0));
+        assert_eq!(resultat.duplication_nouveau_code, None);
+        Ok(())
+    }
+
+    #[test]
+    fn resultat_sonar_couverture_sans_couverture_nouveau_code_se_desserialise_a_none()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document postérieur à la correction du bug Sonar `new_coverage` (schéma 7 -> 8) : `couvertureNouveauCode`
+        // est absent (projet sans nouveau code, ou audit historique). La désérialisation produit `None` sans
+        // anomalie (cf. `#[serde(default)]`).
+        let resultat: ResultatSonarCouverture = serde_json::from_str(
+            r#"{
+                "sourceId": "source-2",
+                "couverture": 61.2
+            }"#,
+        )?;
+
+        assert_eq!(resultat.couverture_nouveau_code, None);
         assert_eq!(resultat.duplication_nouveau_code, None);
         Ok(())
     }

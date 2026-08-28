@@ -24,21 +24,6 @@
       }
     </div>
 
-    @if (auMoinsUnPointHistorique()) {
-      <p class="graphique-evolution__legende-formes">
-        <span
-          class="graphique-evolution__forme-point graphique-evolution__forme-point--regulier"
-          aria-hidden="true"
-        ></span>
-        Audit régulier
-        <span
-          class="graphique-evolution__forme-point graphique-evolution__forme-point--historique"
-          aria-hidden="true"
-        ></span>
-        Audit historique
-      </p>
-    }
-
     <div class="graphique-evolution__zoom" role="group" aria-label="Zoom temporel">
       <button type="button" (click)="zoomerAvant()">Zoom avant</button>
       <button type="button" (click)="zoomerArriere()">Zoom arrière</button>

@@ -284,6 +284,20 @@ describe('FacadeCommandesService', () => {
         });
       },
     );
+
+    it('interrogerVitalite doit reconnaître un rejet « depotVide » du cœur natif plutôt que le requalifier en « reponseInattendue »', async () => {
+      invokeSimule.mockRejectedValue({
+        type: 'depotVide',
+        message: 'Dépôt sans commit (empty_repo)',
+      });
+
+      const resultat = await service.interrogerVitalite(INSTANCE_GITLAB, 'source-1', '1234');
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'depotVide', message: 'Dépôt sans commit (empty_repo)' },
+      });
+    });
   });
 
   describe('interrogerMarqueursIa (Phase 5, incrément 7)', () => {

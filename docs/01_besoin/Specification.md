@@ -160,12 +160,12 @@ Chaque résultat GitLab porte la ref effectivement auditée et le SHA du commit 
 | `gitlab.membres` | Membres (username, nom, niveau d'accès, hérité) et auteurs de commits | Statuts interne / client / partenaire / inconnu via les membres connus (cf. F17) |
 | `sonar.violations` | Nombre de violations par sévérité | Seuils de couleur |
 | `sonar.dette` | Dette technique totale, ratio dette/taille | Comparabilité inter-projets |
-| `sonar.couverture` | `coverage` et `new_coverage` | Seuils de couleur |
+| `sonar.couverture` | `coverage` (toujours présent) et `new_coverage` (absent si le projet n'a aucune ligne de nouveau code sur la fenêtre de référence Sonar) | Seuils de couleur |
 | `sonar.notes` | Notes A–E des quatre axes (fiabilité, sécurité, maintenabilité, revue sécurité), stockées séparément | Lettres colorées A=vert … E=rouge |
 | `sonar.ncloc` | `ncloc` et répartition par langage | Volumétrie, dénominateur de normalisation |
 | `croise.fraicheur_sonar` | Date du dernier commit et date de la dernière analyse Sonar | Badge **SONAR_KO** si écart > tolérance (défaut 7 j) ou aucune analyse ; grise toutes les métriques Sonar du même audit |
 | `croise.activite_sans_qualite` | Nombre de commits (90 j) et nouvelles violations | Signal levé si les deux dépassent leurs seuils ; « non évaluable » si une source manque ou si SONAR_KO |
-| `croise.ia_nouveau_code` | Présence de marqueurs, outils, `new_coverage`, `new_violations`, `new_duplicated_lines_density` | Juxtaposition des séries sur les projets où l'IA est autorisée ; aucun verdict automatique |
+| `croise.ia_nouveau_code` | Présence de marqueurs, outils, `new_coverage`, `new_violations`, `new_duplicated_lines_density` (chacune de ces trois métriques Sonar pouvant être absente si le projet n'a aucune ligne de nouveau code) | Juxtaposition des séries sur les projets où l'IA est autorisée ; aucun verdict automatique |
 
 Le coût API de chaque indicateur est classé (gratuit/léger/coûteux) et les indicateurs coûteux sont désactivables par groupe.
 
@@ -179,7 +179,7 @@ Tout lancement passe par un écran de **constitution de campagne** : sélection 
 
 ### 5.8 F08 — Rapport d'anomalies techniques d'audit
 
-Distingue rigoureusement les **anomalies d'exécution** des indicateurs métier. Chaque anomalie porte : projet et source concernés, **catégorie typée** (authentification refusée, ref introuvable, instance injoignable, délai dépassé, réponse inattendue, droits insuffisants), message technique brut repliable, et **action suggérée** en langage clair. Les anomalies de même cause sont regroupées (un token expiré sur 15 projets = une ligne racine). Le rapport de la dernière campagne reste consultable depuis la synthèse ; les projets en échec y portent un pictogramme dédié, distinct des couleurs de seuils. Le vocabulaire d'erreurs est le même que celui du test de connectivité (F24).
+Distingue rigoureusement les **anomalies d'exécution** des indicateurs métier. Chaque anomalie porte : projet et source concernés, **catégorie typée** (authentification refusée, ref introuvable, instance injoignable, délai dépassé, réponse inattendue, droits insuffisants, ou dépôt vide — source GitLab sans aucun commit, exclue des indicateurs GitLab de l'audit sans faire échouer la campagne), message technique brut repliable, et **action suggérée** en langage clair. Les anomalies de même cause sont regroupées (un token expiré sur 15 projets = une ligne racine). Le rapport de la dernière campagne reste consultable depuis la synthèse ; les projets en échec y portent un pictogramme dédié, distinct des couleurs de seuils. Le vocabulaire d'erreurs est le même que celui du test de connectivité (F24).
 
 ### 5.9 F09 — Brouillon d'audit et validation avant intégration
 

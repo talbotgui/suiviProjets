@@ -76,7 +76,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | écran | zone | composants / actions |
 |---|---|---|
 | Synthèse graphique | Filtres | Groupe, projet, type d'indicateur |
-| Synthèse graphique | Graphique | Zoom temporel, séries superposables, lignes verticales pour les annotations et les changements de seuils, signaux affichés en séries binaires |
+| Synthèse graphique | Graphique | Zoom temporel, séries superposables (audits historiques et réguliers d'un projet fondus dans une même courbe continue, RG-046), lignes verticales pour les annotations, les changements de seuils et le repère « Début des audits réguliers » (date du plus ancien audit régulier tous projets confondus), signaux affichés en séries binaires |
 | Synthèse graphique | Export | Export natif du graphique en image PNG |
 
 ### Obsolescence

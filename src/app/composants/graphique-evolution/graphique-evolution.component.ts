@@ -82,23 +82,23 @@ export interface SerieGraphiqueEvolution {
   readonly libelle: string;
   /** Couleur CSS de la série (ex. `#1a56db`). */
   readonly couleur: string;
-  /** Points de la série, triés par date croissante. */
-  readonly points: readonly PointSerieGraphique[];
   /**
-   * Points d'audits historiques (C15-14, US-046, RG-046) de cette série, jamais intégrés à `points` ni reliés par
-   * la ligne de tendance (cf. `SqmSyntheseGraphiqueComponent.construireSerie`, qui les exclut de `points` pour ne
-   * pas distordre le calcul de tendance existant), restitués séparément sous une forme de point distincte (croix)
-   * partageant la couleur de la série. Absent ou vide si cette série ne porte aucun audit historique.
+   * Points de la série, triés par date croissante. Les audits historiques (C15-14, US-046, RG-046) et les audits
+   * réguliers du projet sont fondus dans cette même liste (courbe unique et continue, décision d'arbitrage humain
+   * du 2026-08-27 remplaçant la représentation antérieure des audits historiques en points croix séparés). Le
+   * repère de bascule entre les deux régimes est porté par une ligne verticale `premierAuditRegulier` fournie via
+   * {@link SqmGraphiqueEvolutionComponent.lignesVerticales}, jamais par la forme des points.
    */
-  readonly pointsHistoriques?: readonly PointSerieGraphique[];
+  readonly points: readonly PointSerieGraphique[];
 }
 
 /**
  * Catégorie d'une ligne verticale étiquetée du graphique d'évolution : une annotation (US-019, Phase 8, créée
- * ailleurs — `SqmFicheProjetComponent` — et seulement lue et affichée ici, en lecture seule), ou un changement de
- * seuil (RG-023, `ChangementSeuilUtils`).
+ * ailleurs — `SqmFicheProjetComponent` — et seulement lue et affichée ici, en lecture seule), un changement de
+ * seuil (RG-023, `ChangementSeuilUtils`), ou le repère du premier audit régulier tous projets confondus (C15-14,
+ * US-046, RG-046) : à gauche de ce repère, tout point de toute série provient d'un audit historique.
  */
-export type CategorieLigneVerticale = 'annotation' | 'changementSeuil';
+export type CategorieLigneVerticale = 'annotation' | 'changementSeuil' | 'premierAuditRegulier';
 
 /**
  * Ligne verticale étiquetée du graphique d'évolution (charte d'ergonomie).
@@ -117,33 +117,16 @@ export interface LigneVerticaleGraphique {
 /**
  * Style visuel d'une catégorie de ligne verticale (couleur et tirets), décision arbitraire d'ergonomie (à valider
  * par un humain, cf. rapport de développement de cet incrément) faute de maquette haute-fidélité pour cet écran :
- * trait plein gris pour une annotation, trait tireté ambre pour un changement de seuil : ces lignes verticales ne
- * portent elles-mêmes aucun jugement de seuil, d'où l'absence des couleurs sémantiques vert/orange/rouge du Moteur
- * de jugement (RG-022).
+ * trait plein gris pour une annotation, trait tireté ambre pour un changement de seuil, trait tireté bleu pour le
+ * repère du premier audit régulier (C15-14, US-046, RG-046) : ces lignes verticales ne portent elles-mêmes aucun
+ * jugement de seuil, d'où l'absence des couleurs sémantiques vert/orange/rouge du Moteur de jugement (RG-022).
  */
 const STYLE_LIGNE_VERTICALE: Readonly<
   Record<CategorieLigneVerticale, { readonly couleur: string; readonly tirets: readonly number[] }>
 > = {
   annotation: { couleur: '#6b7280', tirets: [] },
   changementSeuil: { couleur: '#d97706', tirets: [6, 4] },
-};
-
-/**
- * Style visuel des points d'audits historiques (C15-14, US-046, RG-046) : croix (`crossRot`) plutôt que le rond
- * plein des points réguliers, seule façon de rester distinguable sans recourir à une couleur sémantique
- * supplémentaire (ces points partagent la couleur de leur série, identité catégorielle du projet, cf.
- * `PALETTE_SERIES` de `SqmSyntheseGraphiqueComponent`). Rayon et épaisseur de trait légèrement supérieurs au point
- * régulier (`pointRadius: 3` dans {@link SqmGraphiqueEvolutionComponent.construireConfiguration}) pour rester
- * lisible malgré une forme plus fine visuellement que le disque plein. Choix arbitraire (à valider par un humain,
- * cf. rapport de développement de cet incrément) entre une croix et un rond vide, les deux formes proposées par la
- * demande utilisateur à l'origine de ce point.
- */
-const STYLE_POINT_HISTORIQUE: Readonly<{
-  readonly pointStyle: 'crossRot';
-  readonly pointRadius: number;
-}> = {
-  pointStyle: 'crossRot',
-  pointRadius: 5,
+  premierAuditRegulier: { couleur: '#1a56db', tirets: [2, 3] },
 };
 
 /**
@@ -242,17 +225,7 @@ export class SqmGraphiqueEvolutionComponent {
    * graphique vide silencieux).
    */
   public readonly aucuneDonnee: Signal<boolean> = computed(() =>
-    this.series().every(
-      (serie) => serie.points.length === 0 && (serie.pointsHistoriques?.length ?? 0) === 0,
-    ),
-  );
-
-  /**
-   * `true` si au moins une série porte un point d'audit historique (C15-14, US-046, RG-046), pour n'afficher la
-   * légende expliquant la forme distincte de ces points (cf. gabarit) que lorsqu'elle est pertinente.
-   */
-  public readonly auMoinsUnPointHistorique: Signal<boolean> = computed(() =>
-    this.series().some((serie) => (serie.pointsHistoriques?.length ?? 0) > 0),
+    this.series().every((serie) => serie.points.length === 0),
   );
 
   /**
@@ -348,36 +321,16 @@ export class SqmGraphiqueEvolutionComponent {
    */
   private construireConfiguration(): ChartConfiguration<'line', ScatterDataPoint[]> {
     const seriesMasquees = this.seriesMasquees();
-    const datasets: ChartDataset<'line', ScatterDataPoint[]>[] = this.series().flatMap((serie) => {
-      const datasetSerie: ChartDataset<'line', ScatterDataPoint[]> = {
-        label: serie.libelle,
-        data: serie.points.map((point) => ({ x: new Date(point.date).getTime(), y: point.valeur })),
-        borderColor: serie.couleur,
-        backgroundColor: serie.couleur,
-        hidden: seriesMasquees.has(serie.id),
-        spanGaps: true,
-        tension: 0.15,
-        pointRadius: 3,
-      };
-      if ((serie.pointsHistoriques?.length ?? 0) === 0) {
-        return [datasetSerie];
-      }
-      const datasetHistorique: ChartDataset<'line', ScatterDataPoint[]> = {
-        label: `${serie.libelle} (audit historique)`,
-        data: (serie.pointsHistoriques ?? []).map((point) => ({
-          x: new Date(point.date).getTime(),
-          y: point.valeur,
-        })),
-        borderColor: serie.couleur,
-        backgroundColor: serie.couleur,
-        hidden: seriesMasquees.has(serie.id),
-        showLine: false,
-        pointStyle: STYLE_POINT_HISTORIQUE.pointStyle,
-        pointRadius: STYLE_POINT_HISTORIQUE.pointRadius,
-        pointBorderWidth: 2,
-      };
-      return [datasetSerie, datasetHistorique];
-    });
+    const datasets: ChartDataset<'line', ScatterDataPoint[]>[] = this.series().map((serie) => ({
+      label: serie.libelle,
+      data: serie.points.map((point) => ({ x: new Date(point.date).getTime(), y: point.valeur })),
+      borderColor: serie.couleur,
+      backgroundColor: serie.couleur,
+      hidden: seriesMasquees.has(serie.id),
+      spanGaps: true,
+      tension: 0.15,
+      pointRadius: 3,
+    }));
 
     const annotations: AnnotationOptions[] = this.lignesVerticales().map((ligne) =>
       this.construireAnnotation(ligne),

@@ -13,9 +13,10 @@
 //! première étape réelle, [`migration_1_vers_2`], complétée d'une seconde à la Phase 6, incrément 1,
 //! [`migration_2_vers_3`] (ajout de `referentiels.motifNommageBranches`, RG-030), puis étendue jusqu'à
 //! [`migration_5_vers_6`] (US-048 ajout de `referentiels.categoriesDependances` ; US-050 insertion de la règle de
-//! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`) et
+//! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`),
 //! [`migration_6_vers_7`] (Phase 16, amendement de RG-043 : normalisation de la casse du champ `statut` des bornes
-//! de version de `referentiels.reglesDependances`).
+//! de version de `referentiels.reglesDependances`) et [`migration_7_vers_8`] (correction du bug Sonar
+//! `new_coverage` : `ResultatSonarCouverture.couvertureNouveauCode` devient optionnel).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -120,6 +121,21 @@ fn migration_6_vers_7(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Septième migration réelle du projet (correction du bug Sonar `new_coverage`, 2026-08-27), faisant progresser
+/// `versionSchema` de `7` à `8` suite au passage du champ `couvertureNouveauCode` de
+/// [`crate::modele::racine::ResultatSonarCouverture`] (`sonar.couverture`) de `f64` à `Option<f64>`.
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : le champ
+/// devient optionnel (`#[serde(default, skip_serializing_if = "Option::is_none")]`), donc une valeur `f64`
+/// présente sur un document existant se désérialise directement en `Some(_)` et son absence en `None` ; seule la
+/// version de schéma progresse.
+fn migration_7_vers_8(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(8));
+    }
+    Ok(())
+}
+
 /// Normalise la casse du champ `statut` de toutes les bornes de version de `document.referentiels.reglesDependances`
 /// (cf. [`migration_6_vers_7`]), en déléguant chaque entrée à
 /// [`crate::modele::racine::canoniser_casse_statuts_regle_dependance`]. Best-effort, comme
@@ -161,7 +177,8 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
-/// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`] et [`migration_6_vers_7`].
+/// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`] et
+/// [`migration_7_vers_8`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
@@ -169,6 +186,7 @@ pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (4, migration_4_vers_5),
     (5, migration_5_vers_6),
     (6, migration_6_vers_7),
+    (7, migration_7_vers_8),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -388,6 +406,78 @@ mod tests {
             return Err("variante SonarCouverture attendue".into());
         };
         assert_eq!(couverture.duplication_nouveau_code, None);
+        // La valeur `f64` historique de `couvertureNouveauCode` (champ devenu `Option<f64>` au palier 7 → 8) se
+        // désérialise en `Some(_)`, sans perte.
+        assert_eq!(couverture.couverture_nouveau_code, Some(71.0));
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_7_vers_8_rend_couverture_nouveau_code_optionnel_sans_perte()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant la correction du bug Sonar `new_coverage` : `versionSchema: 7`, deux résultats
+        // `sonar.couverture`, l'un portant `couvertureNouveauCode` (valeur `f64` de l'ancien schéma), l'autre non
+        // (impossible avant le palier, illustre ici le repli `None`). La migration ne doit ni échouer ni altérer
+        // les données ; `versionSchema` progresse, la valeur présente devient `Some(_)`, l'absence `None`.
+        let mut valeur = json!({
+            "versionSchema": 7,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "referentiels": { "reglesDependances": [], "reglesMarqueursIA": [], "motifNommageBranches": "^feature/.+$" },
+            "groupes": [
+                {
+                    "id": "a0000000-0000-4000-8000-000000000001",
+                    "nom": "Groupe",
+                    "description": "",
+                    "instances": [],
+                    "membresConnus": [],
+                    "annotations": [],
+                    "indicateursDesactives": [],
+                    "projets": [
+                        {
+                            "id": "d0000000-0000-4000-8000-000000000001",
+                            "nom": "Projet",
+                            "description": "",
+                            "iaAutorisee": false,
+                            "sources": [],
+                            "annotations": [],
+                            "audits": [
+                                {
+                                    "id": "10000000-0000-4000-8000-000000000001",
+                                    "date": "2026-01-01",
+                                    "campagneId": "e0000000-0000-4000-8000-000000000001",
+                                    "resultats": [
+                                        { "type": "sonar.couverture", "sourceId": "source-a", "couverture": 61.2, "couvertureNouveauCode": 71.0 },
+                                        { "type": "sonar.couverture", "sourceId": "source-b", "couverture": 40.0 }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        let resultats = &racine.groupes[0].projets[0].audits[0].resultats;
+        let crate::modele::racine::Resultat::SonarCouverture(avec) = &resultats[0] else {
+            return Err("variante SonarCouverture attendue (source-a)".into());
+        };
+        let crate::modele::racine::Resultat::SonarCouverture(sans) = &resultats[1] else {
+            return Err("variante SonarCouverture attendue (source-b)".into());
+        };
+        assert_eq!(avec.couverture_nouveau_code, Some(71.0));
+        assert_eq!(sans.couverture_nouveau_code, None);
         Ok(())
     }
 

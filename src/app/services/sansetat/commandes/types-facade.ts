@@ -5,7 +5,8 @@
 // US-003, US-004 ; Phase 3, US-008 ; Phase 5, US-009), alignés sur `src-tauri/src/modele/racine.rs` (`Instance`,
 // `TypeInstance`, `Resultat*`) et `src-tauri/src/connecteurs/commun.rs` (`VerdictConnectivite`, `ErreurConnecteur`),
 // tous deux sérialisés en `camelCase` côté Rust (`serde(rename_all = "camelCase")`). `credentialAbsent` (Phase 3)
-// est une extension propre à `interrogerBranches`, hors catalogue RG-021 d'origine.
+// et `depotVide` (dépôt GitLab sans commit) sont des extensions du catalogue RG-021 d'origine, cf. la doc de
+// `CategorieErreurConnecteur` ci-dessous.
 //
 // Périmètre de la Phase 5, incrément 1 : les dix charges utiles et résultats typés des opérations d'interrogation
 // GitLab/Sonar ne nécessitant qu'un appel API déterministe (`interrogerVitalite`, `interrogerTailleDepot`,
@@ -47,11 +48,13 @@ export interface Instance {
 
 /**
  * Catégorie d'anomalie pouvant survenir lors d'un appel à une instance GitLab ou Sonar (mirroir de
- * `ErreurConnecteur` côté cœur natif), alignée sur le catalogue figé RG-021 complété de `credentialAbsent`
- * (extension propre à `interrogerBranches`, Phase 3, hors catalogue RG-021 d'origine) et de `instanceIntrouvable`
+ * `ErreurConnecteur` côté cœur natif), alignée sur le catalogue RG-021 complété de `credentialAbsent`
+ * (extension propre à `interrogerBranches`, Phase 3, hors catalogue RG-021 d'origine), de `instanceIntrouvable`
  * (extension propre à `OrchestrateurCampagneService.auditerProjet`, Phase 10, R10-09 : une source dont
  * `instanceId` ne désigne plus aucune instance du groupe, jamais un échec d'appel réseau à proprement parler,
- * mais sur le même modèle que `credentialAbsent`, une anomalie de configuration détectée avant tout appel).
+ * mais sur le même modèle que `credentialAbsent`, une anomalie de configuration détectée avant tout appel) et de
+ * `depotVide` (dépôt GitLab sans aucun commit, `GET /projects/{id}` sans `default_branch` exploitable : état
+ * légitime traité en dégradation par source par l'orchestrateur de campagne, sur le modèle de RG-046).
  */
 export type CategorieErreurConnecteur =
   | 'authentificationRefusee'
@@ -61,7 +64,8 @@ export type CategorieErreurConnecteur =
   | 'reponseInattendue'
   | 'droitsInsuffisants'
   | 'credentialAbsent'
-  | 'instanceIntrouvable';
+  | 'instanceIntrouvable'
+  | 'depotVide';
 
 /**
  * Anomalie typée d'un test de connectivité (US-004) ou d'un audit (Phase 5), mirroir de `ErreurConnecteur` côté
@@ -357,15 +361,18 @@ export type ResultatInterrogationDette =
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**
- * Constat brut de `sonar.couverture` (mirroir de `ResultatSonarCouverture` côté cœur natif). `duplicationNouveauCode`
- * (`new_duplicated_lines_density`, Phase 5 incrément 7) est absent si Sonar ne retourne pas cette métrique pour le
- * projet (jamais analysé en incrémental, ou instance ne l'exposant pas) : consommé par
- * `ConnecteurCroiseUtils.calculerIaNouveauCode`, jamais par une anomalie.
+ * Constat brut de `sonar.couverture` (mirroir de `ResultatSonarCouverture` côté cœur natif). `couvertureNouveauCode`
+ * (`new_coverage`) et `duplicationNouveauCode` (`new_duplicated_lines_density`, Phase 5 incrément 7) sont absents si
+ * Sonar ne retourne pas la métrique correspondante pour le projet (aucune ligne de nouveau code sur la fenêtre de
+ * référence, audit historique C15-14, ou instance ne l'exposant pas) : consommés par
+ * `ConnecteurCroiseUtils.calculerIaNouveauCode`, jamais par une anomalie. Seul `couverture` (métrique absolue) est
+ * toujours présent. `couvertureNouveauCode` est passé optionnel le 2026-08-27 (correction de bug, schéma cœur natif
+ * 7 -> 8).
  */
 export interface ResultatSonarCouverture {
   readonly sourceId: string;
   readonly couverture: number;
-  readonly couvertureNouveauCode: number;
+  readonly couvertureNouveauCode?: number;
   readonly duplicationNouveauCode?: number;
 }
 

@@ -544,6 +544,10 @@ struct RefResolue {
 struct ReponseProjet {
     #[serde(default)]
     default_branch: Option<String>,
+    /// `true` lorsque le dépôt ne contient encore aucun commit : GitLab n'expose alors pas de `default_branch`,
+    /// ce qui distingue un dépôt vide (état légitime, `ErreurConnecteur::DepotVide`) d'une réponse malformée.
+    #[serde(default)]
+    empty_repo: Option<bool>,
     #[serde(default)]
     statistics: Option<ReponseStatistiques>,
 }
@@ -597,8 +601,9 @@ fn url_commit_ref(
 ///
 /// # Erreurs
 ///
-/// Voir [`resoudre_ref_effective`] ; [`ErreurConnecteur::ReponseInattendue`] également si le champ
-/// `default_branch` est absent de la réponse.
+/// Voir [`resoudre_ref_effective`] ; [`ErreurConnecteur::DepotVide`] si le dépôt ne contient aucun commit
+/// (`empty_repo`), [`ErreurConnecteur::ReponseInattendue`] si le champ `default_branch` est absent de la réponse
+/// sans que le dépôt soit signalé vide.
 async fn resoudre_branche_par_defaut(
     url_base: &str,
     credential: &str,
@@ -632,16 +637,24 @@ async fn resoudre_branche_par_defaut(
             message: format!("Statut HTTP {} reçu", statut.as_u16()),
         });
     }
-    reponse
-        .json::<ReponseProjet>()
-        .await
-        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+    let projet = reponse.json::<ReponseProjet>().await.map_err(|erreur| {
+        ErreurConnecteur::ReponseInattendue {
             message: erreur.to_string(),
-        })?
-        .default_branch
-        .ok_or_else(|| ErreurConnecteur::ReponseInattendue {
-            message: "Champ default_branch absent de la réponse".to_string(),
-        })
+        }
+    })?;
+    match projet.default_branch {
+        Some(branche) => Ok(branche),
+        // Dépôt sans aucun commit : GitLab n'expose pas de `default_branch`. État légitime, traité en dégradation
+        // par source par l'orchestrateur de campagne (RG-021 « dépôt vide », modèle RG-046), jamais comme un
+        // dysfonctionnement d'instance.
+        None if matches!(projet.empty_repo, Some(true)) => Err(ErreurConnecteur::DepotVide {
+            message: "Dépôt sans commit (empty_repo)".to_string(),
+        }),
+        None => Err(ErreurConnecteur::ReponseInattendue {
+            message: "Champ default_branch absent de la réponse alors que le dépôt n'est pas signalé vide"
+                .to_string(),
+        }),
+    }
 }
 
 /// Résout la ref effectivement auditée (branche par défaut du dépôt si `ref_auditee` est absente, cf.
@@ -2965,6 +2978,61 @@ mod tests {
             resultat,
             Err(ErreurConnecteur::ReponseInattendue { .. })
         ));
+    }
+
+    #[tokio::test]
+    async fn interroger_vitalite_signale_une_branche_par_defaut_absente_hors_depot_vide_en_reponse_inattendue()
+     {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "empty_repo": false })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_vitalite(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            None,
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_vitalite_signale_un_depot_vide() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "empty_repo": true })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_vitalite(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            None,
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(resultat, Err(ErreurConnecteur::DepotVide { .. })));
     }
 
     #[tokio::test]

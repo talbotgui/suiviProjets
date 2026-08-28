@@ -24,7 +24,8 @@ use std::time::Duration;
 const DELAI_REQUETE: Duration = Duration::from_secs(30);
 
 /// Catégorie d'anomalie pouvant survenir lors d'un appel à une instance GitLab ou Sonar, alignée sur le catalogue
-/// figé RG-021 (`docs/02_documentation/05_reglesGestion.md#audits-et-campagnes`).
+/// RG-021 (`docs/02_documentation/05_reglesGestion.md#audits-et-campagnes`), complété des extensions propres à
+/// l'application signalées variante par variante (`CredentialAbsent`, `DepotVide`).
 ///
 /// Chaque variante porte désormais un champ `message` : message technique brut (statut HTTP, texte d'erreur
 /// réseau/parsing) destiné au futur écran « rapport d'anomalies » (US-013/RG-021/F08), affiché de façon repliable.
@@ -69,6 +70,16 @@ pub(crate) enum ErreurConnecteur {
     /// des branches, US-008) : catégorie propre à `interrogerBranches`, hors catalogue RG-021 d'origine qui ne
     /// couvre que les anomalies d'exécution d'un audit.
     CredentialAbsent {
+        /// Message technique brut associé à l'anomalie (diagnostic uniquement, jamais de credential).
+        message: String,
+    },
+    /// Le dépôt GitLab interrogé ne contient aucun commit (`empty_repo`) : `GET /projects/{id}` ne renvoie alors
+    /// pas de `default_branch` exploitable, la résolution de la ref auditée est donc impossible. Extension hors
+    /// catalogue RG-021 d'origine (comme `CredentialAbsent`) : un dépôt vide est un état légitime, distinct d'un
+    /// dysfonctionnement d'instance (`ReponseInattendue`) ; l'orchestrateur de campagne le traite en dégradation
+    /// par source, sur le modèle de RG-046 (aucun indicateur GitLab collecté pour cette source, jamais un échec de
+    /// la campagne entière).
+    DepotVide {
         /// Message technique brut associé à l'anomalie (diagnostic uniquement, jamais de credential).
         message: String,
     },

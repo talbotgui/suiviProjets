@@ -6,6 +6,8 @@ const SOURCE_ID_GITLAB_CONNU = 'f0000000-0000-4000-8000-000000000001';
 const SOURCE_ID_SONAR_CONNU = 'f0000000-0000-4000-8000-000000000002';
 const SOURCE_ID_GITLAB_FRONT_PORTAIL = 'f0000000-0000-4000-8000-000000000006';
 const SOURCE_ID_SONAR_FRONT_PORTAIL = 'f0000000-0000-4000-8000-000000000007';
+// API Portail : `couvertureNouveauCode` absent du jeu de données (`null` dans `exemple-donnees.json`).
+const SOURCE_ID_SONAR_API_PORTAIL = 'f0000000-0000-4000-8000-000000000009';
 const ID_EXTERNE_GITLAB_CONNU = '1234';
 const ID_EXTERNE_SONAR_CONNU = 'entreprise:api-facturation';
 
@@ -282,6 +284,21 @@ describe('BouchonCommandesUtils', () => {
 
       expect('duplicationNouveauCode' in avecDuplication).toBe(true);
       expect('duplicationNouveauCode' in sansDuplication).toBe(false);
+    });
+
+    it('doit inclure couvertureNouveauCode seulement quand le constat le porte', async () => {
+      // Correction du 2026-08-27 : `couvertureNouveauCode` est optionnel côté `ResultatSonarCouverture` ; le
+      // bouchon l'omet pour une source dont le constat ne le porte pas (API Portail, `null` dans le fichier source).
+      const avecCouvertureNouveauCode = await BouchonCommandesUtils.invoquer<
+        Record<string, unknown>
+      >('interroger_couverture', { sourceId: SOURCE_ID_SONAR_CONNU });
+      const sansCouvertureNouveauCode = await BouchonCommandesUtils.invoquer<
+        Record<string, unknown>
+      >('interroger_couverture', { sourceId: SOURCE_ID_SONAR_API_PORTAIL });
+
+      expect('couvertureNouveauCode' in avecCouvertureNouveauCode).toBe(true);
+      expect('couvertureNouveauCode' in sansCouvertureNouveauCode).toBe(false);
+      expect(typeof sansCouvertureNouveauCode['couverture']).toBe('number');
     });
 
     it('doit appliquer un écart maximal de +10 % quand le tirage est à son maximum', async () => {

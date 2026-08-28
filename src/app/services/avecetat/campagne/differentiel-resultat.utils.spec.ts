@@ -233,6 +233,19 @@ describe('DifferentielResultatUtils', () => {
       );
     });
 
+    it('doit omettre « Couverture du nouveau code » quand couvertureNouveauCode est absent des deux audits', () => {
+      // Correction du 2026-08-27 : `couvertureNouveauCode` est optionnel (métrique `new_coverage` parfois absente).
+      // Le différentiel ne doit alors produire que la ligne « Couverture de tests », sans erreur.
+      const resultat = DifferentielResultatUtils.comparerAudits(
+        [{ type: 'sonar.couverture', sourceId: 's1', couverture: 80 }],
+        [{ type: 'sonar.couverture', sourceId: 's1', couverture: 10 }],
+        VARIATION_RELATIVE,
+      );
+      const libelles = resultat.map((ecart) => ecart.libelle);
+
+      expect(libelles).toEqual(['Couverture de tests']);
+    });
+
     it('ne doit rien détecter pour gitlab.contributeurs, gitlab.merge_requests ou gitlab.membres si le champ attendu n’est pas un tableau', () => {
       const resultat = DifferentielResultatUtils.comparerAudits(
         [

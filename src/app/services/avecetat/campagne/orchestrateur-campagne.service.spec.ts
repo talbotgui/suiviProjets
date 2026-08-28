@@ -635,6 +635,67 @@ describe('OrchestrateurCampagneService', () => {
       ).toBe(false);
     });
 
+    it('doit exclure une source GitLab pointant un dépôt vide (RG-021 « depotVide ») sans appeler ses autres indicateurs, en poursuivant la campagne et en auditant les autres sources', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.sourceGitlab('source-1'),
+        DonneesDeTest.sourceSonar('source-2'),
+      ]);
+      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+      invokeSimule.mockImplementation((commande: string) =>
+        commande === 'interroger_vitalite'
+          ? Promise.reject(UtilitairesTest.erreurConnecteur('depotVide'))
+          : Promise.resolve(REPONSES_PAR_DEFAUT[commande]),
+      );
+
+      const resultat = await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(invokeSimule).toHaveBeenCalledWith('interroger_vitalite', expect.anything());
+      for (const commande of [
+        'interroger_taille_depot',
+        'interroger_contributeurs',
+        'interroger_merge_requests',
+        'interroger_membres',
+        'interroger_branches_completes',
+        'interroger_dependances',
+        'interroger_marqueurs_ia',
+      ]) {
+        expect(invokeSimule).not.toHaveBeenCalledWith(commande, expect.anything());
+      }
+      const [, , , verdicts] = donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+      const verdict: Verdict = verdicts[0];
+      expect(verdict.statut).toBe('succes');
+      expect(verdict.anomalies).toEqual([
+        expect.objectContaining({ indicateur: 'gitlab.depotVide', sourceId: 'source-1' }),
+      ]);
+    });
+
+    it('doit produire un verdict « échec » quand un projet n’a qu’une source GitLab pointant un dépôt vide', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+      donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+      invokeSimule.mockImplementation((commande: string) =>
+        commande === 'interroger_vitalite'
+          ? Promise.reject(UtilitairesTest.erreurConnecteur('depotVide'))
+          : Promise.resolve(REPONSES_PAR_DEFAUT[commande]),
+      );
+      const etatSession = TestBed.inject(EtatSessionService);
+
+      const resultat = await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+      expect(resultat).toEqual({ type: 'succes' });
+      const [, , , verdicts, resultatsParProjet] =
+        donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+      expect(verdicts[0].statut).toBe('echec');
+      expect(verdicts[0].anomalies).toEqual([
+        expect.objectContaining({ indicateur: 'gitlab.depotVide', sourceId: 'source-1' }),
+      ]);
+      expect(resultatsParProjet).toEqual([]);
+      const progressionProjet = etatSession.progressionCampagne()?.projets['projet-1'];
+      expect(progressionProjet?.statut).toBe('echoue');
+      expect(progressionProjet?.categorieEchec).toBe('depotVide');
+      expect(progressionProjet?.indicateurEchec).toBe('gitlab.depotVide');
+    });
+
     it('doit produire un verdict « échec » sans entrée de brouillon quand aucun résultat n’est exploitable', async () => {
       const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
       donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);

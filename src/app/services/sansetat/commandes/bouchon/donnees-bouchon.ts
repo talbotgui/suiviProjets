@@ -14,8 +14,8 @@
 //   groupe « Portail Nova » désactivant même cet indicateur (`indicateursDesactives`) : les autres sources
 //   reçoivent une liste réduite à leur seule ref auditée (ou `main`/`master` à défaut) ;
 // - `sonar.couverture.couvertureNouveauCode` vaut `null` dans le fichier source pour la source `api-portail`
-//   (métrique jamais calculée), valeur non représentable par `ResultatSonarCouverture` (`number` non optionnel) :
-//   repliée sur `0`.
+//   (métrique `new_coverage` jamais calculée, aucune ligne de nouveau code) : le champ est simplement omis, la
+//   propriété étant devenue optionnelle sur `ResultatSonarCouverture` (correction de bug du 2026-08-27).
 //
 // Évolution du 2026-08-02 (US-008, RG-036) : `SOURCES_DISPONIBLES_PAR_INSTANCE`, jeu de données du bouchon de
 // `listerSourcesDisponibles`, reprend les identifiants externes déjà attachés dans
@@ -347,9 +347,9 @@ export const CONSTATS_SONAR_BOUCHON: ReadonlyMap<string, ConstatSonarBouchon> = 
       violations: { bloquant: 2, critique: 8, majeur: 55, mineur: 90, info: 4 },
       nouvellesViolations: 0,
       dette: DETTE_REPLI,
-      // `couvertureNouveauCode` vaut `null` dans le fichier source pour cette source (métrique jamais calculée) :
-      // replié sur `0`, cf. en-tête de fichier.
-      couverture: { couverture: 51.0, couvertureNouveauCode: 0 },
+      // `couvertureNouveauCode` vaut `null` dans le fichier source pour cette source (métrique `new_coverage`
+      // jamais calculée) : champ omis, cf. en-tête de fichier.
+      couverture: { couverture: 51.0 },
       notes: { fiabilite: 2.0, securite: 4.0, maintenabilite: 3.0, revueSecurite: 4.0 },
       ncloc: { ncloc: 15800, parLangage: { ts: 15800 } },
       derniereAnalyseLe: '2026-04-19',

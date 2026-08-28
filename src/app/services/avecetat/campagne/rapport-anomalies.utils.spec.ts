@@ -135,6 +135,32 @@ describe('RapportAnomaliesUtils', () => {
       expect(resolues[0].categorie).toBe('instanceIntrouvable');
     });
 
+    it('doit résoudre une entrée « depotVide » (RG-021), sans la rejeter comme catégorie inconnue', () => {
+      const groupes = [
+        DonneesDeTest.groupe([DonneesDeTest.projet('p1', [DonneesDeTest.source('s1')])]),
+      ];
+
+      const resolues = RapportAnomaliesUtils.resoudreAnomaliesProjet(
+        'p1',
+        'Projet p1',
+        [
+          {
+            indicateur: 'gitlab.depotVide',
+            sourceId: 's1',
+            anomalie: {
+              type: 'depotVide',
+              message:
+                'Dépôt « s1 » sans aucun commit : indicateurs GitLab non collectés pour cette source.',
+            },
+          },
+        ],
+        groupes,
+      );
+
+      expect(resolues).toHaveLength(1);
+      expect(resolues[0].categorie).toBe('depotVide');
+    });
+
     it('doit ignorer silencieusement une entrée malformée (forme inattendue)', () => {
       const resolues = RapportAnomaliesUtils.resoudreAnomaliesProjet(
         'p1',

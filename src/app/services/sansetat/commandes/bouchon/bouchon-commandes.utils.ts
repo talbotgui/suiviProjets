@@ -523,6 +523,10 @@ export class BouchonCommandesUtils {
   ): ResultatSonarCouverture {
     const sourceId = BouchonCommandesUtils.lireSourceId(parametres);
     const constat = BouchonCommandesUtils.resoudreConstatSonar(parametres);
+    const couvertureNouveauCode =
+      constat.couverture.couvertureNouveauCode === undefined
+        ? undefined
+        : BouchonCommandesUtils.jitterDecimal(constat.couverture.couvertureNouveauCode, 100);
     const duplicationNouveauCode =
       constat.couverture.duplicationNouveauCode === undefined
         ? undefined
@@ -530,10 +534,7 @@ export class BouchonCommandesUtils {
     return {
       sourceId,
       couverture: BouchonCommandesUtils.jitterDecimal(constat.couverture.couverture, 100),
-      couvertureNouveauCode: BouchonCommandesUtils.jitterDecimal(
-        constat.couverture.couvertureNouveauCode,
-        100,
-      ),
+      ...(couvertureNouveauCode === undefined ? {} : { couvertureNouveauCode }),
       ...(duplicationNouveauCode === undefined ? {} : { duplicationNouveauCode }),
     };
   }

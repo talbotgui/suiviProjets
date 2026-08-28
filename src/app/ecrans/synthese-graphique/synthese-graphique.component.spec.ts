@@ -231,7 +231,6 @@ describe('SqmSyntheseGraphiqueComponent', () => {
         libelle: 'Projet 1',
         couleur: '#1a56db',
         points: [],
-        pointsHistoriques: [],
       },
     ]);
     expect(element.querySelector('[role="status"]')?.textContent).toContain(
@@ -272,8 +271,9 @@ describe('SqmSyntheseGraphiqueComponent', () => {
   });
 
   it(
-    'exclut les audits historiques (typeAudit "historique") de la ligne de tendance et les restitue ' +
-      'séparément comme points de forme distincte de la même série (C15-14, US-046, RG-046)',
+    'fond les audits historiques (typeAudit "historique") dans la même série que les audits réguliers, en une ' +
+      'courbe unique triée par date, et repère le premier audit régulier tous projets confondus par une ligne ' +
+      'verticale dédiée (C15-14, US-046, RG-046)',
     () => {
       const projet = DonneesDeTest.projet('projet-a', 'Projet A', [
         DonneesDeTest.audit('2026-06-05', { couverture: 61.2 }),
@@ -294,11 +294,50 @@ describe('SqmSyntheseGraphiqueComponent', () => {
 
       const series = fixture.componentInstance.series();
       expect(series[0]?.points).toEqual([
+        { date: '2026-04-01', valeur: 55.0 },
         { date: '2026-06-05', valeur: 61.2 },
         { date: '2026-07-08', valeur: 64.8 },
       ]);
-      expect(series[0]?.pointsHistoriques).toEqual([{ date: '2026-04-01', valeur: 55.0 }]);
-      expect(fixture.componentInstance.lignesVerticales()).toEqual([]);
+      expect(series[0]).not.toHaveProperty('pointsHistoriques');
+
+      const lignes = fixture.componentInstance.lignesVerticales();
+      const repere = lignes.find((ligne) => ligne.categorie === 'premierAuditRegulier');
+      expect(repere?.date).toBe('2026-06-05');
+      expect(repere?.libelle).toBe('Début des audits réguliers');
+    },
+  );
+
+  it(
+    'ancre le repère du premier audit régulier sur le plus ancien audit régulier tous projets confondus, sans ' +
+      'tenir compte des filtres de groupe/projet en vigueur (C15-14, US-046, RG-046)',
+    () => {
+      const projetA = DonneesDeTest.projet('projet-a', 'Projet A', [
+        DonneesDeTest.audit('2026-05-10', { couverture: 60.0 }),
+      ]);
+      const projetB = DonneesDeTest.projet('projet-b', 'Projet B', [
+        DonneesDeTest.audit('2026-02-01', { couverture: 40.0, typeAudit: 'historique' }),
+        DonneesDeTest.audit('2026-03-15', { couverture: 42.0 }),
+      ]);
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe 1',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projetA, projetB],
+      };
+      const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+      const composant = fixture.componentInstance;
+
+      composant.basculerProjet('projet-b');
+      fixture.detectChanges();
+
+      const repere = composant
+        .lignesVerticales()
+        .find((ligne) => ligne.categorie === 'premierAuditRegulier');
+      expect(repere?.date).toBe('2026-03-15');
     },
   );
 
@@ -440,11 +479,12 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     const fixture = creerFixture(DonneesDeTest.racine([groupe], journal));
 
     // Indicateur par défaut : couverture -> seule l'entrée du journal concernant la couverture est retenue.
-    const lignes = fixture.componentInstance.lignesVerticales();
-    expect(lignes).toHaveLength(1);
-    expect(lignes[0]?.date).toBe('2026-05-15T09:30:00Z');
-    expect(lignes[0]?.categorie).toBe('changementSeuil');
-    expect(lignes[0]?.libelle).toBe('couverture.seuilRouge : 30 → 40');
+    const lignesSeuil = fixture.componentInstance
+      .lignesVerticales()
+      .filter((ligne) => ligne.categorie === 'changementSeuil');
+    expect(lignesSeuil).toHaveLength(1);
+    expect(lignesSeuil[0]?.date).toBe('2026-05-15T09:30:00Z');
+    expect(lignesSeuil[0]?.libelle).toBe('couverture.seuilRouge : 30 → 40');
   });
 
   it('rappelle les annotations des seuls projets actuellement retenus, jamais celles d’un projet exclu du filtre', () => {
@@ -485,14 +525,21 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     const fixture = creerFixture(DonneesDeTest.racine([groupe]));
     const composant = fixture.componentInstance;
 
-    const lignesAvant = composant.lignesVerticales();
-    expect(lignesAvant.map((ligne) => ligne.id).sort()).toEqual(['a1', 'a2']);
+    const idsAnnotationsAvant = composant
+      .lignesVerticales()
+      .filter((ligne) => ligne.categorie === 'annotation')
+      .map((ligne) => ligne.id)
+      .sort();
+    expect(idsAnnotationsAvant).toEqual(['a1', 'a2']);
 
     composant.basculerProjet('projet-b');
     fixture.detectChanges();
 
-    const lignesApres = composant.lignesVerticales();
-    expect(lignesApres.map((ligne) => ligne.id)).toEqual(['a1']);
+    const idsAnnotationsApres = composant
+      .lignesVerticales()
+      .filter((ligne) => ligne.categorie === 'annotation')
+      .map((ligne) => ligne.id);
+    expect(idsAnnotationsApres).toEqual(['a1']);
   });
 
   it(

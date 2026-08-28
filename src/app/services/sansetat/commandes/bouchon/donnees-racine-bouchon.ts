@@ -1265,10 +1265,11 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   nouvellesViolations: 0,
                 },
                 {
+                  // `couvertureNouveauCode` absent : `null` dans `exemple-donnees.json` pour cette source
+                  // (métrique `new_coverage` jamais calculée), champ optionnel depuis la correction du 2026-08-27.
                   type: 'sonar.couverture',
                   sourceId: 'f0000000-0000-4000-8000-000000000009',
                   couverture: 51.0,
-                  couvertureNouveauCode: 0,
                 },
                 {
                   type: 'sonar.notes',

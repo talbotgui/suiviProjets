@@ -13,6 +13,13 @@
 //! une branche fixe (généralement gérée côté CI, hors périmètre de cette application), sans équivalent du
 //! `refAuditee` d'une source GitLab dans la conception détaillée.
 //!
+//! Métriques « nouveau code » (`new_coverage`, `new_violations`, `new_duplicated_lines_density`…) :
+//! `api/measures/component` ne renseigne jamais leur champ `value` de mesure, mais place la valeur dans un objet
+//! `period` (SonarQube 8.1+, dont EE v2026.1.5) ou un tableau `periods` (versions antérieures). [`valeur`]
+//! normalise ces trois formes. Une telle métrique peut par ailleurs être totalement absente de la réponse quand
+//! le projet n'a aucune ligne de nouveau code sur la fenêtre de référence : ce n'est jamais une anomalie
+//! « réponse inattendue » (repli `0` pour un comptage, `None` pour une valeur numérique optionnelle).
+//!
 //! C15-14 (audit historique à date passée) : les cinq opérations ci-dessus ainsi que `interroger_derniere_analyse`
 //! reçoivent un paramètre additionnel `date_ciblee`. Le paramètre serveur `from`/`to` du point d'API
 //! `measures/search_history` n'a pas pu être vérifié contre une instance réelle au moment de ce développement (cf.
@@ -98,12 +105,31 @@ pub(crate) async fn tester_connectivite(
     }
 }
 
+/// Valeur d'une mesure Sonar rapportée à la période de « nouveau code » (fenêtre de référence courante) plutôt
+/// qu'au code global : `api/measures/component` place la valeur des métriques `new_*` ici, jamais dans le champ
+/// `value` de la mesure. Forme `period` (objet unique) depuis SonarQube 8.1 (dont EE v2026.1.5) ; forme `periods`
+/// (tableau) sur les versions antérieures et sur `api/measures/component_tree`.
+#[derive(Debug, Deserialize)]
+struct Periode {
+    #[serde(default)]
+    value: Option<String>,
+}
+
 /// Mesure individuelle du point d'API `measures/component` de Sonar.
+///
+/// Les métriques absolues (`coverage`, `ncloc`…) renseignent `value` ; les métriques de nouveau code
+/// (`new_coverage`, `new_violations`, `new_duplicated_lines_density`…) laissent `value` vide et portent leur
+/// valeur dans `period` (SonarQube 8.1+) ou `periods` (versions antérieures). [`valeur`] normalise ces trois
+/// formes en un unique accès à la valeur brute.
 #[derive(Debug, Deserialize)]
 struct Mesure {
     metric: String,
     #[serde(default)]
     value: Option<String>,
+    #[serde(default)]
+    period: Option<Periode>,
+    #[serde(default)]
+    periods: Vec<Periode>,
 }
 
 /// Composant Sonar interrogé, réduit à ses mesures.
@@ -170,12 +196,33 @@ async fn recuperer_mesures(
         .measures)
 }
 
+/// Valeur brute (chaîne) d'une mesure Sonar, quelle que soit la forme sous laquelle `api/measures/component` la
+/// rapporte : champ `value` (métrique absolue), puis objet `period` (métrique de nouveau code, SonarQube 8.1+),
+/// puis premier élément du tableau `periods` (métrique de nouveau code, versions antérieures).
+fn premiere_valeur_disponible(mesure: &Mesure) -> Option<&str> {
+    mesure
+        .value
+        .as_deref()
+        .or_else(|| {
+            mesure
+                .period
+                .as_ref()
+                .and_then(|periode| periode.value.as_deref())
+        })
+        .or_else(|| {
+            mesure
+                .periods
+                .first()
+                .and_then(|periode| periode.value.as_deref())
+        })
+}
+
 /// Valeur brute (chaîne) d'une métrique, si présente dans le jeu de mesures interrogé.
 fn valeur<'a>(mesures: &'a [Mesure], cle: &str) -> Option<&'a str> {
     mesures
         .iter()
         .find(|mesure| mesure.metric == cle)
-        .and_then(|mesure| mesure.value.as_deref())
+        .and_then(premiere_valeur_disponible)
 }
 
 /// Valeur d'une métrique numérique requise pour former le résultat : son absence ou son format non numérique
@@ -488,19 +535,21 @@ pub(crate) async fn interroger_dette(
     })
 }
 
-/// Interroge la couverture de tests Sonar (US-009, `sonar.couverture`), ainsi que la densité de duplication du
-/// nouveau code (`new_duplicated_lines_density`, Phase 5, incrément 7), l'une des données combinées par
-/// `croise.ia_nouveau_code` (cf. `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`).
-/// Cette dernière métrique reste optionnelle : son absence de la réponse Sonar (ex. aucune nouvelle ligne de code)
-/// se traduit par `None`, jamais par une anomalie « réponse inattendue ».
+/// Interroge la couverture de tests Sonar (US-009, `sonar.couverture`), la couverture du nouveau code
+/// (`new_coverage`) ainsi que la densité de duplication du nouveau code (`new_duplicated_lines_density`,
+/// Phase 5, incrément 7), ces deux dernières étant des données combinées par `croise.ia_nouveau_code`
+/// (cf. `docs/01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs`).
+/// `new_coverage` et `new_duplicated_lines_density` restent optionnelles : leur absence de la réponse Sonar
+/// (ex. aucune nouvelle ligne de code sur la fenêtre de référence) se traduit par `None`, jamais par une anomalie
+/// « réponse inattendue ». Seule `coverage` (métrique absolue) est requise.
 ///
 /// En mode historique (C15-14, `date_ciblee` renseigné) : seule `coverage` est historisable au sens de cette
 /// évolution (`new_coverage`/`new_duplicated_lines_density` sont relatives à une période glissante se terminant
 /// « maintenant », sans portée à une date passée, cf. `croise.ia_nouveau_code` omis de l'audit historique côté
 /// Orchestrateur de campagne) ; `couverture` est résolue via l'historique
 /// ([`recuperer_historique_mesures`]/[`valeur_historique`]), avec repli à `0` (aucune couverture connue, décision
-/// arbitraire à valider par un humain) si absente de l'historique retourné ; `couverture_nouveau_code` vaut alors
-/// toujours `0` et `duplication_nouveau_code` toujours `None`, par convention documentée ici (jamais interprétés
+/// arbitraire à valider par un humain) si absente de l'historique retourné ; `couverture_nouveau_code` et
+/// `duplication_nouveau_code` valent alors toujours `None`, par convention documentée ici (jamais interprétés
 /// côté UI en mode historique).
 ///
 /// # Erreurs
@@ -522,7 +571,7 @@ pub(crate) async fn interroger_couverture(
         return Ok(ResultatSonarCouverture {
             source_id: source_id.to_string(),
             couverture: valeur_historique(&historique, "coverage", &date_cible).unwrap_or(0.0),
-            couverture_nouveau_code: 0.0,
+            couverture_nouveau_code: None,
             duplication_nouveau_code: None,
         });
     }
@@ -539,7 +588,8 @@ pub(crate) async fn interroger_couverture(
     Ok(ResultatSonarCouverture {
         source_id: source_id.to_string(),
         couverture: valeur_numerique_requise(&mesures, "coverage")?,
-        couverture_nouveau_code: valeur_numerique_requise(&mesures, "new_coverage")?,
+        couverture_nouveau_code: valeur(&mesures, "new_coverage")
+            .and_then(|valeur| valeur.parse().ok()),
         duplication_nouveau_code: valeur(&mesures, "new_duplicated_lines_density")
             .and_then(|valeur| valeur.parse().ok()),
     })
@@ -1052,6 +1102,8 @@ mod tests {
 
     #[tokio::test]
     async fn interroger_violations_reussit() {
+        // Forme réelle de `api/measures/component` : les compteurs absolus portent `value`, `new_violations`
+        // (métrique de nouveau code) porte sa valeur dans un objet `period`, jamais dans `value`.
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/measures/component"))
@@ -1063,7 +1115,7 @@ mod tests {
                         { "metric": "major_violations", "value": "88" },
                         { "metric": "minor_violations", "value": "240" },
                         { "metric": "info_violations", "value": "31" },
-                        { "metric": "new_violations", "value": "9" }
+                        { "metric": "new_violations", "period": { "index": 1, "value": "9" } }
                     ]
                 }
             })))
@@ -1281,6 +1333,9 @@ mod tests {
 
     #[tokio::test]
     async fn interroger_couverture_reussit() {
+        // Forme réelle de `api/measures/component` : `coverage` (métrique absolue) porte `value`, les métriques de
+        // nouveau code portent leur valeur dans un objet `period` (SonarQube 8.1+, dont EE v2026.1.5), jamais dans
+        // `value`.
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/measures/component"))
@@ -1288,8 +1343,8 @@ mod tests {
                 "component": {
                     "measures": [
                         { "metric": "coverage", "value": "61.2" },
-                        { "metric": "new_coverage", "value": "71.0" },
-                        { "metric": "new_duplicated_lines_density", "value": "4.5" }
+                        { "metric": "new_coverage", "period": { "index": 1, "value": "71.0" } },
+                        { "metric": "new_duplicated_lines_density", "period": { "index": 1, "value": "4.5" } }
                     ]
                 }
             })))
@@ -1311,8 +1366,47 @@ mod tests {
             Ok(crate::modele::racine::ResultatSonarCouverture {
                 source_id: "source-2".to_string(),
                 couverture: 61.2,
-                couverture_nouveau_code: 71.0,
+                couverture_nouveau_code: Some(71.0),
                 duplication_nouveau_code: Some(4.5),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn interroger_couverture_lit_la_forme_periods_tableau() {
+        // Versions de SonarQube antérieures à 8.1 (et `api/measures/component_tree`) : les métriques de nouveau
+        // code portent leur valeur dans un tableau `periods` plutôt qu'un objet `period`.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/measures/component"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "component": {
+                    "measures": [
+                        { "metric": "coverage", "value": "61.2" },
+                        { "metric": "new_coverage", "periods": [{ "index": 1, "value": "71.0" }] }
+                    ]
+                }
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_couverture(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-2",
+            "proj-key",
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(
+            resultat,
+            Ok(crate::modele::racine::ResultatSonarCouverture {
+                source_id: "source-2".to_string(),
+                couverture: 61.2,
+                couverture_nouveau_code: Some(71.0),
+                duplication_nouveau_code: None,
             })
         );
     }
@@ -1329,7 +1423,7 @@ mod tests {
                 "component": {
                     "measures": [
                         { "metric": "coverage", "value": "61.2" },
-                        { "metric": "new_coverage", "value": "71.0" }
+                        { "metric": "new_coverage", "period": { "index": 1, "value": "71.0" } }
                     ]
                 }
             })))
@@ -1346,17 +1440,61 @@ mod tests {
         )
         .await?;
 
+        assert_eq!(resultat.couverture_nouveau_code, Some(71.0));
         assert_eq!(resultat.duplication_nouveau_code, None);
         Ok(())
     }
 
     #[tokio::test]
-    async fn interroger_couverture_signale_une_valeur_manquante_en_reponse_inattendue() {
+    async fn interroger_couverture_tolere_new_coverage_absente_a_none()
+    -> Result<(), ErreurConnecteur> {
+        // La métrique `new_coverage` est optionnelle (correction du bug 2026-08-27) : Sonar peut l'omettre quand
+        // le projet n'a aucune ligne de nouveau code sur la fenêtre de référence. Son absence ne doit provoquer
+        // aucune anomalie « réponse inattendue », seulement un `None` — seule `coverage` reste requise.
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/measures/component"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "component": { "measures": [{ "metric": "coverage", "value": "61.2" }] }
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_couverture(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-2",
+            "proj-key",
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            crate::modele::racine::ResultatSonarCouverture {
+                source_id: "source-2".to_string(),
+                couverture: 61.2,
+                couverture_nouveau_code: None,
+                duplication_nouveau_code: None,
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_couverture_signale_une_valeur_manquante_en_reponse_inattendue() {
+        // `coverage` (métrique absolue) reste requise : son absence de la réponse traduit un format inattendu
+        // (ex. après une montée de version d'instance Sonar), à la différence des métriques de nouveau code.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/measures/component"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "component": {
+                    "measures": [
+                        { "metric": "new_coverage", "period": { "index": 1, "value": "71.0" } }
+                    ]
+                }
             })))
             .mount(&serveur)
             .await;
@@ -1419,7 +1557,7 @@ mod tests {
         .await?;
 
         assert_eq!(resultat.couverture, 55.0);
-        assert_eq!(resultat.couverture_nouveau_code, 0.0);
+        assert_eq!(resultat.couverture_nouveau_code, None);
         assert_eq!(resultat.duplication_nouveau_code, None);
         Ok(())
     }

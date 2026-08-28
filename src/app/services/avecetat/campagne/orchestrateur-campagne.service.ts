@@ -50,6 +50,11 @@
 // `Audit.dateExecution` dans `types-donnees.ts`) et `dateExecution` = l'horodatage réel de la campagne. Le repli
 // automatique sur la date Sonar disponible la plus proche en cas d'absence à la date demandée est intégralement
 // géré côté cœur natif (transparent pour ce service).
+//
+// Dépôt GitLab vide (RG-021, catégorie `depotVide`) : lorsqu'une source GitLab pointe un dépôt sans aucun commit,
+// le cœur natif renvoie `ErreurConnecteur::DepotVide` dès la résolution de la ref auditée. Cette source est alors
+// exclue des indicateurs GitLab de l'audit (anomalie explicite `gitlab.depotVide`), sur le même modèle de
+// dégradation par source que le SHA/tag figé de C15-14 ci-dessus, jamais un échec de la campagne entière.
 import { Injectable, inject, signal } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { EMPTY, firstValueFrom, from } from 'rxjs';
@@ -348,6 +353,34 @@ export class OrchestrateurCampagneService {
               dateCiblee,
             ),
         );
+        if (reponseVitalite.echec?.categorie === 'depotVide') {
+          // Dépôt GitLab sans aucun commit : la résolution de la ref auditée est impossible, donc aucun indicateur
+          // GitLab ne peut aboutir pour cette source. Dégradation par source sur le modèle de RG-046 (cf. bloc
+          // `verificationRef.exclue` ci-dessus) : anomalie explicite consignée sous le pseudo-tag `gitlab.depotVide`
+          // — analogue à `gitlab.refFigee` —, les autres indicateurs GitLab de la source sont sautés, la campagne se
+          // poursuit. Une source Sonar du même projet reste auditée normalement.
+          //
+          // Ce contrôle s'appuie sur `gitlab.vitalite` comme premier indicateur GitLab systématiquement exécuté pour
+          // toute source de dépôt : `indicateursDesactives` ne peut pas encore le retirer (aucun écran ne peuple ce
+          // champ à ce jour). Si un futur écran rend `gitlab.vitalite` désactivable, il faudra propager ce même
+          // court-circuit `depotVide` au premier indicateur GitLab réellement exécuté (sans quoi la source
+          // remonterait une anomalie `depotVide` générique par indicateur actif — campagne toujours poursuivie,
+          // regroupement RG-021 préservé, mais libellé moins explicite).
+          anomalies.push({
+            indicateur: 'gitlab.depotVide',
+            sourceId: source.id,
+            anomalie: {
+              type: 'depotVide',
+              message: `Dépôt « ${source.idExterne} » sans aucun commit : indicateurs GitLab non collectés pour cette source.`,
+            },
+          });
+          dernierEchec = {
+            motif: 'gitlab.depotVide : dépôt sans commit',
+            indicateur: 'gitlab.depotVide',
+            categorie: 'depotVide',
+          };
+          continue;
+        }
         dernierEchec = this.integrer(reponseVitalite, resultats, anomalies) ?? dernierEchec;
         vitalite = reponseVitalite.resultatBrut;
 

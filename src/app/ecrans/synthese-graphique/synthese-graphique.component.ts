@@ -42,7 +42,7 @@ import type {
 } from '../../composants/selecteur-vue/selecteur-vue.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import type { Audit, Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
+import type { Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { ChangementSeuilUtils } from '../../services/sansetat/jugement/changement-seuil.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { TriAlphabetiqueUtils } from '../../services/sansetat/jugement/tri-alphabetique.utils';
@@ -284,11 +284,12 @@ export class SqmSyntheseGraphiqueComponent {
 
   /**
    * Lignes verticales étiquetées du graphique : changements de seuil pertinents pour l'indicateur sélectionné
-   * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global), et annotations des
+   * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global), annotations des
    * projets actuellement retenus (US-019, Phase 8, créées ailleurs — `SqmFicheProjetComponent` — et seulement lues
-   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran). Les audits historiques (C15-14,
-   * US-046, RG-046) ne sont pas représentés ici : ils apparaissent comme des points de forme distincte directement
-   * sur les séries (cf. {@link construireSerie}, `SerieGraphiqueEvolution.pointsHistoriques`).
+   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran), et le repère du premier audit
+   * régulier tous projets confondus (C15-14, US-046, RG-046, cf. {@link datePremierAuditRegulier}) : à gauche de ce
+   * repère, tout point de toute série provient d'un audit historique, les valeurs des audits historiques et
+   * régulières étant désormais fondues dans une même courbe continue (cf. {@link construireSerie}).
    */
   public readonly lignesVerticales: Signal<readonly LigneVerticaleGraphique[]> = computed(() => {
     const racine = this.donneesApplication.racine();
@@ -319,7 +320,46 @@ export class SqmSyntheseGraphiqueComponent {
       }
     }
 
-    return [...lignesSeuil, ...annotationsParId.values()];
+    const datePremierAuditRegulier = this.datePremierAuditRegulier();
+    const lignePremierAuditRegulier: readonly LigneVerticaleGraphique[] =
+      datePremierAuditRegulier === undefined
+        ? []
+        : [
+            {
+              id: 'premier-audit-regulier',
+              date: datePremierAuditRegulier,
+              libelle: 'Début des audits réguliers',
+              categorie: 'premierAuditRegulier',
+            },
+          ];
+
+    return [...lignesSeuil, ...annotationsParId.values(), ...lignePremierAuditRegulier];
+  });
+
+  /**
+   * Date du plus ancien audit régulier (`typeAudit: 'reguliere'`), tous groupes et tous projets confondus, sans
+   * tenir compte des filtres de groupe/projet en vigueur (C15-14, US-046, RG-046 : « à gauche de ce repère, tous
+   * les audits sont historiques » — un repère de nature globale, pas propre à la sélection courante). `undefined`
+   * si aucun audit régulier n'existe encore (rien à repérer). Décision d'arbitrage humain du 2026-08-27 : la
+   * représentation antérieure des audits historiques en points croix séparés est remplacée par une courbe continue
+   * unique, ce repère vertical portant seul l'information de bascule entre les deux régimes.
+   * @returns La date ISO 8601 du premier audit régulier, `undefined` si aucun.
+   */
+  private readonly datePremierAuditRegulier: Signal<string | undefined> = computed(() => {
+    let plusAncienne: string | undefined;
+    for (const groupe of this.donneesApplication.groupes()) {
+      for (const projet of groupe.projets) {
+        for (const audit of projet.audits) {
+          if (audit.typeAudit === 'historique') {
+            continue;
+          }
+          if (plusAncienne === undefined || audit.date < plusAncienne) {
+            plusAncienne = audit.date;
+          }
+        }
+      }
+    }
+    return plusAncienne;
   });
 
   /**
@@ -571,11 +611,15 @@ export class SqmSyntheseGraphiqueComponent {
   }
 
   /**
-   * Construit la série d'un projet pour l'indicateur sélectionné, un point par audit régulier du projet portant le
-   * constat nécessaire, dans l'ordre chronologique de `Projet.audits` (déjà croissant, cf. `docs/02_documentation/
-   * 12_modeleDonnees.md`), complétée des points d'audits historiques du même projet (cf.
-   * {@link pointsHistoriquesDuProjet}), jamais intégrés à la ligne de tendance mais restitués séparément sous une
-   * forme de point distincte par le composant transverse de graphique.
+   * Construit la série d'un projet pour l'indicateur sélectionné, un point par audit du projet portant le constat
+   * nécessaire, audits historiques (`typeAudit: 'historique'`, C15-14, US-046, RG-046) et audits réguliers
+   * confondus dans une même courbe continue (décision d'arbitrage humain du 2026-08-27, remplaçant la
+   * représentation antérieure des audits historiques en points croix séparés). Les points sont triés par date
+   * croissante : `Projet.audits` est déjà chronologique (cf. `docs/02_documentation/12_modeleDonnees.md`) mais un
+   * audit historique ciblant une date passée peut avoir été ajouté après des audits réguliers plus récents, d'où le
+   * tri explicite garantissant une ligne qui relie les points dans le bon ordre temporel. Le repère de bascule
+   * entre audits historiques et réguliers est porté par la ligne verticale `premierAuditRegulier` (cf.
+   * {@link lignesVerticales}), jamais par la forme des points.
    * @param projet - Projet concerné.
    * @param indicateur - Indicateur sélectionné.
    * @param couleur - Couleur catégorielle assignée à ce projet (cf. {@link PALETTE_SERIES}).
@@ -586,58 +630,19 @@ export class SqmSyntheseGraphiqueComponent {
     indicateur: CleIndicateurGraphique,
     couleur: string,
   ): SerieGraphiqueEvolution {
-    const points = [];
-    for (const audit of this.exclureAuditsHistoriques(projet.audits)) {
+    const points: PointSerieGraphique[] = [];
+    for (const audit of projet.audits) {
       const valeur = this.extraireValeur(indicateur, audit.resultats);
       if (valeur !== undefined) {
         points.push({ date: audit.date, valeur });
       }
     }
+    points.sort((a, b) => a.date.localeCompare(b.date));
     return {
       id: projet.id,
       libelle: projet.nom,
       couleur,
       points,
-      pointsHistoriques: this.pointsHistoriquesDuProjet(projet, indicateur),
     };
-  }
-
-  /**
-   * Exclut les audits historiques (`typeAudit: 'historique'`, C15-14, US-046, RG-046) d'un historique d'audits,
-   * pour protéger la ligne de tendance continue d'une série (cf. {@link construireSerie}) : un audit historique à
-   * date passée ne doit jamais distordre le calcul de tendance existant, ni apparaître comme un point de la série
-   * qu'il représente déjà séparément (cf. {@link pointsHistoriquesDuProjet}).
-   * @param audits - Historique complet des audits d'un projet (`Projet.audits`).
-   * @returns Les seuls audits réguliers (`typeAudit: 'reguliere'`), dans le même ordre.
-   */
-  private exclureAuditsHistoriques(audits: readonly Audit[]): readonly Audit[] {
-    return audits.filter((audit) => audit.typeAudit !== 'historique');
-  }
-
-  /**
-   * Points des audits historiques (C15-14, US-046, RG-046) d'un projet pour l'indicateur sélectionné, un point par
-   * audit `typeAudit: 'historique'` portant le constat nécessaire (même règle d'omission qu'un point régulier, cf.
-   * {@link extraireValeur}), jamais intégrés à la ligne de tendance continue de la série (cf. {@link construireSerie}
-   * et {@link exclureAuditsHistoriques}) mais restitués séparément par le composant transverse de graphique sous une
-   * forme de point distincte, partageant la couleur de la série.
-   * @param projet - Projet concerné.
-   * @param indicateur - Indicateur sélectionné.
-   * @returns Les points des audits historiques du projet.
-   */
-  private pointsHistoriquesDuProjet(
-    projet: Projet,
-    indicateur: CleIndicateurGraphique,
-  ): readonly PointSerieGraphique[] {
-    const points: PointSerieGraphique[] = [];
-    for (const audit of projet.audits) {
-      if (audit.typeAudit !== 'historique') {
-        continue;
-      }
-      const valeur = this.extraireValeur(indicateur, audit.resultats);
-      if (valeur !== undefined) {
-        points.push({ date: audit.date, valeur });
-      }
-    }
-    return points;
   }
 }
