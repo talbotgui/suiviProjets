@@ -6,7 +6,7 @@
       id="parametrage-onglet-seuils-referentiels"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
-      [class.parametrage__onglet--actif]="ongletActif === 'seuilsReferentiels'"
+      [class.parametrage__onglet--actif]="ongletActif() === 'seuilsReferentiels'"
       (click)="selectionnerOnglet('seuilsReferentiels')"
     >
       Seuils et référentiels
@@ -15,7 +15,7 @@
       id="parametrage-onglet-journal"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
-      [class.parametrage__onglet--actif]="ongletActif === 'journal'"
+      [class.parametrage__onglet--actif]="ongletActif() === 'journal'"
       (click)="selectionnerOnglet('journal')"
     >
       Journal des modifications
@@ -24,7 +24,7 @@
       id="parametrage-onglet-purge"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
-      [class.parametrage__onglet--actif]="ongletActif === 'purge'"
+      [class.parametrage__onglet--actif]="ongletActif() === 'purge'"
       (click)="selectionnerOnglet('purge')"
     >
       Purge des audits
@@ -33,7 +33,7 @@
       id="parametrage-onglet-export-import"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
-      [class.parametrage__onglet--actif]="ongletActif === 'exportImport'"
+      [class.parametrage__onglet--actif]="ongletActif() === 'exportImport'"
       (click)="selectionnerOnglet('exportImport')"
     >
       Export / Import
@@ -42,14 +42,23 @@
       id="parametrage-onglet-securite"
       type="button"
       class="parametrage__onglet bouton bouton--discret"
-      [class.parametrage__onglet--actif]="ongletActif === 'securite'"
+      [class.parametrage__onglet--actif]="ongletActif() === 'securite'"
       (click)="selectionnerOnglet('securite')"
     >
       Sécurité
     </button>
+    <button
+      id="parametrage-onglet-vues-enregistrees"
+      type="button"
+      class="parametrage__onglet bouton bouton--discret"
+      [class.parametrage__onglet--actif]="ongletActif() === 'vuesEnregistrees'"
+      (click)="selectionnerOnglet('vuesEnregistrees')"
+    >
+      Vues enregistrées
+    </button>
   </nav>
 
-  @switch (ongletActif) {
+  @switch (ongletActif()) {
     @case ('seuilsReferentiels') {
       <div class="d-flex direction-colonne ecart-6">
         <app-seuils-parametrage />
@@ -71,6 +80,9 @@
     }
     @case ('securite') {
       <app-securite-parametrage />
+    }
+    @case ('vuesEnregistrees') {
+      <app-vues-enregistrees-parametrage />
     }
   }
 </section>

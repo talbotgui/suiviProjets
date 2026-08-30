@@ -1,6 +1,7 @@
 // Test du composant transverse de sélection de vue enregistrée (cf. selecteur-vue.component.ts, US-028, RG-027),
 // généré avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { SqmSelecteurVueComponent } from './selecteur-vue.component';
 import type { VueSelectionnable } from './selecteur-vue.component';
 
@@ -15,6 +16,7 @@ describe('SqmSelecteurVueComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [SqmSelecteurVueComponent],
+      providers: [provideRouter([])],
     }).compileComponents();
     const fixture = TestBed.createComponent(SqmSelecteurVueComponent);
     fixture.componentRef.setInput('vues', VUES);

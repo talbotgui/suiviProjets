@@ -1,0 +1,122 @@
+<!-- Généré avec l'assistance de l'IA (Claude Code), cf. .claude/rules/01-usage-ia-et-conventions.md. -->
+<section class="vues-enregistrees-parametrage">
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Vues enregistrées</h2>
+  <p class="vues-enregistrees-parametrage__intro texte-sm texte-discret exterieur-bas-4">
+    Administration centralisée de toutes les vues enregistrées (US-054). La modification des filtres
+    d'une vue reste sur l'écran concerné, qui porte sa barre de filtres ; cet onglet gère le nom, le
+    statut de vue par défaut, la duplication et la suppression.
+  </p>
+
+  @if (aucuneVue()) {
+    <p class="vues-enregistrees-parametrage__vide texte-discret">
+      Aucune vue n'est enregistrée. Enregistrez-en une depuis la barre de filtres d'un écran de
+      restitution (Synthèse des audits, Synthèse graphique, Obsolescence, Liste de travail).
+    </p>
+  } @else {
+    @for (groupe of groupes(); track groupe.ecran) {
+      <section class="vues-enregistrees-parametrage__groupe exterieur-bas-5">
+        <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">
+          {{ groupe.libelleEcran }}
+        </h3>
+        <div class="deborde-auto">
+          <table class="vues-enregistrees-parametrage__tableau tableau">
+            <thead>
+              <tr>
+                <th scope="col">Nom</th>
+                <th scope="col">Par défaut</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (vue of groupe.vues; track vue.id) {
+                <tr>
+                  <td>
+                    @if (idEnRenommage() === vue.id) {
+                      <span class="d-flex aligne-centre ecart-2">
+                        <input
+                          type="text"
+                          class="champ__controle"
+                          [attr.aria-label]="'Nouveau nom de la vue ' + vue.nom"
+                          [ngModel]="nomEnRenommage()"
+                          (ngModelChange)="nomEnRenommage.set($event)"
+                        />
+                        <button
+                          type="button"
+                          class="bouton bouton--principal"
+                          [disabled]="enCours()"
+                          (click)="validerRenommage(vue)"
+                        >
+                          Valider
+                        </button>
+                        <button
+                          type="button"
+                          class="bouton bouton--discret"
+                          (click)="annulerRenommage()"
+                        >
+                          Annuler
+                        </button>
+                      </span>
+                    } @else {
+                      {{ vue.nom }}
+                    }
+                  </td>
+                  <td>{{ vue.parDefaut ? 'Oui' : '—' }}</td>
+                  <td class="d-flex retour-ligne ecart-2">
+                    <button
+                      type="button"
+                      class="bouton bouton--discret"
+                      [disabled]="enCours() || idEnRenommage() === vue.id"
+                      (click)="ouvrirRenommage(vue)"
+                    >
+                      Renommer
+                    </button>
+                    <button
+                      type="button"
+                      class="bouton bouton--discret"
+                      [disabled]="enCours()"
+                      (click)="demanderDuplication(vue)"
+                    >
+                      Dupliquer
+                    </button>
+                    <button
+                      type="button"
+                      class="bouton bouton--discret"
+                      [disabled]="enCours()"
+                      (click)="demanderBasculeParDefaut(vue)"
+                    >
+                      {{ vue.parDefaut ? 'Retirer le statut par défaut' : 'Définir par défaut' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="bouton bouton--danger"
+                      [disabled]="enCours()"
+                      (click)="demanderSuppression(vue)"
+                    >
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+
+  @if (vueEnSuppression(); as vue) {
+    <app-confirmation-suppression
+      [message]="'Supprimer la vue « ' + vue.nom + ' » ? Cette action est irréversible.'"
+      (confirmee)="confirmerSuppression()"
+      (annulee)="annulerSuppression()"
+    />
+  }
+
+  @if (actionEnAttente() !== null) {
+    <app-confirmation-mot-de-passe
+      [message]="messageMotDePasse()"
+      (confirmee)="confirmerMotDePasse($event)"
+      (annulee)="annulerMotDePasse()"
+    />
+  }
+</section>

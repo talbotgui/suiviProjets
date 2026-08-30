@@ -83,6 +83,13 @@ import { TypeSource } from './types-donnees';
 const ORIGINE_ADMINISTRATION = 'Administration';
 
 /**
+ * Origine consignée dans le journal des modifications (RG-054, extension de RG-023) pour toute mutation de vue
+ * enregistrée, qu'elle provienne du sélecteur de vue d'un écran de restitution ou de l'onglet « Vues enregistrées »
+ * de l'écran de Paramétrage (US-054).
+ */
+const ORIGINE_VUES = 'Vues enregistrées';
+
+/**
  * Données saisies pour créer ou remplacer intégralement un groupe (US-006).
  */
 export interface DonneesGroupe {
@@ -1398,6 +1405,7 @@ export class DonneesApplicationService {
         versionFiltres,
         parDefaut,
         filtres,
+        origine: ORIGINE_VUES,
         motDePasse,
       });
       this.racineInterne.set(nouvelleRacine);
@@ -1427,6 +1435,7 @@ export class DonneesApplicationService {
         chemin,
         donnees: racine,
         id,
+        origine: ORIGINE_VUES,
         motDePasse,
       });
       this.racineInterne.set(nouvelleRacine);

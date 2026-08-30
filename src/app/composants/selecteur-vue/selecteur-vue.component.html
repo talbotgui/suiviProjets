@@ -32,6 +32,14 @@
     }
   </div>
 
+  <a
+    class="selecteur-vue__gerer texte-xs"
+    routerLink="/parametrage"
+    [queryParams]="{ onglet: 'vuesEnregistrees' }"
+  >
+    Gérer les vues…
+  </a>
+
   @if (formulaireEnregistrementOuvert()) {
     <form class="selecteur-vue__formulaire" (ngSubmit)="validerFormulaireEnregistrement()">
       <label>

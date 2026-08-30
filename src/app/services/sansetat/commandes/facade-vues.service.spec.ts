@@ -34,6 +34,7 @@ describe('FacadeVuesService', () => {
       versionFiltres: 1,
       parDefaut: false,
       filtres: { groupeId: 'g1' },
+      origine: 'Vues enregistrées',
       motDePasse: 'mot-de-passe',
     });
 
@@ -46,6 +47,7 @@ describe('FacadeVuesService', () => {
       versionFiltres: 1,
       parDefaut: false,
       filtres: { groupeId: 'g1' },
+      origine: 'Vues enregistrées',
       motDePasse: 'mot-de-passe',
     });
     expect(resultat).toEqual({ versionSchema: 2 });
@@ -63,12 +65,13 @@ describe('FacadeVuesService', () => {
       versionFiltres: 1,
       parDefaut: true,
       filtres: { groupeId: 'g2' },
+      origine: 'Vues enregistrées',
       motDePasse: 'mot-de-passe',
     });
 
     expect(invokeSimule).toHaveBeenCalledWith(
       'definir_vue',
-      expect.objectContaining({ id: 'vue-1', parDefaut: true }),
+      expect.objectContaining({ id: 'vue-1', parDefaut: true, origine: 'Vues enregistrées' }),
     );
   });
 
@@ -79,6 +82,7 @@ describe('FacadeVuesService', () => {
       chemin: '/tmp/donnees-test.sqm',
       donnees: { versionSchema: 1 },
       id: 'vue-1',
+      origine: 'Vues enregistrées',
       motDePasse: 'mot-de-passe',
     });
 
@@ -86,6 +90,7 @@ describe('FacadeVuesService', () => {
       chemin: '/tmp/donnees-test.sqm',
       donnees: { versionSchema: 1 },
       id: 'vue-1',
+      origine: 'Vues enregistrées',
       motDePasse: 'mot-de-passe',
     });
     expect(resultat).toEqual({ versionSchema: 2 });

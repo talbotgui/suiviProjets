@@ -16,19 +16,34 @@ describe('SqmParametrageComponent', () => {
   it("affiche l'onglet Seuils et référentiels par défaut", () => {
     const composant = TestBed.createComponent(SqmParametrageComponent).componentInstance;
 
-    expect(composant.ongletActif).toBe('seuilsReferentiels');
+    expect(composant.ongletActif()).toBe('seuilsReferentiels');
   });
 
-  it.each(['seuilsReferentiels', 'journal', 'purge', 'exportImport', 'securite'] as const)(
-    'sélectionne l’onglet « %s »',
-    (onglet) => {
-      const composant = TestBed.createComponent(SqmParametrageComponent).componentInstance;
+  it.each([
+    'seuilsReferentiels',
+    'journal',
+    'purge',
+    'exportImport',
+    'securite',
+    'vuesEnregistrees',
+  ] as const)('sélectionne l’onglet « %s »', (onglet) => {
+    const composant = TestBed.createComponent(SqmParametrageComponent).componentInstance;
 
-      composant.selectionnerOnglet(onglet);
+    composant.selectionnerOnglet(onglet);
 
-      expect(composant.ongletActif).toBe(onglet);
-    },
-  );
+    expect(composant.ongletActif()).toBe(onglet);
+  });
+
+  it("préselectionne l'onglet Vues enregistrées via le paramètre de requête `onglet` (US-054)", () => {
+    const fixture = TestBed.createComponent(SqmParametrageComponent);
+    fixture.componentRef.setInput('onglet', 'vuesEnregistrees');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.ongletActif()).toBe('vuesEnregistrees');
+    expect(DomTestUtils.obtenirElementNatif(fixture).textContent).toContain(
+      'Administration centralisée de toutes les vues',
+    );
+  });
 
   it("affiche l'onglet Export / Import, construit à la Phase 9 (incrément 3, US-029, US-030)", () => {
     const fixture = TestBed.createComponent(SqmParametrageComponent);

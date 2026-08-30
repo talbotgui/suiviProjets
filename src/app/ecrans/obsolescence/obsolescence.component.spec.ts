@@ -2,6 +2,7 @@
 // conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
@@ -166,6 +167,7 @@ describe('SqmObsolescenceComponent', () => {
     jest.mocked(invoke).mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmObsolescenceComponent],
+      providers: [provideRouter([])],
     }).compileComponents();
     donneesApplication = TestBed.inject(DonneesApplicationService);
     notification = TestBed.inject(NotificationService);

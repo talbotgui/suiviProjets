@@ -20,6 +20,7 @@
 import { Component, computed, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../confirmation-suppression/confirmation-suppression.component';
 
@@ -83,7 +84,12 @@ export interface DemandeSuppressionVue {
  */
 @Component({
   selector: 'app-selecteur-vue',
-  imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    SqmConfirmationMotDePasseComponent,
+    SqmConfirmationSuppressionComponent,
+  ],
   templateUrl: './selecteur-vue.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './selecteur-vue.component.scss',

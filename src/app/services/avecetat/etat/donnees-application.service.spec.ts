@@ -776,6 +776,7 @@ describe('DonneesApplicationService', () => {
         versionFiltres: 1,
         parDefaut: true,
         filtres: { groupeId: 'g1' },
+        origine: 'Vues enregistrées',
         motDePasse: 'mot-de-passe',
       });
       expect(resultat).toEqual({ type: 'succes' });
@@ -809,6 +810,7 @@ describe('DonneesApplicationService', () => {
         chemin: '/tmp/donnees-test.sqm',
         donnees: racineAvantAppel,
         id: 'vue-1',
+        origine: 'Vues enregistrées',
         motDePasse: 'mot-de-passe',
       });
       expect(resultat).toEqual({ type: 'succes' });

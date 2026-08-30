@@ -44,6 +44,8 @@ export interface ParametresDefinitionVue<TDonnees> {
   readonly parDefaut: boolean;
   /** Filtres, structure propre à l'écran concerné. */
   readonly filtres: unknown;
+  /** Libellé d'origine consigné au journal des modifications pour cette mutation de vue (RG-054). */
+  readonly origine: string;
   /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
   readonly motDePasse: string;
 }
@@ -59,6 +61,8 @@ export interface ParametresSuppressionVue<TDonnees> {
   readonly donnees: TDonnees;
   /** Identifiant de la vue à supprimer. */
   readonly id: string;
+  /** Libellé d'origine consigné au journal des modifications pour cette suppression de vue (RG-054). */
+  readonly origine: string;
   /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
   readonly motDePasse: string;
 }

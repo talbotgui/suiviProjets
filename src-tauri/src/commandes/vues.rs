@@ -16,12 +16,14 @@ use super::fichier::ErreurFacade;
 use crate::modele::racine::DonneesRacine;
 use crate::persistance::moteur;
 use crate::persistance::vues;
+use chrono::{SecondsFormat, Utc};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use tauri::State;
 
-/// Ajoute ou met à jour une vue enregistrée, sauvegarde le fichier (US-028, RG-027, RG-002). Aucune entrée de
-/// journal n'est consignée (cf. commentaire d'en-tête de [`crate::persistance::vues`]).
+/// Ajoute ou met à jour une vue enregistrée, sauvegarde le fichier (US-028, RG-027, RG-002). Consigne une entrée
+/// du journal des modifications avant sauvegarde (RG-054, cf. commentaire d'en-tête de [`crate::persistance::vues`]) ;
+/// l'`horodatage` de l'entrée est calculé ici, comme pour les autres commandes de paramétrage.
 ///
 /// # Erreurs
 ///
@@ -30,7 +32,7 @@ use tauri::State;
 /// sinon.
 #[allow(
     clippy::too_many_arguments,
-    reason = "gabarit `definirSeuil`/`definirReferentiel` (chemin, données, mot de passe, état) augmenté des seuls champs métier d'une VueEnregistree, cf. commentaire d'en-tête du module"
+    reason = "gabarit `definirSeuil`/`definirReferentiel` (chemin, données, mot de passe, état) augmenté des champs métier d'une VueEnregistree et de l'origine de journalisation, cf. commentaire d'en-tête du module"
 )]
 #[tauri::command]
 pub(crate) fn definir_vue(
@@ -42,12 +44,14 @@ pub(crate) fn definir_vue(
     version_filtres: u32,
     par_defaut: bool,
     filtres: Value,
+    origine: String,
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
     crate::journalisation::consigner_debut_commande("definirVue");
     let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
         super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
         let mut donnees = donnees;
         vues::definir_vue(
             &mut donnees,
@@ -57,6 +61,8 @@ pub(crate) fn definir_vue(
             version_filtres,
             par_defaut,
             filtres,
+            origine,
+            horodatage,
         )?;
 
         let cle =
@@ -69,7 +75,8 @@ pub(crate) fn definir_vue(
     resultat
 }
 
-/// Supprime une vue enregistrée par identifiant, sauvegarde le fichier (US-028).
+/// Supprime une vue enregistrée par identifiant, sauvegarde le fichier (US-028). Consigne une entrée du journal
+/// des modifications avant sauvegarde (RG-054).
 ///
 /// # Erreurs
 ///
@@ -80,14 +87,16 @@ pub(crate) fn supprimer_vue(
     chemin: String,
     donnees: DonneesRacine,
     id: String,
+    origine: String,
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
     crate::journalisation::consigner_debut_commande("supprimerVue");
     let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
         super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
         let mut donnees = donnees;
-        vues::supprimer_vue(&mut donnees, &id)?;
+        vues::supprimer_vue(&mut donnees, &id, origine, horodatage)?;
 
         let cle = moteur::sauvegarder_fichier(
             Path::new(&chemin),

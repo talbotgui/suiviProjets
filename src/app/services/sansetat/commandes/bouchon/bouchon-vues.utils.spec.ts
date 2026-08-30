@@ -113,4 +113,49 @@ describe('BouchonVuesUtils', () => {
 
     expect(resultat.meta.modifieLe).not.toBe('2020-01-01T00:00:00.000Z');
   });
+
+  it('consigne une entrée de journal résumée pour chaque mutation de vue (RG-054)', async () => {
+    const creation = await BouchonVuesUtils.invoquer<{
+      readonly journal: readonly {
+        readonly objet: string;
+        readonly avant: unknown;
+        readonly apres: unknown;
+        readonly origine: string;
+      }[];
+    }>('definir_vue', {
+      donnees: { ...DONNEES_DE_BASE, journal: [] },
+      nom: 'Vue E2E',
+      ecran: 'obsolescence',
+      versionFiltres: 1,
+      parDefaut: false,
+      filtres: { groupeId: 'g1' },
+      origine: 'Vues enregistrées',
+    });
+
+    expect(creation.journal).toHaveLength(1);
+    expect(creation.journal[0].objet).toMatch(/^vuesEnregistrees\//);
+    expect(creation.journal[0].avant).toBeNull();
+    expect(creation.journal[0].apres).toEqual({
+      nom: 'Vue E2E',
+      ecran: 'obsolescence',
+      parDefaut: false,
+    });
+    expect(creation.journal[0].origine).toBe('Vues enregistrées');
+
+    const suppression = await BouchonVuesUtils.invoquer<{
+      readonly journal: readonly { readonly avant: unknown; readonly apres: unknown }[];
+    }>('supprimer_vue', {
+      donnees: { ...DONNEES_DE_BASE, journal: [] },
+      id: 'v1',
+      origine: 'Vues enregistrées',
+    });
+
+    expect(suppression.journal).toHaveLength(1);
+    expect(suppression.journal[0].avant).toEqual({
+      nom: 'Vue existante',
+      ecran: 'syntheseAudits',
+      parDefaut: true,
+    });
+    expect(suppression.journal[0].apres).toBeNull();
+  });
 });

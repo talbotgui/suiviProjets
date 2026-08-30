@@ -7,8 +7,10 @@
 // l'enregistrement d'une vue depuis l'écran Synthèse des audits lors d'un rejeu du test de bout en bout Playwright.
 //
 // Reproduit une version volontairement simplifiée de la logique métier du cœur natif
-// (`src-tauri/src/commandes/vues.rs`, hors périmètre de lecture de cette tâche), sur le modèle déjà retenu par les
-// bouchons voisins : RG-023 (journal des modifications) jamais alimentée par ce bouchon.
+// (`src-tauri/src/commandes/vues.rs`), sur le modèle déjà retenu par les bouchons voisins. Depuis le plan_16
+// (incrément 4, RG-054), toute mutation de vue consigne une entrée du journal des modifications (`avant`/`apres`
+// résumés en `{ nom, ecran, parDefaut }`, jamais le contenu des filtres), pour que le test de bout en bout puisse
+// vérifier cette journalisation.
 //
 // Volontairement non typé sur `DonneesRacine`/`VueEnregistree`/… (`services/avecetat/etat/types-donnees.ts`),
 // interdits en dépendance depuis `services/sansetat/` (cf. commentaire d'en-tête de `donnees-racine-bouchon.ts`) :
@@ -104,12 +106,23 @@ export class BouchonVuesUtils {
         ? [...vuesRebasees, nouvelleVue]
         : vuesRebasees.map((vue, position) => (position === index ? nouvelleVue : vue));
 
-    return { ...donnees, vuesEnregistrees: nouvellesVues };
+    const avant = index === -1 ? null : BouchonVuesUtils.resumeVue(vues[index]);
+    return {
+      ...donnees,
+      vuesEnregistrees: nouvellesVues,
+      journal: BouchonVuesUtils.avecEntreeJournal(
+        donnees,
+        parametres,
+        id,
+        avant,
+        BouchonVuesUtils.resumeVue(nouvelleVue),
+      ),
+    };
   }
 
   /**
-   * Supprime une vue enregistrée par identifiant (US-028).
-   * @param parametres - Paramètres reçus (`id`, `donnees`).
+   * Supprime une vue enregistrée par identifiant (US-028), consigne l'entrée de journal correspondante (RG-054).
+   * @param parametres - Paramètres reçus (`id`, `origine`, `donnees`).
    * @returns La racine mise à jour (non encore horodatée).
    */
   private static supprimerVue(
@@ -118,7 +131,62 @@ export class BouchonVuesUtils {
     const donnees = BouchonVuesUtils.exigerObjet(parametres['donnees']);
     const id = BouchonVuesUtils.lireTexte(parametres, 'id');
     const vues = BouchonVuesUtils.lireListe(donnees, 'vuesEnregistrees');
-    return { ...donnees, vuesEnregistrees: vues.filter((vue) => vue['id'] !== id) };
+    const supprimee = vues.find((vue) => vue['id'] === id);
+    return {
+      ...donnees,
+      vuesEnregistrees: vues.filter((vue) => vue['id'] !== id),
+      journal: BouchonVuesUtils.avecEntreeJournal(
+        donnees,
+        parametres,
+        id,
+        supprimee === undefined ? null : BouchonVuesUtils.resumeVue(supprimee),
+        null,
+      ),
+    };
+  }
+
+  /**
+   * Résume une vue pour le journal des modifications (RG-054) : nom, écran et statut par défaut uniquement, jamais
+   * le contenu des filtres.
+   * @param vue - Vue (objet non typé à cette frontière).
+   * @returns Le résumé `{ nom, ecran, parDefaut }`.
+   */
+  private static resumeVue(vue: Readonly<Record<string, unknown>>): Record<string, unknown> {
+    return {
+      nom: typeof vue['nom'] === 'string' ? vue['nom'] : '',
+      ecran: typeof vue['ecran'] === 'string' ? vue['ecran'] : '',
+      parDefaut: vue['parDefaut'] === true,
+    };
+  }
+
+  /**
+   * Construit le journal des modifications de la racine avec une entrée supplémentaire pour la mutation de vue
+   * courante (RG-054).
+   * @param donnees - Racine source.
+   * @param parametres - Paramètres reçus (pour lire `origine`).
+   * @param idVue - Identifiant de la vue mutée.
+   * @param avant - Résumé avant mutation, `null` pour une création.
+   * @param apres - Résumé après mutation, `null` pour une suppression.
+   * @returns Le journal enrichi de l'entrée.
+   */
+  private static avecEntreeJournal(
+    donnees: Readonly<Record<string, unknown>>,
+    parametres: Readonly<Record<string, unknown>>,
+    idVue: string,
+    avant: Record<string, unknown> | null,
+    apres: Record<string, unknown> | null,
+  ): readonly unknown[] {
+    return [
+      ...BouchonVuesUtils.lireListe(donnees, 'journal'),
+      {
+        id: crypto.randomUUID(),
+        horodatage: new Date().toISOString(),
+        objet: `vuesEnregistrees/${idVue}`,
+        avant,
+        apres,
+        origine: BouchonVuesUtils.lireTexte(parametres, 'origine') || 'Vues enregistrées',
+      },
+    ];
   }
 
   /**
