@@ -282,10 +282,18 @@ const MAX_PAGES_CONTRIBUTEURS: u32 = 20;
 const FENETRE_CONTRIBUTEURS_JOURS: u32 = 90;
 
 /// Nombre maximal de pages parcourues lors de la récupération de l'arborescence complète d'un dépôt
-/// (`interrogerMarqueursIa`) : borne de sécurité arbitraire (cf. rapport de développement de cette phase), sur le
-/// même principe que [`MAX_PAGES_CONTRIBUTEURS`] ; au-delà, un dépôt à très fort volume de fichiers verrait sa
-/// détection de marqueurs IA limitée aux premières entrées plutôt que de générer un nombre d'appels illimité.
-const MAX_PAGES_ARBORESCENCE: u32 = 50;
+/// ([`recuperer_arborescence_recursive`], partagée par `interrogerMarqueursIa` et `interrogerDependances`) :
+/// garde-fou anti-boucle uniquement, jamais un arrêt nominal. La pagination réelle suit l'en-tête `x-next-page`
+/// renvoyé par GitLab et s'arrête d'elle-même à la dernière page ; atteindre cette borne alors que l'API annonce
+/// encore une page suivante est une [`ErreurConnecteur::ReponseInattendue`] explicite (dépôt hors de l'échelle
+/// visée, cf. `docs/02_documentation/07_exigencesNonFonctionnelles.md` RNF-006), et non plus une troncature
+/// silencieuse de l'arborescence.
+///
+/// Valeur portée de 50 à 2000 le 2026-08-30 : à 50 pages (5 000 entrées) et parce que la forme récursive de cet
+/// endpoint énumère toutes les entrées de répertoire avant les fichiers de premier niveau
+/// (`gitlab-org/gitlab#353211`, `#427205`), le `pom.xml` racine d'un projet multi-module réel n'était jamais
+/// atteint — donc jamais audité (bug, cf. rapport de développement).
+const MAX_PAGES_ARBORESCENCE: u32 = 2000;
 
 /// Type de correspondance d'une règle de détection de marqueur IA (`Referentiels.reglesMarqueursIA`), cf.
 /// `docs/01_besoin/Specification.md#518-f18--politique-ia`.
@@ -438,10 +446,112 @@ fn detecter_marqueurs(
     Ok(marqueurs)
 }
 
+/// Numéro de la page suivante d'une réponse paginée de l'API GitLab, lu dans l'en-tête `x-next-page` : `None`
+/// lorsqu'il est absent, vide ou non numérique — ce que GitLab renvoie sur la dernière page. GitLab expose ces
+/// en-têtes de pagination par numéro de page (`x-page`, `x-next-page`, `x-total-pages`) même sur la forme
+/// récursive de `repository/tree`, dont la documentation annonce pourtant une pagination keyset non encore
+/// effective (`gitlab-org/gitlab#427205`).
+fn entete_page_suivante(entetes: &reqwest::header::HeaderMap) -> Option<u32> {
+    entetes
+        .get("x-next-page")?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u32>()
+        .ok()
+}
+
+/// Récupère l'intégralité de l'arborescence récursive (`recursive=true`) de la ref auditée d'un dépôt GitLab
+/// (`GET .../repository/tree`), en suivant la pagination par numéro de page tant que GitLab signale une page
+/// suivante ([`entete_page_suivante`]) et que la page courante n'est pas vide. Partagée par
+/// [`interroger_marqueurs_ia`] et [`interroger_dependances`].
+///
+/// L'arrêt sur l'en-tête `x-next-page` remplace l'ancien arrêt au bout de [`MAX_PAGES_ARBORESCENCE`] pages : la
+/// forme récursive de cet endpoint énumère toutes les entrées de répertoire avant les fichiers de premier niveau
+/// (`gitlab-org/gitlab#353211`), si bien qu'un plafond de pages fixe écartait silencieusement les derniers
+/// fichiers du dépôt — typiquement le `pom.xml` racine d'un projet multi-module, jamais audité de ce fait (bug
+/// corrigé le 2026-08-30, cf. rapport de développement). [`MAX_PAGES_ARBORESCENCE`] n'est plus qu'un garde-fou
+/// anti-boucle : le dépasser est désormais une [`ErreurConnecteur::ReponseInattendue`] explicite.
+///
+/// # Erreurs
+///
+/// Voir [`resoudre_ref_effective`] : authentification refusée (401), droits insuffisants (403), instance
+/// injoignable, délai dépassé, réponse inattendue (statut ou JSON non conforme, ou pagination au-delà du
+/// garde-fou [`MAX_PAGES_ARBORESCENCE`]).
+async fn recuperer_arborescence_recursive(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    ref_effective: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<ReponseEntreeArborescence>, ErreurConnecteur> {
+    let url = format!(
+        "{}/api/v4/projects/{}/repository/tree",
+        url_base.trim_end_matches('/'),
+        id_externe
+    );
+    let mut entrees = Vec::new();
+    let mut page: u32 = 1;
+    loop {
+        let reponse = client
+            .get(url.as_str())
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("ref", ref_effective),
+                ("recursive", "true"),
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        let page_suivante = entete_page_suivante(reponse.headers());
+        let page_entrees = reponse
+            .json::<Vec<ReponseEntreeArborescence>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        let page_vide = page_entrees.is_empty();
+        entrees.extend(page_entrees);
+
+        match page_suivante {
+            Some(suivante) if !page_vide && suivante > page => {
+                if suivante > MAX_PAGES_ARBORESCENCE {
+                    return Err(ErreurConnecteur::ReponseInattendue {
+                        message: format!(
+                            "Arborescence du dépôt paginée au-delà de {MAX_PAGES_ARBORESCENCE} pages (dépôt hors de l'échelle visée)"
+                        ),
+                    });
+                }
+                page = suivante;
+            }
+            // En-tête `x-next-page` absent/vide, page vide, ou numéro non progressif : arborescence complète.
+            _ => return Ok(entrees),
+        }
+    }
+}
+
 /// Interroge les marqueurs d'outils IA détectés dans l'arborescence complète de la ref auditée d'un dépôt GitLab
 /// (US-009, F18, RG-021), par correspondance avec le référentiel `regles` (`Referentiels.reglesMarqueursIA`)
-/// transmis par l'appelant : récupère l'arborescence complète, paginée (`recursive=true`), jusqu'à épuisement ou
-/// [`MAX_PAGES_ARBORESCENCE`], puis applique [`detecter_marqueurs`].
+/// transmis par l'appelant : récupère l'arborescence complète ([`recuperer_arborescence_recursive`]), puis applique
+/// [`detecter_marqueurs`].
 ///
 /// # Erreurs
 ///
@@ -472,52 +582,14 @@ pub(crate) async fn interroger_marqueurs_ia(
     )
     .await?;
 
-    let mut entrees = Vec::new();
-    for page in 1..=MAX_PAGES_ARBORESCENCE {
-        let url = format!(
-            "{}/api/v4/projects/{}/repository/tree",
-            url_base.trim_end_matches('/'),
-            id_externe
-        );
-        let reponse = client
-            .get(url)
-            .header("PRIVATE-TOKEN", credential)
-            .query(&[
-                ("ref", resolue.ref_effective.as_str()),
-                ("recursive", "true"),
-                ("per_page", TAILLE_PAGE_AUDIT),
-                ("page", page.to_string().as_str()),
-            ])
-            .send()
-            .await
-            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-        let statut = reponse.status();
-        if statut.as_u16() == 401 {
-            return Err(ErreurConnecteur::AuthentificationRefusee {
-                message: format!("Statut HTTP {} reçu", statut.as_u16()),
-            });
-        }
-        if statut.as_u16() == 403 {
-            return Err(ErreurConnecteur::DroitsInsuffisants {
-                message: format!("Statut HTTP {} reçu", statut.as_u16()),
-            });
-        }
-        if !statut.is_success() {
-            return Err(ErreurConnecteur::ReponseInattendue {
-                message: format!("Statut HTTP {} reçu", statut.as_u16()),
-            });
-        }
-        let page_entrees = reponse
-            .json::<Vec<ReponseEntreeArborescence>>()
-            .await
-            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-                message: erreur.to_string(),
-            })?;
-        if page_entrees.is_empty() {
-            break;
-        }
-        entrees.extend(page_entrees);
-    }
+    let entrees = recuperer_arborescence_recursive(
+        url_base,
+        credential,
+        id_externe,
+        &resolue.ref_effective,
+        client,
+    )
+    .await?;
 
     let marqueurs = detecter_marqueurs(&entrees, regles)?;
 
@@ -2439,8 +2511,9 @@ fn parser_build_gradle(contenu: &str, chemin_manifeste: &str) -> Vec<Dependance>
 
 /// Interroge les dépendances déclarées par les manifestes du dépôt (`gitlab.dependances`), tous écosystèmes
 /// reconnus confondus (périmètre V1, cf. [`NOMS_MANIFESTES_RECONNUS`]) : récupère l'arborescence complète de la ref
-/// auditée (même algorithme paginé que [`interroger_marqueurs_ia`]), retient les fichiers dont le basename
-/// correspond à un manifeste reconnu, lit leur contenu brut puis les parse avec le module dédié à leur écosystème.
+/// auditée ([`recuperer_arborescence_recursive`], partagée avec [`interroger_marqueurs_ia`]), retient les fichiers
+/// dont le basename correspond à un manifeste reconnu, lit leur contenu brut puis les parse avec le module dédié à
+/// leur écosystème.
 /// L'absence de tout manifeste dans le dépôt n'est jamais une anomalie : `dependances` est alors simplement vide.
 ///
 /// Pour l'écosystème Maven, le traitement se fait en deux passes : tous les `pom.xml` du dépôt sont d'abord parsés
@@ -2483,56 +2556,21 @@ pub(crate) async fn interroger_dependances(
     )
     .await?;
 
+    let entrees = recuperer_arborescence_recursive(
+        url_base,
+        credential,
+        id_externe,
+        &resolue.ref_effective,
+        client,
+    )
+    .await?;
+
     let mut chemins_manifestes = Vec::new();
-    for page in 1..=MAX_PAGES_ARBORESCENCE {
-        let url = format!(
-            "{}/api/v4/projects/{}/repository/tree",
-            url_base.trim_end_matches('/'),
-            id_externe
-        );
-        let reponse = client
-            .get(url)
-            .header("PRIVATE-TOKEN", credential)
-            .query(&[
-                ("ref", resolue.ref_effective.as_str()),
-                ("recursive", "true"),
-                ("per_page", TAILLE_PAGE_AUDIT),
-                ("page", page.to_string().as_str()),
-            ])
-            .send()
-            .await
-            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-        let statut = reponse.status();
-        if statut.as_u16() == 401 {
-            return Err(ErreurConnecteur::AuthentificationRefusee {
-                message: format!("Statut HTTP {} reçu", statut.as_u16()),
-            });
-        }
-        if statut.as_u16() == 403 {
-            return Err(ErreurConnecteur::DroitsInsuffisants {
-                message: format!("Statut HTTP {} reçu", statut.as_u16()),
-            });
-        }
-        if !statut.is_success() {
-            return Err(ErreurConnecteur::ReponseInattendue {
-                message: format!("Statut HTTP {} reçu", statut.as_u16()),
-            });
-        }
-        let page_entrees = reponse
-            .json::<Vec<ReponseEntreeArborescence>>()
-            .await
-            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-                message: erreur.to_string(),
-            })?;
-        if page_entrees.is_empty() {
-            break;
-        }
-        for entree in &page_entrees {
-            if entree.type_entree == "blob"
-                && NOMS_MANIFESTES_RECONNUS.contains(&basename(&entree.path))
-            {
-                chemins_manifestes.push(entree.path.clone());
-            }
+    for entree in &entrees {
+        if entree.type_entree == "blob"
+            && NOMS_MANIFESTES_RECONNUS.contains(&basename(&entree.path))
+        {
+            chemins_manifestes.push(entree.path.clone());
         }
     }
 
@@ -4394,32 +4432,32 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn interroger_marqueurs_ia_agrege_plusieurs_pages_avant_la_page_vide()
+    async fn interroger_marqueurs_ia_agrege_toutes_les_pages_signalees_par_lentete_page_suivante()
     -> Result<(), ErreurConnecteur> {
         use wiremock::matchers::query_param;
 
         let serveur = MockServer::start().await;
         monter_mock_resolution_ref(&serveur).await;
+        // Page 1 : `x-next-page` annonce une page 2 (le corps de la page 1 n'est pas vide).
         Mock::given(method("GET"))
             .and(path("/api/v4/projects/1234/repository/tree"))
             .and(query_param("page", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                { "path": "CLAUDE.md", "type": "blob" }
-            ])))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-next-page", "2")
+                    .set_body_json(serde_json::json!([
+                        { "path": "CLAUDE.md", "type": "blob" }
+                    ])),
+            )
             .mount(&serveur)
             .await;
+        // Page 2 : dernière page (aucun en-tête `x-next-page`), corps non vide.
         Mock::given(method("GET"))
             .and(path("/api/v4/projects/1234/repository/tree"))
             .and(query_param("page", "2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
                 { "path": "sous-dossier/CLAUDE.md", "type": "blob" }
             ])))
-            .mount(&serveur)
-            .await;
-        Mock::given(method("GET"))
-            .and(path("/api/v4/projects/1234/repository/tree"))
-            .and(query_param("page", "3"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
             .mount(&serveur)
             .await;
 
@@ -4443,6 +4481,8 @@ mod tests {
         )
         .await?;
 
+        // Un marqueur pour `CLAUDE.md` (page 1) et un pour `sous-dossier/CLAUDE.md` (page 2) :
+        // la page 2 n'est atteinte que parce que l'en-tête `x-next-page` de la page 1 la signale.
         assert_eq!(resultat.marqueurs.len(), 2);
         Ok(())
     }
@@ -4656,7 +4696,7 @@ mod tests {
     // -- interroger_dependances --------------------------------------------------------------------------------
 
     /// Monte les mocks de résolution de ref et d'arborescence communs aux tests de `interroger_dependances`
-    /// (un seul appel de pagination de l'arborescence, page suivante vide).
+    /// (arborescence tenant sur une seule page : aucun en-tête `x-next-page`, la pagination s'arrête d'elle-même).
     async fn monter_mock_arborescence(serveur: &MockServer, entrees: serde_json::Value) {
         use wiremock::matchers::query_param;
 
@@ -4664,12 +4704,6 @@ mod tests {
             .and(path("/api/v4/projects/1234/repository/tree"))
             .and(query_param("page", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(entrees))
-            .mount(serveur)
-            .await;
-        Mock::given(method("GET"))
-            .and(path("/api/v4/projects/1234/repository/tree"))
-            .and(query_param("page", "2"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
             .mount(serveur)
             .await;
     }
@@ -4949,6 +4983,124 @@ mod tests {
         assert!(matches!(
             resultat,
             Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_dependances_collecte_un_manifeste_present_seulement_sur_une_page_ulterieure()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::{path_regex, query_param};
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // Page 1 : un module de sous-répertoire ; `x-next-page` annonce une page 2.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-next-page", "2")
+                    .set_body_json(serde_json::json!([
+                        { "path": "module-a/pom.xml", "type": "blob" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+        // Page 2 (dernière) : le `pom.xml` racine, classé après toutes les entrées de sous-répertoires par la
+        // forme récursive de l'endpoint — l'ancien plafond de pages fixe l'écartait silencieusement de l'audit.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "path": "pom.xml", "type": "blob" }
+            ])))
+            .mount(&serveur)
+            .await;
+
+        let racine = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>racine</artifactId>
+            <version>1.0.0</version>
+            <dependencies>
+                <dependency>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                    <version>2.0.13</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/files/pom.xml/raw"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(racine))
+            .mount(&serveur)
+            .await;
+
+        let module = r#"<project><artifactId>module-a</artifactId></project>"#;
+        Mock::given(method("GET"))
+            .and(path_regex(
+                r"/api/v4/projects/1234/repository/files/module-a.*pom\.xml/raw",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_string(module))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert!(
+            resultat
+                .dependances
+                .iter()
+                .any(|d| d.reference == "org.slf4j:slf4j-api" && d.manifeste == "pom.xml"),
+            "la dépendance du pom.xml racine, présent seulement en page 2, doit être auditée : {:?}",
+            resultat.dependances
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_dependances_signale_une_arborescence_paginee_au_dela_du_garde_fou() {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // `x-next-page` pointe au-delà de `MAX_PAGES_ARBORESCENCE` : dépôt hors de l'échelle visée, anomalie
+        // explicite plutôt que troncature silencieuse de l'arborescence.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/tree"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-next-page", "3000")
+                    .set_body_json(serde_json::json!([
+                        { "path": "pom.xml", "type": "blob" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_dependances(
+            &serveur.uri(),
+            "jeton-valide",
+            "source-1",
+            "1234",
+            Some("develop"),
+            None, // date_ciblee
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
         ));
     }
 
