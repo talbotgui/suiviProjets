@@ -325,7 +325,8 @@ export class SqmListeTravailComponent {
   );
 
   /**
-   * Alertes après application des filtres courants (groupe, recherche texte).
+   * Alertes après application des filtres courants : sélection de groupe et de projets du filtre partagé
+   * ({@link ContexteConsultationService}, RG-053) et texte de recherche libre.
    */
   public readonly alertesFiltrees: Signal<readonly LigneAlerteTravail[]> = computed(() => {
     const { groupeId, projetIds } = this.contexte.etat();

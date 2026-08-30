@@ -267,6 +267,29 @@ describe('SqmObsolescenceComponent', () => {
     expect(composant.projetsAffiches()).toHaveLength(2);
   });
 
+  it('filtre par projets via le filtre groupe/projet mutualisé (RG-053)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'Projet 1', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '17', manifeste: 'pom.xml' },
+        ]),
+      ]),
+      DonneesDeTest.groupe('g2', 'Groupe 2', 'p2', 'Projet 2', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '8', manifeste: 'pom.xml' },
+        ]),
+      ]),
+    ]);
+    const composant = creer(racine).componentInstance;
+    expect(composant.projetsAffiches()).toHaveLength(2);
+
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: ['p1'] });
+    expect(composant.projetsAffiches().map((ligne) => ligne.projetId)).toEqual(['p1']);
+
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: null });
+    expect(composant.projetsAffiches()).toHaveLength(2);
+  });
+
   it('exclut un projet hors des bornes min/max resserrées d’une catégorie', () => {
     const racine = DonneesDeTest.racine([
       DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'Projet 1', [

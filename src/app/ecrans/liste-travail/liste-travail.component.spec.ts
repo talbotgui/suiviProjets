@@ -354,7 +354,7 @@ describe('SqmListeTravailComponent', () => {
     expect(alertes[0].detecteeDepuis).toBe('2026-07-01T09:00:00Z');
   });
 
-  it('filtre les alertes par groupe et par texte de recherche', () => {
+  it('filtre les alertes par groupe, par projets (RG-053) et par texte de recherche', () => {
     const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('jdupont', 30)]);
     const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
     donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
@@ -372,6 +372,12 @@ describe('SqmListeTravailComponent', () => {
     composant.onChangerRecherche('');
     composant.onSelectionGroupeProjet({ groupeId: 'groupe-inconnu', projetIds: null });
     expect(composant.alertesFiltrees()).toHaveLength(0);
+
+    // Filtre par sélection de projets du filtre partagé.
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: ['projet-absent'] });
+    expect(composant.alertesFiltrees()).toHaveLength(0);
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: ['projet-1'] });
+    expect(composant.alertesFiltrees()).toHaveLength(1);
   });
 
   it('ouvre le panneau de traitement à l’activation d’une ligne puis le referme sans qualifier', () => {
@@ -689,7 +695,7 @@ describe('SqmListeTravailComponent', () => {
   });
 
   describe('vues enregistrées (US-028, RG-027, Phase 9 incrément 1)', () => {
-    it('applique le filtre de groupe porté par une vue choisie', () => {
+    it('applique la sélection groupe/projet portée par une vue choisie', () => {
       donneesApplication.chargerRacine(DonneesDeTest.racine([]));
       const fixture = TestBed.createComponent(SqmListeTravailComponent);
       fixture.detectChanges();
@@ -697,12 +703,13 @@ describe('SqmListeTravailComponent', () => {
 
       composant.appliquerVue({
         id: 'v1',
-        nom: 'Mon groupe',
+        nom: 'Mon périmètre',
         parDefaut: false,
-        filtres: { groupeId: 'groupe-1' },
+        filtres: { groupeId: 'groupe-1', projetIds: ['projet-1'] },
       });
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreProjetIds()).toEqual(['projet-1']);
     });
 
     it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
@@ -713,8 +720,21 @@ describe('SqmListeTravailComponent', () => {
       composant.contexte.definirParUtilisateur({ groupeId: 'groupe-1', projetIds: null });
 
       composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
+      composant.appliquerVue({
+        id: 'v2',
+        nom: 'Projets invalides',
+        parDefaut: false,
+        filtres: { groupeId: 'groupe-1', projetIds: [42] },
+      });
+      composant.appliquerVue({
+        id: 'v3',
+        nom: 'Groupe de type invalide',
+        parDefaut: false,
+        filtres: { groupeId: 42, projetIds: null },
+      });
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
+      expect(composant.filtreProjetIds()).toBeNull();
     });
 
     it('enregistre une vue avec les filtres courants et met à jour la racine (US-028)', async () => {
@@ -828,6 +848,34 @@ describe('SqmListeTravailComponent', () => {
       const composant = fixture.componentInstance;
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
+    });
+
+    it("n'amorce la vue par défaut qu'une seule fois par instance, même après rechargement de la racine", () => {
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...DonneesDeTest.racine([]),
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'listeTravail',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'groupe-1', projetIds: null },
+          },
+        ],
+      };
+      donneesApplication.chargerRacine(racineAvecVueParDefaut);
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+      expect(composant.filtreGroupeId()).toBe('groupe-1');
+
+      // Rechargement de la racine : `chargerRacine` réinitialise le filtre partagé ; l'effet se réévalue mais ne
+      // doit pas ré-amorcer la vue par défaut (garde `vueParDefautDejaAppliquee`, une application par instance).
+      donneesApplication.chargerRacine({ ...racineAvecVueParDefaut, versionSchema: 2 });
+      fixture.detectChanges();
+
+      expect(composant.filtreGroupeId()).toBeNull();
     });
 
     it("n'écrase jamais un choix de filtre de l'utilisateur par la vue par défaut de l'écran (RG-053)", () => {
