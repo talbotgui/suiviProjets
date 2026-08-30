@@ -132,7 +132,9 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | écran | zone | composants / actions |
 |---|---|---|
 | Liste de travail | Filtres et vues | [Barre de filtres commune](#barre-de-filtres-commune-synthèse-des-audits-synthèse-graphique-obsolescence-liste-de-travail) (filtre groupe/projet mutualisé + sélecteur de vue), puis sous elle : filtres d'alerte combinables propres à l'écran |
-| Liste de travail | Tableau des alertes | Membres inconnus toujours en tête ; par ligne : gravité, projet, groupe, description, date de première détection, statut vu/traité avec commentaire et horodatage |
+| Liste de travail | Onglets « À traiter » / « Traités » | Deux onglets répartissent les alertes actives (chacun affiche son nombre) : « À traiter » (actif par défaut) regroupe les alertes qui ne sont pas au statut traité (jamais vues, ou seulement vues) ; « Traités » regroupe les alertes actives déjà marquées traitées, avec la date de leur traitement, pour les consulter et les réactiver ([RG-026](./05_reglesGestion.md#vues-alertes-export-et-import)) |
+| Liste de travail | Tableau des alertes | Membres inconnus toujours en tête ; par ligne : gravité, projet, groupe, description, une colonne temporelle (« Détectée depuis » dans l'onglet « À traiter », « Traitée le » dans l'onglet « Traités »), statut vu/traité avec commentaire et horodatage |
+| Liste de travail | Panneau de traitement | Ouvert par activation d'une ligne ; « Marquer vue » / « Marquer traitée » (avec commentaire) dans l'onglet « À traiter », « Réactiver » (repasse l'alerte au statut vu, elle revient dans l'onglet « À traiter ») dans l'onglet « Traités » ; chaque action redemande le mot de passe du fichier ([RG-002](./05_reglesGestion.md#stockage-et-confidentialité-des-données)) ; accès à la Fiche projet et, pour un membre inconnu, bouton « Qualifier ce membre » |
 
 ### Recherche transversale
 
@@ -175,7 +177,7 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | Fiche projet | SONAR_KO actif : bloc Indicateurs Sonar grisé avec légende explicative de l'écart |
 | Fiche projet | Section de membres sans membre : message explicite (« Aucun membre nominatif direct. » / « Aucun groupe invité à ce projet. » / « Aucun membre hérité de l'arborescence. »), jamais une section vide muette ; l'export PNG déplie toujours les trois sections |
 | Fiche projet | Détail des groupes invités ou ancêtres inaccessible : les membres concernés sont restitués dans la section « hérités de l'arborescence », sans erreur affichée |
-| Liste de travail | Aucune alerte active : message de confirmation explicite, pas de tableau vide silencieux |
+| Liste de travail | Aucune alerte active : message de confirmation explicite, pas de tableau vide silencieux, onglets masqués. Onglet « À traiter » vide alors que des alertes traitées existent : message « Aucune alerte à traiter : tout est traité. » ; onglet « Traités » vide : message « Aucun élément traité pour le moment. » |
 | Recherche transversale | Aucun résultat : message explicite avec suggestion d'étendre la recherche à l'historique |
 | Gestion des credentials | Instance sans credential saisi : listée explicitement, jamais masquée, avec statut « — » |
 | Écran de verrouillage | Dernier échec autorisé avant fermeture : avertissement explicite avant la tentative suivante |

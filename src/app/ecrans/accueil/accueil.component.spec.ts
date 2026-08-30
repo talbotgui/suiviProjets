@@ -33,14 +33,19 @@ class DonneesDeTest {
    * écran à ce stade (cf. commentaire d'en-tête de `accueil.component.ts`).
    * @param date - Date de l'audit (ISO 8601).
    * @param usernames - Identifiants des membres du dépôt constatés lors de cet audit.
+   * @param typeAudit - Catégorie de l'audit, `reguliere` par défaut.
    * @returns L'audit de test.
    */
-  public static auditAvecMembres(date: string, usernames: readonly string[]): Audit {
+  public static auditAvecMembres(
+    date: string,
+    usernames: readonly string[],
+    typeAudit: Audit['typeAudit'] = 'reguliere',
+  ): Audit {
     return {
-      id: `audit-${date}`,
+      id: `audit-${date}-${typeAudit}`,
       date,
       campagneId: 'campagne-1',
-      typeAudit: 'reguliere',
+      typeAudit,
       resultats: [
         {
           type: 'gitlab.membres',
@@ -375,6 +380,32 @@ describe('SqmAccueilComponent', () => {
     expect(element.textContent).toContain('Jamais audité');
     expect(element.textContent).toContain('Audité il y a longtemps');
   });
+
+  it(
+    "ne signale pas « non audité depuis longtemps » ni ne masque un membre inconnu lorsqu'un audit " +
+      'historique à date passée est intégré après le dernier audit régulier (C15-14/RG-046)',
+    () => {
+      const maintenant = new Date().toISOString();
+      const auditRegulier = DonneesDeTest.auditAvecMembres(maintenant, ['inconnu1']);
+      const auditHistorique = DonneesDeTest.auditAvecMembres(
+        new Date(Date.now() - 400 * JOUR_MS).toISOString(),
+        [],
+        'historique',
+      );
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [
+        auditRegulier,
+        auditHistorique,
+      ]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      expect(composant.projetsNonAuditesDepuisLongtemps()).toEqual([]);
+      expect(composant.membreInconnuDetecte()).toBe(true);
+    },
+  );
 
   it('affiche un message explicite en l’absence de toute alerte et de tout projet ancien', () => {
     const auditRecent = DonneesDeTest.auditAvecMembres(new Date().toISOString(), ['jdupont']);

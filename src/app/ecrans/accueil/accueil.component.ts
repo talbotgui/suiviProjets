@@ -41,6 +41,7 @@ import type {
   TraitementAlerteConnu,
 } from '../../services/sansetat/jugement/alertes-accueil.utils';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
+import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { ParametresJugementUtils } from '../../services/sansetat/jugement/parametres-jugement.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 
@@ -200,8 +201,10 @@ export class SqmAccueilComponent {
   }
 
   /**
-   * Détecte les causes de membre inconnu actuellement actives (RG-006 à RG-009), à partir du dernier audit intégré
-   * de chaque projet (`Resultat.GitlabMembres`) confronté aux membres connus de son groupe de rattachement.
+   * Détecte les causes de membre inconnu actuellement actives (RG-006 à RG-009), à partir du dernier audit
+   * RÉGULIER intégré de chaque projet (`DernierAuditRegulierUtils`, convention C15-14/RG-046 : un audit historique
+   * à date passée, à périmètre d'indicateurs réduit, n'est jamais retenu ici), `Resultat.GitlabMembres` confronté
+   * aux membres connus de son groupe de rattachement.
    * Dédoublonnée par clé d'alerte (`cleAlerte`, une par couple projet/username) : un projet à plusieurs sources
    * GitLab (ex. un dépôt back et un dépôt front, cf. R15-06) produit un résultat `gitlab.membres` par source, si
    * bien qu'un même membre inconnu des deux dépôts y apparaîtrait sinon deux fois, gonflant artificiellement le
@@ -212,7 +215,7 @@ export class SqmAccueilComponent {
     const causesParCle = new Map<string, CauseAlerteActive>();
     for (const groupe of this.donneesApplication.groupes()) {
       for (const projet of groupe.projets) {
-        const dernierAudit = projet.audits.at(-1);
+        const dernierAudit = DernierAuditRegulierUtils.dernierAuditRegulier(projet.audits);
         if (dernierAudit === undefined) {
           continue;
         }

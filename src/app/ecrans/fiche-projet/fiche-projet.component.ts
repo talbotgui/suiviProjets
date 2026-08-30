@@ -73,6 +73,7 @@ import type {
   MergeRequestOuverte,
 } from '../../services/sansetat/commandes/types-facade';
 import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
+import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
 import { DerniereCampagneUtils } from '../../services/sansetat/jugement/derniere-campagne.utils';
@@ -832,8 +833,9 @@ export class SqmFicheProjetComponent {
 
     // C15-14, US-046, RG-046 : le dernier audit **régulier** est sélectionné ici, jamais simplement `.at(-1)`, pour
     // ne pas remplacer silencieusement la restitution principale par un audit historique à date passée — ce
-    // dernier reste restitué séparément (cf. {@link construireAuditsHistoriques}).
-    const dernierAudit = projet.audits.filter((audit) => audit.typeAudit !== 'historique').at(-1);
+    // dernier reste restitué séparément (cf. {@link construireAuditsHistoriques}). Filtre centralisé dans
+    // `DernierAuditRegulierUtils`.
+    const dernierAudit = DernierAuditRegulierUtils.dernierAuditRegulier(projet.audits);
     const themes = AgregationThemeFicheProjetUtils.regrouper(dernierAudit?.resultats ?? []);
 
     const seuilsFraicheurSonar = ParametresJugementUtils.lireSeuilsFraicheurSonar(seuilsBruts);

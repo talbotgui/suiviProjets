@@ -93,6 +93,7 @@ import type {
 } from '../../services/sansetat/commandes/types-facade';
 import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
 import { BadgeAuditAncienUtils } from '../../services/sansetat/jugement/badge-audit-ancien.utils';
+import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
@@ -1154,8 +1155,9 @@ export class SqmSyntheseAuditsComponent {
     const campagneEnEchec = this.campagneEnEchecPourProjet(campagnes, projet.id);
     // C15-14, US-046, RG-046 (arbitrage humain du 2026-08-24) : le dernier audit **régulier** est sélectionné ici,
     // jamais simplement `.at(-1)`, pour ne pas remplacer silencieusement la restitution de synthèse par un audit
-    // historique à date passée — même convention que `FicheProjetComponent.construireDonnees`.
-    const dernierAudit = projet.audits.filter((audit) => audit.typeAudit !== 'historique').at(-1);
+    // historique à date passée — même convention que `FicheProjetComponent.construireDonnees`, centralisée dans
+    // `DernierAuditRegulierUtils`.
+    const dernierAudit = DernierAuditRegulierUtils.dernierAuditRegulier(projet.audits);
     if (dernierAudit === undefined) {
       return {
         projetId: projet.id,

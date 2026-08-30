@@ -6,3 +6,16 @@
 .liste-travail__recherche {
   width: 260px;
 }
+
+// Résidu propre à ce composant (US-020, RG-026) : couleur de l'onglet actif « À traiter » / « Traités », non
+// exprimable par les classes utilitaires génériques, sur le modèle exact de `.parametrage__onglet--actif`
+// (src/app/ecrans/parametrage/parametrage.component.scss).
+.liste-travail__onglet--actif {
+  background-color: var(--sqm-marque-fond);
+  color: var(--sqm-marque-texte);
+  font-weight: var(--sqm-poids-demi-gras);
+
+  &:hover {
+    background-color: var(--sqm-marque-fond);
+  }
+}

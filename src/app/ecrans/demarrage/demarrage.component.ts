@@ -27,6 +27,7 @@ import { Router } from '@angular/router';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import type { CategorieErreurAdministration } from '../../services/avecetat/etat/types-donnees';
 import { SelecteurFichierUtils } from '../../services/sansetat/commandes/selecteur-fichier.utils';
+import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 
 /**
@@ -221,14 +222,14 @@ export class SqmDemarrageComponent {
 
   /**
    * Détecte si au moins une cause de membre inconnu ou en conflit (RG-006 à RG-009) existe sur le dernier audit
-   * intégré d'un projet quelconque, sur le modèle de `SqmAccueilComponent.causesMembreInconnu` (cf. commentaire
-   * d'en-tête de ce fichier).
+   * RÉGULIER intégré d'un projet quelconque (`DernierAuditRegulierUtils`, convention C15-14/RG-046), sur le modèle
+   * de `SqmAccueilComponent.causesMembreInconnu` (cf. commentaire d'en-tête de ce fichier).
    * @returns `true` si au moins une cause d'alerte active est détectée.
    */
   private alertesActivesDetectees(): boolean {
     for (const groupe of this.donneesApplication.groupes()) {
       for (const projet of groupe.projets) {
-        const dernierAudit = projet.audits.at(-1);
+        const dernierAudit = DernierAuditRegulierUtils.dernierAuditRegulier(projet.audits);
         if (dernierAudit === undefined) {
           continue;
         }

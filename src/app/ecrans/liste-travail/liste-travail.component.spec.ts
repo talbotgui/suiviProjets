@@ -40,14 +40,18 @@ class DonneesDeTest {
   /**
    * Construit un audit minimal ne portant que le constat `gitlab.membres`.
    * @param membres - Membres du dépôt constatés lors de cet audit.
+   * @param typeAudit - Catégorie de l'audit, `reguliere` par défaut.
    * @returns L'audit de test.
    */
-  public static auditAvecMembres(membres: readonly MembreGitlab[]): Audit {
+  public static auditAvecMembres(
+    membres: readonly MembreGitlab[],
+    typeAudit: Audit['typeAudit'] = 'reguliere',
+  ): Audit {
     return {
-      id: 'audit-1',
+      id: `audit-${typeAudit}`,
       date: '2026-07-20T00:00:00Z',
       campagneId: 'campagne-1',
-      typeAudit: 'reguliere',
+      typeAudit,
       resultats: [
         {
           type: 'gitlab.membres',
@@ -167,6 +171,38 @@ class DonneesDeTest {
       vuesEnregistrees: [],
     };
   }
+
+  /**
+   * Racine avec deux membres inconnus sur un même projet : `a-traiter` jamais traité, `deja-traite` marqué vu puis
+   * traité (US-020, RG-026 : jeu commun aux tests des deux onglets).
+   * @returns La racine de test.
+   */
+  public static racineUnTraiteUnATraiter(): DonneesRacine {
+    const audit = DonneesDeTest.auditAvecMembres([
+      DonneesDeTest.membreGitlab('a-traiter', 30),
+      DonneesDeTest.membreGitlab('deja-traite', 30),
+    ]);
+    const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+    return DonneesDeTest.racine(
+      [projet],
+      [],
+      [
+        {
+          id: 't1',
+          cleAlerte: 'membreInconnu|projet-1|deja-traite',
+          statut: StatutTraitementAlerte.Vue,
+          horodatage: '2026-07-01T09:00:00Z',
+        },
+        {
+          id: 't2',
+          cleAlerte: 'membreInconnu|projet-1|deja-traite',
+          statut: StatutTraitementAlerte.Traitee,
+          commentaire: 'Qualifié comme partenaire',
+          horodatage: '2026-07-05T09:00:00Z',
+        },
+      ],
+    );
+  }
 }
 
 describe('SqmListeTravailComponent', () => {
@@ -254,6 +290,29 @@ describe('SqmListeTravailComponent', () => {
       const composant = fixture.componentInstance;
 
       const alertes = composant.toutesLesAlertes();
+      expect(alertes).toHaveLength(1);
+      expect(alertes[0].cleAlerte).toBe('membreInconnu|projet-1|inconnu1');
+    },
+  );
+
+  it(
+    'détecte le membre inconnu sur le dernier audit RÉGULIER, en ignorant un audit historique à date passée ' +
+      'intégré après coup (C15-14/RG-046 : cohérence avec la Synthèse des audits)',
+    () => {
+      const auditRegulier = DonneesDeTest.auditAvecMembres([
+        DonneesDeTest.membreGitlab('inconnu1', 30),
+      ]);
+      const auditHistorique = DonneesDeTest.auditAvecMembres([], 'historique');
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [
+        auditRegulier,
+        auditHistorique,
+      ]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+
+      const alertes = fixture.componentInstance.toutesLesAlertes();
       expect(alertes).toHaveLength(1);
       expect(alertes[0].cleAlerte).toBe('membreInconnu|projet-1|inconnu1');
     },
@@ -517,6 +576,116 @@ describe('SqmListeTravailComponent', () => {
 
     expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
     expect(composant.alerteSelectionnee()).toBeDefined();
+  });
+
+  describe('onglets « À traiter » / « Traités » (US-020, RG-026)', () => {
+    it("répartit les alertes entre les deux onglets selon leur statut, l'onglet « À traiter » étant actif par défaut", () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineUnTraiteUnATraiter());
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      expect(composant.ongletActif()).toBe('aTraiter');
+      expect(composant.alertesATraiter().map((ligne) => ligne.cleAlerte)).toEqual([
+        'membreInconnu|projet-1|a-traiter',
+      ]);
+      expect(composant.alertesTraitees().map((ligne) => ligne.cleAlerte)).toEqual([
+        'membreInconnu|projet-1|deja-traite',
+      ]);
+      expect(composant.alertesOngletActif()).toBe(composant.alertesATraiter());
+    });
+
+    it("expose l'horodatage du dernier traitement effectif et une colonne « Traitée le » dans l'onglet « Traités »", () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineUnTraiteUnATraiter());
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      const traitee = composant.alertesTraitees()[0];
+      expect(traitee.traiteeLe).toBe('2026-07-05T09:00:00Z');
+      expect(composant.colonnes().map((colonne) => colonne.cle)).toContain('detecteeDepuis');
+
+      composant.changerOnglet('traitees');
+      expect(composant.ongletActif()).toBe('traitees');
+      const cles = composant.colonnes().map((colonne) => colonne.cle);
+      expect(cles).toContain('traiteeLe');
+      expect(cles).not.toContain('detecteeDepuis');
+    });
+
+    it('referme le panneau de traitement ouvert lorsqu’on change d’onglet', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineUnTraiteUnATraiter());
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.activerLigne(composant.alertesATraiter()[0]);
+      expect(composant.alerteSelectionnee()).toBeDefined();
+
+      composant.changerOnglet('traitees');
+      expect(composant.alerteSelectionnee()).toBeUndefined();
+    });
+
+    it('affiche le bouton « Réactiver » (et non « Marquer vue »/« Marquer traitée ») pour une alerte traitée', () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racineUnTraiteUnATraiter());
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.changerOnglet('traitees');
+      composant.activerLigne(composant.alertesTraitees()[0]);
+      fixture.detectChanges();
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.querySelector('#liste-travail-bouton-reactiver')).not.toBeNull();
+      expect(element.querySelector('#liste-travail-bouton-marquer-vue')).toBeNull();
+      expect(element.querySelector('#liste-travail-bouton-marquer-traitee')).toBeNull();
+    });
+
+    it('réactive une alerte traitée en la repassant au statut « vue » après confirmation du mot de passe', async () => {
+      const racine = DonneesDeTest.racineUnTraiteUnATraiter();
+      donneesApplication.chargerRacine(racine);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockResolvedValue(racine);
+
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.changerOnglet('traitees');
+      composant.activerLigne(composant.alertesTraitees()[0]);
+      composant.demanderReactiver();
+      expect(composant.actionEnAttenteMotDePasse()).toBe('reactivation');
+
+      await composant.confirmerQualification('mot-de-passe');
+
+      expect(invoke).toHaveBeenCalledWith(
+        'qualifier_alerte',
+        expect.objectContaining({
+          cleAlerte: 'membreInconnu|projet-1|deja-traite',
+          statut: StatutTraitementAlerte.Vue,
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      expect(composant.alerteSelectionnee()).toBeUndefined();
+      expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+    });
+
+    it('affiche un état vide dédié dans l’onglet « Traités » tant qu’aucune alerte n’est traitée', () => {
+      const audit = DonneesDeTest.auditAvecMembres([DonneesDeTest.membreGitlab('a-traiter', 30)]);
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+      const fixture = TestBed.createComponent(SqmListeTravailComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.changerOnglet('traitees');
+      fixture.detectChanges();
+
+      expect(composant.alertesTraitees()).toHaveLength(0);
+      expect(DomTestUtils.obtenirElementNatif(fixture).textContent).toContain(
+        'Aucun élément traité pour le moment.',
+      );
+    });
   });
 
   describe('vues enregistrées (US-028, RG-027, Phase 9 incrément 1)', () => {

@@ -4,6 +4,7 @@
 // Raccourcis intelligents de sélection du périmètre d'une campagne (F07, Phase 5, incrément 5), consommés par
 // l'écran Constitution de campagne : « rejouer les échecs de la dernière campagne » et « projets non audités
 // depuis plus de N jours » (`docs/01_besoin/Specification.md#57-f07--audit-partiel-et-reprise-sur-échec`).
+import { DernierAuditRegulierUtils } from '../../sansetat/jugement/dernier-audit-regulier.utils';
 import type { Campagne, Groupe } from '../etat/types-donnees';
 
 /**
@@ -32,7 +33,9 @@ export class PerimetreCampagneUtils {
 
   /**
    * Détermine les projets non audités depuis plus de `ancienJours` jours (F07 : « projets non audités depuis plus
-   * de N jours »), y compris les projets n'ayant encore jamais été audités.
+   * de N jours »), y compris les projets n'ayant encore jamais été audités. L'ancienneté est calculée sur le
+   * dernier audit RÉGULIER (`DernierAuditRegulierUtils`, convention C15-14/RG-046) : un audit historique à date
+   * passée ne rend pas un projet « récemment audité » et n'est jamais retenu comme référence ici.
    * @param groupes - Grappe complète des groupes/projets (`DonneesRacine.groupes`).
    * @param ancienJours - Seuil en jours (`parametres.seuils.fraicheurAudit.ancienJours`, connu de l'appelant).
    * @param maintenant - Date de référence pour le calcul de l'ancienneté (permet des tests déterministes).
@@ -47,7 +50,7 @@ export class PerimetreCampagneUtils {
     const projetsConcernes: string[] = [];
     for (const groupe of groupes) {
       for (const projet of groupe.projets) {
-        const dernierAudit = projet.audits.at(-1);
+        const dernierAudit = DernierAuditRegulierUtils.dernierAuditRegulier(projet.audits);
         if (dernierAudit === undefined) {
           projetsConcernes.push(projet.id);
           continue;

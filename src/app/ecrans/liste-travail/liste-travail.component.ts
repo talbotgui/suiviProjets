@@ -30,6 +30,17 @@
 // (arborescence : « Liste de travail a un enfant contextuel Fiche projet, accès par clic sur une alerte ») est
 // proposé comme une action explicite de ce même panneau plutôt que déclenché directement par l'activation de ligne,
 // pour ne pas faire disparaître silencieusement le panneau de traitement à chaque simple consultation.
+//
+// Évolution (US-020, RG-026 amendée le 2026-08-30, cf. `docs/02_documentation/05_reglesGestion.md` et
+// `docs/02_documentation/09_maquettes.md#liste-de-travail`) : les alertes actives sont réparties en deux onglets.
+// « À traiter » (onglet par défaut) reprend le fonctionnement historique — toute alerte active qui n'est pas au
+// statut `traitee` (jamais vue, ou seulement vue). « Traités » liste les alertes actives déjà marquées `traitee`,
+// avec la date de leur traitement (`traiteeLe`, dernière entrée `traitee` de `traitementsAlertes`) : on peut y
+// consulter le commentaire de traitement et « réactiver » l'alerte, ce qui la repasse au statut `vue` via la
+// commande `qualifier_alerte` déjà existante (aucune commande native nouvelle, RG-002 : ressaisie du mot de passe).
+// Une alerte dont la cause a disparu (membre devenu connu, ou retiré du dernier audit régulier) n'apparaît plus
+// dans aucun des deux onglets : ce sont toujours les seules alertes actuellement actives qui sont restituées,
+// jamais un historique reconstruit depuis `traitementsAlertes` (arbitrage humain du 2026-08-30).
 import {
   Component,
   ElementRef,
@@ -75,6 +86,7 @@ import {
 } from '../../services/avecetat/etat/types-donnees';
 import type { MembreGitlab } from '../../services/sansetat/commandes/types-facade';
 import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
+import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { HorodatageUtils } from '../../services/sansetat/jugement/horodatage.utils';
 import { StatutMembreUtils } from '../../services/sansetat/jugement/statut-membre.utils';
 import type { GraviteAlerteMembreInconnu } from '../../services/sansetat/jugement/statut-membre.utils';
@@ -163,12 +175,26 @@ interface LigneAlerteTravail {
   readonly commentaire: string | undefined;
   /** Horodatage de la plus ancienne entrée de traitement connue (décision arbitraire, cf. commentaire d'en-tête). */
   readonly detecteeDepuis: string | undefined;
+  /**
+   * Horodatage de l'entrée `traitee` la plus récente pour cette clé d'alerte (US-020, RG-026 : colonne « Traitée
+   * le » de l'onglet des éléments traités), `undefined` si l'alerte n'a jamais été marquée traitée.
+   */
+  readonly traiteeLe: string | undefined;
 }
 
 /**
- * Action en attente de ressaisie du mot de passe (RG-002).
+ * Onglet actif de la Liste de travail (US-020, RG-026 : suivi du traitement en deux onglets) : `aTraiter` regroupe
+ * toute alerte active qui n'est pas au statut `traitee` (jamais vue ou seulement vue), `traitees` les alertes
+ * actives déjà marquées traitées, consultables et réactivables.
  */
-type ActionEnAttente = 'vu' | 'traitement' | null;
+type TypeOngletTravail = 'aTraiter' | 'traitees';
+
+/**
+ * Action en attente de ressaisie du mot de passe (RG-002) : `vu`/`traitement` depuis l'onglet des éléments à
+ * traiter, `reactivation` depuis l'onglet des éléments traités (US-020, RG-026 : repasse l'alerte au statut
+ * `vue`, elle repart dans l'onglet « À traiter »).
+ */
+type ActionEnAttente = 'vu' | 'traitement' | 'reactivation' | null;
 
 /**
  * Écran Liste de travail (US-020) : centralise les alertes actives, membres inconnus toujours en tête, permet de
@@ -286,6 +312,12 @@ export class SqmListeTravailComponent {
   public readonly enCours: WritableSignal<boolean> = signal(false);
 
   /**
+   * Onglet actuellement affiché (US-020, RG-026) : « À traiter » par défaut, fonctionnement historique de l'écran.
+   */
+  public readonly ongletActif: WritableSignal<TypeOngletTravail> =
+    signal<TypeOngletTravail>('aTraiter');
+
+  /**
    * Ensemble complet des alertes actives, membres inconnus toujours en tête (RG-009, US-020), non filtré.
    */
   public readonly toutesLesAlertes: Signal<readonly LigneAlerteTravail[]> = computed(() =>
@@ -313,6 +345,28 @@ export class SqmListeTravailComponent {
       );
     });
   });
+
+  /**
+   * Alertes filtrées de l'onglet « À traiter » (US-020, RG-026) : toute alerte active qui n'est pas au statut
+   * `traitee` (jamais vue, ou seulement vue).
+   */
+  public readonly alertesATraiter: Signal<readonly LigneAlerteTravail[]> = computed(() =>
+    this.alertesFiltrees().filter((ligne) => ligne.statut !== StatutTraitementAlerte.Traitee),
+  );
+
+  /**
+   * Alertes filtrées de l'onglet « Traités » (US-020, RG-026) : alertes actives déjà marquées `traitee`.
+   */
+  public readonly alertesTraitees: Signal<readonly LigneAlerteTravail[]> = computed(() =>
+    this.alertesFiltrees().filter((ligne) => ligne.statut === StatutTraitementAlerte.Traitee),
+  );
+
+  /**
+   * Alertes de l'onglet actuellement affiché (US-020, RG-026), transmises au tableau dense.
+   */
+  public readonly alertesOngletActif: Signal<readonly LigneAlerteTravail[]> = computed(() =>
+    this.ongletActif() === 'aTraiter' ? this.alertesATraiter() : this.alertesTraitees(),
+  );
 
   /**
    * Résultat du filtrage des vues enregistrées de cet écran par version de filtres courante (US-028, RG-027) :
@@ -364,11 +418,34 @@ export class SqmListeTravailComponent {
 
   /**
    * Indique qu'aucune alerte n'est active (état particulier de la maquette : message explicite, jamais un tableau
-   * vide silencieux).
+   * vide silencieux). Dans ce cas, les onglets ne sont pas affichés.
    * @returns `true` si aucune alerte n'est actuellement active.
    */
   public aucuneAlerte(): boolean {
     return this.toutesLesAlertes().length === 0;
+  }
+
+  /**
+   * Bascule l'onglet affiché (US-020, RG-026) et referme le panneau de traitement éventuellement ouvert sur une
+   * alerte de l'autre onglet.
+   * @param onglet - Onglet à activer.
+   */
+  public changerOnglet(onglet: TypeOngletTravail): void {
+    if (this.ongletActif() === onglet) {
+      return;
+    }
+    this.ongletActif.set(onglet);
+    this.fermerPanneau();
+  }
+
+  /**
+   * Indique si l'alerte donnée est au statut `traitee` (US-020, RG-026 : pilote l'affichage du bouton
+   * « Réactiver » plutôt que « Marquer vue »/« Marquer traitée » dans le panneau de traitement).
+   * @param alerte - Ligne d'alerte concernée.
+   * @returns `true` si l'alerte est marquée traitée.
+   */
+  public estAlerteTraitee(alerte: LigneAlerteTravail): boolean {
+    return alerte.statut === StatutTraitementAlerte.Traitee;
   }
 
   /**
@@ -493,8 +570,10 @@ export class SqmListeTravailComponent {
 
   /**
    * Colonnes du tableau dense de la Liste de travail (cf. `docs/02_documentation/09_maquettes.md#liste-de-travail`
-   * : gravité, projet, groupe, description, date de première détection, statut).
-   * @returns Les colonnes à afficher.
+   * : gravité, projet, groupe, description, puis une colonne temporelle et le statut). La colonne temporelle est
+   * « Détectée depuis » dans l'onglet « À traiter » et « Traitée le » dans l'onglet « Traités » (US-020, RG-026 :
+   * « voir quand a été traité un point »).
+   * @returns Les colonnes à afficher pour l'onglet actif.
    */
   public colonnes(): readonly ColonneTableauDense<LigneAlerteTravail>[] {
     return [
@@ -525,17 +604,7 @@ export class SqmListeTravailComponent {
         extraireTexteBrut: (ligne) => ligne.libelle,
         extraireCellule: (ligne) => ({ segments: [{ type: 'texte', valeur: ligne.libelle }] }),
       },
-      {
-        cle: 'detecteeDepuis',
-        libelle: 'Détectée depuis',
-        triable: true,
-        extraireTexteBrut: (ligne) => ligne.detecteeDepuis ?? '',
-        extraireCellule: (ligne) => ({
-          segments: [
-            { type: 'texte', valeur: HorodatageUtils.formaterDateAvecRepli(ligne.detecteeDepuis) },
-          ],
-        }),
-      },
+      this.ongletActif() === 'traitees' ? this.colonneTraiteeLe() : this.colonneDetecteeDepuis(),
       {
         cle: 'statut',
         libelle: 'Statut',
@@ -544,6 +613,44 @@ export class SqmListeTravailComponent {
         extraireCellule: (ligne) => this.extraireCelluleStatut(ligne),
       },
     ];
+  }
+
+  /**
+   * Colonne temporelle « Détectée depuis » de l'onglet « À traiter » (horodatage de la première interaction connue
+   * avec l'alerte, cf. commentaire d'en-tête).
+   * @returns La colonne construite.
+   */
+  private colonneDetecteeDepuis(): ColonneTableauDense<LigneAlerteTravail> {
+    return {
+      cle: 'detecteeDepuis',
+      libelle: 'Détectée depuis',
+      triable: true,
+      extraireTexteBrut: (ligne) => ligne.detecteeDepuis ?? '',
+      extraireCellule: (ligne) => ({
+        segments: [
+          { type: 'texte', valeur: HorodatageUtils.formaterDateAvecRepli(ligne.detecteeDepuis) },
+        ],
+      }),
+    };
+  }
+
+  /**
+   * Colonne temporelle « Traitée le » de l'onglet « Traités » (US-020, RG-026 : horodatage de la dernière entrée
+   * `traitee` de l'alerte).
+   * @returns La colonne construite.
+   */
+  private colonneTraiteeLe(): ColonneTableauDense<LigneAlerteTravail> {
+    return {
+      cle: 'traiteeLe',
+      libelle: 'Traitée le',
+      triable: true,
+      extraireTexteBrut: (ligne) => ligne.traiteeLe ?? '',
+      extraireCellule: (ligne) => ({
+        segments: [
+          { type: 'texte', valeur: HorodatageUtils.formaterDateAvecRepli(ligne.traiteeLe) },
+        ],
+      }),
+    };
   }
 
   /**
@@ -601,6 +708,14 @@ export class SqmListeTravailComponent {
   }
 
   /**
+   * Ouvre la ressaisie du mot de passe (RG-002) avant de réactiver l'alerte traitée sélectionnée (US-020, RG-026 :
+   * elle repasse au statut `vue` et réapparaît dans l'onglet « À traiter »).
+   */
+  public demanderReactiver(): void {
+    this.actionEnAttenteMotDePasse.set('reactivation');
+  }
+
+  /**
    * Annule la ressaisie du mot de passe en cours, quelle que soit l'action qui l'avait demandée.
    */
   public annulerMotDePasse(): void {
@@ -618,7 +733,10 @@ export class SqmListeTravailComponent {
       this.actionEnAttenteMotDePasse.set(null);
       return;
     }
-    const statut = action === 'vu' ? StatutTraitementAlerte.Vue : StatutTraitementAlerte.Traitee;
+    // `reactivation` et `vu` produisent tous deux une entrée `traitementsAlertes` au statut `vue` (US-020,
+    // RG-026) : seule l'origine du geste diffère, jamais le statut résultant persisté.
+    const statut =
+      action === 'traitement' ? StatutTraitementAlerte.Traitee : StatutTraitementAlerte.Vue;
     const commentaire = this.commentaire.trim().length > 0 ? this.commentaire.trim() : undefined;
 
     this.enCours.set(true);
@@ -734,6 +852,18 @@ export class SqmListeTravailComponent {
   }
 
   /**
+   * Libellé de la date du dernier traitement effectif d'une alerte (US-020, RG-026), pour l'entête du panneau de
+   * consultation d'un élément traité.
+   * @param ligne - Ligne concernée.
+   * @returns Le libellé `Traitée le AAAA-MM-JJ`, chaîne vide si l'alerte n'a jamais été traitée.
+   */
+  public libelleDateTraitement(ligne: LigneAlerteTravail): string {
+    return ligne.traiteeLe === undefined
+      ? ''
+      : `Traitée le ${HorodatageUtils.formaterDateAvecRepli(ligne.traiteeLe)}`;
+  }
+
+  /**
    * Construit l'ensemble des alertes actives (RG-006 à RG-009, RG-010, RG-026), triées membres inconnus en tête
    * puis par gravité décroissante (US-020).
    *
@@ -755,7 +885,7 @@ export class SqmListeTravailComponent {
     const lignes: LigneAlerteTravail[] = [];
     for (const groupe of racine.groupes) {
       for (const projet of groupe.projets) {
-        const dernierAudit = projet.audits.at(-1);
+        const dernierAudit = DernierAuditRegulierUtils.dernierAuditRegulier(projet.audits);
         if (dernierAudit === undefined) {
           continue;
         }
@@ -785,6 +915,7 @@ export class SqmListeTravailComponent {
             statut: dernierTraitement?.statut ?? null,
             commentaire: dernierTraitement?.commentaire,
             detecteeDepuis: this.premiereDetection(cleAlerte, traitements),
+            traiteeLe: this.dernierHorodatageTraitee(cleAlerte, traitements),
           });
         }
       }
@@ -878,5 +1009,31 @@ export class SqmListeTravailComponent {
         : plusAncienneConnue,
     );
     return plusAncienne.horodatage;
+  }
+
+  /**
+   * Retrouve l'horodatage de l'entrée `traitee` la plus récente pour une clé d'alerte (US-020, RG-026 : colonne
+   * « Traitée le » de l'onglet des éléments traités). Une entrée `vue` postérieure (réactivation) fait sortir
+   * l'alerte de cet onglet mais n'efface pas la date du dernier traitement effectif si elle y revenait.
+   * @param cleAlerte - Clé stable de l'alerte recherchée.
+   * @param traitements - Historique complet des statuts de traitement connus.
+   * @returns L'horodatage de la dernière entrée `traitee`, `undefined` si l'alerte n'a jamais été traitée.
+   */
+  private dernierHorodatageTraitee(
+    cleAlerte: string,
+    traitements: readonly TraitementAlerte[],
+  ): string | undefined {
+    const entreesTraitees = traitements.filter(
+      (traitement) =>
+        traitement.cleAlerte === cleAlerte && traitement.statut === StatutTraitementAlerte.Traitee,
+    );
+    if (entreesTraitees.length === 0) {
+      return undefined;
+    }
+    return entreesTraitees.reduce((plusRecenteConnue, candidate) =>
+      new Date(candidate.horodatage).getTime() > new Date(plusRecenteConnue.horodatage).getTime()
+        ? candidate
+        : plusRecenteConnue,
+    ).horodatage;
   }
 }

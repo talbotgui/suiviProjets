@@ -1,7 +1,7 @@
 // Test de PerimetreCampagneUtils (cf. perimetre-campagne.utils.ts), généré avec l'assistance de l'IA (Claude
 // Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { PerimetreCampagneUtils } from './perimetre-campagne.utils';
-import type { Audit, Campagne, Groupe, Projet } from '../etat/types-donnees';
+import type { Audit, Campagne, Groupe, Projet, TypeAudit } from '../etat/types-donnees';
 
 /**
  * Fabrique de données de test, classe à membres statiques uniquement conformément à la règle « aucune fonction
@@ -47,15 +47,16 @@ class DonneesDeTest {
   /**
    * Construit un audit de test à la date donnée.
    * @param date - Date ISO 8601 de l'audit.
+   * @param typeAudit - Catégorie de l'audit, `reguliere` par défaut.
    * @returns L'audit construit.
    */
-  public static audit(date: string): Audit {
+  public static audit(date: string, typeAudit: TypeAudit = 'reguliere'): Audit {
     return {
       id: `audit-${date}`,
       date,
       campagneId: 'campagne-x',
       resultats: [],
-      typeAudit: 'reguliere',
+      typeAudit,
     };
   }
 }
@@ -153,6 +154,29 @@ describe('PerimetreCampagneUtils', () => {
       const resultat = PerimetreCampagneUtils.projetsNonAuditesDepuis(groupes, 30, MAINTENANT);
 
       expect(resultat).toEqual([]);
+    });
+
+    it("ne doit pas inclure un projet audité récemment lorsqu'un audit historique à date passée est intégré après coup (C15-14, RG-046)", () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.audit('2026-07-20T00:00:00Z'),
+        DonneesDeTest.audit('2024-01-01T00:00:00Z', 'historique'),
+      ]);
+      const groupes = [DonneesDeTest.groupe([projet])];
+
+      const resultat = PerimetreCampagneUtils.projetsNonAuditesDepuis(groupes, 30, MAINTENANT);
+
+      expect(resultat).toEqual([]);
+    });
+
+    it('doit inclure un projet dont le seul audit est un audit historique à date passée (jamais audité régulièrement)', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.audit('2026-07-20T00:00:00Z', 'historique'),
+      ]);
+      const groupes = [DonneesDeTest.groupe([projet])];
+
+      const resultat = PerimetreCampagneUtils.projetsNonAuditesDepuis(groupes, 30, MAINTENANT);
+
+      expect(resultat).toEqual(['projet-1']);
     });
 
     it('doit parcourir tous les groupes', () => {
