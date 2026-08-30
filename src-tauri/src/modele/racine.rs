@@ -74,7 +74,22 @@ use std::collections::HashMap;
 /// désérialisation. Champ purement additif à valeur de repli, aucune transformation de donnée : voir
 /// `migration_8_vers_9` enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`, sur le modèle
 /// de `migration_1_vers_2`.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 9;
+///
+/// Passage de `9` à `10` (plan_16, incrément 2 — filtrage groupe/projet mutualisé, RG-027 amendée, RG-053) :
+/// uniformise la forme du champ `filtres` de chaque [`VueEnregistree`]. À la différence des paliers additifs
+/// précédents, cette étape **mute** le document : pour chaque entrée de `vuesEnregistrees`, `filtres` est réécrit en
+/// `{ groupeId, projetIds }` (tout autre champ éventuellement présent, notamment l'`indicateur` des vues Synthèse
+/// des audits, est abandonné) et `versionFiltres` est fixé à [`VERSION_FILTRES_VUE`] pour tous les écrans, la forme
+/// de filtres devenant commune. Une vue antérieure est ainsi migrée vers la forme courante plutôt qu'ignorée avec
+/// avertissement. Voir `migration_9_vers_10` enregistrée dans
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 10;
+
+/// Version unique et partagée du schéma de filtres d'une [`VueEnregistree`], depuis le palier `9` → `10`
+/// (plan_16, incrément 2) : la forme de `filtres` (`{ groupeId, projetIds }`) est désormais commune à tous les
+/// écrans, il n'existe donc plus qu'une seule valeur de `versionFiltres` attendue. Le cœur natif n'interprète pas
+/// `filtres` (typé [`Value`]) ; cette constante ne sert qu'à `migration_9_vers_10`.
+pub(crate) const VERSION_FILTRES_VUE: u32 = 1;
 
 /// Nombre par défaut de sauvegardes de sécurité conservées avant rotation, en l'absence de valeur explicite dans
 /// `parametres.sauvegarde.nombreSauvegardesSecurite` (RG-003, valeur par défaut déduite de
@@ -1230,6 +1245,11 @@ pub(crate) struct EntreeJournal {
 }
 
 /// Modèle de filtres nommé, propre à l'utilisateur, non exporté (F22).
+///
+/// Depuis le palier de schéma `9` → `10` (plan_16, incrément 2), la forme de `filtres` est uniforme pour tous les
+/// écrans (`{ groupeId, projetIds }`, sélection de groupe et de projets uniquement, RG-027 amendée) et
+/// `version_filtres` vaut [`VERSION_FILTRES_VUE`] pour tous. Le cœur natif n'interprète jamais `filtres` (typé
+/// [`Value`]) : seule l'interface le fait.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct VueEnregistree {
@@ -1239,12 +1259,12 @@ pub(crate) struct VueEnregistree {
     pub(crate) nom: String,
     /// Écran auquel s'applique la vue.
     pub(crate) ecran: String,
-    /// Version du schéma de filtres, propre à l'écran concerné.
+    /// Version du schéma de filtres ([`VERSION_FILTRES_VUE`] depuis le palier `9` → `10`, forme désormais commune).
     pub(crate) version_filtres: u32,
     /// Indique si cette vue est la vue par défaut de son écran.
     #[serde(default)]
     pub(crate) par_defaut: bool,
-    /// Filtres, structure propre à l'écran concerné.
+    /// Filtres de la vue (`{ groupeId, projetIds }` depuis le palier `9` → `10`), jamais interprétés côté cœur natif.
     pub(crate) filtres: Value,
 }
 

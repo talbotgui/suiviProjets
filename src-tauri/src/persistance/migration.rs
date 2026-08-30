@@ -16,8 +16,10 @@
 //! dépendances `java` par défaut — première étape réelle à muter le document au-delà de `versionSchema`),
 //! [`migration_6_vers_7`] (Phase 16, amendement de RG-043 : normalisation de la casse du champ `statut` des bornes
 //! de version de `referentiels.reglesDependances`), [`migration_7_vers_8`] (correction du bug Sonar
-//! `new_coverage` : `ResultatSonarCouverture.couvertureNouveauCode` devient optionnel) et [`migration_8_vers_9`]
-//! (US-017 : `MembreGitlab.herite` remplacé par `direct` + `groupesInvites`).
+//! `new_coverage` : `ResultatSonarCouverture.couvertureNouveauCode` devient optionnel), [`migration_8_vers_9`]
+//! (US-017 : `MembreGitlab.herite` remplacé par `direct` + `groupesInvites`) et [`migration_9_vers_10`] (plan_16,
+//! incrément 2 : uniformisation de la forme du champ `filtres` de chaque `VueEnregistree` en `{ groupeId, projetIds }`,
+//! RG-027 amendée / RG-053).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -155,6 +157,62 @@ fn migration_8_vers_9(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Neuvième migration réelle du projet (plan_16, incrément 2 — filtrage groupe/projet mutualisé, RG-027 amendée,
+/// RG-053), faisant progresser `versionSchema` de `9` à `10` : uniformise la forme du champ `filtres` de chaque
+/// [`crate::modele::racine::VueEnregistree`] de `vuesEnregistrees`.
+///
+/// Comme [`migration_5_vers_6`] et [`migration_6_vers_7`], cette étape **mute** le document : pour chaque entrée,
+/// `filtres` est réécrit en `{ groupeId, projetIds }` (`groupeId` repris tel quel s'il est une chaîne, sinon
+/// `null` ; `projetIds` repris tel quel s'il est un tableau, sinon `null` ; tout autre champ, notamment
+/// l'`indicateur` des vues Synthèse des audits, est abandonné) et `versionFiltres` est fixé à
+/// [`crate::modele::racine::VERSION_FILTRES_VUE`]. Une vue antérieure est ainsi migrée vers la forme courante,
+/// plutôt qu'ignorée avec avertissement par l'interface. Best-effort : si `vuesEnregistrees` a une forme
+/// inattendue (document édité à la main), l'entrée concernée est laissée telle quelle plutôt que de faire échouer
+/// la migration.
+fn migration_9_vers_10(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        uniformiser_filtres_vues(objet);
+        objet.insert("versionSchema".to_string(), Value::from(10));
+    }
+    Ok(())
+}
+
+/// Réécrit le champ `filtres` et le champ `versionFiltres` de chaque entrée de `document.vuesEnregistrees`
+/// (cf. [`migration_9_vers_10`]). Best-effort, comme [`inserer_regle_java_si_absente`].
+fn uniformiser_filtres_vues(document: &mut serde_json::Map<String, Value>) {
+    let Some(vues) = document
+        .get_mut("vuesEnregistrees")
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    for vue in vues {
+        let Some(vue) = vue.as_object_mut() else {
+            continue;
+        };
+        let groupe_id = vue
+            .get("filtres")
+            .and_then(|filtres| filtres.get("groupeId"))
+            .filter(|valeur| valeur.is_string())
+            .cloned()
+            .unwrap_or(Value::Null);
+        let projet_ids = vue
+            .get("filtres")
+            .and_then(|filtres| filtres.get("projetIds"))
+            .filter(|valeur| valeur.is_array())
+            .cloned()
+            .unwrap_or(Value::Null);
+        vue.insert(
+            "filtres".to_string(),
+            serde_json::json!({ "groupeId": groupe_id, "projetIds": projet_ids }),
+        );
+        vue.insert(
+            "versionFiltres".to_string(),
+            Value::from(crate::modele::racine::VERSION_FILTRES_VUE),
+        );
+    }
+}
+
 /// Normalise la casse du champ `statut` de toutes les bornes de version de `document.referentiels.reglesDependances`
 /// (cf. [`migration_6_vers_7`]), en déléguant chaque entrée à
 /// [`crate::modele::racine::canoniser_casse_statuts_regle_dependance`]. Best-effort, comme
@@ -197,7 +255,7 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
 /// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`],
-/// [`migration_7_vers_8`] et [`migration_8_vers_9`].
+/// [`migration_7_vers_8`], [`migration_8_vers_9`] et [`migration_9_vers_10`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
@@ -207,6 +265,7 @@ pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (6, migration_6_vers_7),
     (7, migration_7_vers_8),
     (8, migration_8_vers_9),
+    (9, migration_9_vers_10),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -836,6 +895,132 @@ mod tests {
                 "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
                 "referentiels": referentiels,
                 "groupes": []
+            });
+
+            appliquer_migrations(
+                &mut valeur,
+                crate::modele::racine::VERSION_SCHEMA_COURANTE,
+                ETAPES_MIGRATION_REELLES,
+            )?;
+
+            assert_eq!(
+                valeur["versionSchema"],
+                json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_9_vers_10_uniformise_les_filtres_des_vues_et_abandonne_lindicateur()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant plan_16 : `versionSchema: 9`, trois vues de formes de filtres hétérogènes —
+        // une vue Synthèse des audits portant un `indicateur` (abandonné), une vue avec `projetIds`, une vue à
+        // filtres vides. La migration réécrit `filtres` en `{ groupeId, projetIds }` et fixe `versionFiltres` à 1
+        // pour toutes, sans toucher aux autres champs (`id`, `nom`, `ecran`, `parDefaut`).
+        let mut valeur = json!({
+            "versionSchema": 9,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "groupes": [],
+            "vuesEnregistrees": [
+                {
+                    "id": "v1", "nom": "Vue synthèse", "ecran": "syntheseAudits", "versionFiltres": 1,
+                    "parDefaut": true, "filtres": { "groupeId": "g1", "indicateur": "vitalite" }
+                },
+                {
+                    "id": "v2", "nom": "Vue graphique", "ecran": "syntheseGraphique", "versionFiltres": 2,
+                    "parDefaut": false, "filtres": { "groupeId": null, "projetIds": ["p1", "p2"] }
+                },
+                {
+                    "id": "v3", "nom": "Vue liste", "ecran": "listeTravail", "versionFiltres": 1,
+                    "parDefaut": false, "filtres": {}
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        assert_eq!(racine.vues_enregistrees.len(), 3);
+        for vue in &racine.vues_enregistrees {
+            assert_eq!(vue.version_filtres, crate::modele::racine::VERSION_FILTRES_VUE);
+            let Some(filtres) = vue.filtres.as_object() else {
+                return Err("filtres doit être un objet après migration".into());
+            };
+            assert_eq!(filtres.len(), 2, "seuls groupeId et projetIds sont conservés");
+            assert!(filtres.contains_key("groupeId"));
+            assert!(filtres.contains_key("projetIds"));
+        }
+        let v1 = &racine.vues_enregistrees[0];
+        assert_eq!(v1.nom, "Vue synthèse");
+        assert!(v1.par_defaut);
+        assert_eq!(v1.filtres["groupeId"], json!("g1"));
+        assert_eq!(v1.filtres["projetIds"], json!(null));
+        assert_eq!(racine.vues_enregistrees[1].filtres["groupeId"], json!(null));
+        assert_eq!(
+            racine.vues_enregistrees[1].filtres["projetIds"],
+            json!(["p1", "p2"])
+        );
+        assert_eq!(racine.vues_enregistrees[2].filtres["groupeId"], json!(null));
+        assert_eq!(racine.vues_enregistrees[2].filtres["projetIds"], json!(null));
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_9_vers_10_est_idempotente_sur_une_vue_deja_a_la_forme_cible()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Une vue déjà à la forme `{ groupeId, projetIds }` (créée par une installation à jour puis rechargée
+        // après un aller-retour sur un poste antérieur) doit ressortir inchangée du palier.
+        let mut valeur = json!({
+            "versionSchema": 9,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "groupes": [],
+            "vuesEnregistrees": [
+                {
+                    "id": "v1", "nom": "Vue cible", "ecran": "obsolescence", "versionFiltres": 1,
+                    "parDefaut": false, "filtres": { "groupeId": "g7", "projetIds": ["p9"] }
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        let vue = &racine.vues_enregistrees[0];
+        assert_eq!(vue.filtres["groupeId"], json!("g7"));
+        assert_eq!(vue.filtres["projetIds"], json!(["p9"]));
+        assert_eq!(vue.version_filtres, crate::modele::racine::VERSION_FILTRES_VUE);
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_9_vers_10_tolere_une_forme_inattendue_de_vues_enregistrees()
+    -> Result<(), ErreurPersistance> {
+        // Documents édités à la main : `vuesEnregistrees` qui n'est pas un tableau, entrée sans `filtres`, entrée
+        // dont `filtres` est une chaîne. Aucun ne doit faire paniquer ni échouer la migration.
+        for vues in [
+            json!("chaine-inattendue"),
+            json!([{ "id": "v1", "nom": "Sans filtres", "ecran": "listeTravail", "versionFiltres": 1 }]),
+            json!([{ "id": "v2", "nom": "Filtres chaîne", "ecran": "listeTravail", "versionFiltres": 1, "filtres": "oups" }]),
+        ] {
+            let mut valeur = json!({
+                "versionSchema": 9,
+                "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+                "groupes": [],
+                "vuesEnregistrees": vues
             });
 
             appliquer_migrations(

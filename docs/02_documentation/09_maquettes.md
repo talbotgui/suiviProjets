@@ -12,6 +12,23 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 
 ## Maquettes par écran
 
+### Barre supérieure du shell
+
+| écran | zone | composants / actions |
+|---|---|---|
+| Barre supérieure | Navigation d'historique | En tête de la barre supérieure, deux boutons Reculer (`◀`) et Avancer (`▶`) parcourant l'historique de navigation interne (cf. [RG-052](./05_reglesGestion.md#navigation-transverse-et-filtrage-mutualisé)) ; chaque bouton est grisé et non actionnable quand le déplacement correspondant n'est pas possible |
+| Barre supérieure | Reste de la barre | Nom du fichier chargé, statut de sauvegarde, accès à la recherche transversale, à la gestion des credentials et au verrouillage manuel (inchangé) |
+
+### Barre de filtres commune (Synthèse des audits, Synthèse graphique, Obsolescence, Liste de travail)
+
+Composant mutualisé unique décrit ici une fois, référencé par les quatre écrans concernés (cf. [RG-053](./05_reglesGestion.md#navigation-transverse-et-filtrage-mutualisé)).
+
+| zone | composants / actions |
+|---|---|
+| Filtre groupe/projet | Un sélecteur de groupe (« Tous les groupes » plus une entrée par groupe) et un sélecteur multi-projets dont la liste est restreinte au groupe sélectionné (tous les projets si aucun groupe) ; choisir un groupe désélectionne les projets ; la sélection est partagée entre les quatre écrans et suit l'utilisateur d'un écran à l'autre |
+| Sélecteur de vue | Sélection, enregistrement, mise à jour ou suppression d'une vue nommée (sélection de groupe et de projets uniquement) ; lien « Gérer les vues… » vers l'onglet « Vues enregistrées » de l'écran de Paramétrage |
+| Filtres complémentaires | Rendus sous la barre commune, gérés par chaque écran (indicateur pour les deux synthèses, date et bornes min/max par catégorie pour l'Obsolescence, filtres d'alerte pour la Liste de travail) ; jamais mémorisés dans une vue, jamais partagés entre écrans |
+
 ### Écran d'accueil
 
 | écran | zone | composants / actions |
@@ -66,7 +83,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 
 | écran | zone | composants / actions |
 |---|---|---|
-| Synthèse des audits | Barre de filtres | Sélecteur de groupe, sélecteur d'indicateurs, champ de recherche, compteur de projets |
+| Synthèse des audits | Barre de filtres | [Barre de filtres commune](#barre-de-filtres-commune-synthèse-des-audits-synthèse-graphique-obsolescence-liste-de-travail) (filtre groupe/projet mutualisé + sélecteur de vue), puis sous elle : sélecteur d'indicateurs, champ de recherche, compteur de projets |
 | Synthèse des audits | Bandeau d'alerte | Bandeau membres inconnus, toujours au-dessus du tableau si applicable |
 | Synthèse des audits | Tableau dense | Treize colonnes (Projet, Groupe, Dernier audit, Vitalité, Taille, Couverture, Notes Sonar, Violations, MR ouvertes, Membres, IA, Sonar, Dépendances) ; première colonne fixe au défilement horizontal ; badges « AUDIT ANCIEN » et pictogramme de campagne en échec ; ligne teintée si membre inconnu. Colonne Dépendances ajoutée en Phase 15 (demande directe de l'utilisateur, hors périmètre initial de cette maquette) : trois compteurs (dépendances inconnues du référentiel, obsolètes, maintenues), fusionnés entre toutes les sources GitLab du projet (RG-011, cf. R15-06) |
 | Synthèse des audits | Export | Export de la vue en image PNG, alerte membre inconnu conservée |
@@ -75,7 +92,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 
 | écran | zone | composants / actions |
 |---|---|---|
-| Synthèse graphique | Filtres | Groupe, projet, type d'indicateur |
+| Synthèse graphique | Filtres | [Barre de filtres commune](#barre-de-filtres-commune-synthèse-des-audits-synthèse-graphique-obsolescence-liste-de-travail) (filtre groupe/projet mutualisé + sélecteur de vue), puis sous elle : sélecteur de type d'indicateur |
 | Synthèse graphique | Graphique | Zoom temporel, séries superposables (audits historiques et réguliers d'un projet fondus dans une même courbe continue, RG-046), lignes verticales pour les annotations, les changements de seuils et le repère « Début des audits réguliers » (date du plus ancien audit régulier tous projets confondus), signaux affichés en séries binaires |
 | Synthèse graphique | Export | Export natif du graphique en image PNG |
 
@@ -86,10 +103,10 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | écran | zone | composants / actions |
 |---|---|---|
 | Obsolescence | Entête | Titre de page, paragraphe d'introduction (largeur bornée) précisant l'échelle des indicateurs (retard en versions majeures, 0 = à jour) |
-| Obsolescence | Barre de filtres | Sélecteur de groupe, filtre de date d'audit (dernier audit régulier à cette date ou avant, initialisé à aujourd'hui), un couple valeur min / valeur max par catégorie (minimum toujours à 0, maximum adapté à la valeur maximale de l'indicateur tous filtres ignorés), bouton d'export PNG |
+| Obsolescence | Barre de filtres | [Barre de filtres commune](#barre-de-filtres-commune-synthèse-des-audits-synthèse-graphique-obsolescence-liste-de-travail) (filtre groupe/projet mutualisé + sélecteur de vue), puis sous elle : filtre de date d'audit (dernier audit régulier à cette date ou avant, initialisé à aujourd'hui), un couple valeur min / valeur max par catégorie (minimum toujours à 0, maximum adapté à la valeur maximale de l'indicateur tous filtres ignorés), bouton d'export PNG |
 | Obsolescence | Bandeau du panneau | Légende des indicateurs (pastille de teinte, libellé, médiane par catégorie sur les projets affichés), décompte total de projets à droite |
 | Obsolescence | Grille de tuiles | Colonnes fluides (nombre adapté à la largeur), quadrillage continu de 1 px ; chaque tuile : nom du projet sur deux lignes à hauteur réservée, puis une ligne de mesure par catégorie (sigle de 3 lettres, barre sur rail sombre, valeur numérique alignée à droite) ; une catégorie sans dépendance concernée pour le projet n'affiche que son sigle, sans barre ni valeur, pour rendre repérables les catégories manquantes (la valeur `0`, « à jour », garde sa barre) ; survol éclaircissant le fond, infobulle native donnant le détail complet |
-| Obsolescence | Détail d'un projet | Au clic sur une tuile, modale résumant le dernier audit retenu du projet : date de l'audit, tableau des dépendances (référence, catégorie, version, retard calculé), ligne Java mise en évidence ; fermeture par bouton ou touche Échap |
+| Obsolescence | Détail d'un projet | Au clic sur une tuile, modale résumant le dernier audit retenu du projet : date de l'audit, tableau des dépendances (référence, catégorie, version, retard calculé), ligne Java mise en évidence ; ouverture et fermeture pilotées par un paramètre de requête de la route `/obsolescence` (l'écran reste monté sous la modale, l'ouverture est une étape d'historique, cf. [RG-052](./05_reglesGestion.md#navigation-transverse-et-filtrage-mutualisé)) ; fermeture par bouton, touche Échap ou bouton Reculer, un lien « Ouvrir la fiche projet » dans le pied de la modale |
 | Obsolescence | Export | Export de la grille (bandeau inclus) en image PNG |
 
 ### Fiche projet
@@ -114,7 +131,7 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 
 | écran | zone | composants / actions |
 |---|---|---|
-| Liste de travail | Filtres et vues | Filtres combinables, sélection ou enregistrement d'une vue nommée |
+| Liste de travail | Filtres et vues | [Barre de filtres commune](#barre-de-filtres-commune-synthèse-des-audits-synthèse-graphique-obsolescence-liste-de-travail) (filtre groupe/projet mutualisé + sélecteur de vue), puis sous elle : filtres d'alerte combinables propres à l'écran |
 | Liste de travail | Tableau des alertes | Membres inconnus toujours en tête ; par ligne : gravité, projet, groupe, description, date de première détection, statut vu/traité avec commentaire et horodatage |
 
 ### Recherche transversale
@@ -131,7 +148,8 @@ En l'absence d'outil graphique, chaque écran est décrit textuellement sous for
 | Paramétrage | Seuils de couleur | Seuils de chaque indicateur de la synthèse et seuils spécifiques (vitalité, bornes de taille, fraîcheur Sonar, activité sans qualité, matérialité du brouillon, fraîcheur d'audit) |
 | Paramétrage | Référentiels | Référentiel des dépendances (motif, versions, statut), référentiel des marqueurs IA, et motif de nommage des branches (expression régulière unique, initialisée à la convention Gitflow) |
 | Paramétrage | Réglages applicatifs | Délai de verrouillage, concurrence d'audit, proxy optionnel, nombre de sauvegardes de sécurité |
-| Paramétrage | Accès complémentaires | Journal des modifications, purge des audits, export/import de configuration |
+| Paramétrage | Accès complémentaires | Journal des modifications, purge des audits, export/import de configuration, vues enregistrées |
+| Paramétrage | Vues enregistrées | Onglet listant toutes les vues enregistrées regroupées par écran (libellé d'écran lisible) ; par ligne : nom, actions Renommer (nom seul), Dupliquer (« … (copie) »), Supprimer, et bascule « Vue par défaut » (exclusive par écran), plus un lien « Ouvrir l'écran concerné » ; chaque mutation redemande le mot de passe du fichier ([RG-002](./05_reglesGestion.md#stockage-et-confidentialité-des-données)) et est journalisée ([RG-054](./05_reglesGestion.md#vues-alertes-export-et-import)) |
 
 ### Écran de verrouillage
 

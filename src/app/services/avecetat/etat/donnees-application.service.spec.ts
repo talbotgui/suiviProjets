@@ -11,6 +11,7 @@ import type {
   DonneesSource,
 } from './donnees-application.service';
 import { EtatFichier, EtatSessionService } from './etat-session.service';
+import { ContexteConsultationService } from './contexte-consultation.service';
 import { StatutMembre, TypeCritereMembre, TypeSource } from './types-donnees';
 import type {
   DonneesRacine,
@@ -143,6 +144,19 @@ describe('DonneesApplicationService', () => {
 
     service.reinitialiser();
     expect(service.racine()).toBeNull();
+  });
+
+  it('réinitialise le filtre groupe/projet mutualisé au changement de fichier (RG-053)', () => {
+    const contexte = TestBed.inject(ContexteConsultationService);
+    contexte.definirParUtilisateur({ groupeId: 'g1', projetIds: ['p1'] });
+
+    service.chargerRacine(DonneesDeTest.racineVide());
+    expect(contexte.etat()).toEqual({ groupeId: null, projetIds: null });
+    expect(contexte.filtreModifieParUtilisateur()).toBe(false);
+
+    contexte.definirParUtilisateur({ groupeId: 'g2', projetIds: null });
+    service.reinitialiser();
+    expect(contexte.etat()).toEqual({ groupeId: null, projetIds: null });
   });
 
   describe('mutations sans fichier chargé', () => {

@@ -1,0 +1,7 @@
+// Disposition portée par les classes utilitaires/motifs du gabarit (cf. filtre-groupe-projet.component.html) ; seule
+// la hauteur visible du sélecteur multi-projets, spécifique à ce composant, est fixée ici pour éviter qu'il n'occupe
+// toute la hauteur de la barre de filtres.
+.filtre-groupe-projet__projets {
+  min-width: 180px;
+  max-height: 6rem;
+}

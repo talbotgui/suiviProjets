@@ -35,7 +35,7 @@ Ce modèle de données reprend et formalise la structure déjà posée par le do
 | Brouillon | `campagneId`, `creeLe`, `resultatsParProjet[]` (`projetId`, `audit`, `statut`, `motifRejet` optionnel, `aberrations[]` optionnel) | Occurrence unique et nullable à la racine ; référence la Campagne dont il est issu |
 | TraitementAlerte | `id`, `cleAlerte`, `statut` (`vue` \| `traitee`), `commentaire` (optionnel), `horodatage` | Indépendant des Audit ; clé stable de suivi (cf. [RG-026](./05_reglesGestion.md#vues-alertes-export-et-import)) |
 | EntréeJournal | `id`, `horodatage`, `objet`, `avant`, `apres`, `origine`, `detailOrigine` (optionnel) | Append-only ; référence librement un objet de n'importe quelle autre entité par son chemin |
-| VueEnregistrée | `id`, `nom`, `ecran`, `versionFiltres`, `parDefaut` (booléen), `filtres` (structure propre à l'écran) | Donnée de travail personnelle, non exportée |
+| VueEnregistrée | `id`, `nom`, `ecran`, `versionFiltres`, `parDefaut` (booléen), `filtres` | Donnée de travail personnelle, non exportée. Depuis le palier de schéma `9` → `10` (2026-08-30), la forme de `filtres` est uniforme pour tous les écrans — `{ groupeId: string \| null, projetIds: string[] \| null }` (`null` = tous) — et `versionFiltres` vaut `1` pour tous les écrans ; le cœur natif ne l'interprète pas (typée `unknown` côté Rust), seule l'interface le fait. Le périmètre couvre quatre écrans : Synthèse des audits, Synthèse graphique, Obsolescence, Liste de travail ([RG-027](./05_reglesGestion.md#vues-alertes-export-et-import) amendée, [RG-053](./05_reglesGestion.md#navigation-transverse-et-filtrage-mutualisé), [RG-054](./05_reglesGestion.md#vues-alertes-export-et-import)) |
 
 ## Invariants et règles de cohérence
 
@@ -58,7 +58,9 @@ Les données vivent exclusivement dans un fichier unique, choisi par l'utilisate
 
 ## Stratégie de migration des données
 
-`versionSchema` est incrémenté à chaque évolution structurelle du modèle. Au chargement d'un fichier dont `versionSchema` est inférieur à la version courante de l'application, une séquence de fonctions de migration est appliquée successivement, palier par palier, jusqu'à la version courante. Un fichier dont `versionSchema` est supérieur à la version courante de l'application (créé par une version plus récente) est refusé explicitement plutôt que migré de façon hasardeuse. Un filtre de `VueEnregistrée` dont `versionFiltres` ne correspond plus au schéma courant est ignoré avec avertissement plutôt que de bloquer le chargement du fichier (cf. F22, [Specification.md, section 5.22](../01_besoin/Specification.md#522-f22--modèles-de-vues-enregistrées)). Le format de l'enveloppe chiffrée (paramètres cryptographiques) est versionné indépendamment de `versionSchema` et migré séparément (cf. [Specification.md, section 6.3](../01_besoin/Specification.md#63-enveloppe-chiffrée)).
+`versionSchema` est incrémenté à chaque évolution structurelle du modèle. Au chargement d'un fichier dont `versionSchema` est inférieur à la version courante de l'application, une séquence de fonctions de migration est appliquée successivement, palier par palier, jusqu'à la version courante. Un fichier dont `versionSchema` est supérieur à la version courante de l'application (créé par une version plus récente) est refusé explicitement plutôt que migré de façon hasardeuse.
+
+Le palier `9` → `10` (2026-08-30, [plan_16](../03_plan/plan_16_navigationFiltrageEtVues.md#impacts-sur-le-modèle-de-données-et-migration)) uniformise la forme de `filtres` de chaque `VueEnregistrée` : pour chaque entrée, `filtres` est réécrit en `{ groupeId: <filtres.groupeId ou null>, projetIds: <filtres.projetIds ou null> }` (tout autre champ éventuellement présent, notamment l'`indicateur` des vues Synthèse des audits, est abandonné) et `versionFiltres` est fixé à `1`. Cette transformation est générique : le cœur natif n'a pas besoin de connaître la forme de filtres de chaque écran, la cible étant identique pour tous. En conséquence, une vue enregistrée dans une version antérieure du schéma est migrée vers la forme courante, non plus ignorée avec avertissement comme prévu initialement (cf. F22, [Specification.md, section 5.22](../01_besoin/Specification.md#522-f22--modèles-de-vues-enregistrées) ; [RG-027](./05_reglesGestion.md#vues-alertes-export-et-import) amendée). Conséquence fonctionnelle assumée : une vue « Synthèse des audits » antérieure perd le filtre d'indicateur qu'elle portait, mais conserve sa sélection de groupe. Le format de l'enveloppe chiffrée (paramètres cryptographiques) est versionné indépendamment de `versionSchema` et migré séparément (cf. [Specification.md, section 6.3](../01_besoin/Specification.md#63-enveloppe-chiffrée)).
 
 ## Stratégie de sauvegarde et de restauration
 
@@ -86,7 +88,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | Le champ `type` d'un Résultat appartient au catalogue figé documenté ([Specification.md, section 5.5](../01_besoin/Specification.md#55-f05--audits-et-catalogue-des-indicateurs)) | Résultat |
 | Un Résultat ne comporte aucun champ de statut ou de verdict calculé | Résultat |
 | `cleAlerte` respecte le motif `type_alerte|projetId|discriminant` | TraitementAlerte |
-| `versionFiltres` est un entier positif correspondant à un schéma de filtres connu de l'écran concerné | VueEnregistrée |
+| `versionFiltres` est un entier positif correspondant à un schéma de filtres connu ; depuis le palier `9` → `10`, la valeur attendue est la constante partagée unique `1`, la forme de `filtres` étant commune à tous les écrans (`{ groupeId, projetIds }`) | VueEnregistrée |
 | L'export en clair ne contient que `parametres.seuils` et `referentiels` | Contrôle transverse à l'export de configuration |
 | `referentiels.motifNommageBranches` est une expression régulière syntaxiquement valide, jamais vide (valeur par défaut Gitflow appliquée à la création du fichier) | Référentiels |
 
@@ -104,5 +106,5 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | Référentiels, Paramètres (seuils) | [RG-012](./05_reglesGestion.md#constat-jugement-et-politique-ia), [RG-022](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation), [RG-030](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
 | EntréeJournal | [RG-023](./05_reglesGestion.md#seuils-référentiels-et-historisation) |
 | TraitementAlerte | [RG-026](./05_reglesGestion.md#vues-alertes-export-et-import) |
-| VueEnregistrée | [RG-027](./05_reglesGestion.md#vues-alertes-export-et-import) |
+| VueEnregistrée | [RG-027](./05_reglesGestion.md#vues-alertes-export-et-import), [RG-053](./05_reglesGestion.md#navigation-transverse-et-filtrage-mutualisé), [RG-054](./05_reglesGestion.md#vues-alertes-export-et-import) |
 | Export (Référentiels + Paramètres.seuils uniquement) | [RG-028](./05_reglesGestion.md#vues-alertes-export-et-import), [RG-029](./05_reglesGestion.md#vues-alertes-export-et-import) |

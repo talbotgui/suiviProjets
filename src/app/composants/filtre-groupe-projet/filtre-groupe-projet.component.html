@@ -1,0 +1,34 @@
+<!-- Barre de filtres commune (plan_16, incrément 2, RG-053) : sélecteur de groupe, sélecteur multi-projets
+     restreint au groupe sélectionné, puis contenu projeté par l'écran appelant (sélecteur de vue et filtres
+     complémentaires propres à l'écran), cf. docs/02_documentation/09_maquettes.md#barre-de-filtres-commune. -->
+<div class="filtre-groupe-projet d-flex retour-ligne aligne-centre ecart-3">
+  <select
+    #selectGroupe
+    class="filtre-groupe-projet__groupe champ__controle"
+    aria-label="Filtrer par groupe"
+    (change)="onChangerGroupe(selectGroupe.value)"
+  >
+    <option value="" [selected]="groupeId() === null">Tous les groupes</option>
+    @for (groupe of groupes(); track groupe.id) {
+      <option [value]="groupe.id" [selected]="groupe.id === groupeId()">{{ groupe.nom }}</option>
+    }
+  </select>
+
+  <select
+    #selectProjets
+    multiple
+    class="filtre-groupe-projet__projets champ__controle"
+    aria-label="Filtrer par projet"
+    (change)="onChangerProjets(selectProjets)"
+  >
+    @for (projet of projetsProposes(); track projet.id) {
+      <option [value]="projet.id" [selected]="estProjetSelectionne(projet.id)">
+        {{ projet.nom }}
+      </option>
+    } @empty {
+      <option disabled>Aucun projet dans ce groupe</option>
+    }
+  </select>
+
+  <ng-content />
+</div>

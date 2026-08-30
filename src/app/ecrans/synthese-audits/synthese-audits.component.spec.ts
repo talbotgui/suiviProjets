@@ -723,7 +723,7 @@ describe('SqmSyntheseAuditsComponent', () => {
     const element = DomTestUtils.obtenirElementNatif(fixture);
 
     // Combinaison 1 : filtre de groupe excluant le groupe du projet à membre inconnu (« Groupe A »).
-    composant.onChangerGroupe('groupe-b');
+    composant.onSelectionGroupeProjet({ groupeId: 'groupe-b', projetIds: null });
     fixture.detectChanges();
     expect(element.querySelectorAll('tbody tr').length).toBe(1);
     expect(
@@ -735,7 +735,7 @@ describe('SqmSyntheseAuditsComponent', () => {
     expect(element.querySelector('[role="alert"]')).not.toBeNull();
 
     // Combinaison 2 : recherche texte ne correspondant à aucun projet (tableau dense vide, RG-009 par ailleurs).
-    composant.onChangerGroupe('');
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: null });
     composant.onChangerRecherche('zzz-introuvable');
     fixture.detectChanges();
     expect(composant.compteurProjets()).toBe(0);
@@ -767,22 +767,24 @@ describe('SqmSyntheseAuditsComponent', () => {
 
     expect(composant.compteurProjets()).toBe(3);
 
-    composant.onChangerGroupe('groupe-a');
+    composant.onSelectionGroupeProjet({ groupeId: 'groupe-a', projetIds: null });
     fixture.detectChanges();
     expect(composant.compteurProjets()).toBe(2);
 
-    composant.onChangerGroupe('');
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: null });
     composant.onChangerIndicateur('sonarKo');
     fixture.detectChanges();
     expect(composant.compteurProjets()).toBe(1);
-    expect(element.textContent).toContain('Projet SonarKO');
-    expect(element.textContent).not.toContain('Projet Sain');
+    // Assertions portées sur le corps du tableau : le sélecteur multi-projets de la barre de filtres commune
+    // affiche par ailleurs tous les noms de projets, indépendamment du filtre appliqué au tableau.
+    expect(element.querySelector('tbody')?.textContent).toContain('Projet SonarKO');
+    expect(element.querySelector('tbody')?.textContent).not.toContain('Projet Sain');
 
     composant.onChangerIndicateur('tous');
     composant.onChangerRecherche('sain');
     fixture.detectChanges();
     expect(composant.compteurProjets()).toBe(1);
-    expect(element.textContent).toContain('Projet Sain');
+    expect(element.querySelector('tbody')?.textContent).toContain('Projet Sain');
   });
 
   it('affiche des valeurs neutres en l’absence de tout fichier chargé', () => {
@@ -1040,42 +1042,43 @@ describe('SqmSyntheseAuditsComponent', () => {
   });
 
   describe('vues enregistrées (US-028, RG-027, Phase 9 incrément 2)', () => {
-    it('applique le filtre de groupe et d’indicateur portés par une vue choisie', () => {
+    it('applique la sélection groupe/projet portée par une vue choisie (RG-027 amendée)', () => {
       const fixture = creerFixture(DonneesDeTest.racine([]));
       const composant = fixture.componentInstance;
 
       composant.appliquerVue({
         id: 'v1',
-        nom: 'Mon groupe en alerte',
+        nom: 'Mon groupe et deux projets',
         parDefaut: false,
-        filtres: { groupeId: 'groupe-1', indicateur: 'sonarKo' },
+        filtres: { groupeId: 'groupe-1', projetIds: ['p1', 'p2'] },
       });
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
-      expect(composant.filtreIndicateur()).toBe('sonarKo');
+      expect(composant.filtreProjetIds()).toEqual(['p1', 'p2']);
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(true);
     });
 
     it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
       const fixture = creerFixture(DonneesDeTest.racine([]));
       const composant = fixture.componentInstance;
-      composant.onChangerGroupe('groupe-1');
+      composant.onSelectionGroupeProjet({ groupeId: 'groupe-1', projetIds: null });
 
       composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
       composant.appliquerVue({
         id: 'v2',
-        nom: 'Indicateur invalide',
+        nom: 'projetIds invalide',
         parDefaut: false,
-        filtres: { groupeId: 'groupe-1', indicateur: 'inexistant' },
+        filtres: { groupeId: 'groupe-1', projetIds: 'pas-un-tableau' },
       });
       composant.appliquerVue({
         id: 'v3',
         nom: 'Groupe de type invalide',
         parDefaut: false,
-        filtres: { groupeId: 42, indicateur: 'tous' },
+        filtres: { groupeId: 42, projetIds: null },
       });
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
-      expect(composant.filtreIndicateur()).toBe('tous');
+      expect(composant.filtreProjetIds()).toBeNull();
     });
 
     it('enregistre une vue avec les filtres courants et met à jour la racine (US-028)', async () => {
@@ -1085,7 +1088,7 @@ describe('SqmSyntheseAuditsComponent', () => {
       const fixture = creerFixture(racineInitiale);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
       const composant = fixture.componentInstance;
-      composant.onChangerGroupe('groupe-1');
+      composant.onSelectionGroupeProjet({ groupeId: 'groupe-1', projetIds: ['p1'] });
       composant.onChangerIndicateur('couverture');
 
       await composant.enregistrerVue({
@@ -1103,7 +1106,7 @@ describe('SqmSyntheseAuditsComponent', () => {
           ecran: 'syntheseAudits',
           versionFiltres: 1,
           parDefaut: true,
-          filtres: { groupeId: 'groupe-1', indicateur: 'couverture' },
+          filtres: { groupeId: 'groupe-1', projetIds: ['p1'] },
           motDePasse: 'mot-de-passe',
         }),
       );
@@ -1162,7 +1165,7 @@ describe('SqmSyntheseAuditsComponent', () => {
       ]);
     });
 
-    it('applique automatiquement la vue par défaut de cet écran à l’ouverture', () => {
+    it('amorce le filtre partagé avec la sélection de la vue par défaut de cet écran à l’ouverture', () => {
       const racine = DonneesDeTest.racine([]);
       const racineAvecVueParDefaut: DonneesRacine = {
         ...racine,
@@ -1173,7 +1176,7 @@ describe('SqmSyntheseAuditsComponent', () => {
             ecran: 'syntheseAudits',
             versionFiltres: 1,
             parDefaut: true,
-            filtres: { groupeId: 'groupe-1', indicateur: 'sonarKo' },
+            filtres: { groupeId: 'groupe-1', projetIds: null },
           },
         ],
       };
@@ -1181,10 +1184,12 @@ describe('SqmSyntheseAuditsComponent', () => {
       const fixture = creerFixture(racineAvecVueParDefaut);
 
       expect(fixture.componentInstance.filtreGroupeId()).toBe('groupe-1');
-      expect(fixture.componentInstance.filtreIndicateur()).toBe('sonarKo');
+      expect(fixture.componentInstance.filtreProjetIds()).toBeNull();
+      // Amorçage par la vue par défaut : le filtre n'est pas encore réputé « modifié par l'utilisateur » (RG-053).
+      expect(fixture.componentInstance.contexte.filtreModifieParUtilisateur()).toBe(false);
     });
 
-    it("n'applique la vue par défaut qu'une seule fois, sans écraser un choix ultérieur de l'utilisateur", () => {
+    it("n'écrase jamais un choix de filtre de l'utilisateur par la vue par défaut de l'écran", () => {
       const racine = DonneesDeTest.racine([]);
       const racineAvecVueParDefaut: DonneesRacine = {
         ...racine,
@@ -1195,7 +1200,7 @@ describe('SqmSyntheseAuditsComponent', () => {
             ecran: 'syntheseAudits',
             versionFiltres: 1,
             parDefaut: true,
-            filtres: { groupeId: 'groupe-1', indicateur: 'sonarKo' },
+            filtres: { groupeId: 'groupe-1', projetIds: null },
           },
         ],
       };
@@ -1203,14 +1208,11 @@ describe('SqmSyntheseAuditsComponent', () => {
       const composant = fixture.componentInstance;
       expect(composant.filtreGroupeId()).toBe('groupe-1');
 
-      composant.onChangerGroupe('');
-      TestBed.inject(DonneesApplicationService).chargerRacine({
-        ...racineAvecVueParDefaut,
-        versionSchema: 2,
-      });
+      composant.onSelectionGroupeProjet({ groupeId: 'groupe-2', projetIds: null });
       fixture.detectChanges();
 
-      expect(composant.filtreGroupeId()).toBeNull();
+      expect(composant.filtreGroupeId()).toBe('groupe-2');
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(true);
     });
 
     it('ignore une vue enregistrée dont la version de filtres est obsolète et avertit l’utilisateur', () => {
@@ -1224,7 +1226,7 @@ describe('SqmSyntheseAuditsComponent', () => {
             ecran: 'syntheseAudits',
             versionFiltres: 0,
             parDefaut: false,
-            filtres: { groupeId: 'groupe-1', indicateur: 'tous' },
+            filtres: { groupeId: 'groupe-1', projetIds: null },
           },
         ],
       };

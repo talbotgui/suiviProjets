@@ -54,6 +54,12 @@ import type {
   DemandeSuppressionVue,
   VueSelectionnable,
 } from '../../composants/selecteur-vue/selecteur-vue.component';
+import { SqmFiltreGroupeProjetComponent } from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
+import type {
+  GroupeFiltrable,
+  ProjetFiltrable,
+  SelectionGroupeProjet,
+} from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
 import { SqmTableauDenseComponent } from '../../composants/tableau-dense/tableau-dense.component';
 import type {
   CelluleTableauDense,
@@ -61,6 +67,8 @@ import type {
   SegmentCelluleTableauDense,
 } from '../../composants/tableau-dense/tableau-dense.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
+import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type {
   Campagne,
@@ -137,21 +145,30 @@ export type CleFiltreIndicateur =
 const ECRAN_SYNTHESE_AUDITS = 'syntheseAudits';
 
 /**
- * Version courante du schéma de filtres de cet écran (US-028, RG-027) : à incrémenter si la forme de
- * {@link FiltresSyntheseAudits} change, sur le modèle déjà établi par `SqmListeTravailComponent` (Phase 9
- * incrément 1).
+ * Version courante du schéma de filtres, désormais commune à tous les écrans depuis le palier de migration
+ * `9` → `10` (plan_16, incrément 2) : la forme de {@link FiltresSyntheseAudits} (`{ groupeId, projetIds }`) est
+ * partagée, il n'existe plus qu'une seule valeur de `versionFiltres`.
  */
 const VERSION_FILTRES_SYNTHESE_AUDITS = 1;
 
 /**
- * Forme des filtres de cet écran persistée par une vue enregistrée (US-028, RG-027 : « groupes, projets,
- * indicateurs, période, tri »). Le texte de recherche libre en est volontairement exclu (recherche ponctuelle, non
- * un critère de vue durable), sur le modèle déjà retenu par `SqmListeTravailComponent`.
+ * Forme des filtres persistée par une vue enregistrée depuis le palier `9` → `10` (RG-027 amendée) : uniquement la
+ * sélection de groupe et de projets, commune à tous les écrans. Le filtre d'indicateur, le tri du tableau et le
+ * texte de recherche libre n'entrent jamais dans une vue (filtres complémentaires propres à l'écran, gérés
+ * localement).
  */
 interface FiltresSyntheseAudits {
+  /** Identifiant du groupe sélectionné, `null` = tous les groupes. */
   readonly groupeId: string | null;
-  readonly indicateur: CleFiltreIndicateur;
+  /** Identifiants des projets sélectionnés, `null` = aucune restriction de projet. */
+  readonly projetIds: readonly string[] | null;
 }
+
+/**
+ * Origine d'une application de vue, pour distinguer une sélection explicite de l'utilisateur (qui prend le pas sur
+ * la vue par défaut d'un écran, RG-053) de l'amorçage automatique par la vue par défaut à la première visite.
+ */
+type OrigineApplicationVue = 'utilisateur' | 'vueParDefaut';
 
 /**
  * Libellé et couleur sémantique d'une valeur calculée, couleur absente si aucun seuil courant n'est disponible pour
@@ -266,7 +283,12 @@ interface SeuilsResolus {
  */
 @Component({
   selector: 'app-synthese-audits',
-  imports: [SqmBandeauAlerteComponent, SqmTableauDenseComponent, SqmSelecteurVueComponent],
+  imports: [
+    SqmBandeauAlerteComponent,
+    SqmTableauDenseComponent,
+    SqmSelecteurVueComponent,
+    SqmFiltreGroupeProjetComponent,
+  ],
   templateUrl: './synthese-audits.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './synthese-audits.component.scss',
@@ -303,6 +325,12 @@ export class SqmSyntheseAuditsComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
 
+  /**
+   * Filtre groupe/projet mutualisé, partagé avec les autres écrans de restitution (RG-053). Exposé au gabarit pour
+   * alimenter `SqmFiltreGroupeProjetComponent` et lire l'état courant.
+   */
+  public readonly contexte: ContexteConsultationService = inject(ContexteConsultationService);
+
   private readonly router: Router = inject(Router);
   private readonly notification: NotificationService = inject(NotificationService);
 
@@ -318,6 +346,12 @@ export class SqmSyntheseAuditsComponent {
       if (this.vueParDefautDejaAppliquee) {
         return;
       }
+      // Priorité RG-053 : dès que l'utilisateur a touché le filtre partagé pendant la session, son choix le suit
+      // d'un écran à l'autre et prime sur la vue par défaut de cet écran.
+      if (this.contexte.filtreModifieParUtilisateur()) {
+        this.vueParDefautDejaAppliquee = true;
+        return;
+      }
       const vueParDefaut = VuesEnregistreesUtils.trouverVueParDefaut(
         this.resultatFiltrageVues().applicables,
       );
@@ -325,7 +359,7 @@ export class SqmSyntheseAuditsComponent {
         return;
       }
       this.vueParDefautDejaAppliquee = true;
-      this.appliquerVue(vueParDefaut);
+      this.appliquerVue(vueParDefaut, 'vueParDefaut');
     });
   }
 
@@ -336,12 +370,24 @@ export class SqmSyntheseAuditsComponent {
   private readonly conteneurExport = viewChild<ElementRef<HTMLElement>>('conteneurExport');
 
   /**
-   * Identifiant du groupe sélectionné dans le filtre, `null` = tous les groupes.
+   * Identifiant du groupe sélectionné dans le filtre partagé, `null` = tous les groupes. Dérivé de
+   * {@link ContexteConsultationService} (RG-053) : la sélection est partagée avec les autres écrans de restitution.
    */
-  public readonly filtreGroupeId: WritableSignal<string | null> = signal<string | null>(null);
+  public readonly filtreGroupeId: Signal<string | null> = computed(
+    () => this.contexte.etat().groupeId,
+  );
 
   /**
-   * Clé de l'indicateur actuellement sélectionné dans le filtre (cf. {@link CleFiltreIndicateur}).
+   * Identifiants des projets sélectionnés dans le filtre partagé, `null` = aucune restriction de projet. Dérivé de
+   * {@link ContexteConsultationService} (RG-053).
+   */
+  public readonly filtreProjetIds: Signal<readonly string[] | null> = computed(
+    () => this.contexte.etat().projetIds,
+  );
+
+  /**
+   * Clé de l'indicateur actuellement sélectionné dans le filtre complémentaire propre à cet écran (cf.
+   * {@link CleFiltreIndicateur}), jamais mémorisé dans une vue enregistrée (RG-027 amendée).
    */
   public readonly filtreIndicateur: WritableSignal<CleFiltreIndicateur> = signal('tous');
 
@@ -377,11 +423,14 @@ export class SqmSyntheseAuditsComponent {
    * `SqmTableauDenseComponent`.
    */
   public readonly lignesFiltrees: Signal<readonly LigneSyntheseAudit[]> = computed(() => {
-    const groupeId = this.filtreGroupeId();
+    const { groupeId, projetIds } = this.contexte.etat();
     const indicateur = this.filtreIndicateur();
     const texte = this.texteRecherche().trim().toLowerCase();
     return this.toutesLesLignes().filter((ligne) => {
       if (groupeId !== null && ligne.groupeId !== groupeId) {
+        return false;
+      }
+      if (projetIds !== null && !projetIds.includes(ligne.projetId)) {
         return false;
       }
       if (texte.length > 0 && !ligne.nomProjet.toLowerCase().includes(texte)) {
@@ -419,12 +468,23 @@ export class SqmSyntheseAuditsComponent {
   );
 
   /**
-   * Groupes disponibles pour le filtre.
-   * @returns Les groupes actuellement chargés.
+   * Groupes proposés au composant de filtre mutualisé (forme structurelle minimale, RG-053), triés par nom.
    */
-  public groupesDisponibles(): readonly Groupe[] {
-    return this.donneesApplication.groupes();
-  }
+  public readonly groupesFiltrables: Signal<readonly GroupeFiltrable[]> = computed(() =>
+    this.donneesApplication.groupes().map((groupe) => ({ id: groupe.id, nom: groupe.nom })),
+  );
+
+  /**
+   * Ensemble des projets (tous groupes confondus) proposés au composant de filtre mutualisé (RG-053). La liste
+   * réellement affichée est restreinte au groupe sélectionné par le composant lui-même.
+   */
+  public readonly projetsFiltrables: Signal<readonly ProjetFiltrable[]> = computed(() =>
+    this.donneesApplication
+      .groupes()
+      .flatMap((groupe) =>
+        groupe.projets.map((projet) => ({ id: projet.id, nom: projet.nom, groupeId: groupe.id })),
+      ),
+  );
 
   /**
    * Extrait l'identifiant stable d'une ligne, transmis à `SqmTableauDenseComponent`.
@@ -482,11 +542,15 @@ export class SqmSyntheseAuditsComponent {
   }
 
   /**
-   * Applique le filtre de groupe sélectionné.
-   * @param valeur - Identifiant du groupe sélectionné, chaîne vide = tous les groupes.
+   * Reporte dans le filtre partagé (RG-053) la sélection émise par `SqmFiltreGroupeProjetComponent`, la marquant
+   * comme modifiée par l'utilisateur (elle prime désormais sur toute vue par défaut d'écran).
+   * @param selection - Sélection de groupe et de projets résultante.
    */
-  public onChangerGroupe(valeur: string): void {
-    this.filtreGroupeId.set(valeur.length === 0 ? null : valeur);
+  public onSelectionGroupeProjet(selection: SelectionGroupeProjet): void {
+    this.contexte.definirParUtilisateur({
+      groupeId: selection.groupeId,
+      projetIds: selection.projetIds,
+    });
   }
 
   /**
@@ -508,17 +572,30 @@ export class SqmSyntheseAuditsComponent {
   }
 
   /**
-   * Applique les filtres portés par une vue enregistrée choisie dans `SqmSelecteurVueComponent` (US-028). Ignore
-   * silencieusement une vue dont les filtres ne correspondent pas structurellement à {@link FiltresSyntheseAudits}
-   * (aucun accès non sûr à une valeur JSON externe), sur le modèle de `SqmListeTravailComponent`.
+   * Applique la sélection groupe/projet portée par une vue enregistrée (RG-027 amendée). Ignore silencieusement une
+   * vue dont les filtres ne correspondent pas structurellement à {@link FiltresSyntheseAudits} (aucun accès non sûr
+   * à une valeur JSON externe). Selon l'origine, reporte la sélection dans le filtre partagé soit comme un choix
+   * explicite de l'utilisateur (`utilisateur`, prime sur la vue par défaut d'un autre écran), soit comme un
+   * amorçage automatique par la vue par défaut de cet écran (`vueParDefaut`, n'écrase jamais un choix déjà fait).
    * @param vue - Vue choisie, dont `filtres` reste typé `unknown` côté composant transverse.
+   * @param origine - Origine de l'application (défaut : sélection explicite de l'utilisateur).
    */
-  public appliquerVue(vue: VueSelectionnable): void {
+  public appliquerVue(
+    vue: VueSelectionnable,
+    origine: OrigineApplicationVue = 'utilisateur',
+  ): void {
     if (!SqmSyntheseAuditsComponent.estFiltresSyntheseAudits(vue.filtres)) {
       return;
     }
-    this.filtreGroupeId.set(vue.filtres.groupeId);
-    this.filtreIndicateur.set(vue.filtres.indicateur);
+    const selection: EtatFiltreGroupeProjet = {
+      groupeId: vue.filtres.groupeId,
+      projetIds: vue.filtres.projetIds ?? null,
+    };
+    if (origine === 'vueParDefaut') {
+      this.contexte.amorcerParVueParDefaut(selection);
+    } else {
+      this.contexte.definirParUtilisateur(selection);
+    }
   }
 
   /**
@@ -528,20 +605,24 @@ export class SqmSyntheseAuditsComponent {
    * @returns `true` si `valeur` correspond à la forme attendue.
    */
   private static estFiltresSyntheseAudits(valeur: unknown): valeur is FiltresSyntheseAudits {
-    if (
-      typeof valeur !== 'object' ||
-      valeur === null ||
-      !('groupeId' in valeur) ||
-      !('indicateur' in valeur)
-    ) {
+    if (typeof valeur !== 'object' || valeur === null || !('groupeId' in valeur)) {
       return false;
     }
     const groupeId: unknown = valeur.groupeId;
     if (groupeId !== null && typeof groupeId !== 'string') {
       return false;
     }
-    const indicateur: unknown = valeur.indicateur;
-    return SqmSyntheseAuditsComponent.CLES_FILTRE_INDICATEUR.some((cle) => cle === indicateur);
+    const projetIds: unknown = 'projetIds' in valeur ? valeur.projetIds : null;
+    return projetIds === null || SqmSyntheseAuditsComponent.estTableauDeChaines(projetIds);
+  }
+
+  /**
+   * Indique si une valeur JSON externe est un tableau dont tous les éléments sont des chaînes.
+   * @param valeur - Valeur à vérifier.
+   * @returns `true` si `valeur` est un `readonly string[]`.
+   */
+  private static estTableauDeChaines(valeur: unknown): valeur is readonly string[] {
+    return Array.isArray(valeur) && valeur.every((element) => typeof element === 'string');
   }
 
   /**
@@ -550,9 +631,10 @@ export class SqmSyntheseAuditsComponent {
    * `SqmSelecteurVueComponent`.
    */
   public async enregistrerVue(demande: DemandeEnregistrementVue): Promise<void> {
+    const etat = this.contexte.etat();
     const filtres: FiltresSyntheseAudits = {
-      groupeId: this.filtreGroupeId(),
-      indicateur: this.filtreIndicateur(),
+      groupeId: etat.groupeId,
+      projetIds: etat.projetIds,
     };
     const resultat = await this.donneesApplication.definirVue(
       demande.id,
