@@ -952,11 +952,18 @@ mod tests {
         let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
         assert_eq!(racine.vues_enregistrees.len(), 3);
         for vue in &racine.vues_enregistrees {
-            assert_eq!(vue.version_filtres, crate::modele::racine::VERSION_FILTRES_VUE);
+            assert_eq!(
+                vue.version_filtres,
+                crate::modele::racine::VERSION_FILTRES_VUE
+            );
             let Some(filtres) = vue.filtres.as_object() else {
                 return Err("filtres doit être un objet après migration".into());
             };
-            assert_eq!(filtres.len(), 2, "seuls groupeId et projetIds sont conservés");
+            assert_eq!(
+                filtres.len(),
+                2,
+                "seuls groupeId et projetIds sont conservés"
+            );
             assert!(filtres.contains_key("groupeId"));
             assert!(filtres.contains_key("projetIds"));
         }
@@ -971,7 +978,10 @@ mod tests {
             json!(["p1", "p2"])
         );
         assert_eq!(racine.vues_enregistrees[2].filtres["groupeId"], json!(null));
-        assert_eq!(racine.vues_enregistrees[2].filtres["projetIds"], json!(null));
+        assert_eq!(
+            racine.vues_enregistrees[2].filtres["projetIds"],
+            json!(null)
+        );
         Ok(())
     }
 
@@ -1002,7 +1012,10 @@ mod tests {
         let vue = &racine.vues_enregistrees[0];
         assert_eq!(vue.filtres["groupeId"], json!("g7"));
         assert_eq!(vue.filtres["projetIds"], json!(["p9"]));
-        assert_eq!(vue.version_filtres, crate::modele::racine::VERSION_FILTRES_VUE);
+        assert_eq!(
+            vue.version_filtres,
+            crate::modele::racine::VERSION_FILTRES_VUE
+        );
         Ok(())
     }
 
