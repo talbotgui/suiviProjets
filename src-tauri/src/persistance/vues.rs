@@ -87,6 +87,21 @@ pub(crate) fn definir_vue(
         .find(|vue| vue.id == id)
         .map_or(Value::Null, resume_vue);
 
+    // Rétrogradations implicites : chaque autre vue du même écran qui perd son statut par défaut du fait de cette
+    // mutation est consignée séparément au journal (RG-023 étendu : « tout retrait du statut de vue par défaut »).
+    // La vue en cours de définition (`vue.id == id`) est exclue : son propre changement est déjà porté par
+    // l'entrée `avant`/`apres` ci-dessous.
+    let retrogradees: Vec<(String, String, String)> = if par_defaut {
+        donnees
+            .vues_enregistrees
+            .iter()
+            .filter(|vue| vue.ecran == ecran && vue.par_defaut && vue.id != id)
+            .map(|vue| (vue.id.clone(), vue.nom.clone(), vue.ecran.clone()))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     if par_defaut {
         for vue in donnees
             .vues_enregistrees
@@ -113,13 +128,25 @@ pub(crate) fn definir_vue(
 
     donnees.journal.push(EntreeJournal {
         id: uuid::Uuid::new_v4().to_string(),
-        horodatage,
+        horodatage: horodatage.clone(),
         objet: format!("vuesEnregistrees/{id}"),
         avant,
         apres: resume_vue(&vue),
-        origine,
+        origine: origine.clone(),
         detail_origine: None,
     });
+
+    for (id_retrogradee, nom_retrogradee, ecran_retrogradee) in retrogradees {
+        donnees.journal.push(EntreeJournal {
+            id: uuid::Uuid::new_v4().to_string(),
+            horodatage: horodatage.clone(),
+            objet: format!("vuesEnregistrees/{id_retrogradee}"),
+            avant: json!({ "nom": nom_retrogradee, "ecran": ecran_retrogradee, "parDefaut": true }),
+            apres: json!({ "nom": nom_retrogradee, "ecran": ecran_retrogradee, "parDefaut": false }),
+            origine: origine.clone(),
+            detail_origine: None,
+        });
+    }
 
     Ok(vue)
 }
@@ -300,6 +327,44 @@ mod tests {
                 .filter(|vue| vue.par_defaut)
                 .count(),
             1
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn definir_vue_par_defaut_consigne_le_retrait_du_statut_des_autres_vues_de_lecran()
+    -> Result<(), ErreurVues> {
+        let mut racine = DonneesRacine::nouvelle("Test", "2026-07-28T08:00:00Z");
+        definir(&mut racine, None, "Ancienne défaut", "obsolescence", 1, true, json!({}))?;
+        // Une vue d'un autre écran, également par défaut : elle ne doit pas être touchée ni journalisée.
+        definir(&mut racine, None, "Défaut listeTravail", "listeTravail", 1, true, json!({}))?;
+        racine.journal.clear();
+
+        definir(&mut racine, None, "Nouvelle défaut", "obsolescence", 1, true, json!({}))?;
+
+        // Deux entrées : la nouvelle vue par défaut, et le retrait du statut de « Ancienne défaut ».
+        assert_eq!(racine.journal.len(), 2);
+        let retraits: Vec<&EntreeJournal> = racine
+            .journal
+            .iter()
+            .filter(|entree| {
+                entree.avant
+                    == json!({ "nom": "Ancienne défaut", "ecran": "obsolescence", "parDefaut": true })
+            })
+            .collect();
+        assert_eq!(retraits.len(), 1);
+        assert_eq!(
+            retraits[0].apres,
+            json!({ "nom": "Ancienne défaut", "ecran": "obsolescence", "parDefaut": false })
+        );
+        assert_eq!(retraits[0].origine, ORIGINE);
+        assert_eq!(retraits[0].horodatage, HORODATAGE);
+        // La vue par défaut de l'autre écran n'apparaît dans aucune entrée.
+        assert!(
+            !racine
+                .journal
+                .iter()
+                .any(|entree| entree.avant.to_string().contains("Défaut listeTravail"))
         );
         Ok(())
     }

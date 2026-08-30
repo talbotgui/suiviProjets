@@ -97,26 +97,38 @@ export class BouchonVuesUtils {
 
     const vues = BouchonVuesUtils.lireListe(donnees, 'vuesEnregistrees');
     const index = vues.findIndex((vue) => vue['id'] === id);
-    const vuesRebasees =
-      parDefaut && index !== -1
-        ? vues.map((vue) => (vue['ecran'] === ecran ? { ...vue, parDefaut: false } : vue))
-        : vues;
+    // Rétrogradations implicites des autres vues par défaut du même écran (RG-023 étendu), comme côté cœur natif :
+    // à la création comme à la mise à jour.
+    const retrogradees = parDefaut
+      ? vues.filter(
+          (vue) => vue['ecran'] === ecran && vue['id'] !== id && vue['parDefaut'] === true,
+        )
+      : [];
+    const vuesRebasees = parDefaut
+      ? vues.map((vue) => (vue['ecran'] === ecran ? { ...vue, parDefaut: false } : vue))
+      : vues;
     const nouvellesVues =
       index === -1
         ? [...vuesRebasees, nouvelleVue]
         : vuesRebasees.map((vue, position) => (position === index ? nouvelleVue : vue));
 
     const avant = index === -1 ? null : BouchonVuesUtils.resumeVue(vues[index]);
+    const origine = BouchonVuesUtils.lireTexte(parametres, 'origine') || 'Vues enregistrées';
     return {
       ...donnees,
       vuesEnregistrees: nouvellesVues,
-      journal: BouchonVuesUtils.avecEntreeJournal(
-        donnees,
-        parametres,
-        id,
-        avant,
-        BouchonVuesUtils.resumeVue(nouvelleVue),
-      ),
+      journal: [
+        ...BouchonVuesUtils.lireListe(donnees, 'journal'),
+        BouchonVuesUtils.entreeJournal(origine, id, avant, BouchonVuesUtils.resumeVue(nouvelleVue)),
+        ...retrogradees.map((vue) =>
+          BouchonVuesUtils.entreeJournal(
+            origine,
+            typeof vue['id'] === 'string' ? vue['id'] : '',
+            BouchonVuesUtils.resumeVue(vue),
+            { ...BouchonVuesUtils.resumeVue(vue), parDefaut: false },
+          ),
+        ),
+      ],
     };
   }
 
@@ -132,16 +144,19 @@ export class BouchonVuesUtils {
     const id = BouchonVuesUtils.lireTexte(parametres, 'id');
     const vues = BouchonVuesUtils.lireListe(donnees, 'vuesEnregistrees');
     const supprimee = vues.find((vue) => vue['id'] === id);
+    const origine = BouchonVuesUtils.lireTexte(parametres, 'origine') || 'Vues enregistrées';
     return {
       ...donnees,
       vuesEnregistrees: vues.filter((vue) => vue['id'] !== id),
-      journal: BouchonVuesUtils.avecEntreeJournal(
-        donnees,
-        parametres,
-        id,
-        supprimee === undefined ? null : BouchonVuesUtils.resumeVue(supprimee),
-        null,
-      ),
+      journal: [
+        ...BouchonVuesUtils.lireListe(donnees, 'journal'),
+        BouchonVuesUtils.entreeJournal(
+          origine,
+          id,
+          supprimee === undefined ? null : BouchonVuesUtils.resumeVue(supprimee),
+          null,
+        ),
+      ],
     };
   }
 
@@ -160,33 +175,27 @@ export class BouchonVuesUtils {
   }
 
   /**
-   * Construit le journal des modifications de la racine avec une entrée supplémentaire pour la mutation de vue
-   * courante (RG-054).
-   * @param donnees - Racine source.
-   * @param parametres - Paramètres reçus (pour lire `origine`).
-   * @param idVue - Identifiant de la vue mutée.
+   * Construit une entrée de journal des modifications pour une mutation de vue (RG-054).
+   * @param origine - Libellé d'origine de la mutation.
+   * @param idVue - Identifiant de la vue concernée.
    * @param avant - Résumé avant mutation, `null` pour une création.
    * @param apres - Résumé après mutation, `null` pour une suppression.
-   * @returns Le journal enrichi de l'entrée.
+   * @returns L'entrée de journal.
    */
-  private static avecEntreeJournal(
-    donnees: Readonly<Record<string, unknown>>,
-    parametres: Readonly<Record<string, unknown>>,
+  private static entreeJournal(
+    origine: string,
     idVue: string,
     avant: Record<string, unknown> | null,
     apres: Record<string, unknown> | null,
-  ): readonly unknown[] {
-    return [
-      ...BouchonVuesUtils.lireListe(donnees, 'journal'),
-      {
-        id: crypto.randomUUID(),
-        horodatage: new Date().toISOString(),
-        objet: `vuesEnregistrees/${idVue}`,
-        avant,
-        apres,
-        origine: BouchonVuesUtils.lireTexte(parametres, 'origine') || 'Vues enregistrées',
-      },
-    ];
+  ): Record<string, unknown> {
+    return {
+      id: crypto.randomUUID(),
+      horodatage: new Date().toISOString(),
+      objet: `vuesEnregistrees/${idVue}`,
+      avant,
+      apres,
+      origine,
+    };
   }
 
   /**

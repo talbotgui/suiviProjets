@@ -2,7 +2,9 @@
 // US-054, RG-054), généré avec l'assistance de l'IA (Claude Code), conformément à
 // .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
@@ -92,6 +94,7 @@ describe('SqmVuesEnregistreesParametrageComponent', () => {
     invokeSimule.mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmVuesEnregistreesParametrageComponent],
+      providers: [provideRouter([])],
     }).compileComponents();
     donneesApplication = TestBed.inject(DonneesApplicationService);
     notification = TestBed.inject(NotificationService);
@@ -227,5 +230,119 @@ describe('SqmVuesEnregistreesParametrageComponent', () => {
     await composant.confirmerMotDePasse('mot-de-passe');
 
     expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
+  });
+
+  it("remet `enCours` à `false` et notifie une erreur si l'appel de service lève (fichier fermé/verrouillé, m3)", async () => {
+    donneesApplication.chargerRacine(DonneesDeTest.racine([DonneesDeTest.vue()]));
+    // `DonneesApplicationService.supprimerVue` lit la racine / le chemin hors de son `try` : il lève (et non
+    // rejette proprement) si le fichier a été fermé ou verrouillé pendant que la modale était ouverte.
+    jest
+      .spyOn(donneesApplication, 'supprimerVue')
+      .mockRejectedValue(new Error("Aucun fichier n'est actuellement ouvert."));
+    const composant = TestBed.createComponent(
+      SqmVuesEnregistreesParametrageComponent,
+    ).componentInstance;
+
+    composant.demanderSuppression(DonneesDeTest.vue());
+    composant.confirmerSuppression();
+    await composant.confirmerMotDePasse('mot-de-passe');
+
+    expect(composant.enCours()).toBe(false);
+    expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
+  });
+
+  it('ferme le champ de renommage sans muter (annulerRenommage)', () => {
+    donneesApplication.chargerRacine(DonneesDeTest.racine([DonneesDeTest.vue()]));
+    const composant = TestBed.createComponent(
+      SqmVuesEnregistreesParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirRenommage(DonneesDeTest.vue());
+    expect(composant.idEnRenommage()).toBe('v1');
+    composant.annulerRenommage();
+
+    expect(composant.idEnRenommage()).toBeNull();
+    expect(composant.actionEnAttente()).toBeNull();
+  });
+
+  it('ferme la confirmation de suppression préalable sans muter (annulerSuppression)', () => {
+    donneesApplication.chargerRacine(DonneesDeTest.racine([DonneesDeTest.vue()]));
+    const composant = TestBed.createComponent(
+      SqmVuesEnregistreesParametrageComponent,
+    ).componentInstance;
+
+    composant.demanderSuppression(DonneesDeTest.vue());
+    expect(composant.vueEnSuppression()).not.toBeNull();
+    composant.annulerSuppression();
+
+    expect(composant.vueEnSuppression()).toBeNull();
+    expect(composant.actionEnAttente()).toBeNull();
+  });
+
+  it('annule la ressaisie du mot de passe sans muter (annulerMotDePasse)', async () => {
+    donneesApplication.chargerRacine(DonneesDeTest.racine([DonneesDeTest.vue()]));
+    const composant = TestBed.createComponent(
+      SqmVuesEnregistreesParametrageComponent,
+    ).componentInstance;
+
+    composant.demanderDuplication(DonneesDeTest.vue());
+    expect(composant.actionEnAttente()).not.toBeNull();
+    composant.annulerMotDePasse();
+    expect(composant.actionEnAttente()).toBeNull();
+
+    // Une confirmation reçue après annulation ne déclenche aucune mutation.
+    await composant.confirmerMotDePasse('mot-de-passe');
+    expect(invokeSimule).not.toHaveBeenCalled();
+  });
+
+  it('produit un message de ressaisie du mot de passe propre à chaque action', () => {
+    donneesApplication.chargerRacine(
+      DonneesDeTest.racine([DonneesDeTest.vue({ parDefaut: true })]),
+    );
+    const composant = TestBed.createComponent(
+      SqmVuesEnregistreesParametrageComponent,
+    ).componentInstance;
+
+    expect(composant.messageMotDePasse()).toBe('');
+
+    composant.ouvrirRenommage(DonneesDeTest.vue());
+    composant.nomEnRenommage.set('Autre nom');
+    composant.validerRenommage(DonneesDeTest.vue());
+    expect(composant.messageMotDePasse()).toContain('renommer');
+
+    composant.demanderDuplication(DonneesDeTest.vue());
+    expect(composant.messageMotDePasse()).toContain('dupliquer');
+
+    composant.demanderBasculeParDefaut(DonneesDeTest.vue({ parDefaut: true }));
+    expect(composant.messageMotDePasse()).toContain('retirer le statut');
+
+    composant.demanderBasculeParDefaut(DonneesDeTest.vue({ parDefaut: false }));
+    expect(composant.messageMotDePasse()).toContain('vue par défaut');
+
+    composant.demanderSuppression(DonneesDeTest.vue());
+    composant.confirmerSuppression();
+    expect(composant.messageMotDePasse()).toContain('supprimer');
+  });
+
+  it("expose un lien « Ouvrir l'écran concerné » vers la route de chaque écran (RG-054, §C.2)", () => {
+    donneesApplication.chargerRacine(
+      DonneesDeTest.racine([
+        DonneesDeTest.vue({ id: 'a', ecran: 'obsolescence' }),
+        DonneesDeTest.vue({ id: 'b', ecran: 'listeTravail' }),
+      ]),
+    );
+    const fixture = TestBed.createComponent(SqmVuesEnregistreesParametrageComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.groupes().map((g) => g.route)).toEqual([
+      '/liste-travail',
+      '/obsolescence',
+    ]);
+    const liens = Array.from(
+      DomTestUtils.obtenirElementNatif(fixture).querySelectorAll<HTMLAnchorElement>(
+        '.vues-enregistrees-parametrage__lien-ecran',
+      ),
+    );
+    expect(liens.map((a) => a.getAttribute('href'))).toEqual(['/liste-travail', '/obsolescence']);
   });
 });

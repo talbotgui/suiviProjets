@@ -25,22 +25,23 @@ import { SqmSeuilsParametrageComponent } from './seuils/seuils-parametrage.compo
 import { SqmVuesEnregistreesParametrageComponent } from './vues-enregistrees/vues-enregistrees-parametrage.component';
 
 /**
- * Identifiant d'un onglet de l'écran Paramétrage.
+ * Onglets de l'écran Paramétrage, dans l'ordre d'affichage. Source de vérité unique : le type
+ * {@link OngletParametrage} en est dérivé, ce qui interdit toute divergence entre la liste utilisée pour valider
+ * le paramètre de requête `onglet` et l'ensemble des identifiants d'onglet acceptés.
  */
-type OngletParametrage =
-  'seuilsReferentiels' | 'journal' | 'purge' | 'exportImport' | 'securite' | 'vuesEnregistrees';
-
-/**
- * Onglets valides, pour valider sans assertion de type la valeur brute d'un paramètre de requête `onglet`.
- */
-const ONGLETS: readonly OngletParametrage[] = [
+const ONGLETS = [
   'seuilsReferentiels',
   'journal',
   'purge',
   'exportImport',
   'securite',
   'vuesEnregistrees',
-];
+] as const;
+
+/**
+ * Identifiant d'un onglet de l'écran Paramétrage (dérivé de {@link ONGLETS}).
+ */
+type OngletParametrage = (typeof ONGLETS)[number];
 
 /**
  * Écran Paramétrage : coquille à onglets (US-033, US-027, US-025, US-028 à US-030, US-041, US-054).
@@ -87,8 +88,11 @@ export class SqmParametrageComponent {
     signal<OngletParametrage>('seuilsReferentiels');
 
   public constructor() {
-    // Applique une seule fois l'onglet demandé par le paramètre de requête, s'il est valide (cf. commentaire
-    // d'en-tête) ; une sélection ultérieure de l'utilisateur (`selectionnerOnglet`) prime.
+    // Positionne l'onglet actif sur celui demandé par le paramètre de requête `onglet`, s'il est valide (cf.
+    // commentaire d'en-tête). L'effet ne dépend que de `this.onglet()` : il ne se réévalue donc que si ce
+    // paramètre change (jamais après une sélection via `selectionnerOnglet`, qui n'écrit pas `onglet`). En
+    // pratique le paramètre est fixé une fois à l'arrivée sur la route et ne change plus : l'effet s'exécute une
+    // seule fois. Une valeur brute non reconnue est ignorée (l'onglet par défaut reste affiché).
     effect(() => {
       const demande = this.onglet();
       const trouve = ONGLETS.find((onglet) => onglet === demande);

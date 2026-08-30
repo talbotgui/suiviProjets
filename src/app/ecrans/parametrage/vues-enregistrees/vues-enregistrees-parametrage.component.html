@@ -3,8 +3,9 @@
   <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Vues enregistrées</h2>
   <p class="vues-enregistrees-parametrage__intro texte-sm texte-discret exterieur-bas-4">
     Administration centralisée de toutes les vues enregistrées (US-054). La modification des filtres
-    d'une vue reste sur l'écran concerné, qui porte sa barre de filtres ; cet onglet gère le nom, le
-    statut de vue par défaut, la duplication et la suppression.
+    d'une vue reste sur l'écran concerné, qui porte sa barre de filtres : utilisez « Ouvrir l'écran
+    concerné » puis « Mettre à jour ». Cet onglet gère le nom, le statut de vue par défaut, la
+    duplication et la suppression.
   </p>
 
   @if (aucuneVue()) {
@@ -15,9 +16,19 @@
   } @else {
     @for (groupe of groupes(); track groupe.ecran) {
       <section class="vues-enregistrees-parametrage__groupe exterieur-bas-5">
-        <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">
-          {{ groupe.libelleEcran }}
-        </h3>
+        <div class="d-flex retour-ligne aligne-centre ecart-3 exterieur-bas-2">
+          <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+            {{ groupe.libelleEcran }}
+          </h3>
+          @if (groupe.route !== null) {
+            <a
+              class="vues-enregistrees-parametrage__lien-ecran texte-xs"
+              [routerLink]="groupe.route"
+            >
+              Ouvrir l'écran concerné
+            </a>
+          }
+        </div>
         <div class="deborde-auto">
           <table class="vues-enregistrees-parametrage__tableau tableau">
             <thead>

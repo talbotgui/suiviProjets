@@ -7,15 +7,17 @@
 // défaut), supprimer, définir ou retirer le statut de vue par défaut (exclusif par écran, garanti côté cœur natif).
 //
 // La modification des filtres eux-mêmes reste sur l'écran d'origine (elle a besoin de sa barre de filtres) : cet
-// onglet ne propose que le nom et le statut par défaut. Chaque mutation réutilise `DonneesApplicationService.
-// definirVue`/`supprimerVue`, sans commande native nouvelle (RG-054 : la journalisation de la mutation est portée
-// par les commandes natives `definir_vue`/`supprimer_vue` elles-mêmes depuis cet incrément). Chaque mutation
-// sauvegarde effectivement le fichier et redemande donc le mot de passe (RG-002), via
-// `SqmConfirmationMotDePasseComponent` (et `SqmConfirmationSuppressionComponent` avant une suppression), sur le
-// même modèle que `SqmSelecteurVueComponent`.
+// onglet ne propose que le nom et le statut par défaut, plus un lien « Ouvrir l'écran concerné » (RG-054, §C.2 du
+// plan) vers l'écran de restitution correspondant, où la barre de filtres permet de retoucher puis « Mettre à
+// jour » la vue. Chaque mutation réutilise `DonneesApplicationService.definirVue`/`supprimerVue`, sans commande
+// native nouvelle (RG-054 : la journalisation de la mutation est portée par les commandes natives
+// `definir_vue`/`supprimer_vue` elles-mêmes depuis cet incrément). Chaque mutation sauvegarde effectivement le
+// fichier et redemande donc le mot de passe (RG-002), via `SqmConfirmationMotDePasseComponent` (et
+// `SqmConfirmationSuppressionComponent` avant une suppression), sur le même modèle que `SqmSelecteurVueComponent`.
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { Signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../composants/confirmation-suppression/confirmation-suppression.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -26,14 +28,14 @@ import type {
 } from '../../../services/avecetat/etat/types-donnees';
 
 /**
- * Table des libellés lisibles des écrans porteurs de vues enregistrées (les quatre écrans de restitution du
- * périmètre RG-027 amendée). Un identifiant d'écran absent de cette table est restitué tel quel.
+ * Métadonnées d'affichage d'un écran porteur de vues enregistrées (les quatre écrans de restitution du périmètre
+ * RG-027 amendée) : libellé lisible et chemin de route (`app.routes.ts`) pour le lien « Ouvrir l'écran concerné ».
  */
-const LIBELLES_ECRAN: Readonly<Record<string, string>> = {
-  syntheseAudits: 'Synthèse des audits',
-  syntheseGraphique: 'Synthèse graphique',
-  obsolescence: 'Obsolescence',
-  listeTravail: 'Liste de travail',
+const ECRANS: Readonly<Record<string, { readonly libelle: string; readonly route: string }>> = {
+  syntheseAudits: { libelle: 'Synthèse des audits', route: '/synthese-audits' },
+  syntheseGraphique: { libelle: 'Synthèse graphique', route: '/synthese-graphique' },
+  obsolescence: { libelle: 'Obsolescence', route: '/obsolescence' },
+  listeTravail: { libelle: 'Liste de travail', route: '/liste-travail' },
 };
 
 /**
@@ -42,8 +44,10 @@ const LIBELLES_ECRAN: Readonly<Record<string, string>> = {
 interface GroupeVues {
   /** Identifiant stable de l'écran. */
   readonly ecran: string;
-  /** Libellé lisible de l'écran (cf. {@link LIBELLES_ECRAN}). */
+  /** Libellé lisible de l'écran (cf. {@link ECRANS}). */
   readonly libelleEcran: string;
+  /** Chemin de route de l'écran (`app.routes.ts`), `null` si l'écran n'est pas reconnu. */
+  readonly route: string | null;
   /** Vues enregistrées de cet écran, dans l'ordre du fichier. */
   readonly vues: readonly VueEnregistree[];
 }
@@ -64,7 +68,12 @@ type ActionEnAttente =
  */
 @Component({
   selector: 'app-vues-enregistrees-parametrage',
-  imports: [FormsModule, SqmConfirmationMotDePasseComponent, SqmConfirmationSuppressionComponent],
+  imports: [
+    FormsModule,
+    RouterLink,
+    SqmConfirmationMotDePasseComponent,
+    SqmConfirmationSuppressionComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './vues-enregistrees-parametrage.component.html',
 })
@@ -87,7 +96,8 @@ export class SqmVuesEnregistreesParametrageComponent {
     return Array.from(parEcran.entries())
       .map(([ecran, vuesEcran]) => ({
         ecran,
-        libelleEcran: LIBELLES_ECRAN[ecran] ?? ecran,
+        libelleEcran: ECRANS[ecran]?.libelle ?? ecran,
+        route: ECRANS[ecran]?.route ?? null,
         vues: vuesEcran,
       }))
       .sort((a, b) => a.libelleEcran.localeCompare(b.libelleEcran));
@@ -237,15 +247,24 @@ export class SqmVuesEnregistreesParametrageComponent {
       return;
     }
     this.enCours.set(true);
-    const resultat = await this.executer(action, motDePasse);
-    this.enCours.set(false);
-    if (resultat.type === 'echec') {
+    try {
+      const resultat = await this.executer(action, motDePasse);
+      if (resultat.type === 'echec') {
+        this.notification.erreur(
+          "Une erreur inattendue est survenue lors de l'opération sur la vue.",
+        );
+        return;
+      }
+      this.notification.succes(this.messageSucces(action));
+    } catch {
+      // `DonneesApplicationService.definirVue`/`supprimerVue` peut lever si le fichier est fermé ou verrouillé
+      // pendant que la modale de mot de passe est ouverte (lecture de la racine/du chemin hors de leur `try`).
       this.notification.erreur(
         "Une erreur inattendue est survenue lors de l'opération sur la vue.",
       );
-      return;
+    } finally {
+      this.enCours.set(false);
     }
-    this.notification.succes(this.messageSucces(action));
   }
 
   /**

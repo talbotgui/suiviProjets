@@ -158,4 +158,61 @@ describe('BouchonVuesUtils', () => {
     });
     expect(suppression.journal[0].apres).toBeNull();
   });
+
+  it('consigne aussi le retrait implicite du statut par défaut des autres vues du même écran (RG-023 étendu)', async () => {
+    const donnees = {
+      ...DONNEES_DE_BASE,
+      journal: [],
+      vuesEnregistrees: [
+        {
+          id: 'v1',
+          nom: 'Ancienne défaut',
+          ecran: 'syntheseAudits',
+          versionFiltres: 1,
+          parDefaut: true,
+          filtres: null,
+        },
+        {
+          id: 'v2',
+          nom: 'Défaut listeTravail',
+          ecran: 'listeTravail',
+          versionFiltres: 1,
+          parDefaut: true,
+          filtres: null,
+        },
+      ],
+    };
+
+    const resultat = await BouchonVuesUtils.invoquer<{
+      readonly journal: readonly {
+        readonly objet: string;
+        readonly avant: unknown;
+        readonly apres: unknown;
+      }[];
+    }>('definir_vue', {
+      donnees,
+      nom: 'Nouvelle défaut',
+      ecran: 'syntheseAudits',
+      versionFiltres: 1,
+      parDefaut: true,
+      filtres: null,
+      origine: 'Vues enregistrées',
+    });
+
+    // Deux entrées : la nouvelle vue par défaut + le retrait du statut de « Ancienne défaut ». La vue par défaut
+    // d'un autre écran (« Défaut listeTravail ») n'est ni rétrogradée ni journalisée.
+    expect(resultat.journal).toHaveLength(2);
+    const retrait = resultat.journal.filter((e) => e.objet === 'vuesEnregistrees/v1');
+    expect(retrait).toHaveLength(1);
+    expect(retrait[0].avant).toEqual({
+      nom: 'Ancienne défaut',
+      ecran: 'syntheseAudits',
+      parDefaut: true,
+    });
+    expect(retrait[0].apres).toEqual({
+      nom: 'Ancienne défaut',
+      ecran: 'syntheseAudits',
+      parDefaut: false,
+    });
+  });
 });

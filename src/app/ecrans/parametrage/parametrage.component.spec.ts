@@ -1,15 +1,17 @@
 // Test de l'écran Paramétrage (cf. parametrage.component.ts), généré avec l'assistance de l'IA (Claude Code),
 // conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmParametrageComponent } from './parametrage.component';
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 describe('SqmParametrageComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [SqmParametrageComponent],
+      providers: [provideRouter([])],
     }).compileComponents();
   });
 
