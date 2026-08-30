@@ -10,7 +10,7 @@ Application de bureau qui suit et surveille, dans le temps, la qualimétrie et l
 4. [Stack technique](#stack-technique)
 5. [Pour aller plus loin](#pour-aller-plus-loin)
 
-![Écran de synthèse des audits](01_besoin/screenshots/02-synthese.png)
+![Écran de synthèse des audits](assets/captures/synthese-audits.png)
 
 ## Qu'est-ce que c'est
 
@@ -37,6 +37,7 @@ Application [Tauri](https://tauri.app/) : le cœur natif en **Rust** assure les 
 
 ## Pour aller plus loin
 
+- [Guide utilisateur](guide-utilisateur.md) : prise en main pas à pas, écran par écran, captures de l'application à l'appui.
 - [La méthode](methode.md) : comment ce projet est cadré et construit, en documentation-first assistée par IA.
 - [La documentation](02_documentation/01_modalitesUsageEtConventions.md) : l'intégralité du besoin, de la documentation normative, des plans et des rapports, navigable depuis le menu.
 - [Qualité et téléchargements](qualite.md) : couverture de code, documentation technique générée, statut d'intégration continue, exécutables.

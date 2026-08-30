@@ -22,7 +22,7 @@ Application de bureau qui suit et surveille, dans le temps, la qualimétrie et l
 
 ## Aperçu
 
-![Synthèse des audits](docs/01_besoin/screenshots/02-synthese.png)
+![Synthèse des audits](docs/assets/captures/synthese-audits.png)
 
 ## Qu'est-ce que c'est
 
