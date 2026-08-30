@@ -5,20 +5,28 @@ Application de bureau qui suit et surveille, dans le temps, la qualimétrie et l
 [![Licence](https://img.shields.io/github/license/talbotgui/suiviProjets)](./LICENSE)
 [![Validation, montée de version et publication](https://github.com/talbotgui/suiviProjets/actions/workflows/validationVersionEtPublication.yml/badge.svg)](https://github.com/talbotgui/suiviProjets/actions/workflows/validationVersionEtPublication.yml)
 ![Plateformes](https://img.shields.io/badge/plateformes-Windows%20%7C%20macOS%20%7C%20Linux-informational)
+[![Site documentaire](https://img.shields.io/badge/site%20documentaire-en%20ligne-1f6feb)](https://me.guillaumetalbot.com/suiviProjets/)
+
+> **Documentation en ligne : <https://me.guillaumetalbot.com/suiviProjets/>** — toute la documentation du projet, navigable et recherchable, aux côtés des rapports de couverture de code et de documentation technique. Détail en [section dédiée](#documentation-en-ligne).
 
 ## Sommaire
 
-1. [Aperçu](#aperçu)
-2. [Qu'est-ce que c'est](#quest-ce-que-cest)
-3. [Statut du projet](#statut-du-projet)
-4. [Ce qui distingue ce projet](#ce-qui-distingue-ce-projet)
-5. [Stack technique](#stack-technique)
-6. [Installation](#installation)
+1. [Documentation en ligne](#documentation-en-ligne)
+2. [Aperçu](#aperçu)
+3. [Qu'est-ce que c'est](#quest-ce-que-cest)
+4. [Statut du projet](#statut-du-projet)
+5. [Ce qui distingue ce projet](#ce-qui-distingue-ce-projet)
+6. [Stack technique](#stack-technique)
+7. [Installation](#installation)
    1. [Utilisatrice ou utilisateur](#utilisatrice-ou-utilisateur)
    2. [Développeuse ou développeur](#développeuse-ou-développeur)
-7. [Documentation et méthode de construction](#documentation-et-méthode-de-construction)
-8. [Avertissements](#avertissements)
-9. [Licence](#licence)
+8. [Documentation et méthode de construction](#documentation-et-méthode-de-construction)
+9. [Avertissements](#avertissements)
+10. [Licence](#licence)
+
+## Documentation en ligne
+
+L'intégralité de la documentation du projet — besoin, exigences, architecture, modèle de données, normes de développement, de sécurité et de tests, guide utilisateur, plan et rapport de développement — est publiée et navigable sur [un site MkDocs](https://me.guillaumetalbot.com/suiviProjets/), aux côtés des rapports de couverture de code (Rust et TypeScript) et de documentation technique (rustdoc, Compodoc), republiés à chaque release. Le dépôt reste la source unique ; le site n'en est que la vue lisible et recherchable.
 
 ## Aperçu
 
@@ -66,8 +74,8 @@ Détail complet, dépendances système du webview et variables d'environnement d
 
 ## Documentation et méthode de construction
 
-- [Documentation technique](docs/02_documentation/) : besoin, exigences, architecture, modèle de données, normes de développement, de sécurité et de tests, poste développeur, intégration continue.
-- [Site documentaire, rapports de couverture de code et de documentation technique](https://me.guillaumetalbot.com/suiviProjets/).
+- **[Site documentaire en ligne](https://me.guillaumetalbot.com/suiviProjets/)** — portail principal (cf. [section dédiée](#documentation-en-ligne)) : documentation navigable et recherchable, rapports de couverture de code et de documentation technique, republiés à chaque release.
+- [Documentation technique dans le dépôt](docs/02_documentation/) : besoin, exigences, architecture, modèle de données, normes de développement, de sécurité et de tests, poste développeur, intégration continue.
 
 Ce projet est autant une démonstration de méthode qu'un outil : l'ensemble de la conception a été cadré en amont, en français, à travers une discussion structurée en 15 étapes pilotée par [un prompt de cadrage réutilisable](docs/00_init&prompt/00_promptInitial.md), chaque étape produisant des documents relus dans une session isolée puis validés explicitement par un humain avant de passer à la suivante. Le développement lui-même est dérivé exclusivement de cette documentation (jamais du dossier de besoin, à l'exception des feuilles de style) et suit le même principe binôme, incrément par incrément : un « Codeur » développe, un « Relecteur » relit dans un contexte isolé du raisonnement du Codeur, consigné dans le [rapport de développement](docs/04_rapports/rapportDeDeveloppement.md). Chaque exigence porte un identifiant stable (`US-NNN`, `RG-NNN`) tracé sans rupture depuis le besoin jusqu'aux tests.
 
