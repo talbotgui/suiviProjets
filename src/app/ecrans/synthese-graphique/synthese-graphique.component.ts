@@ -40,9 +40,17 @@ import type {
   DemandeSuppressionVue,
   VueSelectionnable,
 } from '../../composants/selecteur-vue/selecteur-vue.component';
+import { SqmFiltreGroupeProjetComponent } from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
+import type {
+  GroupeFiltrable,
+  ProjetFiltrable,
+  SelectionGroupeProjet,
+} from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
+import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import type { Groupe, Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
+import type { Projet, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { ChangementSeuilUtils } from '../../services/sansetat/jugement/changement-seuil.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { TriAlphabetiqueUtils } from '../../services/sansetat/jugement/tri-alphabetique.utils';
@@ -66,21 +74,28 @@ export type CleIndicateurGraphique =
 const ECRAN_SYNTHESE_GRAPHIQUE = 'syntheseGraphique';
 
 /**
- * Version courante du schéma de filtres de cet écran (US-028, RG-027) : à incrémenter si la forme de
- * {@link FiltresSyntheseGraphique} change.
+ * Version courante du schéma de filtres, commune à tous les écrans depuis le palier de migration `9` → `10`
+ * (plan_16, incrément 2) : la forme de {@link FiltresSyntheseGraphique} (`{ groupeId, projetIds }`) est partagée.
  */
 const VERSION_FILTRES_SYNTHESE_GRAPHIQUE = 1;
 
 /**
- * Forme des filtres de cet écran persistée par une vue enregistrée (US-028, RG-027 : « groupes, projets,
- * indicateurs, période, tri »). `projetIds` restitue {@link filtreProjetIdsInterne} sous forme sérialisable
- * (`null` = tous les projets disponibles, sur le même modèle que le signal interne).
+ * Forme des filtres persistée par une vue enregistrée depuis le palier `9` → `10` (RG-027 amendée) : uniquement la
+ * sélection de groupe et de projets, commune à tous les écrans. Le type d'indicateur est un filtre complémentaire
+ * propre à cet écran, géré localement et jamais mémorisé dans une vue.
  */
 interface FiltresSyntheseGraphique {
+  /** Identifiant du groupe sélectionné, `null` = tous les groupes. */
   readonly groupeId: string | null;
-  readonly indicateur: CleIndicateurGraphique;
+  /** Identifiants des projets sélectionnés, `null` = aucune restriction de projet. */
   readonly projetIds: readonly string[] | null;
 }
+
+/**
+ * Origine d'une application de vue, pour distinguer une sélection explicite de l'utilisateur (qui prend le pas sur
+ * la vue par défaut d'un écran, RG-053) de l'amorçage automatique par la vue par défaut à la première visite.
+ */
+type OrigineApplicationVue = 'utilisateur' | 'vueParDefaut';
 
 /**
  * Définition d'un type d'indicateur restituable : libellé affiché, préfixe de filtrage des changements de seuil du
@@ -118,7 +133,11 @@ const PALETTE_SERIES: readonly string[] = [
  */
 @Component({
   selector: 'app-synthese-graphique',
-  imports: [SqmGraphiqueEvolutionComponent, SqmSelecteurVueComponent],
+  imports: [
+    SqmGraphiqueEvolutionComponent,
+    SqmSelecteurVueComponent,
+    SqmFiltreGroupeProjetComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './synthese-graphique.component.html',
 })
@@ -159,6 +178,12 @@ export class SqmSyntheseGraphiqueComponent {
   private readonly notification: NotificationService = inject(NotificationService);
 
   /**
+   * Filtre groupe/projet mutualisé, partagé avec les autres écrans de restitution (RG-053). Exposé au gabarit pour
+   * alimenter `SqmFiltreGroupeProjetComponent` et lire l'état courant.
+   */
+  public readonly contexte: ContexteConsultationService = inject(ContexteConsultationService);
+
+  /**
    * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne l'appliquer
    * qu'une seule fois par instance de ce composant (sur le modèle de `SqmListeTravailComponent`, Phase 9
    * incrément 1).
@@ -170,6 +195,12 @@ export class SqmSyntheseGraphiqueComponent {
       if (this.vueParDefautDejaAppliquee) {
         return;
       }
+      // Priorité RG-053 : dès que l'utilisateur a touché le filtre partagé pendant la session, son choix le suit
+      // d'un écran à l'autre et prime sur la vue par défaut de cet écran.
+      if (this.contexte.filtreModifieParUtilisateur()) {
+        this.vueParDefautDejaAppliquee = true;
+        return;
+      }
       const vueParDefaut = VuesEnregistreesUtils.trouverVueParDefaut(
         this.resultatFiltrageVues().applicables,
       );
@@ -177,7 +208,7 @@ export class SqmSyntheseGraphiqueComponent {
         return;
       }
       this.vueParDefautDejaAppliquee = true;
-      this.appliquerVue(vueParDefaut);
+      this.appliquerVue(vueParDefaut, 'vueParDefaut');
     });
   }
 
@@ -188,22 +219,27 @@ export class SqmSyntheseGraphiqueComponent {
   private readonly conteneurExport = viewChild<ElementRef<HTMLElement>>('conteneurExport');
 
   /**
-   * Identifiant du groupe sélectionné dans le filtre, `null` = tous les groupes.
+   * Identifiant du groupe sélectionné dans le filtre partagé, `null` = tous les groupes. Dérivé de
+   * {@link ContexteConsultationService} (RG-053) : la sélection est partagée avec les autres écrans de restitution.
    */
-  public readonly filtreGroupeId: WritableSignal<string | null> = signal<string | null>(null);
+  public readonly filtreGroupeId: Signal<string | null> = computed(
+    () => this.contexte.etat().groupeId,
+  );
 
   /**
-   * Clé du type d'indicateur actuellement sélectionné.
+   * Identifiants des projets sélectionnés dans le filtre partagé, `null` = aucune restriction. Dérivé de
+   * {@link ContexteConsultationService} (RG-053).
+   */
+  public readonly filtreProjetIds: Signal<readonly string[] | null> = computed(
+    () => this.contexte.etat().projetIds,
+  );
+
+  /**
+   * Clé du type d'indicateur actuellement sélectionné : filtre complémentaire propre à cet écran, jamais mémorisé
+   * dans une vue enregistrée (RG-027 amendée).
    */
   public readonly filtreIndicateur: WritableSignal<CleIndicateurGraphique> =
     signal<CleIndicateurGraphique>('couverture');
-
-  /**
-   * Identifiants des projets explicitement sélectionnés par l'utilisateur parmi ceux disponibles dans le groupe
-   * filtré, `null` = tous les projets disponibles (valeur par défaut).
-   */
-  private readonly filtreProjetIdsInterne: WritableSignal<ReadonlySet<string> | null> =
-    signal<ReadonlySet<string> | null>(null);
 
   /**
    * Résultat du filtrage des vues enregistrées de cet écran par version de filtres courante (US-028, RG-027).
@@ -232,13 +268,22 @@ export class SqmSyntheseGraphiqueComponent {
     () => this.resultatFiltrageVues().nombreIgnorees,
   );
 
+  /** Groupes proposés au composant de filtre mutualisé (forme structurelle minimale, RG-053), triés par nom. */
+  public readonly groupesFiltrables: Signal<readonly GroupeFiltrable[]> = computed(() =>
+    this.donneesApplication.groupes().map((groupe) => ({ id: groupe.id, nom: groupe.nom })),
+  );
+
   /**
-   * Groupes disponibles pour le filtre.
-   * @returns Les groupes actuellement chargés.
+   * Ensemble des projets (tous groupes confondus) proposés au composant de filtre mutualisé (RG-053). La liste
+   * réellement affichée est restreinte au groupe sélectionné par le composant lui-même.
    */
-  public groupesDisponibles(): readonly Groupe[] {
-    return this.donneesApplication.groupes();
-  }
+  public readonly projetsFiltrables: Signal<readonly ProjetFiltrable[]> = computed(() =>
+    this.donneesApplication
+      .groupes()
+      .flatMap((groupe) =>
+        groupe.projets.map((projet) => ({ id: projet.id, nom: projet.nom, groupeId: groupe.id })),
+      ),
+  );
 
   /**
    * Cinq indicateurs proposés au filtre « type d'indicateur » (cf. {@link INDICATEURS}).
@@ -249,23 +294,23 @@ export class SqmSyntheseGraphiqueComponent {
   }
 
   /**
-   * Projets disponibles compte tenu du seul filtre de groupe (avant restriction éventuelle par le filtre de
-   * projet), triés par nom pour un affichage stable de la liste de sélection et une assignation stable de couleur.
-   */
-  public readonly projetsDisponibles: Signal<readonly Projet[]> = computed(() => {
-    const groupeId = this.filtreGroupeId();
-    const groupes = this.donneesApplication.groupes();
-    const groupesRetenus = groupeId === null ? groupes : groupes.filter((g) => g.id === groupeId);
-    return TriAlphabetiqueUtils.trierParNom(groupesRetenus.flatMap((groupe) => groupe.projets));
-  });
-
-  /**
-   * Projets effectivement retenus pour construire les séries (après application du filtre de projet).
+   * Projets effectivement retenus pour construire les séries : projets du groupe sélectionné dans le filtre partagé
+   * (tous les groupes si aucun n'est sélectionné), restreints à la sélection de projets du filtre partagé si elle
+   * est resserrée (RG-053). Triés par nom pour un affichage stable de la liste et une assignation stable de
+   * couleur.
    */
   private readonly projetsRetenus: Signal<readonly Projet[]> = computed(() => {
-    const disponibles = this.projetsDisponibles();
-    const filtre = this.filtreProjetIdsInterne();
-    return filtre === null ? disponibles : disponibles.filter((projet) => filtre.has(projet.id));
+    const { groupeId, projetIds } = this.contexte.etat();
+    const groupes = this.donneesApplication.groupes();
+    const groupesRetenus = groupeId === null ? groupes : groupes.filter((g) => g.id === groupeId);
+    const tries = TriAlphabetiqueUtils.trierParNom(
+      groupesRetenus.flatMap((groupe) => groupe.projets),
+    );
+    if (projetIds === null) {
+      return tries;
+    }
+    const permis = new Set(projetIds);
+    return tries.filter((projet) => permis.has(projet.id));
   });
 
   /**
@@ -376,27 +421,6 @@ export class SqmSyntheseGraphiqueComponent {
   }
 
   /**
-   * Indique si un projet est actuellement retenu par le filtre de projet, pilote l'état de sa case à cocher.
-   * @param projetId - Identifiant du projet concerné.
-   * @returns `true` si le projet est retenu.
-   */
-  public projetRetenu(projetId: string): boolean {
-    const filtre = this.filtreProjetIdsInterne();
-    return filtre === null || filtre.has(projetId);
-  }
-
-  /**
-   * Applique le filtre de groupe sélectionné ; réinitialise le filtre de projet (décision arbitraire, à valider par
-   * un humain : un changement de périmètre de groupe repart d'une sélection de projets neutre — « tous » — plutôt
-   * que de conserver une sélection devenue partiellement hors périmètre).
-   * @param valeur - Identifiant du groupe sélectionné, chaîne vide = tous les groupes.
-   */
-  public onChangerGroupe(valeur: string): void {
-    this.filtreGroupeId.set(valeur.length === 0 ? null : valeur);
-    this.filtreProjetIdsInterne.set(null);
-  }
-
-  /**
    * Applique le type d'indicateur sélectionné, validé sans assertion de type contre {@link INDICATEURS}.
    * @param valeur - Valeur brute transmise par le sélecteur HTML.
    */
@@ -406,52 +430,43 @@ export class SqmSyntheseGraphiqueComponent {
   }
 
   /**
-   * Bascule la sélection d'un projet dans le filtre de projet (charte d'ergonomie : action au clavier comme à la
-   * souris, case à cocher native).
-   * @param projetId - Identifiant du projet à basculer.
+   * Reporte dans le filtre partagé (RG-053) la sélection émise par `SqmFiltreGroupeProjetComponent`, la marquant
+   * comme modifiée par l'utilisateur (elle prime désormais sur toute vue par défaut d'écran).
+   * @param selection - Sélection de groupe et de projets résultante.
    */
-  public basculerProjet(projetId: string): void {
-    const disponibles = this.projetsDisponibles().map((projet) => projet.id);
-    const actuel = this.filtreProjetIdsInterne() ?? new Set(disponibles);
-    const nouveau = new Set(actuel);
-    if (nouveau.has(projetId)) {
-      nouveau.delete(projetId);
-    } else {
-      nouveau.add(projetId);
-    }
-    this.filtreProjetIdsInterne.set(nouveau);
+  public onSelectionGroupeProjet(selection: SelectionGroupeProjet): void {
+    this.contexte.definirParUtilisateur({
+      groupeId: selection.groupeId,
+      projetIds: selection.projetIds,
+    });
   }
 
   /**
-   * Sélectionne tous les projets actuellement disponibles (bouton de confort).
-   */
-  public toutSelectionner(): void {
-    this.filtreProjetIdsInterne.set(null);
-  }
-
-  /**
-   * Désélectionne tous les projets actuellement disponibles (bouton de confort).
-   */
-  public toutDeselectionner(): void {
-    this.filtreProjetIdsInterne.set(new Set());
-  }
-
-  /**
-   * Applique les filtres portés par une vue enregistrée choisie dans `SqmSelecteurVueComponent` (US-028). Ignore
-   * silencieusement une vue dont les filtres ne correspondent pas structurellement à
-   * {@link FiltresSyntheseGraphique} (aucun accès non sûr à une valeur JSON externe), sur le modèle de
-   * `SqmListeTravailComponent`.
+   * Applique la sélection groupe/projet portée par une vue enregistrée (RG-027 amendée). Ignore silencieusement une
+   * vue dont les filtres ne correspondent pas structurellement à {@link FiltresSyntheseGraphique} (aucun accès non
+   * sûr à une valeur JSON externe). Selon l'origine, reporte la sélection dans le filtre partagé soit comme un
+   * choix explicite de l'utilisateur (`utilisateur`), soit comme un amorçage par la vue par défaut (`vueParDefaut`,
+   * n'écrase jamais un choix déjà fait). Le type d'indicateur n'entre plus dans une vue (RG-027 amendée) : il
+   * conserve sa valeur locale courante.
    * @param vue - Vue choisie, dont `filtres` reste typé `unknown` côté composant transverse.
+   * @param origine - Origine de l'application (défaut : sélection explicite de l'utilisateur).
    */
-  public appliquerVue(vue: VueSelectionnable): void {
+  public appliquerVue(
+    vue: VueSelectionnable,
+    origine: OrigineApplicationVue = 'utilisateur',
+  ): void {
     if (!SqmSyntheseGraphiqueComponent.estFiltresSyntheseGraphique(vue.filtres)) {
       return;
     }
-    this.filtreGroupeId.set(vue.filtres.groupeId);
-    this.filtreIndicateur.set(vue.filtres.indicateur);
-    this.filtreProjetIdsInterne.set(
-      vue.filtres.projetIds === null ? null : new Set(vue.filtres.projetIds),
-    );
+    const selection: EtatFiltreGroupeProjet = {
+      groupeId: vue.filtres.groupeId,
+      projetIds: vue.filtres.projetIds ?? null,
+    };
+    if (origine === 'vueParDefaut') {
+      this.contexte.amorcerParVueParDefaut(selection);
+    } else {
+      this.contexte.definirParUtilisateur(selection);
+    }
   }
 
   /**
@@ -461,24 +476,14 @@ export class SqmSyntheseGraphiqueComponent {
    * @returns `true` si `valeur` correspond à la forme attendue.
    */
   private static estFiltresSyntheseGraphique(valeur: unknown): valeur is FiltresSyntheseGraphique {
-    if (
-      typeof valeur !== 'object' ||
-      valeur === null ||
-      !('groupeId' in valeur) ||
-      !('indicateur' in valeur) ||
-      !('projetIds' in valeur)
-    ) {
+    if (typeof valeur !== 'object' || valeur === null || !('groupeId' in valeur)) {
       return false;
     }
     const groupeId: unknown = valeur.groupeId;
     if (groupeId !== null && typeof groupeId !== 'string') {
       return false;
     }
-    const indicateur: unknown = valeur.indicateur;
-    if (!SqmSyntheseGraphiqueComponent.INDICATEURS.some((def) => def.cle === indicateur)) {
-      return false;
-    }
-    const projetIds: unknown = valeur.projetIds;
+    const projetIds: unknown = 'projetIds' in valeur ? valeur.projetIds : null;
     return (
       projetIds === null ||
       (Array.isArray(projetIds) && projetIds.every((id) => typeof id === 'string'))
@@ -486,16 +491,15 @@ export class SqmSyntheseGraphiqueComponent {
   }
 
   /**
-   * Crée ou met à jour une vue enregistrée avec les filtres courants (US-028, RG-027, RG-002).
+   * Crée ou met à jour une vue enregistrée avec la sélection groupe/projet courante (US-028, RG-027, RG-002).
    * @param demande - Nom, statut par défaut, identifiant de mise à jour éventuel et mot de passe déjà confirmés par
    * `SqmSelecteurVueComponent`.
    */
   public async enregistrerVue(demande: DemandeEnregistrementVue): Promise<void> {
-    const filtreProjets = this.filtreProjetIdsInterne();
+    const etat = this.contexte.etat();
     const filtres: FiltresSyntheseGraphique = {
-      groupeId: this.filtreGroupeId(),
-      indicateur: this.filtreIndicateur(),
-      projetIds: filtreProjets === null ? null : Array.from(filtreProjets),
+      groupeId: etat.groupeId,
+      projetIds: etat.projetIds,
     };
     const resultat = await this.donneesApplication.definirVue(
       demande.id,

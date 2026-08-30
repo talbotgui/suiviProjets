@@ -1,37 +1,35 @@
 <section class="liste-travail d-flex direction-colonne ecart-4">
-  <div class="liste-travail__filtres d-flex retour-ligne aligne-centre ecart-3">
-    <select
-      #selectGroupe
-      class="liste-travail__select champ__controle"
-      aria-label="Filtrer par groupe"
-      (change)="onChangerGroupe(selectGroupe.value)"
+  <div class="liste-travail__filtres d-flex direction-colonne ecart-3">
+    <app-filtre-groupe-projet
+      [groupes]="groupesFiltrables()"
+      [projets]="projetsFiltrables()"
+      [groupeId]="filtreGroupeId()"
+      [projetIds]="filtreProjetIds()"
+      (selectionChangee)="onSelectionGroupeProjet($event)"
     >
-      <option value="">Tous les groupes</option>
-      @for (groupe of groupesDisponibles(); track groupe.id) {
-        <option [value]="groupe.id">{{ groupe.nom }}</option>
-      }
-    </select>
+      <app-selecteur-vue
+        [vues]="vuesApplicables()"
+        (vueAppliquee)="appliquerVue($event)"
+        (enregistrementDemande)="enregistrerVue($event)"
+        (suppressionDemandee)="supprimerVue($event)"
+      />
+    </app-filtre-groupe-projet>
 
-    <input
-      #champRecherche
-      type="text"
-      class="liste-travail__recherche champ__controle"
-      placeholder="Rechercher un projet ou une alerte…"
-      aria-label="Rechercher une alerte"
-      [value]="texteRecherche()"
-      (input)="onChangerRecherche(champRecherche.value)"
-    />
+    <div class="liste-travail__filtres-complementaires d-flex retour-ligne aligne-centre ecart-3">
+      <input
+        #champRecherche
+        type="text"
+        class="liste-travail__recherche champ__controle"
+        placeholder="Rechercher un projet ou une alerte…"
+        aria-label="Rechercher une alerte"
+        [value]="texteRecherche()"
+        (input)="onChangerRecherche(champRecherche.value)"
+      />
 
-    <span class="liste-travail__compteur exterieur-gauche-auto texte-xs texte-discret">
-      {{ alertesFiltrees().length }} alerte{{ alertesFiltrees().length > 1 ? 's' : '' }}
-    </span>
-
-    <app-selecteur-vue
-      [vues]="vuesApplicables()"
-      (vueAppliquee)="appliquerVue($event)"
-      (enregistrementDemande)="enregistrerVue($event)"
-      (suppressionDemandee)="supprimerVue($event)"
-    />
+      <span class="liste-travail__compteur exterieur-gauche-auto texte-xs texte-discret">
+        {{ alertesFiltrees().length }} alerte{{ alertesFiltrees().length > 1 ? 's' : '' }}
+      </span>
+    </div>
   </div>
 
   @if (nombreVuesIgnorees() > 0) {

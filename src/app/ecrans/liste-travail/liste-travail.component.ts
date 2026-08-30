@@ -53,14 +53,22 @@ import type {
   DemandeSuppressionVue,
   VueSelectionnable,
 } from '../../composants/selecteur-vue/selecteur-vue.component';
+import { SqmFiltreGroupeProjetComponent } from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
+import type {
+  GroupeFiltrable,
+  ProjetFiltrable,
+  SelectionGroupeProjet,
+} from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
 import { SqmTableauDenseComponent } from '../../composants/tableau-dense/tableau-dense.component';
 import type {
   CelluleTableauDense,
   ColonneTableauDense,
 } from '../../composants/tableau-dense/tableau-dense.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
+import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import type { Groupe, TraitementAlerte } from '../../services/avecetat/etat/types-donnees';
+import type { TraitementAlerte } from '../../services/avecetat/etat/types-donnees';
 import {
   StatutTraitementAlerte,
   TypeCritereMembre,
@@ -82,21 +90,29 @@ import type {
 const ECRAN_LISTE_TRAVAIL = 'listeTravail';
 
 /**
- * Version courante du schéma de filtres de cet écran (US-028, RG-027) : à incrémenter si la forme de
- * {@link FiltresListeTravail} change, pour que `VuesEnregistreesUtils.filtrerPourEcran` ignore avec avertissement
- * les vues enregistrées par un schéma antérieur incompatible (cf.
- * `docs/02_documentation/12_modeleDonnees.md#stratégie-de-migration-des-données`).
+ * Version courante du schéma de filtres, désormais commune à tous les écrans depuis le palier de migration
+ * `9` → `10` (plan_16, incrément 2) : la forme de {@link FiltresListeTravail} (`{ groupeId, projetIds }`) est
+ * partagée entre les quatre écrans de restitution, il n'existe plus qu'une seule valeur de `versionFiltres`.
  */
 const VERSION_FILTRES_LISTE_TRAVAIL = 1;
 
 /**
- * Forme des filtres de cet écran persistée par une vue enregistrée (US-028). Seul `filtreGroupeId` est aujourd'hui
- * un filtre à proprement parler ; `texteRecherche` est volontairement exclu (recherche ponctuelle, non un critère
- * de vue durable, cf. RG-027 : « groupes, projets, indicateurs, période, tri »).
+ * Forme des filtres persistée par une vue enregistrée depuis le palier `9` → `10` (RG-027 amendée) : uniquement la
+ * sélection de groupe et de projets, commune à tous les écrans. Le texte de recherche libre et le tri du tableau
+ * n'entrent jamais dans une vue (filtres complémentaires propres à l'écran, gérés localement).
  */
 interface FiltresListeTravail {
+  /** Identifiant du groupe sélectionné, `null` = tous les groupes. */
   readonly groupeId: string | null;
+  /** Identifiants des projets sélectionnés, `null` = aucune restriction de projet. */
+  readonly projetIds: readonly string[] | null;
 }
+
+/**
+ * Origine d'une application de vue, pour distinguer une sélection explicite de l'utilisateur (qui prend le pas sur
+ * la vue par défaut d'un écran, RG-053) de l'amorçage automatique par la vue par défaut à la première visite.
+ */
+type OrigineApplicationVue = 'utilisateur' | 'vueParDefaut';
 
 /**
  * Préfixe de clé d'alerte des causes de membre inconnu (RG-006 à RG-009), seul type d'alerte actuellement
@@ -165,6 +181,7 @@ type ActionEnAttente = 'vu' | 'traitement' | null;
     SqmTableauDenseComponent,
     SqmConfirmationMotDePasseComponent,
     SqmSelecteurVueComponent,
+    SqmFiltreGroupeProjetComponent,
   ],
   templateUrl: './liste-travail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -173,6 +190,12 @@ type ActionEnAttente = 'vu' | 'traitement' | null;
 export class SqmListeTravailComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+
+  /**
+   * Filtre groupe/projet mutualisé, partagé avec les autres écrans de restitution (RG-053). Exposé au gabarit pour
+   * alimenter `SqmFiltreGroupeProjetComponent` et lire l'état courant.
+   */
+  public readonly contexte: ContexteConsultationService = inject(ContexteConsultationService);
 
   private readonly router: Router = inject(Router);
   private readonly notification: NotificationService = inject(NotificationService);
@@ -197,6 +220,12 @@ export class SqmListeTravailComponent {
       if (this.vueParDefautDejaAppliquee) {
         return;
       }
+      // Priorité RG-053 : dès que l'utilisateur a touché le filtre partagé pendant la session, son choix le suit
+      // d'un écran à l'autre et prime sur la vue par défaut de cet écran.
+      if (this.contexte.filtreModifieParUtilisateur()) {
+        this.vueParDefautDejaAppliquee = true;
+        return;
+      }
       const vueParDefaut = VuesEnregistreesUtils.trouverVueParDefaut(
         this.resultatFiltrageVues().applicables,
       );
@@ -204,14 +233,25 @@ export class SqmListeTravailComponent {
         return;
       }
       this.vueParDefautDejaAppliquee = true;
-      this.appliquerVue(vueParDefaut);
+      this.appliquerVue(vueParDefaut, 'vueParDefaut');
     });
   }
 
   /**
-   * Identifiant du groupe sélectionné dans le filtre, `null` = tous les groupes.
+   * Identifiant du groupe sélectionné dans le filtre partagé, `null` = tous les groupes. Dérivé de
+   * {@link ContexteConsultationService} (RG-053) : la sélection est partagée avec les autres écrans de restitution.
    */
-  public readonly filtreGroupeId: WritableSignal<string | null> = signal<string | null>(null);
+  public readonly filtreGroupeId: Signal<string | null> = computed(
+    () => this.contexte.etat().groupeId,
+  );
+
+  /**
+   * Identifiants des projets sélectionnés dans le filtre partagé, `null` = aucune restriction de projet. Dérivé de
+   * {@link ContexteConsultationService} (RG-053).
+   */
+  public readonly filtreProjetIds: Signal<readonly string[] | null> = computed(
+    () => this.contexte.etat().projetIds,
+  );
 
   /**
    * Texte de recherche courant (nom de projet ou libellé de l'alerte).
@@ -256,10 +296,13 @@ export class SqmListeTravailComponent {
    * Alertes après application des filtres courants (groupe, recherche texte).
    */
   public readonly alertesFiltrees: Signal<readonly LigneAlerteTravail[]> = computed(() => {
-    const groupeId = this.filtreGroupeId();
+    const { groupeId, projetIds } = this.contexte.etat();
     const texte = this.texteRecherche().trim().toLowerCase();
     return this.toutesLesAlertes().filter((ligne) => {
-      if (groupeId !== null && !this.appartientAuGroupe(ligne, groupeId)) {
+      if (groupeId !== null && ligne.groupeId !== groupeId) {
+        return false;
+      }
+      if (projetIds !== null && !projetIds.includes(ligne.projetId)) {
         return false;
       }
       if (texte.length === 0) {
@@ -301,12 +344,23 @@ export class SqmListeTravailComponent {
   );
 
   /**
-   * Groupes disponibles pour le filtre.
-   * @returns Les groupes actuellement chargés.
+   * Groupes proposés au composant de filtre mutualisé (forme structurelle minimale, RG-053), triés par nom.
    */
-  public groupesDisponibles(): readonly Groupe[] {
-    return this.donneesApplication.groupes();
-  }
+  public readonly groupesFiltrables: Signal<readonly GroupeFiltrable[]> = computed(() =>
+    this.donneesApplication.groupes().map((groupe) => ({ id: groupe.id, nom: groupe.nom })),
+  );
+
+  /**
+   * Ensemble des projets (tous groupes confondus) proposés au composant de filtre mutualisé (RG-053). La liste
+   * réellement affichée est restreinte au groupe sélectionné par le composant lui-même.
+   */
+  public readonly projetsFiltrables: Signal<readonly ProjetFiltrable[]> = computed(() =>
+    this.donneesApplication
+      .groupes()
+      .flatMap((groupe) =>
+        groupe.projets.map((projet) => ({ id: projet.id, nom: projet.nom, groupeId: groupe.id })),
+      ),
+  );
 
   /**
    * Indique qu'aucune alerte n'est active (état particulier de la maquette : message explicite, jamais un tableau
@@ -318,11 +372,15 @@ export class SqmListeTravailComponent {
   }
 
   /**
-   * Applique le filtre de groupe sélectionné.
-   * @param valeur - Identifiant du groupe sélectionné, chaîne vide = tous les groupes.
+   * Reporte dans le filtre partagé (RG-053) la sélection émise par `SqmFiltreGroupeProjetComponent`, la marquant
+   * comme modifiée par l'utilisateur (elle prime désormais sur toute vue par défaut d'écran).
+   * @param selection - Sélection de groupe et de projets résultante.
    */
-  public onChangerGroupe(valeur: string): void {
-    this.filtreGroupeId.set(valeur.length === 0 ? null : valeur);
+  public onSelectionGroupeProjet(selection: SelectionGroupeProjet): void {
+    this.contexte.definirParUtilisateur({
+      groupeId: selection.groupeId,
+      projetIds: selection.projetIds,
+    });
   }
 
   /**
@@ -336,15 +394,29 @@ export class SqmListeTravailComponent {
   /**
    * Applique les filtres portés par une vue enregistrée choisie dans `SqmSelecteurVueComponent` (US-028).
    * Ignore silencieusement une vue dont les filtres ne correspondent pas structurellement à
-   * {@link FiltresListeTravail} (aucun accès non sûr à une valeur JSON externe) : ce cas ne devrait jamais se
-   * produire en pratique, `vuesApplicables` étant déjà restreint à la version de filtres courante de cet écran.
+   * {@link FiltresListeTravail} (aucun accès non sûr à une valeur JSON externe). Selon l'origine, reporte la
+   * sélection dans le filtre partagé soit comme un choix explicite de l'utilisateur (`utilisateur`, prime sur la
+   * vue par défaut d'un autre écran), soit comme un amorçage automatique par la vue par défaut de cet écran
+   * (`vueParDefaut`, n'écrase jamais un choix déjà fait).
    * @param vue - Vue choisie, dont `filtres` reste typé `unknown` côté composant transverse.
+   * @param origine - Origine de l'application (défaut : sélection explicite de l'utilisateur).
    */
-  public appliquerVue(vue: VueSelectionnable): void {
+  public appliquerVue(
+    vue: VueSelectionnable,
+    origine: OrigineApplicationVue = 'utilisateur',
+  ): void {
     if (!SqmListeTravailComponent.estFiltresListeTravail(vue.filtres)) {
       return;
     }
-    this.filtreGroupeId.set(vue.filtres.groupeId);
+    const selection: EtatFiltreGroupeProjet = {
+      groupeId: vue.filtres.groupeId,
+      projetIds: vue.filtres.projetIds ?? null,
+    };
+    if (origine === 'vueParDefaut') {
+      this.contexte.amorcerParVueParDefaut(selection);
+    } else {
+      this.contexte.definirParUtilisateur(selection);
+    }
   }
 
   /**
@@ -359,7 +431,14 @@ export class SqmListeTravailComponent {
       return false;
     }
     const groupeId: unknown = valeur.groupeId;
-    return groupeId === null || typeof groupeId === 'string';
+    if (groupeId !== null && typeof groupeId !== 'string') {
+      return false;
+    }
+    const projetIds: unknown = 'projetIds' in valeur ? valeur.projetIds : null;
+    return (
+      projetIds === null ||
+      (Array.isArray(projetIds) && projetIds.every((element) => typeof element === 'string'))
+    );
   }
 
   /**
@@ -369,7 +448,8 @@ export class SqmListeTravailComponent {
    * `SqmSelecteurVueComponent`.
    */
   public async enregistrerVue(demande: DemandeEnregistrementVue): Promise<void> {
-    const filtres: FiltresListeTravail = { groupeId: this.filtreGroupeId() };
+    const etat = this.contexte.etat();
+    const filtres: FiltresListeTravail = { groupeId: etat.groupeId, projetIds: etat.projetIds };
     const resultat = await this.donneesApplication.definirVue(
       demande.id,
       demande.nom,
@@ -651,17 +731,6 @@ export class SqmListeTravailComponent {
     }
     const base = ligne.statut === StatutTraitementAlerte.Traitee ? 'Traitée' : 'Vue';
     return ligne.commentaire ? `${base} — ${ligne.commentaire}` : base;
-  }
-
-  /**
-   * Indique si une ligne appartient au groupe désigné.
-   * @param ligne - Ligne concernée.
-   * @param groupeId - Identifiant du groupe recherché.
-   * @returns `true` si le projet de cette ligne appartient au groupe désigné.
-   */
-  private appartientAuGroupe(ligne: LigneAlerteTravail, groupeId: string): boolean {
-    const groupe = this.donneesApplication.groupes().find((candidat) => candidat.id === groupeId);
-    return groupe?.projets.some((projet) => projet.id === ligne.projetId) ?? false;
   }
 
   /**

@@ -211,6 +211,32 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     return fixture;
   }
 
+  /**
+   * Reporte une sélection groupe/projet dans le filtre partagé, comme le ferait `SqmFiltreGroupeProjetComponent`
+   * (RG-053).
+   * @param composant - Composant sous test.
+   * @param groupeId - Identifiant du groupe, `null` = tous les groupes.
+   * @param projetIds - Identifiants des projets, `null` = aucune restriction de projet.
+   */
+  function selectionnerFiltre(
+    composant: SqmSyntheseGraphiqueComponent,
+    groupeId: string | null,
+    projetIds: readonly string[] | null,
+  ): void {
+    composant.onSelectionGroupeProjet({ groupeId, projetIds });
+  }
+
+  /**
+   * Indique si un projet est retenu par le filtre partagé courant (`null` = tous les projets retenus).
+   * @param composant - Composant sous test.
+   * @param projetId - Identifiant du projet concerné.
+   * @returns `true` si le projet est retenu.
+   */
+  function projetRetenu(composant: SqmSyntheseGraphiqueComponent, projetId: string): boolean {
+    const ids = composant.filtreProjetIds();
+    return ids === null || ids.includes(projetId);
+  }
+
   it('affiche un message explicite en l’absence de données (aucun audit sur les projets sélectionnés)', () => {
     const groupe: Groupe = {
       id: 'groupe-1',
@@ -331,7 +357,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
       const fixture = creerFixture(DonneesDeTest.racine([groupe]));
       const composant = fixture.componentInstance;
 
-      composant.basculerProjet('projet-b');
+      selectionnerFiltre(composant, null, ['projet-b']);
       fixture.detectChanges();
 
       const repere = composant
@@ -403,7 +429,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     expect(composant.series()[0]?.points).toEqual([{ date: '2026-06-05', valeur: 3 }]);
   });
 
-  it('bascule la sélection d’un projet sans affecter les points de l’autre projet (pas de recalcul erroné)', () => {
+  it('restreint les séries à la sélection de projets du filtre partagé sans recalcul erroné (RG-053)', () => {
     const projetA = DonneesDeTest.projet('projet-a', 'Projet A', [
       DonneesDeTest.audit('2026-06-05', { couverture: 61.2 }),
     ]);
@@ -425,23 +451,19 @@ describe('SqmSyntheseGraphiqueComponent', () => {
 
     expect(composant.series()).toHaveLength(2);
 
-    composant.basculerProjet('projet-a');
+    selectionnerFiltre(composant, null, ['projet-b']);
     fixture.detectChanges();
 
-    expect(composant.projetRetenu('projet-a')).toBe(false);
-    expect(composant.projetRetenu('projet-b')).toBe(true);
+    expect(projetRetenu(composant, 'projet-a')).toBe(false);
+    expect(projetRetenu(composant, 'projet-b')).toBe(true);
     const series = composant.series();
     expect(series).toHaveLength(1);
     expect(series[0]?.id).toBe('projet-b');
     expect(series[0]?.points).toEqual([{ date: '2026-06-05', valeur: 38.4 }]);
 
-    composant.toutSelectionner();
+    selectionnerFiltre(composant, null, null);
     fixture.detectChanges();
     expect(composant.series()).toHaveLength(2);
-
-    composant.toutDeselectionner();
-    fixture.detectChanges();
-    expect(composant.series()).toHaveLength(0);
   });
 
   it('positionne une ligne verticale de changement de seuil à partir d’une entrée connue du journal (RG-023)', () => {
@@ -532,7 +554,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
       .sort();
     expect(idsAnnotationsAvant).toEqual(['a1', 'a2']);
 
-    composant.basculerProjet('projet-b');
+    selectionnerFiltre(composant, null, ['projet-a']);
     fixture.detectChanges();
 
     const idsAnnotationsApres = composant
@@ -583,10 +605,10 @@ describe('SqmSyntheseGraphiqueComponent', () => {
 
     expect(fixture.componentInstance.series()).toEqual([]);
     expect(fixture.componentInstance.lignesVerticales()).toEqual([]);
-    expect(fixture.componentInstance.groupesDisponibles()).toEqual([]);
+    expect(fixture.componentInstance.groupesFiltrables()).toEqual([]);
   });
 
-  it('filtre les projets disponibles par groupe et réinitialise la sélection de projet', () => {
+  it('restreint les séries aux projets du groupe sélectionné dans le filtre partagé (RG-053)', () => {
     const projetA = DonneesDeTest.projet('projet-a', 'Projet A', []);
     const projetB = DonneesDeTest.projet('projet-b', 'Projet B', []);
     const groupeA: Groupe = {
@@ -612,15 +634,13 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     const fixture = creerFixture(DonneesDeTest.racine([groupeA, groupeB]));
     const composant = fixture.componentInstance;
 
-    composant.basculerProjet('projet-a');
-    expect(composant.projetRetenu('projet-a')).toBe(false);
+    expect(composant.series().map((serie) => serie.id)).toEqual(['projet-a', 'projet-b']);
 
-    composant.onChangerGroupe('groupe-b');
+    selectionnerFiltre(composant, 'groupe-b', null);
     fixture.detectChanges();
 
-    expect(composant.projetsDisponibles().map((projet) => projet.id)).toEqual(['projet-b']);
-    // Le filtre de projet a été réinitialisé par le changement de groupe (décision arbitraire documentée).
-    expect(composant.projetRetenu('projet-b')).toBe(true);
+    expect(composant.series().map((serie) => serie.id)).toEqual(['projet-b']);
+    expect(projetRetenu(composant, 'projet-b')).toBe(true);
   });
 
   it('se replie sur « couverture » si le sélecteur d’indicateur transmet une valeur inconnue', () => {
@@ -656,7 +676,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
       return DonneesDeTest.racine([groupe]);
     }
 
-    it('applique le filtre de groupe, d’indicateur et de projets portés par une vue choisie', () => {
+    it('applique la sélection groupe/projet portée par une vue choisie (RG-027 amendée)', () => {
       const fixture = creerFixture(racineAvecDeuxProjets());
       const composant = fixture.componentInstance;
 
@@ -664,71 +684,62 @@ describe('SqmSyntheseGraphiqueComponent', () => {
         id: 'v1',
         nom: 'Ma vue',
         parDefaut: false,
-        filtres: { groupeId: 'groupe-1', indicateur: 'tailleDepot', projetIds: ['projet-a'] },
+        filtres: { groupeId: 'groupe-1', projetIds: ['projet-a'] },
       });
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
-      expect(composant.filtreIndicateur()).toBe('tailleDepot');
-      expect(composant.projetRetenu('projet-a')).toBe(true);
-      expect(composant.projetRetenu('projet-b')).toBe(false);
+      expect(projetRetenu(composant, 'projet-a')).toBe(true);
+      expect(projetRetenu(composant, 'projet-b')).toBe(false);
     });
 
     it('applique une vue dont le filtre de projets vaut `null` (tous les projets)', () => {
       const fixture = creerFixture(racineAvecDeuxProjets());
       const composant = fixture.componentInstance;
-      composant.basculerProjet('projet-a');
-      expect(composant.projetRetenu('projet-a')).toBe(false);
+      selectionnerFiltre(composant, null, ['projet-b']);
+      expect(projetRetenu(composant, 'projet-a')).toBe(false);
 
       composant.appliquerVue({
         id: 'v1',
         nom: 'Ma vue',
         parDefaut: false,
-        filtres: { groupeId: null, indicateur: 'couverture', projetIds: null },
+        filtres: { groupeId: null, projetIds: null },
       });
 
-      expect(composant.projetRetenu('projet-a')).toBe(true);
-      expect(composant.projetRetenu('projet-b')).toBe(true);
+      expect(projetRetenu(composant, 'projet-a')).toBe(true);
+      expect(projetRetenu(composant, 'projet-b')).toBe(true);
     });
 
     it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
       const fixture = creerFixture(racineAvecDeuxProjets());
       const composant = fixture.componentInstance;
-      composant.onChangerGroupe('groupe-1');
+      selectionnerFiltre(composant, 'groupe-1', null);
 
       composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
-      composant.appliquerVue({
-        id: 'v2',
-        nom: 'Indicateur invalide',
-        parDefaut: false,
-        filtres: { groupeId: 'groupe-1', indicateur: 'inexistant', projetIds: null },
-      });
       composant.appliquerVue({
         id: 'v3',
         nom: 'Projets invalides',
         parDefaut: false,
-        filtres: { groupeId: 'groupe-1', indicateur: 'couverture', projetIds: [42] },
+        filtres: { groupeId: 'groupe-1', projetIds: [42] },
       });
       composant.appliquerVue({
         id: 'v4',
         nom: 'Groupe de type invalide',
         parDefaut: false,
-        filtres: { groupeId: 42, indicateur: 'couverture', projetIds: null },
+        filtres: { groupeId: 42, projetIds: null },
       });
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
-      expect(composant.filtreIndicateur()).toBe('couverture');
     });
 
-    it('enregistre une vue avec les filtres courants (dont le filtre de projets sérialisé) et met à jour la racine (US-028)', async () => {
+    it('enregistre une vue avec la sélection groupe/projet partagée courante et met à jour la racine (US-028)', async () => {
       const racineInitiale = racineAvecDeuxProjets();
       const racineMiseAJour = { ...racineInitiale, versionSchema: 2 };
       jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
       const fixture = creerFixture(racineInitiale);
       TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
       const composant = fixture.componentInstance;
-      composant.onChangerGroupe('groupe-1');
+      selectionnerFiltre(composant, 'groupe-1', ['projet-a']);
       composant.onChangerIndicateur('mrOuvertes');
-      composant.basculerProjet('projet-b');
 
       await composant.enregistrerVue({
         id: undefined,
@@ -745,7 +756,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
           ecran: 'syntheseGraphique',
           versionFiltres: 1,
           parDefaut: true,
-          filtres: { groupeId: 'groupe-1', indicateur: 'mrOuvertes', projetIds: ['projet-a'] },
+          filtres: { groupeId: 'groupe-1', projetIds: ['projet-a'] },
           motDePasse: 'mot-de-passe',
         }),
       );
@@ -814,7 +825,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
             ecran: 'syntheseGraphique',
             versionFiltres: 1,
             parDefaut: true,
-            filtres: { groupeId: 'groupe-1', indicateur: 'tailleDepot', projetIds: ['projet-a'] },
+            filtres: { groupeId: 'groupe-1', projetIds: ['projet-a'] },
           },
         ],
       };
@@ -823,12 +834,13 @@ describe('SqmSyntheseGraphiqueComponent', () => {
       const composant = fixture.componentInstance;
 
       expect(composant.filtreGroupeId()).toBe('groupe-1');
-      expect(composant.filtreIndicateur()).toBe('tailleDepot');
-      expect(composant.projetRetenu('projet-a')).toBe(true);
-      expect(composant.projetRetenu('projet-b')).toBe(false);
+      expect(projetRetenu(composant, 'projet-a')).toBe(true);
+      expect(projetRetenu(composant, 'projet-b')).toBe(false);
+      // Amorçage par la vue par défaut : le filtre n'est pas encore réputé « modifié par l'utilisateur ».
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(false);
     });
 
-    it("n'applique la vue par défaut qu'une seule fois, sans écraser un choix ultérieur de l'utilisateur", () => {
+    it("n'écrase jamais un choix de filtre de l'utilisateur par la vue par défaut de l'écran (RG-053)", () => {
       const racineAvecVueParDefaut: DonneesRacine = {
         ...racineAvecDeuxProjets(),
         vuesEnregistrees: [
@@ -838,7 +850,7 @@ describe('SqmSyntheseGraphiqueComponent', () => {
             ecran: 'syntheseGraphique',
             versionFiltres: 1,
             parDefaut: true,
-            filtres: { groupeId: 'groupe-1', indicateur: 'tailleDepot', projetIds: null },
+            filtres: { groupeId: 'groupe-1', projetIds: null },
           },
         ],
       };
@@ -846,14 +858,11 @@ describe('SqmSyntheseGraphiqueComponent', () => {
       const composant = fixture.componentInstance;
       expect(composant.filtreGroupeId()).toBe('groupe-1');
 
-      composant.onChangerGroupe('');
-      TestBed.inject(DonneesApplicationService).chargerRacine({
-        ...racineAvecVueParDefaut,
-        versionSchema: 2,
-      });
+      selectionnerFiltre(composant, null, null);
       fixture.detectChanges();
 
       expect(composant.filtreGroupeId()).toBeNull();
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(true);
     });
 
     it('ignore une vue enregistrée dont la version de filtres est obsolète et avertit l’utilisateur', () => {

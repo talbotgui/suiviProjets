@@ -311,7 +311,7 @@ describe('SqmListeTravailComponent', () => {
     expect(composant.alertesFiltrees()).toHaveLength(0);
 
     composant.onChangerRecherche('');
-    composant.onChangerGroupe('groupe-inconnu');
+    composant.onSelectionGroupeProjet({ groupeId: 'groupe-inconnu', projetIds: null });
     expect(composant.alertesFiltrees()).toHaveLength(0);
   });
 
@@ -541,7 +541,7 @@ describe('SqmListeTravailComponent', () => {
       const fixture = TestBed.createComponent(SqmListeTravailComponent);
       fixture.detectChanges();
       const composant = fixture.componentInstance;
-      composant.filtreGroupeId.set('groupe-1');
+      composant.contexte.definirParUtilisateur({ groupeId: 'groupe-1', projetIds: null });
 
       composant.appliquerVue({ id: 'v1', nom: 'Vue invalide', parDefaut: false, filtres: 'texte' });
 
@@ -558,7 +558,7 @@ describe('SqmListeTravailComponent', () => {
       const fixture = TestBed.createComponent(SqmListeTravailComponent);
       fixture.detectChanges();
       const composant = fixture.componentInstance;
-      composant.filtreGroupeId.set('groupe-1');
+      composant.contexte.definirParUtilisateur({ groupeId: 'groupe-1', projetIds: null });
 
       await composant.enregistrerVue({
         id: undefined,
@@ -575,7 +575,7 @@ describe('SqmListeTravailComponent', () => {
           ecran: 'listeTravail',
           versionFiltres: 1,
           parDefaut: true,
-          filtres: { groupeId: 'groupe-1' },
+          filtres: { groupeId: 'groupe-1', projetIds: null },
           motDePasse: 'mot-de-passe',
         }),
       );
@@ -661,7 +661,7 @@ describe('SqmListeTravailComponent', () => {
       expect(composant.filtreGroupeId()).toBe('groupe-1');
     });
 
-    it("n'applique la vue par défaut qu'une seule fois, sans écraser un choix ultérieur de l'utilisateur", () => {
+    it("n'écrase jamais un choix de filtre de l'utilisateur par la vue par défaut de l'écran (RG-053)", () => {
       const racine = DonneesDeTest.racine([]);
       const racineAvecVueParDefaut: DonneesRacine = {
         ...racine,
@@ -672,7 +672,7 @@ describe('SqmListeTravailComponent', () => {
             ecran: 'listeTravail',
             versionFiltres: 1,
             parDefaut: true,
-            filtres: { groupeId: 'groupe-1' },
+            filtres: { groupeId: 'groupe-1', projetIds: null },
           },
         ],
       };
@@ -682,12 +682,14 @@ describe('SqmListeTravailComponent', () => {
       fixture.detectChanges();
       const composant = fixture.componentInstance;
       expect(composant.filtreGroupeId()).toBe('groupe-1');
+      // Amorçage par la vue par défaut : le filtre n'est pas encore réputé « modifié par l'utilisateur ».
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(false);
 
-      composant.filtreGroupeId.set(null);
-      donneesApplication.chargerRacine({ ...racineAvecVueParDefaut, versionSchema: 2 });
+      composant.onSelectionGroupeProjet({ groupeId: 'groupe-2', projetIds: null });
       fixture.detectChanges();
 
-      expect(composant.filtreGroupeId()).toBeNull();
+      expect(composant.filtreGroupeId()).toBe('groupe-2');
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(true);
     });
 
     it('ignore une vue enregistrée dont la version de filtres est obsolète et avertit l’utilisateur', () => {

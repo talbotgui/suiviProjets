@@ -2,14 +2,17 @@
 // conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
+import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Audit, DonneesRacine, Groupe } from '../../services/avecetat/etat/types-donnees';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmObsolescenceComponent } from './obsolescence.component';
 
 jest.mock('html-to-image', () => ({ toPng: jest.fn() }));
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn(), isTauri: jest.fn(() => true) }));
 
 interface DependanceTest {
   readonly reference: string;
@@ -160,6 +163,7 @@ describe('SqmObsolescenceComponent', () => {
 
   beforeEach(async () => {
     jest.mocked(toPng).mockReset();
+    jest.mocked(invoke).mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmObsolescenceComponent],
     }).compileComponents();
@@ -240,7 +244,7 @@ describe('SqmObsolescenceComponent', () => {
     expect(composant.maxParCategorie().get('cat-exec')).toBe(13); // 21 - 8
   });
 
-  it('filtre par groupe', () => {
+  it('filtre par groupe via le filtre groupe/projet mutualisé (RG-053)', () => {
     const racine = DonneesDeTest.racine([
       DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'Projet 1', [
         DonneesDeTest.audit('2026-06-01', [
@@ -255,9 +259,9 @@ describe('SqmObsolescenceComponent', () => {
     ]);
     const composant = creer(racine).componentInstance;
 
-    composant.onChangerGroupe('g2');
+    composant.onSelectionGroupeProjet({ groupeId: 'g2', projetIds: null });
     expect(composant.projetsAffiches().map((ligne) => ligne.projetId)).toEqual(['p2']);
-    composant.onChangerGroupe('');
+    composant.onSelectionGroupeProjet({ groupeId: null, projetIds: null });
     expect(composant.projetsAffiches()).toHaveLength(2);
   });
 
@@ -542,5 +546,142 @@ describe('SqmObsolescenceComponent', () => {
 
     expect(toPng).toHaveBeenCalledTimes(1);
     expect(succes).toHaveBeenCalledWith(expect.stringContaining('obsolescence-'));
+  });
+
+  describe('vues enregistrées (US-028, RG-027 amendée, plan_16 incrément 3)', () => {
+    it('applique la sélection groupe/projet portée par une vue choisie', () => {
+      const composant = creer(DonneesDeTest.racine([])).componentInstance;
+
+      composant.appliquerVue({
+        id: 'v1',
+        nom: 'Mon périmètre',
+        parDefaut: false,
+        filtres: { groupeId: 'g1', projetIds: ['p1'] },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('g1');
+      expect(composant.filtreProjetIds()).toEqual(['p1']);
+    });
+
+    it('ignore silencieusement une vue dont les filtres ne correspondent pas à la forme attendue', () => {
+      const composant = creer(DonneesDeTest.racine([])).componentInstance;
+      composant.onSelectionGroupeProjet({ groupeId: 'g1', projetIds: null });
+
+      composant.appliquerVue({ id: 'v1', nom: 'Invalide', parDefaut: false, filtres: 'texte' });
+      composant.appliquerVue({
+        id: 'v2',
+        nom: 'Projets invalides',
+        parDefaut: false,
+        filtres: { groupeId: 'g1', projetIds: [42] },
+      });
+
+      expect(composant.filtreGroupeId()).toBe('g1');
+    });
+
+    it('enregistre une vue avec la sélection groupe/projet courante et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      donneesApplication.chargerRacine(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 11 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+
+      const composant = TestBed.createComponent(SqmObsolescenceComponent).componentInstance;
+      composant.onSelectionGroupeProjet({ groupeId: 'g1', projetIds: null });
+
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: true,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'definir_vue',
+        expect.objectContaining({
+          ecran: 'obsolescence',
+          versionFiltres: 1,
+          parDefaut: true,
+          filtres: { groupeId: 'g1', projetIds: null },
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      expect(notification.liste()).toEqual([expect.objectContaining({ type: 'succes' })]);
+      expect(donneesApplication.racine()).toBe(racineMiseAJour);
+    });
+
+    it("affiche un message d'erreur lorsque l'enregistrement d'une vue échoue", async () => {
+      donneesApplication.chargerRacine(DonneesDeTest.racine([]));
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      jest.mocked(invoke).mockRejectedValue({ type: 'erreurInterne' });
+
+      const composant = TestBed.createComponent(SqmObsolescenceComponent).componentInstance;
+      await composant.enregistrerVue({
+        id: undefined,
+        nom: 'Ma vue',
+        parDefaut: false,
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(notification.liste()).toEqual([expect.objectContaining({ type: 'erreur' })]);
+    });
+
+    it('supprime une vue et met à jour la racine (US-028)', async () => {
+      const racineInitiale = DonneesDeTest.racine([]);
+      donneesApplication.chargerRacine(racineInitiale);
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const racineMiseAJour = { ...racineInitiale, versionSchema: 11 };
+      jest.mocked(invoke).mockResolvedValue(racineMiseAJour);
+
+      const composant = TestBed.createComponent(SqmObsolescenceComponent).componentInstance;
+      await composant.supprimerVue({ id: 'v1', motDePasse: 'mot-de-passe' });
+
+      expect(invoke).toHaveBeenCalledWith(
+        'supprimer_vue',
+        expect.objectContaining({ id: 'v1', motDePasse: 'mot-de-passe' }),
+      );
+      expect(donneesApplication.racine()).toBe(racineMiseAJour);
+    });
+
+    it('amorce le filtre partagé avec la vue par défaut de cet écran à l’ouverture (RG-053)', () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'obsolescence',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'g1', projetIds: null },
+          },
+        ],
+      };
+      const composant = creer(racineAvecVueParDefaut).componentInstance;
+
+      expect(composant.filtreGroupeId()).toBe('g1');
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(false);
+    });
+
+    it('ignore une vue dont la version de filtres est obsolète et avertit l’utilisateur', () => {
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueObsolete: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Ancienne vue',
+            ecran: 'obsolescence',
+            versionFiltres: 0,
+            parDefaut: false,
+            filtres: { groupeId: 'g1', projetIds: null },
+          },
+        ],
+      };
+      const composant = creer(racineAvecVueObsolete).componentInstance;
+
+      expect(composant.vuesApplicables()).toHaveLength(0);
+      expect(composant.nombreVuesIgnorees()).toBe(1);
+    });
   });
 });

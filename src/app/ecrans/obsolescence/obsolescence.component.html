@@ -8,22 +8,31 @@
     </p>
   </header>
 
-  <div class="obsolescence__filtres d-flex retour-ligne aligne-fin ecart-3">
-    <select
-      #selectGroupe
-      id="obsolescence-filtre-groupe"
-      class="champ__controle"
-      aria-label="Filtrer par groupe"
-      (change)="onChangerGroupe(selectGroupe.value)"
-    >
-      <option value="">Tous les groupes</option>
-      @for (groupe of groupesDisponibles(); track groupe.id) {
-        <option [value]="groupe.id" [selected]="groupe.id === filtreGroupeId()">
-          {{ groupe.nom }}
-        </option>
-      }
-    </select>
+  <app-filtre-groupe-projet
+    [groupes]="groupesFiltrables()"
+    [projets]="projetsFiltrables()"
+    [groupeId]="filtreGroupeId()"
+    [projetIds]="filtreProjetIds()"
+    (selectionChangee)="onSelectionGroupeProjet($event)"
+  >
+    <app-selecteur-vue
+      [vues]="vuesApplicables()"
+      (vueAppliquee)="appliquerVue($event)"
+      (enregistrementDemande)="enregistrerVue($event)"
+      (suppressionDemandee)="supprimerVue($event)"
+    />
+  </app-filtre-groupe-projet>
 
+  @if (nombreVuesIgnorees() > 0) {
+    <p class="obsolescence__avertissement texte-orange texte-xs" role="status">
+      {{ nombreVuesIgnorees() }} vue{{ nombreVuesIgnorees() > 1 ? 's' : '' }} enregistrée{{
+        nombreVuesIgnorees() > 1 ? 's' : ''
+      }}
+      ignorée{{ nombreVuesIgnorees() > 1 ? 's' : '' }} (schéma de filtres obsolète).
+    </p>
+  }
+
+  <div class="obsolescence__filtres d-flex retour-ligne aligne-fin ecart-3">
     <input
       #champDate
       id="obsolescence-filtre-date"

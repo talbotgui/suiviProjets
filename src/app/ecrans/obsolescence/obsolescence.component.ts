@@ -28,6 +28,7 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -36,9 +37,28 @@ import {
 import type { Signal, WritableSignal } from '@angular/core';
 import { toPng } from 'html-to-image';
 import { SqmBarreMesureComponent } from '../../composants/barre-mesure/barre-mesure.component';
+import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
+import type {
+  DemandeEnregistrementVue,
+  DemandeSuppressionVue,
+  VueSelectionnable,
+} from '../../composants/selecteur-vue/selecteur-vue.component';
+import { SqmFiltreGroupeProjetComponent } from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
+import type {
+  GroupeFiltrable,
+  ProjetFiltrable,
+  SelectionGroupeProjet,
+} from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
+import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Audit } from '../../services/avecetat/etat/types-donnees';
+import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
+import type {
+  ResultatFiltrageVues,
+  VueEnregistreeConnue,
+} from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import {
@@ -52,6 +72,36 @@ import {
 } from '../../services/sansetat/jugement/parametres-jugement.utils';
 import { StatutObsolescenceUtils } from '../../services/sansetat/jugement/statut-obsolescence.utils';
 import { TriAlphabetiqueUtils } from '../../services/sansetat/jugement/tri-alphabetique.utils';
+
+/**
+ * Identifiant stable de cet écran pour les vues enregistrées (US-028, RG-027), distinct de `syntheseAudits`,
+ * `syntheseGraphique` et `listeTravail`. Écran ajouté au périmètre des vues par le plan_16 (RG-027 amendée).
+ */
+const ECRAN_OBSOLESCENCE = 'obsolescence';
+
+/**
+ * Version courante du schéma de filtres, commune à tous les écrans depuis le palier de migration `9` → `10`
+ * (plan_16, incrément 2) : la forme de {@link FiltresObsolescence} (`{ groupeId, projetIds }`) est partagée.
+ */
+const VERSION_FILTRES_OBSOLESCENCE = 1;
+
+/**
+ * Forme des filtres persistée par une vue enregistrée (RG-027 amendée) : uniquement la sélection de groupe et de
+ * projets, commune à tous les écrans. La date de l'audit retenu et les bornes min/max par catégorie n'entrent
+ * jamais dans une vue (filtres complémentaires propres à l'écran, gérés localement).
+ */
+interface FiltresObsolescence {
+  /** Identifiant du groupe sélectionné, `null` = tous les groupes. */
+  readonly groupeId: string | null;
+  /** Identifiants des projets sélectionnés, `null` = aucune restriction de projet. */
+  readonly projetIds: readonly string[] | null;
+}
+
+/**
+ * Origine d'une application de vue, pour distinguer une sélection explicite de l'utilisateur (qui prend le pas sur
+ * la vue par défaut d'un écran, RG-053) de l'amorçage automatique par la vue par défaut à la première visite.
+ */
+type OrigineApplicationVue = 'utilisateur' | 'vueParDefaut';
 
 /** Teintes catégorielles (même clarté/saturation) ; cyclées si le référentiel porte davantage de catégories. */
 const PALETTE_CATEGORIES: readonly string[] = [
@@ -123,7 +173,7 @@ interface DetailProjet {
  */
 @Component({
   selector: 'app-obsolescence',
-  imports: [SqmBarreMesureComponent],
+  imports: [SqmBarreMesureComponent, SqmSelecteurVueComponent, SqmFiltreGroupeProjetComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './obsolescence.component.html',
   styleUrl: './obsolescence.component.scss',
@@ -135,6 +185,40 @@ export class SqmObsolescenceComponent {
   private readonly notification: NotificationService = inject(NotificationService);
   private readonly injector: Injector = inject(Injector);
 
+  /**
+   * Filtre groupe/projet mutualisé, partagé avec les autres écrans de restitution (RG-053). Exposé au gabarit pour
+   * alimenter `SqmFiltreGroupeProjetComponent` et lire l'état courant.
+   */
+  public readonly contexte: ContexteConsultationService = inject(ContexteConsultationService);
+
+  /**
+   * Indique que la vue par défaut de cet écran (US-028, RG-027) a déjà été appliquée une fois, pour ne l'appliquer
+   * qu'une seule fois par instance de ce composant.
+   */
+  private vueParDefautDejaAppliquee = false;
+
+  public constructor() {
+    effect(() => {
+      if (this.vueParDefautDejaAppliquee) {
+        return;
+      }
+      // Priorité RG-053 : dès que l'utilisateur a touché le filtre partagé pendant la session, son choix le suit
+      // d'un écran à l'autre et prime sur la vue par défaut de cet écran.
+      if (this.contexte.filtreModifieParUtilisateur()) {
+        this.vueParDefautDejaAppliquee = true;
+        return;
+      }
+      const vueParDefaut = VuesEnregistreesUtils.trouverVueParDefaut(
+        this.resultatFiltrageVues().applicables,
+      );
+      if (vueParDefaut === undefined) {
+        return;
+      }
+      this.vueParDefautDejaAppliquee = true;
+      this.appliquerVue(vueParDefaut, 'vueParDefaut');
+    });
+  }
+
   private readonly conteneurExport: Signal<ElementRef<HTMLElement> | undefined> =
     viewChild<ElementRef<HTMLElement>>('conteneurExport');
 
@@ -145,8 +229,21 @@ export class SqmObsolescenceComponent {
   /** Élément qui avait le focus avant l'ouverture de la modale, pour le lui rendre à la fermeture. */
   private elementFocusAvantModale: HTMLElement | null = null;
 
-  /** Groupe sélectionné (`null` = tous les groupes). */
-  public readonly filtreGroupeId: WritableSignal<string | null> = signal<string | null>(null);
+  /**
+   * Identifiant du groupe sélectionné dans le filtre partagé, `null` = tous les groupes. Dérivé de
+   * {@link ContexteConsultationService} (RG-053) : la sélection est partagée avec les autres écrans de restitution.
+   */
+  public readonly filtreGroupeId: Signal<string | null> = computed(
+    () => this.contexte.etat().groupeId,
+  );
+
+  /**
+   * Identifiants des projets sélectionnés dans le filtre partagé, `null` = aucune restriction. Dérivé de
+   * {@link ContexteConsultationService} (RG-053).
+   */
+  public readonly filtreProjetIds: Signal<readonly string[] | null> = computed(
+    () => this.contexte.etat().projetIds,
+  );
 
   /** Date de l'audit retenu (dernier audit régulier à cette date ou avant), initialisée à aujourd'hui. */
   public readonly filtreDate: WritableSignal<string> = signal(
@@ -172,8 +269,45 @@ export class SqmObsolescenceComponent {
     return ExportImageUtils.construireHorodatage(new Date()).slice(0, 10);
   }
 
-  /** Groupes disponibles, triés par nom (via le Store). */
-  public readonly groupesDisponibles = computed(() => this.donneesApplication.groupes());
+  /** Groupes proposés au composant de filtre mutualisé (forme structurelle minimale, RG-053), triés par nom. */
+  public readonly groupesFiltrables: Signal<readonly GroupeFiltrable[]> = computed(() =>
+    this.donneesApplication.groupes().map((groupe) => ({ id: groupe.id, nom: groupe.nom })),
+  );
+
+  /**
+   * Ensemble des projets (tous groupes confondus) proposés au composant de filtre mutualisé (RG-053). La liste
+   * réellement affichée est restreinte au groupe sélectionné par le composant lui-même.
+   */
+  public readonly projetsFiltrables: Signal<readonly ProjetFiltrable[]> = computed(() =>
+    this.donneesApplication
+      .groupes()
+      .flatMap((groupe) =>
+        groupe.projets.map((projet) => ({ id: projet.id, nom: projet.nom, groupeId: groupe.id })),
+      ),
+  );
+
+  /**
+   * Résultat du filtrage des vues enregistrées de cet écran par version de filtres courante (US-028, RG-027).
+   */
+  private readonly resultatFiltrageVues: Signal<ResultatFiltrageVues> = computed(() => {
+    const connues: readonly VueEnregistreeConnue[] =
+      this.donneesApplication.racine()?.vuesEnregistrees ?? [];
+    return VuesEnregistreesUtils.filtrerPourEcran(
+      connues,
+      ECRAN_OBSOLESCENCE,
+      VERSION_FILTRES_OBSOLESCENCE,
+    );
+  });
+
+  /** Vues enregistrées applicables à cet écran (US-028, RG-027). */
+  public readonly vuesApplicables: Signal<readonly VueSelectionnable[]> = computed(
+    () => this.resultatFiltrageVues().applicables,
+  );
+
+  /** Nombre de vues enregistrées de cet écran ignorées pour cause de version de filtres obsolète (US-028). */
+  public readonly nombreVuesIgnorees: Signal<number> = computed(
+    () => this.resultatFiltrageVues().nombreIgnorees,
+  );
 
   /** Catégories de dépendance du référentiel courant (fixent aussi l'ordre d'affichage des indicateurs). */
   public readonly categories: Signal<readonly CategorieDependance[]> = computed(() => {
@@ -297,14 +431,17 @@ export class SqmObsolescenceComponent {
     return max;
   });
 
-  /** Projets affichés après application des filtres (groupe + min/max par catégorie, en ET). */
+  /** Projets affichés après application des filtres (groupe/projet partagés + min/max par catégorie, en ET). */
   public readonly projetsAffiches: Signal<readonly LigneObsolescence[]> = computed(() => {
-    const groupeId = this.filtreGroupeId();
+    const { groupeId, projetIds } = this.contexte.etat();
     const bornes = this.bornesFiltre();
     const maxParCategorie = this.maxParCategorie();
     const categories = this.categories();
     return this.lignesTousProjets().filter((ligne) => {
       if (groupeId !== null && ligne.groupeId !== groupeId) {
+        return false;
+      }
+      if (projetIds !== null && !projetIds.includes(ligne.projetId)) {
         return false;
       }
       for (const categorie of categories) {
@@ -467,11 +604,102 @@ export class SqmObsolescenceComponent {
   }
 
   /**
-   * Met à jour le filtre de groupe.
-   * @param valeur - Identifiant de groupe, ou chaîne vide pour « tous les groupes ».
+   * Reporte dans le filtre partagé (RG-053) la sélection émise par `SqmFiltreGroupeProjetComponent`, la marquant
+   * comme modifiée par l'utilisateur (elle prime désormais sur toute vue par défaut d'écran).
+   * @param selection - Sélection de groupe et de projets résultante.
    */
-  public onChangerGroupe(valeur: string): void {
-    this.filtreGroupeId.set(valeur.length === 0 ? null : valeur);
+  public onSelectionGroupeProjet(selection: SelectionGroupeProjet): void {
+    this.contexte.definirParUtilisateur({
+      groupeId: selection.groupeId,
+      projetIds: selection.projetIds,
+    });
+  }
+
+  /**
+   * Applique la sélection groupe/projet portée par une vue enregistrée (RG-027 amendée). Ignore silencieusement une
+   * vue dont les filtres ne correspondent pas structurellement à {@link FiltresObsolescence} (aucun accès non sûr à
+   * une valeur JSON externe). Selon l'origine, reporte la sélection dans le filtre partagé soit comme un choix
+   * explicite de l'utilisateur (`utilisateur`), soit comme un amorçage par la vue par défaut (`vueParDefaut`,
+   * n'écrase jamais un choix déjà fait).
+   * @param vue - Vue choisie, dont `filtres` reste typé `unknown` côté composant transverse.
+   * @param origine - Origine de l'application (défaut : sélection explicite de l'utilisateur).
+   */
+  public appliquerVue(
+    vue: VueSelectionnable,
+    origine: OrigineApplicationVue = 'utilisateur',
+  ): void {
+    if (!SqmObsolescenceComponent.estFiltresObsolescence(vue.filtres)) {
+      return;
+    }
+    const selection: EtatFiltreGroupeProjet = {
+      groupeId: vue.filtres.groupeId,
+      projetIds: vue.filtres.projetIds ?? null,
+    };
+    if (origine === 'vueParDefaut') {
+      this.contexte.amorcerParVueParDefaut(selection);
+    } else {
+      this.contexte.definirParUtilisateur(selection);
+    }
+  }
+
+  /**
+   * Vérifie structurellement qu'une valeur JSON externe (`VueEnregistree.filtres`) correspond bien à
+   * {@link FiltresObsolescence}, avant tout accès à ses champs.
+   * @param valeur - Valeur à vérifier.
+   * @returns `true` si `valeur` correspond à la forme attendue.
+   */
+  private static estFiltresObsolescence(valeur: unknown): valeur is FiltresObsolescence {
+    if (typeof valeur !== 'object' || valeur === null || !('groupeId' in valeur)) {
+      return false;
+    }
+    const groupeId: unknown = valeur.groupeId;
+    if (groupeId !== null && typeof groupeId !== 'string') {
+      return false;
+    }
+    const projetIds: unknown = 'projetIds' in valeur ? valeur.projetIds : null;
+    return (
+      projetIds === null ||
+      (Array.isArray(projetIds) && projetIds.every((element) => typeof element === 'string'))
+    );
+  }
+
+  /**
+   * Crée ou met à jour une vue enregistrée avec la sélection groupe/projet courante (US-028, RG-027, RG-002).
+   * @param demande - Nom, statut par défaut, identifiant de mise à jour éventuel et mot de passe déjà confirmés par
+   * `SqmSelecteurVueComponent`.
+   */
+  public async enregistrerVue(demande: DemandeEnregistrementVue): Promise<void> {
+    const etat = this.contexte.etat();
+    const filtres: FiltresObsolescence = { groupeId: etat.groupeId, projetIds: etat.projetIds };
+    const resultat = await this.donneesApplication.definirVue(
+      demande.id,
+      demande.nom,
+      ECRAN_OBSOLESCENCE,
+      VERSION_FILTRES_OBSOLESCENCE,
+      demande.parDefaut,
+      filtres,
+      demande.motDePasse,
+    );
+    if (resultat.type === 'echec') {
+      this.notification.erreur(
+        "Une erreur inattendue est survenue lors de l'enregistrement de la vue.",
+      );
+      return;
+    }
+    this.notification.succes('La vue a été enregistrée.');
+  }
+
+  /**
+   * Supprime une vue enregistrée (US-028, RG-002).
+   * @param demande - Identifiant de la vue et mot de passe déjà confirmés par `SqmSelecteurVueComponent`.
+   */
+  public async supprimerVue(demande: DemandeSuppressionVue): Promise<void> {
+    const resultat = await this.donneesApplication.supprimerVue(demande.id, demande.motDePasse);
+    if (resultat.type === 'echec') {
+      this.notification.erreur(
+        'Une erreur inattendue est survenue lors de la suppression de la vue.',
+      );
+    }
   }
 
   /**
