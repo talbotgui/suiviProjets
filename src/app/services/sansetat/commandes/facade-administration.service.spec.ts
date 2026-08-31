@@ -99,4 +99,51 @@ describe('FacadeAdministrationService', () => {
     });
     expect(resultat).toEqual({ versionSchema: 3 });
   });
+
+  it('invoque calculer_metriques_volumetrie avec chemin + donnees et renvoie les métriques natives (US-055)', async () => {
+    const metriques = {
+      tailleDisqueOctets: 2_400_000,
+      tailleJsonClairOctets: 1_000_000,
+      ventilation: {
+        parametrageOctets: 300_000,
+        journalOctets: 100_000,
+        administrationOctets: 250_000,
+        auditsOctets: 200_000,
+        autreOctets: 150_000,
+      },
+    };
+    invokeSimule.mockResolvedValue(metriques);
+
+    const resultat = await service.calculerMetriquesVolumetrie({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 10 },
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('calculer_metriques_volumetrie', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 10 },
+    });
+    expect(resultat).toEqual(metriques);
+  });
+
+  it('transmet chemin: null à calculer_metriques_volumetrie pour un fichier jamais sauvegardé', async () => {
+    invokeSimule.mockResolvedValue({
+      tailleDisqueOctets: null,
+      tailleJsonClairOctets: 42,
+      ventilation: {
+        parametrageOctets: 0,
+        journalOctets: 0,
+        administrationOctets: 0,
+        auditsOctets: 0,
+        autreOctets: 42,
+      },
+    });
+
+    await service.calculerMetriquesVolumetrie({ chemin: null, donnees: { versionSchema: 10 } });
+
+    expect(invokeSimule).toHaveBeenCalledWith('calculer_metriques_volumetrie', {
+      chemin: null,
+      donnees: { versionSchema: 10 },
+    });
+  });
 });

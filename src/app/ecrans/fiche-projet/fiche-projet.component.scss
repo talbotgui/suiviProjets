@@ -70,19 +70,24 @@
 }
 
 // US-017 : sections repliables de la ventilation des membres du dépôt (directs, groupes invités, hérités de
-// l'arborescence). Résidu propre au composant : le triangle natif de `<summary>` et l'agencement inline du décompte
-// par statut ne sont pas exprimables par les classes utilitaires génériques.
-.fiche-projet__section-membres {
+// l'arborescence). US-056 : sections repliables de la ventilation des dépendances par écosystème (Maven, NPM,
+// Autres), rendu strictement identique — d'où la mutualisation des sélecteurs. Résidu propre au composant : le
+// triangle natif de `<summary>` et l'agencement inline du décompte par statut ne sont pas exprimables par les
+// classes utilitaires génériques.
+.fiche-projet__section-membres,
+.fiche-projet__section-dependances {
   border: 1px solid var(--sqm-neutre-300);
   border-radius: var(--sqm-rayon-md);
   padding: var(--sqm-espace-1) var(--sqm-espace-2);
 }
 
-.fiche-projet__section-membres + .fiche-projet__section-membres {
+.fiche-projet__section-membres + .fiche-projet__section-membres,
+.fiche-projet__section-dependances + .fiche-projet__section-dependances {
   margin-top: var(--sqm-espace-2);
 }
 
-.fiche-projet__section-membres-resume {
+.fiche-projet__section-membres-resume,
+.fiche-projet__section-dependances-resume {
   cursor: pointer;
   display: flex;
   flex-wrap: wrap;

@@ -622,6 +622,83 @@ describe('SqmComparaisonAuditsComponent', () => {
       expect(element.textContent).toContain('maintenu');
     });
 
+    it('ventile les dépendances du volet en sections repliables par écosystème, fermées par défaut (US-056)', () => {
+      const fixture = creerFixture('projet-1', racineDeuxAudits());
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const sections = element.querySelectorAll<HTMLDetailsElement>(
+        '.comparaison-audits__section-dependances',
+      );
+      expect(sections).toHaveLength(2);
+      sections.forEach((section) => expect(section.hasAttribute('open')).toBe(false));
+
+      const maven = Array.from(sections).find((s) =>
+        s.querySelector('summary')?.textContent?.includes('Maven'),
+      );
+      const npm = Array.from(sections).find((s) =>
+        s.querySelector('summary')?.textContent?.includes('NPM'),
+      );
+      // Maven : 1 changement de statut (spring-core 4.3.0 -> 5.3.30) ; NPM : 1 ajout (lodash) + 1 retrait (requestjs).
+      expect(maven?.querySelector('summary')?.textContent).toContain('(1)');
+      expect(maven?.querySelector('summary')?.textContent).toContain('1 Changement de statut');
+      expect(npm?.querySelector('summary')?.textContent).toContain('(2)');
+      expect(npm?.querySelector('summary')?.textContent).toContain('1 Ajout');
+      expect(npm?.querySelector('summary')?.textContent).toContain('1 Retrait');
+      expect(
+        Array.from(sections).some((s) => s.querySelector('summary')?.textContent?.includes('Autres')),
+      ).toBe(false);
+    });
+
+    it('conserve le garde global du volet Dépendances quand aucune dépendance n’évolue (US-056)', () => {
+      const auditIdentique = (id: string): Audit =>
+        DonneesDeTest.auditComplet({
+          id,
+          decalageJours: id === 'a1' ? -30 : -1,
+          couverture: 50,
+          violationsBloquant: 0,
+          violationsCritique: 0,
+          tailleOctets: 1_000_000,
+          note: 2,
+          dependances: [{ reference: 'moment', version: '2.0.0', manifeste: 'package.json' }],
+          membres: [{ username: 'jdupont', nom: 'Jean Dupont', niveauAcces: 30 }],
+          marqueurs: [],
+        });
+      const projet = DonneesDeTest.projet('projet-1', [auditIdentique('a1'), auditIdentique('a2')]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      expect(element.textContent).toContain(
+        'Aucune évolution des dépendances entre les deux audits comparés.',
+      );
+      expect(
+        element.querySelectorAll('.comparaison-audits__section-dependances'),
+      ).toHaveLength(0);
+    });
+
+    it('exporterPng déplie les sections de dépendances le temps de la capture puis restaure leur état (US-056)', async () => {
+      const fixture = creerFixture('projet-1', racineDeuxAudits());
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+      let replisPendantCapture: boolean[] = [];
+      jest.mocked(toPng).mockImplementation(() => {
+        replisPendantCapture = Array.from(
+          element.querySelectorAll<HTMLDetailsElement>('.comparaison-audits__section-dependances'),
+        ).map((section) => section.open);
+        return Promise.resolve('data:image/png;base64,test');
+      });
+
+      await fixture.componentInstance.exporterPng();
+
+      expect(replisPendantCapture).toEqual([true, true]);
+      expect(
+        Array.from(
+          element.querySelectorAll<HTMLDetailsElement>('.comparaison-audits__section-dependances'),
+        ).map((section) => section.open),
+      ).toEqual([false, false]);
+    });
+
     it('affiche les ajouts et retraits de membres, avec leur statut de rattachement recalculé', () => {
       const fixture = creerFixture('projet-1', racineDeuxAudits());
       const element = DomTestUtils.obtenirElementNatif(fixture);

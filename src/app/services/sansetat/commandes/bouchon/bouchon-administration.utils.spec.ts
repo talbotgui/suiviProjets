@@ -22,7 +22,7 @@ interface DonneesTest {
 }
 
 describe('BouchonAdministrationUtils', () => {
-  it('doit exposer les sept commandes de FacadeAdministrationService dans COMMANDES', () => {
+  it('doit exposer les huit commandes de FacadeAdministrationService dans COMMANDES', () => {
     expect([...BouchonAdministrationUtils.COMMANDES]).toEqual([
       'qualifier_membre',
       'qualifier_membres',
@@ -31,7 +31,55 @@ describe('BouchonAdministrationUtils', () => {
       'enregistrer_brouillon',
       'integrer_brouillon',
       'rejeter_brouillon',
+      'calculer_metriques_volumetrie',
     ]);
+  });
+
+  describe('calculer_metriques_volumetrie (US-055, RG-055)', () => {
+    it('doit renvoyer une ventilation dont la somme des cinq postes vaut exactement le poids du JSON en clair', async () => {
+      const donnees = {
+        versionSchema: 10,
+        meta: { modifieLe: '2026-08-31T08:00:00Z' },
+        groupes: [GROUPE_VIDE],
+        referentiels: { reglesDependances: [{ id: 'd1' }] },
+        parametres: { seuils: {} },
+        campagnes: [],
+        brouillon: null,
+        journal: [{ id: 'j1' }],
+        vuesEnregistrees: [],
+      };
+
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        tailleDisqueOctets: number | null;
+        tailleJsonClairOctets: number;
+        ventilation: Record<string, number>;
+      }>('calculer_metriques_volumetrie', {
+        chemin: '/tmp/fichier.sqm',
+        donnees,
+      });
+
+      const v = resultat.ventilation;
+      expect(
+        v['parametrageOctets'] +
+          v['journalOctets'] +
+          v['administrationOctets'] +
+          v['auditsOctets'] +
+          v['autreOctets'],
+      ).toBe(resultat.tailleJsonClairOctets);
+      expect(resultat.tailleJsonClairOctets).toBe(JSON.stringify(donnees).length);
+      expect(resultat.tailleDisqueOctets).not.toBeNull();
+    });
+
+    it('doit renvoyer tailleDisqueOctets à null quand aucun chemin n’est fourni', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<{
+        tailleDisqueOctets: number | null;
+      }>('calculer_metriques_volumetrie', {
+        chemin: null,
+        donnees: RACINE_VIDE,
+      });
+
+      expect(resultat.tailleDisqueOctets).toBeNull();
+    });
   });
 
   it('doit rejeter une commande non bouchonnée', async () => {

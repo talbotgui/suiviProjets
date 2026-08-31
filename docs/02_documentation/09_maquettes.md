@@ -54,6 +54,7 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | Administration | Onglet Groupes | Liste des groupes, formulaire de création/modification (nom, description, instances), sous-onglets Membres connus et Annotations |
 | Administration | Onglet Projets | Liste des projets du groupe sélectionné, formulaire de création/modification, action « Dupliquer », bascule Politique IA |
 | Administration | Onglet Sources | Liste des sources d'un projet, formulaire de rattachement (instance, type, identifiant externe, ref auditée avec autocomplétion) |
+| Administration | Onglet Métriques (US-055) | Lecture seule, aucune mutation. Bloc de cinq compteurs (groupes, projets, audits, règles de membre, règles de dépendance) ; deux valeurs de poids — poids du fichier chiffré sur disque avec mention « reflète la dernière sauvegarde » et état « — non sauvegardé » si le fichier n'a jamais été enregistré, poids du JSON en clair avec mention « état en mémoire courant » ; tableau de cinq lignes (poste, poids, part en %) pour la ventilation du JSON en clair, total 100 % ; indicateur « Calcul de la volumétrie en cours… » pendant l'appel natif |
 | Administration | Suppression | Confirmation systématique rappelant la perte de l'historique d'audits associé |
 
 ### Constitution de campagne
@@ -116,16 +117,16 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | Fiche projet | En-tête | Groupe > nom du projet > description et référence auditée, badges de statut (IA, SONAR_KO, membre inconnu) |
 | Fiche projet | Métadonnées | Âge chez nous, dernier audit, dernière campagne (mise en évidence si échec), taille/classe |
 | Fiche projet | Anomalie technique | Encart si la dernière campagne a échoué, avec action suggérée |
-| Fiche projet | Colonne gauche | Indicateurs Sonar (grisés si SONAR_KO), dépendances (référence/version/statut), merge requests ouvertes |
+| Fiche projet | Colonne gauche | Indicateurs Sonar (grisés si SONAR_KO) ; dépendances ventilées par écosystème (US-056) en sections repliables natives fermées par défaut — « Maven », « NPM », et « Autres » seulement si non vide, dans cet ordre — chaque barre de titre portant le libellé, le total entre parenthèses puis un badge par statut d'obsolescence présent (statuts à zéro omis), le corps reprenant le tableau référence/version/manifeste/statut inchangé (copie de la référence, lien « Créer une règle » pour une dépendance non référencée) ; merge requests ouvertes |
 | Fiche projet | Colonne droite | Membres et statuts ventilés en trois sections repliables fermées par défaut — (1) membres nominatifs directs, (2) membres des groupes invités au projet regroupés par groupe (chemin complet mentionné une fois, groupes du plus précis vers la racine), (3) membres hérités de l'arborescence — chaque barre de titre portant le décompte par statut (statuts sans membre omis) ; ligne de membre identique d'une section à l'autre (mise en évidence si membre inconnu, lien « Qualifier ce membre ») ; marqueurs IA détectés, annotations et journal |
-| Fiche projet | Actions | Accès à la comparaison entre deux audits, export PNG de la fiche |
+| Fiche projet | Actions | Accès à la comparaison entre deux audits, export PNG de la fiche (les sections repliables de membres et de dépendances apparaissent dépliées dans l'image, puis leur état de repli est restauré à l'écran) |
 
 ### Comparaison entre deux audits
 
 | écran | zone | composants / actions |
 |---|---|---|
 | Comparaison entre deux audits | Sélection | Choix de deux dates, raccourcis (dernier vs précédent, un mois, trois mois) |
-| Comparaison entre deux audits | Différentiel | Quatre volets : indicateurs (avant/après/delta), dépendances, membres et contributeurs, marqueurs IA ; rappel des annotations de l'intervalle |
+| Comparaison entre deux audits | Différentiel | Quatre volets : indicateurs (avant/après/delta), dépendances, membres et contributeurs, marqueurs IA ; rappel des annotations de l'intervalle. Le volet Dépendances (US-056) est ventilé par écosystème en sections repliables natives fermées par défaut (« Maven », « NPM », « Autres » si non vide), chaque barre de titre portant le libellé, le total et un badge par type d'évolution présent (Ajout, Retrait, Changement de statut ; types à zéro omis), le corps reprenant le tableau de différentiel à sept colonnes filtré sur la section ; le message global « Aucune évolution des dépendances… » est conservé quand les trois listes sont vides. L'export PNG déplie ces sections le temps de la capture |
 
 ### Liste de travail
 

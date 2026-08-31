@@ -17,7 +17,8 @@ Shell applicatif (après ouverture d'un fichier — sidebar persistante + barre 
 ├── Administration
 │   ├── Groupes (dont onglet Membres connus, Annotations de groupe)
 │   ├── Projets (dont Politique IA)
-│   └── Sources (dont ref auditée)
+│   ├── Sources (dont ref auditée)
+│   └── Métriques (volumétrie du fichier de données, lecture seule)
 ├── Audits
 │   ├── Constitution de campagne
 │   ├── Tableau de bord d'exécution
@@ -68,15 +69,15 @@ Composant transversal
 |---|---|
 | Accueil | [US-001](./04_casUsage.md#cas-dusage--user-stories), [US-002](./04_casUsage.md#cas-dusage--user-stories), [US-005](./04_casUsage.md#cas-dusage--user-stories) |
 | Gestion des credentials | [US-003](./04_casUsage.md#cas-dusage--user-stories), [US-004](./04_casUsage.md#cas-dusage--user-stories), [US-031](./04_casUsage.md#cas-dusage--user-stories) |
-| Administration | [US-006](./04_casUsage.md#cas-dusage--user-stories), [US-007](./04_casUsage.md#cas-dusage--user-stories), [US-008](./04_casUsage.md#cas-dusage--user-stories), [US-023](./04_casUsage.md#cas-dusage--user-stories), [US-024](./04_casUsage.md#cas-dusage--user-stories) |
+| Administration | [US-006](./04_casUsage.md#cas-dusage--user-stories), [US-007](./04_casUsage.md#cas-dusage--user-stories), [US-008](./04_casUsage.md#cas-dusage--user-stories), [US-023](./04_casUsage.md#cas-dusage--user-stories), [US-024](./04_casUsage.md#cas-dusage--user-stories), [US-055](./04_casUsage.md#cas-dusage--user-stories) |
 | Constitution de campagne | [US-009](./04_casUsage.md#cas-dusage--user-stories), [US-012](./04_casUsage.md#cas-dusage--user-stories) |
 | Tableau de bord d'exécution | [US-010](./04_casUsage.md#cas-dusage--user-stories), [US-011](./04_casUsage.md#cas-dusage--user-stories) |
 | Brouillon (et rapport d'anomalies) | [US-013](./04_casUsage.md#cas-dusage--user-stories), [US-014](./04_casUsage.md#cas-dusage--user-stories) |
 | Synthèse des audits | [US-015](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
 | Synthèse graphique | [US-016](./04_casUsage.md#cas-dusage--user-stories), [US-019](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
 | Obsolescence | [US-050](./04_casUsage.md#cas-dusage--user-stories), [US-051](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
-| Fiche projet | [US-017](./04_casUsage.md#cas-dusage--user-stories), [US-022](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories) |
-| Comparaison entre deux audits | [US-018](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories) |
+| Fiche projet | [US-017](./04_casUsage.md#cas-dusage--user-stories), [US-022](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-056](./04_casUsage.md#cas-dusage--user-stories) |
+| Comparaison entre deux audits | [US-018](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-056](./04_casUsage.md#cas-dusage--user-stories) |
 | Liste de travail | [US-020](./04_casUsage.md#cas-dusage--user-stories), [US-028](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
 | Recherche transversale | [US-021](./04_casUsage.md#cas-dusage--user-stories) |
 | Paramétrage | [US-025](./04_casUsage.md#cas-dusage--user-stories), [US-027](./04_casUsage.md#cas-dusage--user-stories), [US-028](./04_casUsage.md#cas-dusage--user-stories), [US-029](./04_casUsage.md#cas-dusage--user-stories), [US-030](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories), [US-034](./04_casUsage.md#cas-dusage--user-stories), [US-035](./04_casUsage.md#cas-dusage--user-stories), [US-036](./04_casUsage.md#cas-dusage--user-stories), [US-048](./04_casUsage.md#cas-dusage--user-stories), [US-049](./04_casUsage.md#cas-dusage--user-stories), [US-054](./04_casUsage.md#cas-dusage--user-stories) |

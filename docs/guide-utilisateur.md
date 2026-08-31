@@ -80,6 +80,10 @@ Après avoir sélectionné un groupe, on crée, modifie, duplique ou supprime se
 
 Une source rattache un dépôt GitLab ou un projet Sonar d'une instance à un projet. Pour un dépôt GitLab, on précise l'instance, l'identifiant externe (avec autocomplétion) et la ref auditée (par exemple `main`, un tag ou un SHA). Pour un projet Sonar, l'instance et la clé du projet suffisent.
 
+### Métriques
+
+L'onglet Métriques présente, en lecture seule, la volumétrie du fichier de données ouvert : le nombre de groupes, de projets, d'audits, de règles de membre et de règles de dépendance, le poids du fichier chiffré sur disque (celui de la dernière sauvegarde), le poids du contenu en clair et sa répartition en pourcentage sur cinq postes — paramétrage, journal, administration, audits, autre. Cet onglet ne modifie rien et ne demande jamais le mot de passe ; il aide à décider si une purge des audits ou du journal est utile.
+
 ## Adapter l'outil à son contexte : le paramétrage
 
 L'écran de paramétrage regroupe cinq onglets. Chaque section indique explicitement le moment où une modification prend effet (RG-039), et toute modification redemande le mot de passe du fichier.
@@ -160,13 +164,13 @@ La synthèse présente le dernier audit intégré de chaque projet dans un table
 
 ![Fiche projet](assets/captures/fiche-projet.png)
 
-La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (âge du dépôt, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image.
+La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (âge du dépôt, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
 
 ### Comparaison entre deux audits
 
 ![Comparaison entre deux audits](assets/captures/comparaison-audits.png)
 
-On choisit deux dates d'audit, ou un raccourci (« Dernier audit vs précédent », « Il y a un mois », « Il y a trois mois »), et le différentiel est présenté en quatre volets : indicateurs, dépendances, membres et contributeurs, marqueurs IA. Le différentiel est recalculé sur les référentiels courants, et les annotations de l'intervalle sont rappelées.
+On choisit deux dates d'audit, ou un raccourci (« Dernier audit vs précédent », « Il y a un mois », « Il y a trois mois »), et le différentiel est présenté en quatre volets : indicateurs, dépendances, membres et contributeurs, marqueurs IA. Le volet dépendances est lui aussi regroupé par écosystème (Maven, NPM, Autres) dans des sections repliables, chaque titre rappelant le nombre d'ajouts, de retraits et de changements de statut. Le différentiel est recalculé sur les référentiels courants, et les annotations de l'intervalle sont rappelées.
 
 ### Synthèse graphique
 

@@ -16,12 +16,26 @@ describe('SqmAdministrationComponent', () => {
     expect(composant.ongletActif).toBe('groupes');
   });
 
-  it.each(['groupes', 'projets', 'sources'] as const)('sélectionne l’onglet « %s »', (onglet) => {
+  it.each(['groupes', 'projets', 'sources', 'metriques'] as const)(
+    'sélectionne l’onglet « %s »',
+    (onglet) => {
+      const composant = TestBed.createComponent(SqmAdministrationComponent).componentInstance;
+
+      composant.selectionnerOnglet(onglet);
+
+      expect(composant.ongletActif).toBe(onglet);
+    },
+  );
+
+  it("expose l'onglet Métriques (US-055) au niveau du modèle, sans rendu du sous-composant", () => {
+    // Les tests de ce spec n'appellent jamais detectChanges() : rendre le @case imposerait de mocker
+    // `@tauri-apps/api/core` et d'amorcer une racine, le constructeur de SqmMetriquesAdminComponent invoquant
+    // la commande native `calculerMetriquesVolumetrie`.
     const composant = TestBed.createComponent(SqmAdministrationComponent).componentInstance;
 
-    composant.selectionnerOnglet(onglet);
+    composant.selectionnerOnglet('metriques');
 
-    expect(composant.ongletActif).toBe(onglet);
+    expect(composant.ongletActif).toBe('metriques');
   });
 
   it(

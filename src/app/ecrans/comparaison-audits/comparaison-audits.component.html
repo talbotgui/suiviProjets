@@ -176,101 +176,110 @@
           ) {
             <p>Aucune évolution des dépendances entre les deux audits comparés.</p>
           } @else {
-            <div class="deborde-auto">
-              <table class="comparaison-audits__table tableau">
-                <thead>
-                  <tr>
-                    <th scope="col">Évolution</th>
-                    <th scope="col">Référence</th>
-                    <th scope="col">Manifeste</th>
-                    <th scope="col">Version avant</th>
-                    <th scope="col">Version après</th>
-                    <th scope="col">Statut avant</th>
-                    <th scope="col">Statut après</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (
-                    ligne of donnees.dependances.ajouts;
-                    track ligne.reference + ligne.manifeste
-                  ) {
-                    <tr>
-                      <td>Ajout</td>
-                      <td>{{ ligne.reference }}</td>
-                      <td>{{ ligne.manifeste }}</td>
-                      <td>{{ ligne.versionAvantLabel }}</td>
-                      <td>{{ ligne.versionApresLabel }}</td>
-                      <td>
-                        @if (ligne.statutAvant.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
-                        } @else {
-                          <span>{{ ligne.statutAvant.label }}</span>
-                        }
-                      </td>
-                      <td>
-                        @if (ligne.statutApres.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
-                        } @else {
-                          <span>{{ ligne.statutApres.label }}</span>
-                        }
-                      </td>
-                    </tr>
+            <!-- US-056 : ventilation par écosystème en sections repliables (Maven, NPM, Autres si non vide),
+                 fermées par défaut, décompte par type d'évolution (Ajout / Retrait / Changement de statut, types
+                 à zéro omis) dans la barre de titre. Toutes portent la classe
+                 `comparaison-audits__section-dependances` : `exporterPng()` s'en sert pour les déplier le temps de
+                 la capture PNG. -->
+            @for (section of donnees.dependances.sections; track section.ecosysteme) {
+              <details class="comparaison-audits__section-dependances">
+                <summary class="comparaison-audits__section-dependances-resume texte-sm">
+                  <span class="poids-demi-gras">{{ section.titre }}</span> ({{ section.total }})
+                  @for (decompte of section.decompteParEvolution; track decompte.label) {
+                    <app-badge
+                      [couleur]="decompte.couleur"
+                      [libelle]="decompte.nombre + ' ' + decompte.label"
+                    />
                   }
-                  @for (
-                    ligne of donnees.dependances.retraits;
-                    track ligne.reference + ligne.manifeste
-                  ) {
-                    <tr>
-                      <td>Retrait</td>
-                      <td>{{ ligne.reference }}</td>
-                      <td>{{ ligne.manifeste }}</td>
-                      <td>{{ ligne.versionAvantLabel }}</td>
-                      <td>{{ ligne.versionApresLabel }}</td>
-                      <td>
-                        @if (ligne.statutAvant.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
-                        } @else {
-                          <span>{{ ligne.statutAvant.label }}</span>
-                        }
-                      </td>
-                      <td>
-                        @if (ligne.statutApres.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
-                        } @else {
-                          <span>{{ ligne.statutApres.label }}</span>
-                        }
-                      </td>
-                    </tr>
-                  }
-                  @for (
-                    ligne of donnees.dependances.modifications;
-                    track ligne.reference + ligne.manifeste
-                  ) {
-                    <tr>
-                      <td>Changement de statut</td>
-                      <td>{{ ligne.reference }}</td>
-                      <td>{{ ligne.manifeste }}</td>
-                      <td>{{ ligne.versionAvantLabel }}</td>
-                      <td>{{ ligne.versionApresLabel }}</td>
-                      <td>
-                        @if (ligne.statutAvant.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
-                        } @else {
-                          <span>{{ ligne.statutAvant.label }}</span>
-                        }
-                      </td>
-                      <td>
-                        @if (ligne.statutApres.couleur; as couleur) {
-                          <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
-                        } @else {
-                          <span>{{ ligne.statutApres.label }}</span>
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+                </summary>
+                <div class="deborde-auto">
+                  <table class="comparaison-audits__table tableau">
+                    <thead>
+                      <tr>
+                        <th scope="col">Évolution</th>
+                        <th scope="col">Référence</th>
+                        <th scope="col">Manifeste</th>
+                        <th scope="col">Version avant</th>
+                        <th scope="col">Version après</th>
+                        <th scope="col">Statut avant</th>
+                        <th scope="col">Statut après</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (ligne of section.ajouts; track ligne.reference + ligne.manifeste) {
+                        <tr>
+                          <td>Ajout</td>
+                          <td>{{ ligne.reference }}</td>
+                          <td>{{ ligne.manifeste }}</td>
+                          <td>{{ ligne.versionAvantLabel }}</td>
+                          <td>{{ ligne.versionApresLabel }}</td>
+                          <td>
+                            @if (ligne.statutAvant.couleur; as couleur) {
+                              <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
+                            } @else {
+                              <span>{{ ligne.statutAvant.label }}</span>
+                            }
+                          </td>
+                          <td>
+                            @if (ligne.statutApres.couleur; as couleur) {
+                              <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
+                            } @else {
+                              <span>{{ ligne.statutApres.label }}</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                      @for (ligne of section.retraits; track ligne.reference + ligne.manifeste) {
+                        <tr>
+                          <td>Retrait</td>
+                          <td>{{ ligne.reference }}</td>
+                          <td>{{ ligne.manifeste }}</td>
+                          <td>{{ ligne.versionAvantLabel }}</td>
+                          <td>{{ ligne.versionApresLabel }}</td>
+                          <td>
+                            @if (ligne.statutAvant.couleur; as couleur) {
+                              <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
+                            } @else {
+                              <span>{{ ligne.statutAvant.label }}</span>
+                            }
+                          </td>
+                          <td>
+                            @if (ligne.statutApres.couleur; as couleur) {
+                              <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
+                            } @else {
+                              <span>{{ ligne.statutApres.label }}</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                      @for (ligne of section.modifications; track ligne.reference + ligne.manifeste) {
+                        <tr>
+                          <td>Changement de statut</td>
+                          <td>{{ ligne.reference }}</td>
+                          <td>{{ ligne.manifeste }}</td>
+                          <td>{{ ligne.versionAvantLabel }}</td>
+                          <td>{{ ligne.versionApresLabel }}</td>
+                          <td>
+                            @if (ligne.statutAvant.couleur; as couleur) {
+                              <app-badge [couleur]="couleur" [libelle]="ligne.statutAvant.label" />
+                            } @else {
+                              <span>{{ ligne.statutAvant.label }}</span>
+                            }
+                          </td>
+                          <td>
+                            @if (ligne.statutApres.couleur; as couleur) {
+                              <app-badge [couleur]="couleur" [libelle]="ligne.statutApres.label" />
+                            } @else {
+                              <span>{{ ligne.statutApres.label }}</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            }
           }
         </section>
 

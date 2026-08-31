@@ -19,6 +19,7 @@ import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
+import { TailleFichierUtils } from '../../../services/sansetat/taille-fichier.utils';
 import type {
   ErreurAdministration,
   ModePurgeAge,
@@ -190,8 +191,7 @@ export class SqmPurgeParametrageComponent {
    * @returns Le texte affichable (ex. `2,4 Mo`).
    */
   public formaterOctets(octets: number): string {
-    const megaOctets = octets / 1_000_000;
-    return `${megaOctets.toFixed(1).replace('.', ',')} Mo`;
+    return TailleFichierUtils.formaterMegaOctets(octets);
   }
 
   /**

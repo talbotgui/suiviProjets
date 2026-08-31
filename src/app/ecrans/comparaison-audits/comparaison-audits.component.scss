@@ -1,0 +1,22 @@
+// US-056 : sections repliables de la ventilation des dépendances par écosystème (Maven, NPM, Autres) du volet
+// Dépendances. Rendu strictement identique à celui de la Fiche projet (`.fiche-projet__section-dependances`,
+// `fiche-projet.component.scss`, elles-mêmes en miroir des sections de membres de l'US-017). Résidu propre au
+// composant : le triangle natif de `<summary>` et l'agencement inline du décompte par évolution ne sont pas
+// exprimables par les classes utilitaires génériques.
+.comparaison-audits__section-dependances {
+  border: 1px solid var(--sqm-neutre-300);
+  border-radius: var(--sqm-rayon-md);
+  padding: var(--sqm-espace-1) var(--sqm-espace-2);
+}
+
+.comparaison-audits__section-dependances + .comparaison-audits__section-dependances {
+  margin-top: var(--sqm-espace-2);
+}
+
+.comparaison-audits__section-dependances-resume {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sqm-espace-1);
+}

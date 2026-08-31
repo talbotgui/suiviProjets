@@ -270,6 +270,21 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#sources-admin-liste')).toContainText(SOURCES.b2.idExterneSonar);
   });
 
+  // 7b. Administration > Métriques — onglet de volumétrie en lecture seule (US-055, RG-055).
+  await test.step('7b. Administration > Métriques', async () => {
+    await avantChangementEcran(page, '07b-administration-metriques');
+    await page.locator('#administration-onglet-metriques').click();
+
+    const metriques = page.locator('.metriques-admin');
+    await expect(metriques).toContainText('Compteurs');
+    await expect(metriques).toContainText('Poids du JSON en clair');
+    // Le calcul natif bouchonné doit aboutir : au moins une valeur de poids en mégaoctets et le tableau de
+    // ventilation en pourcentages.
+    await expect(metriques).toContainText('Mo');
+    await expect(metriques).toContainText('Ventilation du JSON en clair');
+    await expect(metriques).toContainText('%');
+  });
+
   // 8. Credentials — saisie par instance, test de connectivité, collage JSON, sauvegarde.
   await test.step('8. Credentials', async () => {
     await avantChangementEcran(page, '08-credentials');
@@ -456,8 +471,17 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
       expect(valeurCouverture).toBeLessThanOrEqual(60 * 1.1);
     }
 
-    await expect(page.locator('.fiche-projet__table')).toContainText(REGLE_DEPENDANCE.motif);
-    await expect(page.locator('.fiche-projet__table')).toContainText('obsolète');
+    // US-056 : dépendances ventilées en sections repliables par écosystème (Maven, NPM, Autres), fermées par
+    // défaut. Le contenu des tables reste dans le DOM même section fermée (`filter({ hasText })` opère sur
+    // `textContent`). `toBeAttached()` fait patienter jusqu'au rendu de la section avant les comptages non
+    // ré-essayés ci-dessous.
+    const sectionsDependances = page.locator('.fiche-projet__section-dependances');
+    await expect(sectionsDependances.first()).toBeAttached();
+    await expect(sectionsDependances.first()).not.toHaveAttribute('open');
+    expect(
+      await sectionsDependances.filter({ hasText: REGLE_DEPENDANCE.motif }).count(),
+    ).toBeGreaterThan(0);
+    expect(await sectionsDependances.filter({ hasText: 'obsolète' }).count()).toBeGreaterThan(0);
   });
 
   // 17. Liste de travail — qualification d'un membre inconnu depuis une alerte, traitement d'une autre alerte.
@@ -551,8 +575,13 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await page.locator('#shell-lien-synthese-graphique').click();
     await expect(page).toHaveURL(/\/synthese-graphique$/);
 
-    await page.locator('#synthese-graphique-bouton-tout-selectionner').click();
+    // Depuis la mutualisation du filtre groupe/projet (plan_16 incrément 3), il n'y a plus de bouton « tout
+    // sélectionner » propre à cet écran : le graphique se construit d'emblée sur l'ensemble des projets, le
+    // filtre partagé étant hérité à « tous les groupes / aucune restriction de projet » (RG-053). Deux
+    // campagnes ayant été intégrées, la série d'au moins un projet porte désormais plusieurs points et la
+    // légende (une entrée par projet) est visible plutôt que l'état « aucune donnée ».
     await expect(page.locator('app-graphique-evolution')).toBeVisible();
+    await expect(page.locator('.graphique-evolution__legende')).toBeVisible();
   });
 
   // 19b. Obsolescence — grille de tuiles et modale de détail du dernier audit d'un projet (US-051).
@@ -567,7 +596,7 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(premiereTuile).toBeVisible();
 
     // La modale de détail est pilotée par le paramètre de requête `projet` (plan_16 incrément 5) : son ouverture
-    // est une étape d'historique, sa fermeture par le bouton Reculer de la barre supérieure y revient.
+    // est une étape d'historique, un recul dans l'historique la referme.
     await premiereTuile.click();
     await expect(page.locator('.obsolescence-detail')).toBeVisible();
     await expect(page).toHaveURL(/\/obsolescence\?projet=/);
@@ -576,15 +605,20 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await page.locator('#obsolescence-detail-fiche-projet').click();
     await expect(page).toHaveURL(/\/fiche-projet\//);
 
-    // Retour à la modale par le bouton Reculer, puis fermeture par ce même bouton (revient à `/obsolescence`).
-    await page.locator('#shell-bouton-reculer').click();
+    // Retour à la modale puis fermeture par un second recul dans l'historique (revient à `/obsolescence`). On
+    // exerce la navigation d'historique via `page.goBack()` plutôt que le bouton « Reculer » de la barre
+    // supérieure : ce dernier, une fois la modale rouverte, est recouvert par le fond `.superposition` de la
+    // modale (`position: fixed; inset: 0`, cf. `src/styles/_motifs.scss`) et n'est plus cliquable — cliquer à
+    // travers un overlay est de toute façon un anti-pattern Playwright. `goBack`/`goForward` déclenchent la
+    // même entrée/sortie d'historique que ces boutons (modale pilotée par le paramètre d'URL `projet`).
+    await page.goBack();
     await expect(page.locator('.obsolescence-detail')).toBeVisible();
-    await page.locator('#shell-bouton-reculer').click();
+    await page.goBack();
     await expect(page.locator('.obsolescence-detail')).toHaveCount(0);
     await expect(page).toHaveURL(/\/obsolescence$/);
 
-    // Le bouton Avancer réaffiche la modale (déplacement dans l'historique, sans nouvelle entrée).
-    await page.locator('#shell-bouton-avancer').click();
+    // Avancer dans l'historique réaffiche la modale (déplacement dans l'historique, sans nouvelle entrée).
+    await page.goForward();
     await expect(page.locator('.obsolescence-detail')).toBeVisible();
     await page.locator('#obsolescence-detail-fermer').click();
     await expect(page.locator('.obsolescence-detail')).toHaveCount(0);
@@ -640,10 +674,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await avantChangementEcran(page, '21-parametrage-journal');
     await page.locator('#shell-lien-parametrage').click();
     await page.locator('#parametrage-onglet-journal').click();
-    // RG-023 (journal des modifications) n'est alimenté par aucun des bouchons TS de cette phase (décision déjà
-    // documentée dans chacun d'eux, cohérente avec `BouchonAdministrationUtils` avant eux) : l'écran affiche donc
-    // ici son état vide plutôt qu'un tableau d'entrées, seul retour visuel exploitable en `ng serve`.
-    await expect(page.locator('.journal-parametrage__vide').first()).toBeVisible();
+    // Depuis plan_16 (US-054/RG-054), le bouchon TS des vues enregistrées journalise chaque mutation de vue :
+    // l'enregistrement de « Vue E2E » à l'étape 15 a produit une entrée d'origine « Vues enregistrées ». Le
+    // journal n'est donc plus vide ici (les autres bouchons de cette phase n'alimentent toujours pas RG-023) ;
+    // le retour visuel exploitable en `ng serve` est désormais cette entrée dans le tableau.
+    await expect(page.locator('#journal-parametrage-tableau')).toContainText('Vue E2E');
+    await expect(page.locator('#journal-parametrage-tableau')).toContainText('Vues enregistrées');
   });
 
   // 21b. Paramétrage > Vues enregistrées — administration centralisée (US-054) : renommage puis suppression de la
@@ -736,6 +772,9 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     );
 
     await naviguerVersFicheProjet();
-    await expect(page.locator('.fiche-projet__table')).toContainText('maintenu');
+    // US-056 : la dépendance révisée relève d'une des sections repliables par écosystème.
+    expect(
+      await page.locator('.fiche-projet__section-dependances').filter({ hasText: 'maintenu' }).count(),
+    ).toBeGreaterThan(0);
   });
 });

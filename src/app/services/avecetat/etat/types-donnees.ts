@@ -902,6 +902,52 @@ export type ResultatPrevisualisationPurgeJournal =
   | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
 
 /**
+ * Ventilation du poids du JSON en clair du fichier de données sur cinq postes (US-055, RG-055), mirroir de
+ * `VentilationJsonClair` côté cœur natif (`src-tauri/src/persistance/volumetrie.rs`). La somme des cinq champs
+ * vaut exactement `MetriquesVolumetrie.tailleJsonClairOctets`.
+ */
+export interface VentilationJsonClair {
+  /** `parametres` + `referentiels` + `vuesEnregistrees`. */
+  readonly parametrageOctets: number;
+  /** `journal`. */
+  readonly journalOctets: number;
+  /**
+   * Enveloppes de `groupes[]` hors audits : projets, sources, membres connus, annotations, instances, indicateurs
+   * désactivés.
+   */
+  readonly administrationOctets: number;
+  /** `groupes[].projets[].audits[]` + `campagnes` + `brouillon`. */
+  readonly auditsOctets: number;
+  /** Reste : `meta`, `versionSchema`, `traitementsAlertes` et surcoût structurel du JSON. */
+  readonly autreOctets: number;
+}
+
+/**
+ * Métriques de volumétrie du fichier de données ouvert (US-055, RG-055 ; onglet « Métriques » de l'écran
+ * Administration), mirroir de `MetriquesVolumetrie` côté cœur natif. Structure de transfert calculée à la volée,
+ * jamais persistée.
+ */
+export interface MetriquesVolumetrie {
+  /**
+   * Poids du fichier chiffré sur disque (octets) ; `null` si aucun fichier n'est ouvert (jamais sauvegardé) ou si
+   * la lecture des métadonnées du fichier échoue. Reflète la dernière sauvegarde, pas l'état en mémoire courant.
+   */
+  readonly tailleDisqueOctets: number | null;
+  /** Poids total de la sérialisation JSON en clair de la racine en mémoire (octets). */
+  readonly tailleJsonClairOctets: number;
+  /** Ventilation du JSON en clair sur cinq postes de somme exactement `tailleJsonClairOctets`. */
+  readonly ventilation: VentilationJsonClair;
+}
+
+/**
+ * Résultat typé d'un calcul de métriques de volumétrie (`DonneesApplicationService.calculerMetriquesVolumetrie`),
+ * sur le modèle de {@link ResultatPrevisualisationPurge}.
+ */
+export type ResultatMetriquesVolumetrie =
+  | { readonly type: 'succes'; readonly metriques: MetriquesVolumetrie }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
  * Catégorie d'une ligne du différentiel d'import de configuration partageable (US-030, RG-029), mirroir de
  * `CategorieLigneDifferentiel` côté cœur natif.
  */

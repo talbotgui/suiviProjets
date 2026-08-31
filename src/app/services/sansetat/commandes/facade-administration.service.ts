@@ -23,8 +23,10 @@
 // directement, rompant la frontière unique documentée en en-tête de `FacadeCommandesService`).
 //
 // Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) depuis le 2026-07-28 : point de
-// passage unique permettant le bouchon TS des sept commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
-// `invocation-commande.utils.ts` et `bouchon/bouchon-administration.utils.ts`.
+// passage unique permettant le bouchon TS des huit commandes ci-dessous hors contexte Tauri (`ng serve`), cf.
+// `invocation-commande.utils.ts` et `bouchon/bouchon-administration.utils.ts`. La huitième,
+// `calculerMetriquesVolumetrie` (US-055, RG-055, 2026-08-31), est une commande de consultation pure (aucune
+// mutation, aucun mot de passe) alimentant l'onglet « Métriques » de l'écran Administration.
 import { Injectable } from '@angular/core';
 import { InvocationCommandeUtils } from './invocation-commande.utils';
 
@@ -177,6 +179,18 @@ export interface ParametresResolutionBrouillon<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `calculerMetriquesVolumetrie` (US-055, RG-055, ajoutée le 2026-08-31),
+ * génériques sur le type concret de la racine échangée (`TDonnees`) pour ne jamais importer ce type depuis
+ * `services/avecetat/etat/`. Commande de consultation pure : ni mot de passe, ni sauvegarde.
+ */
+export interface ParametresCalculMetriquesVolumetrie<TDonnees> {
+  /** Chemin du fichier de données ouvert, ou `null` si aucun fichier n'est ouvert (jamais sauvegardé). */
+  readonly chemin: string | null;
+  /** Racine des données courante, sérialisée pour le calcul du poids du JSON en clair et de sa ventilation. */
+  readonly donnees: TDonnees;
+}
+
+/**
  * Client typé de la Façade de commandes, dédié en Phase 4 à la qualification des membres connus d'un groupe et à
  * la politique d'autorisation de l'IA d'un projet (US-022 à US-024), et en Phase 5 (incrément 2) au cycle de vie
  * du brouillon d'une campagne (US-014). Complétée le 2026-08-24 par la qualification en masse de membres connus
@@ -234,6 +248,21 @@ export class FacadeAdministrationService {
     parametres: ParametresSuppressionMembreConnu<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('supprimer_membre_connu', { ...parametres });
+  }
+
+  /**
+   * Calcule la volumétrie du fichier de données ouvert pour l'onglet « Métriques » de l'écran Administration
+   * (US-055, RG-055) : poids du fichier chiffré sur disque, poids du JSON en clair de la racine et ventilation en
+   * cinq postes. Consultation pure : n'écrit rien, ne redemande jamais le mot de passe.
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresCalculMetriquesVolumetrie}.
+   * @returns Les métriques calculées, typées par l'appelant via `TReponse`.
+   */
+  public async calculerMetriquesVolumetrie<TDonnees, TReponse>(
+    parametres: ParametresCalculMetriquesVolumetrie<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('calculer_metriques_volumetrie', {
+      ...parametres,
+    });
   }
 
   /**

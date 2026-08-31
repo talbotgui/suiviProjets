@@ -1216,6 +1216,114 @@ describe('SqmFicheProjetComponent', () => {
     });
   });
 
+  describe('ventilation des dépendances par écosystème (US-056)', () => {
+    /**
+     * Retrouve la section repliable de dépendances dont la barre de titre contient le libellé donné.
+     * @param element - Élément natif de la fixture rendue.
+     * @param libelle - Fragment de libellé attendu dans le `<summary>` de la section.
+     * @returns L'élément `<details>` de la section, ou `undefined` si absente.
+     */
+    function sectionDependances(
+      element: HTMLElement,
+      libelle: string,
+    ): HTMLDetailsElement | undefined {
+      return Array.from(
+        element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-dependances'),
+      ).find((candidat) => candidat.querySelector('summary')?.textContent?.includes(libelle));
+    }
+
+    it('rend les sections Maven/NPM fermées par défaut, titrées et badgées par statut', () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      const sections = element.querySelectorAll<HTMLDetailsElement>(
+        '.fiche-projet__section-dependances',
+      );
+      expect(sections).toHaveLength(2);
+      sections.forEach((section) => expect(section.hasAttribute('open')).toBe(false));
+
+      const maven = sectionDependances(element, 'Maven');
+      const npm = sectionDependances(element, 'NPM');
+      expect(maven?.querySelector('summary')?.textContent).toContain('(1)');
+      expect(maven?.querySelector('summary')?.textContent).toContain('1 maintenu');
+      expect(npm?.querySelector('summary')?.textContent).toContain('(2)');
+      expect(npm?.querySelector('summary')?.textContent).toContain('1 obsolète');
+      expect(npm?.querySelector('summary')?.textContent).toContain('1 non référencé');
+    });
+
+    it('classe build.gradle et la référence « java » dans Maven, package.json dans NPM', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances([
+          { reference: 'com.acme:lib', version: '1.0.0', manifeste: 'sous/module/build.gradle' },
+          { reference: 'java', version: '17', manifeste: '' },
+          { reference: 'left-pad', version: '1.3.0', manifeste: 'front/package.json' },
+        ]),
+      ]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      expect(sectionDependances(element, 'Maven')?.querySelector('summary')?.textContent).toContain(
+        '(2)',
+      );
+      expect(sectionDependances(element, 'NPM')?.querySelector('summary')?.textContent).toContain(
+        '(1)',
+      );
+      expect(sectionDependances(element, 'Autres')).toBeUndefined();
+    });
+
+    it('n’affiche la section « Autres » que si au moins une dépendance a un manifeste non reconnu', () => {
+      const avecInconnu = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances([
+          { reference: 'monpaquet', version: '1.0.0', manifeste: 'Cargo.toml' },
+          { reference: 'left-pad', version: '1.3.0', manifeste: 'package.json' },
+        ]),
+      ]);
+      const elementAvec = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(avecInconnu)),
+      );
+      expect(sectionDependances(elementAvec, 'Autres')?.querySelector('summary')?.textContent).toContain(
+        '(1)',
+      );
+
+      const sansInconnu = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances([
+          { reference: 'left-pad', version: '1.3.0', manifeste: 'package.json' },
+        ]),
+      ]);
+      const elementSans = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(sansInconnu)),
+      );
+      expect(sectionDependances(elementSans, 'Autres')).toBeUndefined();
+    });
+
+    it('exporterPng déplie les sections de dépendances le temps de la capture puis restaure leur état', async () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+      let replisPendantCapture: boolean[] = [];
+      jest.mocked(toPng).mockImplementation(() => {
+        replisPendantCapture = Array.from(
+          element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-dependances'),
+        ).map((section) => section.open);
+        return Promise.resolve('data:image/png;base64,test');
+      });
+
+      await fixture.componentInstance.exporterPng();
+
+      expect(replisPendantCapture).toEqual([true, true]);
+      expect(
+        Array.from(
+          element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-dependances'),
+        ).map((section) => section.open),
+      ).toEqual([false, false]);
+    });
+  });
+
   it(
     'exporterPng déclenche toPng sur le conteneur, provoque un téléchargement nommé ' +
       "fiche-projet-<nomProjet normalisé>-<horodatage complet>.png et confirme l'export (C15-15, RG-047)",

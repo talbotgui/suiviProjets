@@ -77,6 +77,8 @@ import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dern
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
 import { DerniereCampagneUtils } from '../../services/sansetat/jugement/derniere-campagne.utils';
+import { EcosystemeDependanceUtils } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
+import type { EcosystemeDependance } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { LienExterneSourceUtils } from '../../services/sansetat/jugement/lien-externe-source.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
@@ -165,6 +167,37 @@ interface LigneDependance {
    * lien de création d'une règle pré-remplie (cf. {@link SqmFicheProjetComponent.queryParamsReferentielDependance}).
    */
   readonly nonReference: boolean;
+}
+
+/**
+ * Décompte des dépendances d'une section d'écosystème (US-056) portant un même statut d'obsolescence, affiché dans
+ * la barre de titre de la section repliable. Les statuts sans aucune occurrence ne produisent aucune entrée
+ * (strictement le modèle de {@link DecompteStatutMembres}).
+ */
+interface DecompteStatutDependances {
+  /** Libellé du statut d'obsolescence (`obsolète`, `maintenu`, `à jour (M1)`, `à jour (M3)`, `non référencé`). */
+  readonly label: string;
+  /** Couleur sémantique du statut, absente si non calculable (RG-022). */
+  readonly couleur?: Couleur;
+  /** Nombre de dépendances de la section portant ce statut (toujours strictement positif). */
+  readonly nombre: number;
+}
+
+/**
+ * Section repliable d'un écosystème de dépendances (Maven, NPM, Autres) sur la Fiche projet (US-056) : reprend le
+ * modèle des sections repliables de membres (US-017). Seules les sections non vides sont produites.
+ */
+interface SectionDependances {
+  /** Écosystème d'appartenance de la section. */
+  readonly ecosysteme: EcosystemeDependance;
+  /** Libellé affiché de la section (« Maven », « NPM », « Autres »). */
+  readonly titre: string;
+  /** Dépendances de la section, dans l'ordre de parsing des manifestes (inchangé). */
+  readonly dependances: readonly LigneDependance[];
+  /** Nombre de dépendances de la section (identique à `dependances.length`, exposé pour la barre de titre). */
+  readonly total: number;
+  /** Décompte par statut d'obsolescence affiché dans la barre de titre (statuts à zéro omis). */
+  readonly decompteParStatut: readonly DecompteStatutDependances[];
 }
 
 /**
@@ -403,8 +436,13 @@ interface DonneesFicheProjet {
   readonly violationCritique: EtiquetteCouleur | undefined;
   /** `true` si un constat `gitlab.dependances` a été produit par le dernier audit intégré. */
   readonly dependancesDisponibles: boolean;
-  /** Dépendances déclarées, avec leur statut d'obsolescence déjà résolu. */
+  /** Dépendances déclarées, avec leur statut d'obsolescence déjà résolu (liste plate, ordre de parsing). */
   readonly dependances: readonly LigneDependance[];
+  /**
+   * Ventilation des dépendances en sections repliables par écosystème (US-056), dérivée de {@link dependances} ;
+   * seules les sections non vides sont présentes, dans l'ordre Maven, NPM, Autres.
+   */
+  readonly sectionsDependances: readonly SectionDependances[];
   /** Étiquette résumée des demandes de fusion ouvertes (nombre, conflits). */
   readonly mrResume: EtiquetteCouleur | undefined;
   /** Demandes de fusion ouvertes constatées, détaillées ligne par ligne. */
@@ -721,19 +759,24 @@ export class SqmFicheProjetComponent {
     if (conteneur === undefined || etatCourant.type !== 'trouve') {
       return;
     }
-    // US-017 : les trois sections de membres sont repliées par défaut mais doivent toujours apparaître dépliées
-    // dans l'export PNG (décision fonctionnelle validée par un humain). Dépliage impératif le temps de la capture,
-    // état de repli de chaque section restauré ensuite pour ne pas modifier ce que voit l'utilisateur à l'écran.
-    const sectionsMembres = [
-      ...conteneur.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-membres'),
+    // US-017 (sections de membres) et US-056 (sections de dépendances par écosystème) : ces sections repliables
+    // sont fermées par défaut mais doivent toujours apparaître dépliées dans l'export PNG (décision fonctionnelle
+    // validée par un humain). Dépliage impératif le temps de la capture, état de repli de chaque section restauré
+    // ensuite pour ne pas modifier ce que voit l'utilisateur à l'écran.
+    const sectionsRepliables = [
+      ...conteneur.querySelectorAll<HTMLDetailsElement>(
+        '.fiche-projet__section-membres, .fiche-projet__section-dependances',
+      ),
     ];
-    const replisInitiaux = sectionsMembres.map((section) => section.open);
-    sectionsMembres.forEach((section) => (section.open = true));
+    const replisInitiaux = sectionsRepliables.map((section) => section.open);
+    sectionsRepliables.forEach((section) => (section.open = true));
     try {
       const dataUrl = await toPng(conteneur);
       this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
     } finally {
-      sectionsMembres.forEach((section, index) => (section.open = replisInitiaux[index] ?? false));
+      sectionsRepliables.forEach(
+        (section, index) => (section.open = replisInitiaux[index] ?? false),
+      );
     }
   }
 
@@ -878,6 +921,10 @@ export class SqmFicheProjetComponent {
       .sort((a, b) => a.nom.localeCompare(b.nom));
     const sectionsMembres = this.construireSectionsMembres(membres);
 
+    const lignesDependances = themes.dependances.map((dependance) =>
+      this.construireLigneDependance(dependance, reglesDependances),
+    );
+
     const refAuditeeSource = projet.sources.find(
       (source) => source.type === TypeSource.DepotGitlab,
     );
@@ -937,9 +984,8 @@ export class SqmFicheProjetComponent {
               'critique',
             ),
       dependancesDisponibles: themes.dependancesDisponibles,
-      dependances: themes.dependances.map((dependance) =>
-        this.construireLigneDependance(dependance, reglesDependances),
-      ),
+      dependances: lignesDependances,
+      sectionsDependances: this.construireSectionsDependances(lignesDependances),
       mrResume: this.construireResumeMr(mrOuvertesToutesSources, seuilsMrOuvertes, maintenant),
       mrOuvertes: mrOuvertesToutesSources.map((mr) => this.construireLigneMr(mr, maintenant)),
       membres,
@@ -1268,6 +1314,93 @@ export class SqmFicheProjetComponent {
       default:
         return { label: resultat.statut };
     }
+  }
+
+  /**
+   * Ordre d'affichage des statuts d'obsolescence dans le décompte de barre de titre des sections de dépendances
+   * (US-056), sur le modèle de {@link ORDRE_STATUTS_DECOMPTE} pour les membres. Les libellés reprennent ceux
+   * produits par {@link libelleEtCouleurObsolescence} ; un libellé hors liste (statut libre, RG-022) est trié en
+   * fin.
+   */
+  private static readonly ORDRE_STATUTS_DEPENDANCE_DECOMPTE: readonly string[] = [
+    'obsolète',
+    'maintenu',
+    'à jour (M1)',
+    'à jour (M3)',
+    'non référencé',
+  ];
+
+  /**
+   * Ventile une liste plate de dépendances en sections repliables par écosystème (US-056, RG-056), dans l'ordre
+   * `EcosystemeDependanceUtils.ORDRE` (Maven, NPM, Autres). Seules les sections non vides sont produites ; l'ordre
+   * des dépendances au sein d'une section (ordre de parsing des manifestes) est conservé.
+   * @param lignes - Dépendances déjà mappées en lignes d'affichage.
+   * @returns Les sections non vides, dans l'ordre d'affichage.
+   */
+  private construireSectionsDependances(
+    lignes: readonly LigneDependance[],
+  ): readonly SectionDependances[] {
+    const sections: SectionDependances[] = [];
+    for (const ecosysteme of EcosystemeDependanceUtils.ORDRE) {
+      const dependances = lignes.filter(
+        (ligne) => EcosystemeDependanceUtils.classifier(ligne) === ecosysteme,
+      );
+      if (dependances.length === 0) {
+        continue;
+      }
+      sections.push({
+        ecosysteme,
+        titre: EcosystemeDependanceUtils.titre(ecosysteme),
+        dependances,
+        total: dependances.length,
+        decompteParStatut: this.construireDecompteStatutDependances(dependances),
+      });
+    }
+    return sections;
+  }
+
+  /**
+   * Construit le décompte des dépendances d'une section par statut d'obsolescence (US-056), pour affichage dans la
+   * barre de titre de la section repliable. Les statuts sans aucune occurrence ne produisent aucune entrée ; les
+   * entrées sont ordonnées selon {@link ORDRE_STATUTS_DEPENDANCE_DECOMPTE}. Corps calqué sur
+   * {@link construireDecompteStatutMembres}.
+   * @param lignes - Dépendances de la section.
+   * @returns Le décompte par statut, statuts à zéro omis.
+   */
+  private construireDecompteStatutDependances(
+    lignes: readonly LigneDependance[],
+  ): readonly DecompteStatutDependances[] {
+    const parLabel = new Map<string, DecompteStatutDependances>();
+    for (const ligne of lignes) {
+      const existant = parLabel.get(ligne.statut.label);
+      if (existant === undefined) {
+        parLabel.set(ligne.statut.label, {
+          label: ligne.statut.label,
+          couleur: ligne.statut.couleur,
+          nombre: 1,
+        });
+      } else {
+        parLabel.set(ligne.statut.label, { ...existant, nombre: existant.nombre + 1 });
+      }
+    }
+    return [...parLabel.values()].sort(
+      (a, b) =>
+        SqmFicheProjetComponent.rangStatutDependanceDecompte(a.label) -
+        SqmFicheProjetComponent.rangStatutDependanceDecompte(b.label),
+    );
+  }
+
+  /**
+   * Rang d'un libellé de statut d'obsolescence dans {@link ORDRE_STATUTS_DEPENDANCE_DECOMPTE} ; un libellé absent
+   * de la liste (statut libre, RG-022) est trié en fin plutôt que de faire échouer le tri.
+   * @param label - Libellé de statut à classer.
+   * @returns Le rang de tri.
+   */
+  private static rangStatutDependanceDecompte(label: string): number {
+    const rang = SqmFicheProjetComponent.ORDRE_STATUTS_DEPENDANCE_DECOMPTE.indexOf(label);
+    return rang === -1
+      ? SqmFicheProjetComponent.ORDRE_STATUTS_DEPENDANCE_DECOMPTE.length
+      : rang;
   }
 
   /**

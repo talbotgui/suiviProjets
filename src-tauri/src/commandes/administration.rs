@@ -5,6 +5,11 @@
 //! d'autorisation de l'IA d'un projet (Phase 4, US-022 à US-024 ; RG-006 à RG-008, RG-012, RG-014 à RG-016,
 //! RG-023).
 //!
+//! Évolution du 2026-08-31 (US-055 ; RG-055) : s'y ajoute `calculerMetriquesVolumetrie`, commande de consultation
+//! pure alimentant l'onglet « Métriques » de l'écran Administration — sans `State<EtatSession>`, sans mot de passe
+//! et sans entrée de journal, à la différence des quatre commandes de mutation ci-dessus ; seule la journalisation
+//! technique de début et de fin reste obligatoire.
+//!
 //! Point d'architecture décisif (décision, cf. compte-rendu de développement de cette phase) : à la différence de
 //! la Phase 3 (CRUD groupes/projets/sources, sans commande native, mutations tenues entièrement côté interface),
 //! `qualifierMembre` et `definirPolitiqueIA` sont explicitement nommées par
@@ -22,6 +27,7 @@ use super::fichier::ErreurFacade;
 use crate::modele::racine::{DonneesRacine, StatutMembre, TypeCritere};
 use crate::persistance::administration;
 use crate::persistance::moteur;
+use crate::persistance::volumetrie::{self, MetriquesVolumetrie};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -270,5 +276,33 @@ pub(crate) fn supprimer_membre_connu(
         Ok(donnees)
     })();
     crate::journalisation::consigner_fin_commande("supprimerMembreConnu");
+    resultat
+}
+
+/// Calcule la volumétrie du fichier de données ouvert pour l'onglet « Métriques » de l'écran Administration
+/// (US-055, RG-055) : poids du fichier chiffré sur disque (via `chemin`, reflétant la dernière sauvegarde), poids
+/// du JSON en clair de la racine en mémoire et ventilation de ce JSON en clair sur cinq postes.
+///
+/// Commande de consultation pure : ne prend pas de `State<EtatSession>`, ne redemande pas le mot de passe
+/// (RG-002 non déclenchée) et n'écrit aucune entrée de journal des modifications. `chemin` est optionnel : un
+/// fichier jamais sauvegardé, ou un échec de lecture des métadonnées, produit `tailleDisqueOctets` à `null`. Le
+/// type de retour reste un `Result<_, ErreurFacade>` bien que le calcul ne puisse pas échouer, pour rester
+/// homogène avec les autres commandes de ce module et ne pas introduire de cas particulier de désérialisation
+/// côté interface.
+#[tauri::command]
+pub(crate) fn calculer_metriques_volumetrie(
+    chemin: Option<String>,
+    donnees: DonneesRacine,
+) -> Result<MetriquesVolumetrie, ErreurFacade> {
+    crate::journalisation::consigner_debut_commande("calculerMetriquesVolumetrie");
+    #[allow(
+        clippy::redundant_closure_call,
+        reason = "closure immédiatement invoquée pour rester homogène avec les autres commandes de la Façade, motif reconnu"
+    )]
+    let resultat = (|| -> Result<MetriquesVolumetrie, ErreurFacade> {
+        let chemin_ref = chemin.as_deref().map(std::path::Path::new);
+        Ok(volumetrie::calculer_metriques(&donnees, chemin_ref))
+    })();
+    crate::journalisation::consigner_fin_commande("calculerMetriquesVolumetrie");
     resultat
 }

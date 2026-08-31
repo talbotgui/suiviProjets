@@ -62,9 +62,9 @@ type ReponseBouchonAdministration =
   | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
 
 /**
- * Bouchon TS des sept commandes de la Façade portées par `FacadeAdministrationService` (qualification des membres
- * connus, unitaire et en masse, politique d'autorisation de l'IA, cycle de vie du brouillon d'une campagne), activé
- * hors contexte Tauri par `InvocationCommandeUtils`.
+ * Bouchon TS des huit commandes de la Façade portées par `FacadeAdministrationService` (qualification des membres
+ * connus, unitaire et en masse, politique d'autorisation de l'IA, cycle de vie du brouillon d'une campagne,
+ * volumétrie du fichier de données), activé hors contexte Tauri par `InvocationCommandeUtils`.
  */
 export class BouchonAdministrationUtils {
   /**
@@ -79,6 +79,7 @@ export class BouchonAdministrationUtils {
     'enregistrer_brouillon',
     'integrer_brouillon',
     'rejeter_brouillon',
+    'calculer_metriques_volumetrie',
   ]);
 
   /**
@@ -140,6 +141,8 @@ export class BouchonAdministrationUtils {
         return BouchonAdministrationUtils.horodater(
           BouchonAdministrationUtils.resoudreBrouillon(parametres, 'rejete'),
         );
+      case 'calculer_metriques_volumetrie':
+        return BouchonAdministrationUtils.calculerMetriquesVolumetrie(parametres);
       default:
         throw new Error(`BouchonAdministrationUtils : commande « ${commande} » non bouchonnée.`);
     }
@@ -431,6 +434,84 @@ export class BouchonAdministrationUtils {
       ...donneesCourantes,
       brouillon: encoreEnAttente ? { ...brouillon, resultatsParProjet: nouveauxResultats } : null,
     };
+  }
+
+  /**
+   * Calcule des métriques de volumétrie plausibles (US-055, RG-055) : quatre postes obtenus par sérialisation des
+   * sous-arbres de la racine, le cinquième (« autre ») absorbant le reste pour garantir une somme exactement égale
+   * au poids total du JSON en clair (`JSON.stringify(donnees).length`). Version simplifiée du calcul du cœur natif
+   * (`src-tauri/src/persistance/volumetrie.rs`) : l'ordre des clés JSON diffère entre ce bouchon et `serde`, d'où
+   * le rognage défensif ci-dessous, mais l'invariant de somme est préservé (décision arbitraire de bouchonnage).
+   * Aucune mutation : la racine n'est ni modifiée ni horodatée.
+   * @param parametres - Paramètres reçus (`chemin`, `donnees`).
+   * @returns Un objet de forme `MetriquesVolumetrie`.
+   */
+  private static calculerMetriquesVolumetrie(
+    parametres: Readonly<Record<string, unknown>>,
+  ): Record<string, unknown> {
+    const donnees = BouchonAdministrationUtils.exigerObjet(parametres['donnees']);
+    const chemin = BouchonAdministrationUtils.lireTexteOptionnel(parametres, 'chemin');
+    const total = BouchonAdministrationUtils.tailleJson(donnees);
+
+    const parametrageBrut =
+      BouchonAdministrationUtils.tailleJson(donnees['parametres']) +
+      BouchonAdministrationUtils.tailleJson(donnees['referentiels']) +
+      BouchonAdministrationUtils.tailleJson(donnees['vuesEnregistrees']);
+    const journalBrut = BouchonAdministrationUtils.tailleJson(donnees['journal']);
+
+    let administrationBrut = 0;
+    let auditsBrut = 0;
+    for (const groupe of BouchonAdministrationUtils.lireListe(donnees, 'groupes')) {
+      administrationBrut +=
+        BouchonAdministrationUtils.tailleJson(groupe) -
+        BouchonAdministrationUtils.tailleJson(groupe['projets']);
+      for (const projet of BouchonAdministrationUtils.lireListe(groupe, 'projets')) {
+        administrationBrut +=
+          BouchonAdministrationUtils.tailleJson(projet) -
+          BouchonAdministrationUtils.tailleJson(projet['audits']);
+        auditsBrut += BouchonAdministrationUtils.tailleJson(projet['audits']);
+      }
+    }
+    auditsBrut +=
+      BouchonAdministrationUtils.tailleJson(donnees['campagnes']) +
+      BouchonAdministrationUtils.tailleJson(donnees['brouillon'] ?? null);
+
+    let budget = total;
+    const retenir = (poste: number): number => {
+      const retenu = Math.max(0, Math.min(Math.round(poste), budget));
+      budget -= retenu;
+      return retenu;
+    };
+    const parametrageOctets = retenir(parametrageBrut);
+    const journalOctets = retenir(journalBrut);
+    const administrationOctets = retenir(administrationBrut);
+    const auditsOctets = retenir(auditsBrut);
+    const autreOctets = budget;
+
+    return {
+      // Fichier réellement sur disque : compressé (zstd) puis chiffré, donc sensiblement plus petit que le JSON
+      // en clair — facteur ~0,4 plausible, pour ne pas afficher un poids disque supérieur au poids en clair.
+      tailleDisqueOctets: chemin === undefined ? null : Math.round(total * 0.4),
+      tailleJsonClairOctets: total,
+      ventilation: {
+        parametrageOctets,
+        journalOctets,
+        administrationOctets,
+        auditsOctets,
+        autreOctets,
+      },
+    };
+  }
+
+  /**
+   * Taille en octets (approchée : longueur de chaîne) de la sérialisation JSON de `valeur`, `0` si `valeur` n'est
+   * pas sérialisable.
+   * @param valeur - Valeur à mesurer.
+   * @returns La longueur de `JSON.stringify(valeur)`, ou `0`.
+   */
+  private static tailleJson(valeur: unknown): number {
+    const serialise = JSON.stringify(valeur);
+    return typeof serialise === 'string' ? serialise.length : 0;
   }
 
   /**

@@ -74,6 +74,7 @@ pub fn run() {
             commandes::administration::qualifier_membres,
             commandes::administration::definir_politique_ia,
             commandes::administration::supprimer_membre_connu,
+            commandes::administration::calculer_metriques_volumetrie,
             commandes::audit::interroger_vitalite,
             commandes::audit::interroger_taille_depot,
             commandes::audit::interroger_contributeurs,

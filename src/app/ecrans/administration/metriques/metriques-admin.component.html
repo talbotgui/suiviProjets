@@ -1,0 +1,89 @@
+<section class="metriques-admin">
+  <h2 class="texte-lg poids-gras exterieur-bas-3 exterieur-haut-0">Métriques du fichier de données</h2>
+  <p class="texte-sm texte-discret exterieur-bas-4">
+    Vue en lecture seule : cet onglet ne modifie rien et ne demande jamais le mot de passe du fichier.
+  </p>
+
+  <section class="carte interieur-4">
+    <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">Compteurs</h3>
+    <dl class="d-flex retour-ligne ecart-6 exterieur-haut-0 exterieur-bas-0">
+      <div class="d-flex direction-colonne">
+        <dt class="texte-sm texte-discret">Groupes</dt>
+        <dd class="texte-lg poids-gras exterieur-0">{{ nombreGroupes() }}</dd>
+      </div>
+      <div class="d-flex direction-colonne">
+        <dt class="texte-sm texte-discret">Projets</dt>
+        <dd class="texte-lg poids-gras exterieur-0">{{ nombreProjets() }}</dd>
+      </div>
+      <div class="d-flex direction-colonne">
+        <dt class="texte-sm texte-discret">Audits</dt>
+        <dd class="texte-lg poids-gras exterieur-0">{{ nombreAudits() }}</dd>
+      </div>
+      <div class="d-flex direction-colonne">
+        <dt class="texte-sm texte-discret">Règles de membre</dt>
+        <dd class="texte-lg poids-gras exterieur-0">{{ nombreReglesMembre() }}</dd>
+      </div>
+      <div class="d-flex direction-colonne">
+        <dt class="texte-sm texte-discret">Règles de dépendance</dt>
+        <dd class="texte-lg poids-gras exterieur-0">{{ nombreReglesDependance() }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="carte interieur-4 exterieur-haut-4">
+    <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">Volumétrie</h3>
+
+    @if (enCours()) {
+      <p class="texte-sm texte-discret" role="status">Calcul de la volumétrie en cours…</p>
+    } @else if (metriques(); as m) {
+      <dl class="d-flex retour-ligne ecart-6 exterieur-bas-4 exterieur-haut-0">
+        <div class="d-flex direction-colonne">
+          <dt class="texte-sm texte-discret">Poids sur disque (fichier chiffré)</dt>
+          <dd class="texte-md poids-demi-gras exterieur-0">
+            @if (m.tailleDisqueOctets === null) {
+              — non sauvegardé
+            } @else {
+              {{ formaterMegaOctets(m.tailleDisqueOctets) }}
+            }
+          </dd>
+          <dd class="texte-xs texte-discret exterieur-0">
+            Reflète la dernière sauvegarde, pas l'état en mémoire courant.
+          </dd>
+        </div>
+        <div class="d-flex direction-colonne">
+          <dt class="texte-sm texte-discret">Poids du JSON en clair</dt>
+          <dd class="texte-md poids-demi-gras exterieur-0">
+            {{ formaterMegaOctets(m.tailleJsonClairOctets) }}
+          </dd>
+          <dd class="texte-xs texte-discret exterieur-0">État en mémoire courant.</dd>
+        </div>
+      </dl>
+
+      <h4 class="texte-sm poids-demi-gras exterieur-bas-2">Ventilation du JSON en clair</h4>
+      <div class="deborde-auto">
+        <table class="tableau">
+          <thead>
+            <tr>
+              <th scope="col">Poste</th>
+              <th scope="col">Poids</th>
+              <th scope="col">Part</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ligne of lignesVentilation(m.ventilation); track ligne.poste) {
+              <tr>
+                <td>{{ ligne.libelle }}</td>
+                <td>{{ formaterMegaOctets(ligne.octets) }}</td>
+                <td>{{ ligne.pourcentage }}&nbsp;%</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="texte-sm texte-discret">
+        La volumétrie du fichier de données n'a pas pu être calculée.
+      </p>
+    }
+  </section>
+</section>

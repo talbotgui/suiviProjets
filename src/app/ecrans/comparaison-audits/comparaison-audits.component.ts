@@ -50,6 +50,8 @@ import type {
   MembreDifferentiel,
 } from '../../services/sansetat/jugement/differentiel-audits.utils';
 import { DifferentielAuditsUtils } from '../../services/sansetat/jugement/differentiel-audits.utils';
+import { EcosystemeDependanceUtils } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
+import type { EcosystemeDependance } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
 import {
@@ -118,6 +120,43 @@ interface LigneDependanceAffiche {
   readonly statutApres: EtiquetteCouleur;
 }
 
+/**
+ * Décompte des lignes d'une section d'écosystème du volet Dépendances par type d'évolution (US-056), affiché dans
+ * la barre de titre de la section repliable. Sur un différentiel, un décompte « par statut » n'aurait pas de sens
+ * direct : le décompte porte donc sur `Ajout` / `Retrait` / `Changement de statut` (décision arbitraire, cf.
+ * rapport de développement). Les types sans aucune occurrence ne produisent aucune entrée.
+ */
+interface DecompteEvolutionDependances {
+  /** Libellé du type d'évolution (`Ajout`, `Retrait`, `Changement de statut`). */
+  readonly label: string;
+  /** Couleur sémantique du type d'évolution. */
+  readonly couleur: Couleur;
+  /** Nombre de lignes de la section relevant de ce type d'évolution (toujours strictement positif). */
+  readonly nombre: number;
+}
+
+/**
+ * Section repliable d'un écosystème (Maven, NPM, Autres) du volet Dépendances de la Comparaison d'audits (US-056) :
+ * reprend le modèle des sections repliables de la Fiche projet, adapté à un différentiel. Seules les sections
+ * comportant au moins une ligne sont produites.
+ */
+interface SectionDependancesDiff {
+  /** Écosystème d'appartenance de la section. */
+  readonly ecosysteme: EcosystemeDependance;
+  /** Libellé affiché de la section (« Maven », « NPM », « Autres »). */
+  readonly titre: string;
+  /** Dépendances ajoutées de la section (présentes uniquement dans l'audit le plus récent). */
+  readonly ajouts: readonly LigneDependanceAffiche[];
+  /** Dépendances retirées de la section (présentes uniquement dans l'audit le plus ancien). */
+  readonly retraits: readonly LigneDependanceAffiche[];
+  /** Dépendances de la section dont seul le statut d'obsolescence a changé entre les deux audits. */
+  readonly modifications: readonly LigneDependanceAffiche[];
+  /** Nombre total de lignes de la section (`ajouts` + `retraits` + `modifications`). */
+  readonly total: number;
+  /** Décompte par type d'évolution affiché dans la barre de titre (types à zéro omis). */
+  readonly decompteParEvolution: readonly DecompteEvolutionDependances[];
+}
+
 /** Ligne affichée du troisième volet (membres et contributeurs). */
 interface LigneMembreAffiche {
   /** Identifiant de connexion du membre. */
@@ -170,11 +209,15 @@ interface DonneesComparaisonAudits {
   readonly messageSelectionRepliee?: string;
   /** Premier volet : indicateurs avant/après/delta. */
   readonly indicateurs: readonly LigneIndicateurAffiche[];
-  /** Deuxième volet : dépendances. */
+  /**
+   * Deuxième volet : dépendances. `ajouts`/`retraits`/`modifications` restent exposés pour le garde global du
+   * volet ; `sections` porte la ventilation par écosystème effectivement rendue (US-056).
+   */
   readonly dependances: {
     readonly ajouts: readonly LigneDependanceAffiche[];
     readonly retraits: readonly LigneDependanceAffiche[];
     readonly modifications: readonly LigneDependanceAffiche[];
+    readonly sections: readonly SectionDependancesDiff[];
   };
   /** Troisième volet : membres et contributeurs. */
   readonly membres: {
@@ -212,6 +255,7 @@ export type RaccourciComparaisonAudits = 'dernierPrecedent' | 'unMois' | 'troisM
   imports: [RouterLink, SqmBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './comparaison-audits.component.html',
+  styleUrl: './comparaison-audits.component.scss',
 })
 export class SqmComparaisonAuditsComponent {
   private readonly donneesApplication: DonneesApplicationService =
@@ -293,8 +337,23 @@ export class SqmComparaisonAuditsComponent {
     if (conteneur === undefined || etatCourant.type !== 'pret') {
       return;
     }
-    const dataUrl = await toPng(conteneur);
-    this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
+    // US-056 : les sections de dépendances par écosystème sont repliées par défaut mais doivent apparaître
+    // dépliées dans l'export PNG (décision fonctionnelle validée par un humain, cf. le même choix sur
+    // `SqmFicheProjetComponent.exporterPng` pour les sections de membres). Dépliage impératif le temps de la
+    // capture, état de repli restauré ensuite.
+    const sectionsDependances = [
+      ...conteneur.querySelectorAll<HTMLDetailsElement>('.comparaison-audits__section-dependances'),
+    ];
+    const replisInitiaux = sectionsDependances.map((section) => section.open);
+    sectionsDependances.forEach((section) => (section.open = true));
+    try {
+      const dataUrl = await toPng(conteneur);
+      this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
+    } finally {
+      sectionsDependances.forEach(
+        (section, index) => (section.open = replisInitiaux[index] ?? false),
+      );
+    }
   }
 
   /**
@@ -547,6 +606,16 @@ export class SqmComparaisonAuditsComponent {
         projet.iaAutorisee,
       );
 
+    const dependancesAjouts = differentiel.dependances.ajouts.map((d) =>
+      this.construireLigneDependance(d),
+    );
+    const dependancesRetraits = differentiel.dependances.retraits.map((d) =>
+      this.construireLigneDependance(d),
+    );
+    const dependancesModifications = differentiel.dependances.modifications.map((d) =>
+      this.construireLigneDependance(d),
+    );
+
     return {
       groupeId: groupe.id,
       nomGroupe: groupe.nom,
@@ -563,10 +632,13 @@ export class SqmComparaisonAuditsComponent {
         seuilsCouleursViolations,
       ),
       dependances: {
-        ajouts: differentiel.dependances.ajouts.map((d) => this.construireLigneDependance(d)),
-        retraits: differentiel.dependances.retraits.map((d) => this.construireLigneDependance(d)),
-        modifications: differentiel.dependances.modifications.map((d) =>
-          this.construireLigneDependance(d),
+        ajouts: dependancesAjouts,
+        retraits: dependancesRetraits,
+        modifications: dependancesModifications,
+        sections: this.construireSectionsDependancesDiff(
+          dependancesAjouts,
+          dependancesRetraits,
+          dependancesModifications,
         ),
       },
       membres: {
@@ -764,6 +836,53 @@ export class SqmComparaisonAuditsComponent {
       statutAvant: this.libelleEtCouleurObsolescence(dependance.statutAvant),
       statutApres: this.libelleEtCouleurObsolescence(dependance.statutApres),
     };
+  }
+
+  /**
+   * Ventile les trois listes de lignes du différentiel de dépendances (ajouts, retraits, changements de statut) en
+   * sections repliables par écosystème (US-056, RG-056), dans l'ordre `EcosystemeDependanceUtils.ORDRE` (Maven,
+   * NPM, Autres). Seules les sections comportant au moins une ligne sont produites ; l'ordre des lignes au sein de
+   * chaque type d'évolution est conservé.
+   * @param ajouts - Dépendances ajoutées.
+   * @param retraits - Dépendances retirées.
+   * @param modifications - Dépendances dont seul le statut d'obsolescence a changé.
+   * @returns Les sections non vides, dans l'ordre d'affichage.
+   */
+  private construireSectionsDependancesDiff(
+    ajouts: readonly LigneDependanceAffiche[],
+    retraits: readonly LigneDependanceAffiche[],
+    modifications: readonly LigneDependanceAffiche[],
+  ): readonly SectionDependancesDiff[] {
+    const sections: SectionDependancesDiff[] = [];
+    for (const ecosysteme of EcosystemeDependanceUtils.ORDRE) {
+      const relever = (
+        lignes: readonly LigneDependanceAffiche[],
+      ): readonly LigneDependanceAffiche[] =>
+        lignes.filter((ligne) => EcosystemeDependanceUtils.classifier(ligne) === ecosysteme);
+      const ajoutsSection = relever(ajouts);
+      const retraitsSection = relever(retraits);
+      const modificationsSection = relever(modifications);
+      const total = ajoutsSection.length + retraitsSection.length + modificationsSection.length;
+      if (total === 0) {
+        continue;
+      }
+      const evolutions: readonly DecompteEvolutionDependances[] = [
+        { label: 'Ajout', couleur: 'bleu', nombre: ajoutsSection.length },
+        { label: 'Retrait', couleur: 'rouge', nombre: retraitsSection.length },
+        { label: 'Changement de statut', couleur: 'orange', nombre: modificationsSection.length },
+      ];
+      const decompteParEvolution = evolutions.filter((entree) => entree.nombre > 0);
+      sections.push({
+        ecosysteme,
+        titre: EcosystemeDependanceUtils.titre(ecosysteme),
+        ajouts: ajoutsSection,
+        retraits: retraitsSection,
+        modifications: modificationsSection,
+        total,
+        decompteParEvolution,
+      });
+    }
+    return sections;
   }
 
   /**

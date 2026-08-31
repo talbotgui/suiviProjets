@@ -29,6 +29,15 @@
     >
       Sources
     </button>
+    <button
+      id="administration-onglet-metriques"
+      type="button"
+      class="administration__onglet bouton bouton--discret"
+      [class.administration__onglet--actif]="ongletActif === 'metriques'"
+      (click)="selectionnerOnglet('metriques')"
+    >
+      Métriques
+    </button>
   </nav>
 
   @switch (ongletActif) {
@@ -44,6 +53,9 @@
     }
     @case ('sources') {
       <app-sources-admin />
+    }
+    @case ('metriques') {
+      <app-metriques-admin />
     }
   }
 </section>

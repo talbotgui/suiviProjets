@@ -54,6 +54,7 @@ import type {
   Groupe,
   ModePurgeAge,
   DifferentielImportConfiguration,
+  MetriquesVolumetrie,
   PrevisualisationPurge,
   PrevisualisationPurgeJournal,
   Projet,
@@ -63,6 +64,7 @@ import type {
   ResultatBrouillonProjet,
   ResultatDefinitionReferentielsMasse,
   ResultatDeverrouillage,
+  ResultatMetriquesVolumetrie,
   ResultatMutationAdministration,
   ResultatPrevisualisationImportConfiguration,
   ResultatPrevisualisationPurge,
@@ -894,6 +896,29 @@ export class DonneesApplicationService {
       });
       this.racineInterne.set(reponse.donnees);
       return { type: 'succes', reussites: reponse.reussites };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Calcule la volumétrie du fichier de données ouvert (US-055, RG-055 ; onglet « Métriques » de l'écran
+   * Administration) : invoque la commande native `calculerMetriquesVolumetrie` sur la racine actuellement chargée
+   * et le chemin du fichier ouvert (`null` si le fichier n'a jamais été sauvegardé), sans aucune modification ni
+   * sauvegarde (RG-002 non déclenchée). Le chemin est lu via `EtatSessionService.cheminFichier` (signal nullable)
+   * et non `cheminFichierActuel`, qui lèverait en l'absence de fichier ouvert.
+   * @returns Le Résultat typé de l'opération, portant les métriques calculées.
+   * @throws {Error} Si aucun fichier de données n'est chargé.
+   */
+  public async calculerMetriquesVolumetrie(): Promise<ResultatMetriquesVolumetrie> {
+    const racine = this.racineActuelle();
+    const chemin = this.etatSession.cheminFichier();
+    try {
+      const metriques = await this.facadeAdministration.calculerMetriquesVolumetrie<
+        DonneesRacine,
+        MetriquesVolumetrie
+      >({ chemin, donnees: racine });
+      return { type: 'succes', metriques };
     } catch (erreur: unknown) {
       return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
     }

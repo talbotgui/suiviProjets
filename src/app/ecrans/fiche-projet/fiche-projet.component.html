@@ -259,63 +259,91 @@
             } @else if (donnees.dependances.length === 0) {
               <p>Aucune dépendance déclarée par les manifestes du dépôt.</p>
             } @else {
-              <div class="deborde-auto">
-                <table class="fiche-projet__table tableau">
-                  <caption
-                    class="fiche-projet__table-caption texte-gauche poids-demi-gras exterieur-bas-1"
-                  >
-                    Dépendances déclarées
-                    <app-explication-jugement
-                      cle="reglesDependances"
-                      [referentielsBruts]="donnees.referentielsBruts"
-                    />
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Référence</th>
-                      <th scope="col">Version</th>
-                      <th scope="col">Manifeste</th>
-                      <th scope="col">Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (
-                      dependance of donnees.dependances;
-                      track dependance.reference + dependance.version + dependance.manifeste
-                    ) {
-                      <tr>
-                        <td>
-                          <span class="d-inline-flex aligne-centre ecart-2">
-                            {{ dependance.reference }}
-                            <app-bouton-copie
-                              [valeur]="dependance.reference"
-                              [libelleAccessible]="'Copier la référence ' + dependance.reference"
-                            />
-                          </span>
-                        </td>
-                        <td>{{ dependance.version }}</td>
-                        <td>{{ dependance.manifeste }}</td>
-                        <td>
-                          @if (dependance.statut.couleur; as couleur) {
-                            <app-badge [couleur]="couleur" [libelle]="dependance.statut.label" />
-                          } @else {
-                            <span>{{ dependance.statut.label }}</span>
-                          }
-                          @if (dependance.nonReference) {
-                            <a
-                              class="texte-sm"
-                              routerLink="/parametrage"
-                              [queryParams]="queryParamsReferentielDependance(dependance)"
-                            >
-                              Créer une règle
-                            </a>
-                          }
-                        </td>
-                      </tr>
+              <p class="fiche-projet__table-caption poids-demi-gras exterieur-bas-1">
+                Dépendances déclarées
+                <app-explication-jugement
+                  cle="reglesDependances"
+                  [referentielsBruts]="donnees.referentielsBruts"
+                />
+              </p>
+
+              <!-- US-056 : ventilation en sections repliables par écosystème (Maven, NPM, Autres si non vide),
+                   fermées par défaut, décompte par statut d'obsolescence (statuts à zéro omis) dans la barre de
+                   titre. Toutes portent la classe `fiche-projet__section-dependances` : `exporterPng()` s'en sert
+                   pour les déplier le temps de la capture PNG. -->
+              @for (section of donnees.sectionsDependances; track section.ecosysteme) {
+                <details class="fiche-projet__section-dependances">
+                  <summary class="fiche-projet__section-dependances-resume texte-sm">
+                    <span class="poids-demi-gras">{{ section.titre }}</span> ({{ section.total }})
+                    @for (decompte of section.decompteParStatut; track decompte.label) {
+                      <!-- US-056/RG-022 : un statut sans couleur adossée à un seuil (« non référencé », statut
+                           libre) reste en texte simple, jamais forcé en badge rouge — même règle que la colonne
+                           Statut des lignes ci-dessous. -->
+                      @if (decompte.couleur; as couleur) {
+                        <app-badge
+                          [couleur]="couleur"
+                          [libelle]="decompte.nombre + ' ' + decompte.label"
+                        />
+                      } @else {
+                        <span>{{ decompte.nombre }} {{ decompte.label }}</span>
+                      }
                     }
-                  </tbody>
-                </table>
-              </div>
+                  </summary>
+                  <div class="deborde-auto">
+                    <table class="fiche-projet__table tableau">
+                      <thead>
+                        <tr>
+                          <th scope="col">Référence</th>
+                          <th scope="col">Version</th>
+                          <th scope="col">Manifeste</th>
+                          <th scope="col">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (
+                          dependance of section.dependances;
+                          track dependance.reference + dependance.version + dependance.manifeste
+                        ) {
+                          <tr>
+                            <td>
+                              <span class="d-inline-flex aligne-centre ecart-2">
+                                {{ dependance.reference }}
+                                <app-bouton-copie
+                                  [valeur]="dependance.reference"
+                                  [libelleAccessible]="
+                                    'Copier la référence ' + dependance.reference
+                                  "
+                                />
+                              </span>
+                            </td>
+                            <td>{{ dependance.version }}</td>
+                            <td>{{ dependance.manifeste }}</td>
+                            <td>
+                              @if (dependance.statut.couleur; as couleur) {
+                                <app-badge
+                                  [couleur]="couleur"
+                                  [libelle]="dependance.statut.label"
+                                />
+                              } @else {
+                                <span>{{ dependance.statut.label }}</span>
+                              }
+                              @if (dependance.nonReference) {
+                                <a
+                                  class="texte-sm"
+                                  routerLink="/parametrage"
+                                  [queryParams]="queryParamsReferentielDependance(dependance)"
+                                >
+                                  Créer une règle
+                                </a>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              }
             }
 
             @if (modaleSaisieMasseDependancesVisible()) {
