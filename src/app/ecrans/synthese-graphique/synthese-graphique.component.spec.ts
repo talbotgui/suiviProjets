@@ -2,7 +2,7 @@
 // avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
@@ -886,6 +886,54 @@ describe('SqmSyntheseGraphiqueComponent', () => {
 
       expect(fixture.componentInstance.vuesApplicables()).toHaveLength(0);
       expect(fixture.componentInstance.nombreVuesIgnorees()).toBe(1);
+    });
+  });
+
+  describe('lien contextuel vers la Fiche projet (plan_16 groupe 1.1, US-052)', () => {
+    /**
+     * Racine à un groupe et un projet doté de deux audits (série non vide, graphique effectivement rendu).
+     * @returns La racine de test.
+     */
+    function racineAvecUnProjetAudite(): DonneesRacine {
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe 1',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [
+          DonneesDeTest.projet('projet-a', 'Projet A', [
+            DonneesDeTest.audit('2026-06-05', { couverture: 61.2 }),
+            DonneesDeTest.audit('2026-07-08', { couverture: 64.8 }),
+          ]),
+        ],
+      };
+      return DonneesDeTest.racine([groupe]);
+    }
+
+    it('navigue vers `/fiche-projet/:projetId` quand `ouvrirFicheProjet` est appelé', () => {
+      const fixture = creerFixture(racineAvecUnProjetAudite());
+      const router = TestBed.inject(Router);
+      const navigate = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+      fixture.componentInstance.ouvrirFicheProjet('projet-a');
+
+      expect(navigate).toHaveBeenCalledWith('/fiche-projet/projet-a');
+    });
+
+    it('relaie la sélection d’une série du graphique d’évolution (bouton « Ouvrir » de la légende) vers `ouvrirFicheProjet`', () => {
+      const fixture = creerFixture(racineAvecUnProjetAudite());
+      const router = TestBed.inject(Router);
+      const navigate = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+      const boutonOuvrir = DomTestUtils.obtenirElementNatif(
+        fixture,
+      ).querySelector<HTMLButtonElement>('.graphique-evolution__bouton-ouvrir');
+      boutonOuvrir?.click();
+
+      expect(navigate).toHaveBeenCalledWith('/fiche-projet/projet-a');
     });
   });
 });

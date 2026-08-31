@@ -411,6 +411,10 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page).toHaveURL(/\/synthese-audits$/);
     await expect(page.locator('#synthese-audits-compteur')).toContainText('4');
 
+    // Enregistrement d'une vue portant une sélection de groupe non triviale (Groupe A), pour pouvoir en vérifier la
+    // restauration plus bas (US-053, RG-053).
+    await page.locator('#filtre-groupe-projet-groupe').selectOption({ label: GROUPE_A.nom });
+    const groupeVueValeur = await page.locator('#filtre-groupe-projet-groupe').inputValue();
     await page.locator('#selecteur-vue-bouton-enregistrer-sous').click();
     await page.locator('#selecteur-vue-champ-nom').fill('Vue E2E');
     await page.locator('#selecteur-vue-bouton-enregistrer').click();
@@ -421,6 +425,19 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#selecteur-vue-champ-nom')).toBeHidden();
     await attendreNotificationSucces(page);
     await page.locator('button[aria-label="Fermer la notification"]').first().click();
+
+    // Filtre remis à « tous les groupes », puis aller-retour d'écran, puis application de la vue enregistrée :
+    // sa sélection de groupe doit être restaurée (« enregistrement d'une vue puis rechargement de sa sélection »).
+    await page.locator('#filtre-groupe-projet-groupe').selectOption('');
+    await page.locator('#shell-lien-accueil').click();
+    await expect(page).toHaveURL(/\/accueil$/);
+    await page.locator('#shell-lien-synthese-audits').click();
+    await expect(page).toHaveURL(/\/synthese-audits$/);
+    await page.locator('select[aria-label="Vue enregistrée"]').selectOption({ label: 'Vue E2E' });
+    await expect(page.locator('#filtre-groupe-projet-groupe')).toHaveValue(groupeVueValeur);
+
+    // Retour à « tous les groupes » pour ne pas restreindre l'étape 16 (Fiche projet du premier projet).
+    await page.locator('#filtre-groupe-projet-groupe').selectOption('');
   });
 
   // 16. Fiche projet — détail d'un projet, assertions à bornes tolérantes sur les indicateurs Sonar.
@@ -517,7 +534,13 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page).toHaveURL(/\/audits\/tableau-de-bord$/);
     await expect(page.locator('#tableau-de-bord-termine')).toBeVisible({ timeout: 120_000 });
 
+    // Lien contextuel du groupe 1.3 (plan_16 incrément 8) : on exerce le bouton « Voir les résultats intégrés »
+    // (son clic peut atterrir sur `/synthese-audits` si l'enregistrement asynchrone du brouillon n'est pas encore
+    // terminé — course connue, cf. {@link naviguerVersBrouillon}), puis on garantit l'arrivée sur le Brouillon via
+    // le lien permanent de la sidebar, qui route vers `/audits/brouillon` dès que le brouillon existe.
+    await page.locator('#tableau-de-bord-bouton-resultats').click();
     await naviguerVersBrouillon();
+
     await page.locator('#brouillon-bouton-integrer-tout').click();
     await confirmerMotDePasse();
   });
@@ -543,12 +566,62 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     const premiereTuile = page.locator('.obsolescence__tuile').first();
     await expect(premiereTuile).toBeVisible();
 
+    // La modale de détail est pilotée par le paramètre de requête `projet` (plan_16 incrément 5) : son ouverture
+    // est une étape d'historique, sa fermeture par le bouton Reculer de la barre supérieure y revient.
     await premiereTuile.click();
+    await expect(page.locator('.obsolescence-detail')).toBeVisible();
+    await expect(page).toHaveURL(/\/obsolescence\?projet=/);
+
+    // Lien contextuel du groupe 1.1 (plan_16 incrément 6) : le pied de la modale ouvre la Fiche projet.
+    await page.locator('#obsolescence-detail-fiche-projet').click();
+    await expect(page).toHaveURL(/\/fiche-projet\//);
+
+    // Retour à la modale par le bouton Reculer, puis fermeture par ce même bouton (revient à `/obsolescence`).
+    await page.locator('#shell-bouton-reculer').click();
+    await expect(page.locator('.obsolescence-detail')).toBeVisible();
+    await page.locator('#shell-bouton-reculer').click();
+    await expect(page.locator('.obsolescence-detail')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/obsolescence$/);
+
+    // Le bouton Avancer réaffiche la modale (déplacement dans l'historique, sans nouvelle entrée).
+    await page.locator('#shell-bouton-avancer').click();
     await expect(page.locator('.obsolescence-detail')).toBeVisible();
     await page.locator('#obsolescence-detail-fermer').click();
     await expect(page.locator('.obsolescence-detail')).toHaveCount(0);
 
     await page.locator('#obsolescence-bouton-export').click();
+  });
+
+  // 19c. plan_16 — filtre groupe/projet mutualisé conservé d'un écran à l'autre (US-053, RG-053).
+  await test.step('19c. Filtre mutualisé conservé entre écrans', async () => {
+    await avantChangementEcran(page, '19c-filtre-mutualise');
+    await page.locator('#shell-lien-synthese-audits').click();
+    await expect(page).toHaveURL(/\/synthese-audits$/);
+
+    await page.locator('#filtre-groupe-projet-groupe').selectOption({ label: GROUPE_A.nom });
+    const groupeValeur = await page.locator('#filtre-groupe-projet-groupe').inputValue();
+    expect(groupeValeur).not.toEqual('');
+
+    // Le filtre partagé suit l'utilisateur sur l'écran Obsolescence sans transiter par l'URL.
+    await page.locator('#shell-lien-obsolescence').click();
+    await expect(page).toHaveURL(/\/obsolescence$/);
+    await expect(page.locator('#filtre-groupe-projet-groupe')).toHaveValue(groupeValeur);
+
+    // Remise à « tous les groupes » pour ne pas restreindre les écrans suivants du parcours.
+    await page.locator('#filtre-groupe-projet-groupe').selectOption('');
+  });
+
+  // 19d. plan_16 — lien contextuel du groupe 1.2 (US-052) : carte « Dernière campagne » de l'Accueil.
+  await test.step('19d. Lien contextuel du groupe 1.2', async () => {
+    await avantChangementEcran(page, '19d-liens-contextuels');
+
+    // La carte « Dernière campagne » route vers la Synthèse des audits tant qu'aucune campagne n'est en cours
+    // (deux campagnes déjà terminées à ce stade). Le lien du groupe 1.1 est exercé à l'étape 19b, celui du
+    // groupe 1.3 à l'étape 18.
+    await page.locator('#shell-lien-accueil').click();
+    await expect(page).toHaveURL(/\/accueil$/);
+    await page.locator('#accueil-lien-derniere-campagne').click();
+    await expect(page).toHaveURL(/\/synthese-audits$/);
   });
 
   // 20. Comparaison entre deux audits — comparaison des deux audits intégrés d'un même projet.
@@ -571,6 +644,39 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     // documentée dans chacun d'eux, cohérente avec `BouchonAdministrationUtils` avant eux) : l'écran affiche donc
     // ici son état vide plutôt qu'un tableau d'entrées, seul retour visuel exploitable en `ng serve`.
     await expect(page.locator('.journal-parametrage__vide').first()).toBeVisible();
+  });
+
+  // 21b. Paramétrage > Vues enregistrées — administration centralisée (US-054) : renommage puis suppression de la
+  // vue « Vue E2E » enregistrée à l'étape 15. Chaque mutation redemande le mot de passe (RG-002/RG-054).
+  await test.step('21b. Paramétrage > Vues enregistrées', async () => {
+    await avantChangementEcran(page, '21b-parametrage-vues-enregistrees');
+    await page.locator('#parametrage-onglet-vues-enregistrees').click();
+
+    const ligneVue = page
+      .locator('.vues-enregistrees-parametrage__tableau tbody tr')
+      .filter({ hasText: 'Vue E2E' });
+    await expect(ligneVue).toHaveCount(1);
+
+    await ligneVue.getByRole('button', { name: 'Renommer' }).click();
+    await page
+      .locator('input[aria-label="Nouveau nom de la vue Vue E2E"]')
+      .fill('Vue E2E renommée');
+    await page.getByRole('button', { name: 'Valider' }).click();
+    await confirmerMotDePasse();
+    await expect(
+      page
+        .locator('.vues-enregistrees-parametrage__tableau tbody tr')
+        .filter({ hasText: 'Vue E2E renommée' }),
+    ).toHaveCount(1);
+
+    await page
+      .locator('.vues-enregistrees-parametrage__tableau tbody tr')
+      .filter({ hasText: 'Vue E2E renommée' })
+      .getByRole('button', { name: 'Supprimer' })
+      .click();
+    await page.locator('#confirmation-suppression-bouton-confirmer').click();
+    await confirmerMotDePasse();
+    await expect(page.locator('.vues-enregistrees-parametrage__vide')).toBeVisible();
   });
 
   // 22. Paramétrage > Purge des audits — purge par âge, aucun audit récent supprimé.

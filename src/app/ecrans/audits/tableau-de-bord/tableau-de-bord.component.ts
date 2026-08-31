@@ -239,6 +239,19 @@ export class SqmTableauDeBordComponent {
   }
 
   /**
+   * Navigue vers les résultats de la campagne terminée (lien contextuel « Voir les résultats intégrés », plan_16
+   * groupe 1.3, US-052) : la Synthèse des audits si tous les résultats sont intégrés, sinon le Brouillon tant qu'il
+   * reste des entrées à traiter (intégrer ou rejeter). Cible recalculée à l'activation (bouton).
+   */
+  public allerVersResultats(): void {
+    const cible =
+      this.donneesApplication.racine()?.brouillon != null
+        ? '/audits/brouillon'
+        : '/synthese-audits';
+    void this.router.navigateByUrl(cible);
+  }
+
+  /**
    * Indique si un statut d'exécution correspond à un projet déjà traité (par opposition à en attente ou en
    * cours).
    * @param statut - Statut d'exécution à évaluer.

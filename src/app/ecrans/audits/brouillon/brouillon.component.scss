@@ -8,8 +8,12 @@
   border-color: var(--sqm-orange-bordure);
 }
 
+// `.brouillon__anomalie-projet` est un lien (`<a routerLink>`, plan_16 groupe 1.3) : apparence neutralisée pour
+// rester lisible au milieu de l'encart compact, avec un état survol/focus explicite (opérabilité clavier).
 .brouillon__anomalie-projet {
   margin-right: var(--sqm-espace-2);
+  color: inherit;
+  text-decoration: none;
 
   &::after {
     content: ',';
@@ -17,5 +21,14 @@
 
   &:last-child::after {
     content: '';
+  }
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sqm-marque);
+    outline-offset: 2px;
   }
 }

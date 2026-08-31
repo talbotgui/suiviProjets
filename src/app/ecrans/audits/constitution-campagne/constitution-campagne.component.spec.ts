@@ -2,7 +2,8 @@
 // l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import { invoke } from '@tauri-apps/api/core';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { OrchestrateurCampagneService } from '../../../services/avecetat/campagne/orchestrateur-campagne.service';
@@ -88,18 +89,20 @@ class DonneesDeTest {
 describe('SqmConstitutionCampagneComponent', () => {
   let donneesApplication: DonneesApplicationService;
   let composant: SqmConstitutionCampagneComponent;
-  let routerMock: { navigateByUrl: jest.Mock };
+  // Router réel (routes vides) : le gabarit porte des `routerLink` (dont « Ajuster le périmètre », plan_16
+  // groupe 1.3) qui exigent `ActivatedRoute` ; la navigation programmatique reste vérifiée via un espion.
+  let navigateSpy: jest.SpyInstance;
   let groupeId: string;
   let projetId: string;
 
   beforeEach(async () => {
     invokeSimule.mockReset();
     invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
-    routerMock = { navigateByUrl: jest.fn().mockResolvedValue(true) };
     await TestBed.configureTestingModule({
       imports: [SqmConstitutionCampagneComponent],
-      providers: [{ provide: Router, useValue: routerMock }],
+      providers: [provideRouter([])],
     }).compileComponents();
+    navigateSpy = jest.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     donneesApplication = TestBed.inject(DonneesApplicationService);
     donneesApplication.chargerRacine(DonneesDeTest.racineVide());
     groupeId = donneesApplication.creerGroupe({
@@ -198,6 +201,29 @@ describe('SqmConstitutionCampagneComponent', () => {
     expect(composant.brouillonEnAttente()).toBe(false);
   });
 
+  it('affiche, à côté de « Traiter le brouillon », un lien « Ajuster le périmètre » vers Administration (plan_16 groupe 1.3, US-052)', () => {
+    donneesApplication.chargerRacine({
+      ...DonneesDeTest.racineActuelle(donneesApplication),
+      brouillon: {
+        campagneId: 'campagne-1',
+        creeLe: '2026-07-01T00:00:00Z',
+        resultatsParProjet: [],
+      },
+    });
+    const fixture = TestBed.createComponent(SqmConstitutionCampagneComponent);
+    fixture.detectChanges();
+    const banniere = DomTestUtils.obtenirElementNatif(fixture).querySelector(
+      '.constitution-campagne__bandeau-blocage',
+    );
+    const liens = Array.from(banniere?.querySelectorAll<HTMLAnchorElement>('a') ?? []).map(
+      (lien) => [lien.textContent?.trim(), lien.getAttribute('href')],
+    );
+    expect(liens).toEqual([
+      ['Traiter le brouillon', '/audits/brouillon'],
+      ['Ajuster le périmètre', '/administration'],
+    ]);
+  });
+
   it('doit calculer le récapitulatif de la sélection courante', () => {
     composant.basculerProjet(projetId);
 
@@ -212,7 +238,7 @@ describe('SqmConstitutionCampagneComponent', () => {
     composant.confirmerLancement('mot-de-passe');
 
     expect(composant.confirmationMotDePasseVisible).toBe(false);
-    expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/tableau-de-bord');
+    expect(navigateSpy).toHaveBeenCalledWith('/audits/tableau-de-bord');
   });
 
   it("doit retenir l'échec de la sauvegarde finale du brouillon dans le Store, connu seulement après la navigation vers le Tableau de bord (R10-06)", async () => {
@@ -253,7 +279,7 @@ describe('SqmConstitutionCampagneComponent', () => {
     composant.annulerLancement();
 
     expect(composant.confirmationMotDePasseVisible).toBe(false);
-    expect(routerMock.navigateByUrl).not.toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   describe('date d’analyse et audit historique (C15-14, US-046, RG-046)', () => {

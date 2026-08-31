@@ -10,17 +10,29 @@
       aria-label="Séries activables/désactivables"
     >
       @for (serie of series(); track serie.id) {
-        <button
-          type="button"
-          class="graphique-evolution__bouton-serie"
-          [class.graphique-evolution__bouton-serie--inactive]="!serieActive(serie.id)"
-          [style.--couleur-serie]="serie.couleur"
-          [attr.aria-pressed]="serieActive(serie.id)"
-          (click)="basculerSerie(serie.id)"
-        >
-          <span class="graphique-evolution__pastille" aria-hidden="true"></span>
-          {{ serie.libelle }}
-        </button>
+        <span class="graphique-evolution__serie">
+          <button
+            type="button"
+            class="graphique-evolution__bouton-serie"
+            [class.graphique-evolution__bouton-serie--inactive]="!serieActive(serie.id)"
+            [style.--couleur-serie]="serie.couleur"
+            [attr.aria-pressed]="serieActive(serie.id)"
+            (click)="basculerSerie(serie.id)"
+          >
+            <span class="graphique-evolution__pastille" aria-hidden="true"></span>
+            {{ serie.libelle }}
+          </button>
+          <!-- Équivalent clavier du clic sur le graphique (plan_16, groupe 1.1) : sélectionne la série
+               (le composant appelant ouvre la Fiche projet). -->
+          <button
+            type="button"
+            class="graphique-evolution__bouton-ouvrir"
+            [attr.aria-label]="'Ouvrir la fiche du projet ' + serie.libelle"
+            (click)="selectionnerSerie(serie.id)"
+          >
+            Ouvrir
+          </button>
+        </span>
       }
     </div>
 

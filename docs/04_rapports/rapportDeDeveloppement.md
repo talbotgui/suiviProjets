@@ -79,6 +79,7 @@
 75. [Étape 26 — plan_16 (incrément 2) : socle du filtrage mutualisé (ContexteConsultationService, SqmFiltreGroupeProjetComponent, migration 9 → 10), Synthèse des audits pilote](#étape-26--plan_16-incrément-2--socle-du-filtrage-mutualisé-contexteconsultationservice-sqmfiltregroupeprojetcomponent-migration-9--10-synthèse-des-audits-pilote)
 76. [Étape 27 — Bug : `pom.xml` racine d'un dépôt multi-module absent de l'audit des dépendances (troncature silencieuse de l'arborescence GitLab paginée)](#étape-27--bug--pomxml-racine-dun-dépôt-multi-module-absent-de-laudit-des-dépendances-troncature-silencieuse-de-larborescence-gitlab-paginée)
 77. [Étape 28 — plan_16 (incréments 3 & 4) : généralisation du filtre mutualisé aux trois autres écrans et onglet d'administration des vues](#étape-28--plan_16-incréments-3--4--généralisation-du-filtre-mutualisé-aux-trois-autres-écrans-et-onglet-dadministration-des-vues)
+78. [Étape 29 — plan_16 (incrément 5) : historique de navigation Reculer/Avancer et modale Obsolescence pilotée par l'URL](#étape-29--plan_16-incrément-5--historique-de-navigation-reculeravancer-et-modale-obsolescence-pilotée-par-lurl)
 
 ## Étape 0 — Bootstrap du poste de développement et de l'outillage
 
@@ -3396,3 +3397,203 @@ Constats et suite donnée (arbitrage humain « traite tous ces retours », 2026-
 - **s3 (suggestion)** — `effect` de préselection d'onglet sans garde d'unicité. **Traité** : commentaire explicité (l'effet ne dépend que de `this.onglet()`, paramètre stable après l'arrivée sur la route ; une sélection utilisateur n'écrit pas `onglet` et ne le réveille pas).
 
 Après corrections : `npx jest --runInBand` (106 suites, 1540 tests, 0 échec — le delta au-delà de l'incrément 4 provient de sessions concurrentes sur d'autres fichiers), `cargo test`/`clippy`/`fmt`, `typecheck`, `lint`, `prettier` tous propres. Vérification fonctionnelle humaine sous `npm run tauri dev` (chaque mutation redemande le mot de passe et produit une entrée du journal ; lien « Ouvrir l'écran concerné » ; lien « Gérer les vues… » arrivant sur le bon onglet) restant requise avant validation définitive.
+
+## Étape 29 — plan_16 (incrément 5) : historique de navigation Reculer/Avancer et modale Obsolescence pilotée par l'URL
+
+### Codeur
+
+Développement assisté par l'IA (Claude Code). Cinquième incrément de [plan_16_navigationFiltrageEtVues.md](../03_plan/plan_16_navigationFiltrageEtVues.md) (US-052, RG-052), enchaîné à la suite des incréments 1 à 4, relecture isolée à conduire ensuite. Numérotation d'étape (`29`) à revérifier à la relecture (sessions concurrentes possibles, décaler en bloc sans trou le cas échéant, cf. Étape 25). Le découpage du plan note que les incréments 5 à 8 sont indépendants des incréments 2 à 4 ; seuls les liens contextuels des groupes 1.1/1.2/1.3 (incréments 6 à 8) restent hors périmètre ici.
+
+Périmètre livré :
+
+- **`HistoriqueNavigationService`** (`src/app/services/avecetat/etat/historique-navigation.service.ts`) : Store d'état applicatif de portée session, abonné aux `NavigationEnd` du `Router`, tenant une pile ordonnée d'URLs applicatives et un index courant. Signaux `peutReculer`/`peutAvancer`, méthodes `reculer()`/`avancer()` (navigation avec `state: { deplacementHistorique: true }`, jamais ré-empilée), `reinitialiser()`. Une navigation normale depuis une position antérieure tronque la branche « avant » ; une navigation vers l'URL déjà courante n'empile rien. N'observe pas `EtatSessionService` (conservé au verrouillage) ; `DonneesApplicationService.chargerRacine`/`reinitialiser` l'appellent au changement de fichier, en miroir exact de `ContexteConsultationService` (RG-052).
+- **Boutons Reculer (`◀`) / Avancer (`▶`)** en tête de la barre supérieure du shell, avant le nom de fichier (`shell.component.html`/`.ts`), `disabled` **et** `aria-disabled` liés à `peutReculer`/`peutAvancer`. Les boutons « Retour » explicites des écrans contextuels ne sont pas touchés.
+- **Modale de détail de l'écran Obsolescence pilotée par l'URL** : le signal interne `projetSelectionne` devient un `computed` dérivé d'un `input()` `projet` lié au paramètre de requête de la route `/obsolescence` (`withComponentInputBinding()`). `ouvrirDetail` navigue vers `/obsolescence?projet=<id>` (nouvelle étape d'historique) ; `fermerDetail` (bouton, Échap) recule dans l'historique si possible, sinon navigue vers `/obsolescence` sans paramètre. Un identifiant de projet inconnu (supprimé depuis) reste ignoré sans erreur, modale close (comportement préexistant de `detailProjetSelectionne`). La gestion du focus (RNF-019 : focus dans le panneau à l'ouverture, restitué au déclencheur à la fermeture) passe d'un appel impératif à un `effect` sur la transition d'affichage, l'ouverture/fermeture étant désormais asynchrone.
+
+Décisions de conception détaillée (sans nouvel arbitrage humain, cf. « Points restant ouverts » du plan) :
+
+- Nom du paramètre de requête : `projet` (forme retenue dans le plan A.3 ; le plan renvoyait l'harmonisation avec `queryParamsQualification`/`queryParamsReferentielDependance` de la Fiche projet — ces derniers utilisent des noms d'entité en `camelCase` sans suffixe `Id`, `projet` s'y aligne).
+- `HistoriqueNavigationService` amorce sa pile avec `router.url` dans son constructeur ; `reinitialiser()` la vide entièrement (`[]`, index `-1`), la navigation suivante la réamorce — plutôt que de la réamorcer avec l'URL courante, qui pourrait être `/demarrage` (hors shell) au moment d'un chargement de fichier.
+- `ouvrirDetail`/`fermerDetail` naviguent en chemin absolu `['/obsolescence']` (route connue et stable) plutôt qu'en relatif.
+
+Tests ajoutés / adaptés :
+
+- `historique-navigation.service.spec.ts` (nouveau, 7 tests) : amorçage, empilement, non-empilement d'une URL identique, déplacement sans empilement (reculer puis avancer), troncature de la branche « avant », purge + réamorçage, appels no-op quand le déplacement est impossible.
+- `shell.component.spec.ts` : 2 tests (boutons présents et désactivés au départ ; Reculer actif après navigation, retour en arrière au clic, Avancer alors actif) ; assertion « aucune entrée `aria-disabled` » restreinte à `.shell__sidebar` (les boutons d'historique en portent légitimement).
+- `obsolescence.component.spec.ts` : helper `poserParametreProjet` (pose l'`input` `projet` là où seul le contenu de la modale est sous test) ; tests de modale réécrits sur ce helper ; nouveau test d'intégration `ouvrirDetail` → `?projet=p1` → `fermerDetail` recule dans l'historique ; nouveau test du paramètre `projet` inconnu.
+- `donnees-application.service.spec.ts` : 1 test (purge de l'historique au changement de fichier, RG-052).
+- `tableau-de-bord`/`brouillon`/`constitution-campagne` `.component.spec.ts` : le `routerMock` minimal (`{ navigateByUrl }`) gagne `url: '/'` et `events: EMPTY`, désormais requis par `HistoriqueNavigationService` construit transitivement via `DonneesApplicationService`.
+
+`13_conceptionDetaillee.md` complété (ligne « Écrans et navigation », nouvelle ligne « Historique de navigation »). Les documents `04`/`05`/`08`/`09` couvraient déjà cet incrément (incrément 1 documentaire).
+
+**Vérification fonctionnelle restant à faire par un humain.** `npm start` : boutons Reculer/Avancer (grisés au départ, actifs après navigation, cohérence de l'index) ; ouverture d'une tuile Obsolescence → URL `#/obsolescence?projet=…`, fermeture par bouton / Échap / bouton Reculer ; F5 sur `#/obsolescence?projet=…` rouvre la bonne modale ; conservation de l'historique au verrouillage/déverrouillage, purge au changement de fichier. `npm run test:e2e` : le parcours existant (ouverture/fermeture de la modale Obsolescence) doit rester vert (assertions dédiées ajoutées seulement à l'incrément 9).
+
+Outillage (Codeur) : `npm run typecheck` exit 0, `npm run lint` propre, `npx prettier --write` sur les 12 fichiers du lot, `npx jest` **107 suites / 1551 tests / 0 échec**.
+
+### Relecteur
+
+Relecture conduite le 2026-08-31 dans un contexte isolé de celui du Codeur (sous-agent dédié, sans accès à son raisonnement), sur la base du `git diff HEAD` + des deux fichiers non suivis, du plan `plan_16` et des règles opérationnelles. Verdict : *à intégrer après corrections mineures* — aucun défaut fonctionnel majeur, outillage vert (`typecheck` exit 0, `lint` propre, `jest` 107 suites / 1551 tests / 0 échec, `prettier --check` propre sur les 12 fichiers, aucun fichier Rust touché).
+
+Points vérifiés conformes par le Relecteur : boutons en tête de barre supérieure avec `disabled` **et** `aria-disabled` ; cycle de vie RG-052 (purge câblée uniquement dans `chargerRacine`/`reinitialiser`, `integrerBrouillon` et `deverrouillerSession` ne touchent pas la pile → conservé au verrouillage/déverrouillage) ; aucune persistance (`signal`/`computed` seuls) ; couches et absence de cycle (`composant → avecetat`, `DonneesApplicationService → HistoriqueNavigationService` sur le patron de `ContexteConsultationService`) ; troncature de la branche « avant », non-empilement d'une URL identique et d'un déplacement d'historique ; modale Obsolescence pilotée par `?projet=`, écran resté monté, projet inconnu ignoré sans erreur, focus RNF-019 préservé via l'`effect` de transition ; boutons « Retour » des écrans contextuels non touchés ; rigueur TypeScript conforme.
+
+Constats et suite donnée (arbitrage : « fait la relecture » puis traitement des retours) :
+
+- **m1 (mineur)** — le marqueur `state: { deplacementHistorique: true }` était posé sur la navigation mais jamais relu (déduplication portée par un booléen d'instance `deplacementEnCours`), à rebours du plan A.1, et la phrase ajoutée à `13_conceptionDetaillee.md` en devenait inexacte. **Corrigé** : `estDeplacementHistorique()` lit désormais `router.getCurrentNavigation()?.extras.state?.[ETAT_DEPLACEMENT_HISTORIQUE]` dans le gestionnaire de `NavigationEnd` (disponibilité vérifiée par un test-sonde jeté) ; le booléen d'instance et son `finally` sont supprimés ; l'index reste positionné exactement par `deplacerVers` (une même URL peut figurer plusieurs fois, non consécutivement, dans la pile) ; la phrase de `13_conceptionDetaillee.md` est de ce fait exacte. Test ajouté : « ne ré-empile pas un déplacement d'historique, y compris vers une URL répétée non consécutive ».
+- **m2 (mineur)** — le cas « conservation au verrouillage » explicitement listé par la section « Impacts sur les tests » du plan n'était pas couvert par un test dédié. **Corrigé** : test ajouté (`historique-navigation.service.spec.ts`) construisant une pile puis appelant `EtatSessionService.verrouiller()` et vérifiant que `peutReculer`/`peutAvancer` et la navigation d'historique sont inchangés.
+- **s1 (suggestion)** — `indexInterne` positionné avant la résolution de `navigateByUrl` (désynchronisation possible si la navigation interne échoue/est annulée). **Corrigé** : `deplacerVers` capture l'index précédent et le restaure si la promesse de navigation résout `false`.
+- **s2 (suggestion)** — amorçage de la pile avec `router.url` dans le constructeur (entrée `'/'` parasite possible si le service est instancié avant la navigation initiale). **Non retenu** : `reinitialiser()` vide la pile à chaque ouverture de fichier, avant que le shell (et donc les boutons) soit atteignable ; amorcer depuis le premier `NavigationEnd` déstabiliserait les tests sans gain fonctionnel réel. Décision de conception assumée (à valider par un humain).
+- **s3 / s4 (suggestions, tournées vers les incréments 6 à 8)** — `queryParamsHandling` et hypothèse de `reculer()` dans `fermerDetail` vis-à-vis de futurs liens profonds pré-filtrants. **Traité par commentaire** : `ouvrirDetail`/`fermerDetail` documentent explicitement ces deux points comme à réexaminer lors de l'ajout des liens contextuels des groupes 1.1/1.2/1.3.
+- **s5 (information)** — `takeUntilDestroyed()` dans un singleton `providedIn: 'root'` ne se déclenche jamais. **Conservé** : patron défensif idiomatique, sans conséquence.
+
+Après corrections : `npm run typecheck` exit 0, `npm run lint` propre, `npx jest` **107 suites / 1553 tests / 0 échec** (+2 tests d'historique), `prettier` propre. Vérification fonctionnelle humaine (cf. paragraphe ci-dessus) et relecture isolée de confirmation restant requises avant validation définitive, ainsi que la validation humaine explicite de l'incrément avant l'incrément suivant.
+
+## Étape 30 — plan_16 (incrément 6) : liens contextuels du groupe 1.1
+
+### Codeur
+
+Développement assisté par l'IA (Claude Code). Sixième incrément de [plan_16_navigationFiltrageEtVues.md](../03_plan/plan_16_navigationFiltrageEtVues.md) (US-052, RG-052, RG-053), enchaîné à la suite des incréments 1 à 5, relecture isolée à conduire ensuite. Les incréments 6 à 9 sont développés d'affilée à la demande explicite de l'utilisateur (« développe les incréments 6 à 9 puis je déclencherai la relecture »), la relecture isolée puis la validation humaine restant préalables à toute intégration. Numérotation d'étape (`30`) à revérifier à la relecture (sessions concurrentes possibles, décaler en bloc sans trou le cas échéant).
+
+Périmètre livré — liens contextuels du groupe 1.1 de [plan_16, Partie A](../03_plan/plan_16_navigationFiltrageEtVues.md#a4-liens-contextuels-retenus), plus le lien complémentaire « Fiche projet → Obsolescence pré-filtrée sur le groupe » (confirmé en A.4, rattaché ici car il exige la première mise en œuvre de la priorité RG-053 [B.4] n°1) :
+
+- **Modale de détail de l'écran Obsolescence — lien « Ouvrir la fiche projet »** ([obsolescence.component.html](../../src/app/ecrans/obsolescence/obsolescence.component.html)) : `routerLink` dans le pied de la modale vers `/fiche-projet/:projetId`, libellé rappelant la date de l'audit retenu affichée juste au-dessus (« Ouvrir la fiche projet (audit du AAAA-MM-JJ) »). `DetailProjet` gagne un champ `projetId` (renseigné dans les deux branches de `detailProjetSelectionne`, y compris « jamais audité »). `RouterLink` ajouté aux imports du composant.
+- **Synthèse graphique — sélection d'une série** : `SqmGraphiqueEvolutionComponent` gagne un évènement de sortie `serieSelectionnee: OutputEmitterRef<string>` (identifiant de série = identifiant de projet, cf. `construireSerie`). Deux déclencheurs : `options.onClick` de `chart.js` (clic sur un point ou le tracé, mode `nearest` sans intersection stricte via `getElementsAtEventForMode`, interaction souris) ; et un bouton « Ouvrir » par série dans la rangée de légende (équivalent clavier, sur le même principe que les boutons de bascule et de zoom qui doublent déjà les interactions souris natives de `chart.js` — exigence d'opérabilité clavier de la charte d'ergonomie). `SqmSyntheseGraphiqueComponent` reçoit cet évènement (`ouvrirFicheProjet`) et navigue vers `/fiche-projet/:projetId` (`Router.navigateByUrl`, sur le modèle de `SqmSyntheseAuditsComponent.activerLigne`).
+- **Fiche projet — lien « Voir l'obsolescence du groupe »** ([fiche-projet.component.html](../../src/app/ecrans/fiche-projet/fiche-projet.component.html), zone d'actions, à côté de « Comparer à un autre audit ») : `routerLink="/obsolescence"` avec `[queryParams]="{ groupeId: donnees.groupeId }"`.
+- **Consommation du paramètre `groupeId` par l'Obsolescence (priorité RG-053 [B.4] n°1)** : le constructeur de `SqmObsolescenceComponent` lit `ActivatedRoute.snapshot.queryParamMap.get('groupeId')` (une seule fois par entrée sur l'écran) et, s'il est présent, appelle `ContexteConsultationService.definirParUtilisateur({ groupeId, projetIds: null })` — sélection utilisateur (`filtreModifieParUtilisateur` → `true`), ce qui écrase le filtre partagé et neutralise l'amorçage par vue par défaut. `ouvrirDetail`/`fermerDetail` passent à `queryParamsHandling: 'merge'` pour que ce `groupeId` survive à l'ouverture/fermeture de la modale (F5 sur `/obsolescence?groupeId=…&projet=…` restaure le même contexte) — traitement des points s3/s4 laissés ouverts par la relecture de l'incrément 5.
+
+Décisions de conception détaillée (sans nouvel arbitrage humain, cf. « Points restant ouverts » du plan) :
+
+- Nom du paramètre de requête pré-filtrant : `groupeId`, aligné sur `queryParamsQualification` de la Fiche projet (`{ groupeId, typeCritere, critere }`) plutôt que sur le `projet` sans suffixe de la modale Obsolescence (décision 7 du plan : harmonisation avec les paramètres déjà utilisés par la Fiche projet). Divergence mineure assumée entre `projet` (modale) et `groupeId` (pré-filtrage) sur la même route.
+- Seul l'écran Obsolescence consomme un paramètre de requête pré-filtrant à cet incrément : c'est le seul écran cible d'un lien contextuel pré-filtrant. La généralisation de la priorité [B.4] n°1 aux trois autres écrans de restitution reste différée faute de lien la ciblant.
+- Le clic sur le graphique reste une interaction souris ; l'équivalent clavier est le bouton « Ouvrir » de la légende, cohérent avec les deux mécanismes de doublage déjà en place dans ce composant.
+
+Tests ajoutés / adaptés :
+
+- `graphique-evolution.component.spec.ts` : émission de `serieSelectionnee` par le bouton « Ouvrir » de légende ; émission par le `onClick` de la config (`getElementsAtEventForMode` stubé, élément fourni = vrai `PointElement` de la série visée).
+- `synthese-graphique.component.spec.ts` : `ouvrirFicheProjet` navigue vers `/fiche-projet/:projetId` ; le bouton « Ouvrir » de la légende du graphique déclenche cette navigation de bout en bout.
+- `obsolescence.component.spec.ts` : lien « Ouvrir la fiche projet » présent, ciblant `/fiche-projet/p1`, libellé contenant la date d'audit ; amorçage du filtre partagé depuis `?groupeId=…` (`ActivatedRoute` stubé mutable) ; test du piège de focus adapté (le pied de modale porte désormais un `<a>` en plus du bouton « Fermer »).
+- `fiche-projet.component.spec.ts` : lien « Voir l'obsolescence du groupe » présent, `href` `/obsolescence?groupeId=groupe-1`.
+
+`13_conceptionDetaillee.md` : ligne « UI — Écrans et navigation » complétée (liens du groupe 1.1). Les documents `04`/`05`/`08`/`09` couvraient déjà cet incrément (incrément 1 documentaire ; `08` mentionne déjà « Fiche projet (accès par clic sur une série ou un point) » et le lien « Fiche projet → Obsolescence pré-filtrée sur le groupe »).
+
+**Vérification fonctionnelle restant à faire par un humain.** `npm start` : ouverture d'une tuile Obsolescence → clic « Ouvrir la fiche projet » → bonne fiche ; Synthèse graphique → clic sur un point / bouton « Ouvrir » d'une série → bonne fiche ; Fiche projet → « Voir l'obsolescence du groupe » → Obsolescence filtrée sur le groupe du projet, filtre conservé en changeant d'écran, F5 sur l'URL pré-filtrée. `npm run test:e2e` : le parcours existant doit rester vert (assertions de liens contextuels ajoutées seulement à l'incrément 9).
+
+Outillage (Codeur) : `npm run typecheck` exit 0, `npm run lint` propre, `npx prettier --write` sur les fichiers du lot, `npx jest` **107 suites / 1560 tests / 0 échec**.
+
+## Étape 31 — plan_16 (incrément 7) : liens contextuels du groupe 1.2 (écran Accueil)
+
+### Codeur
+
+Développement assisté par l'IA (Claude Code). Septième incrément de [plan_16_navigationFiltrageEtVues.md](../03_plan/plan_16_navigationFiltrageEtVues.md) (US-052), enchaîné à la suite de l'incrément 6 (lot 6 à 9 développé d'affilée à la demande explicite de l'utilisateur ; relecture isolée puis validation humaine préalables à toute intégration). Numérotation d'étape (`31`) à revérifier à la relecture.
+
+Périmètre livré — liens contextuels du groupe 1.2 de [plan_16, Partie A](../03_plan/plan_16_navigationFiltrageEtVues.md#a4-liens-contextuels-retenus). L'écran Accueil ([accueil.component.html](../../src/app/ecrans/accueil/accueil.component.html)) n'avait jusqu'ici aucune sortie de navigation :
+
+- **Carte « Dernière campagne »** → `<button>` (cible recalculée à l'activation, pas `routerLink`) : `/audits/tableau-de-bord` si une campagne est réellement en cours, sinon `/synthese-audits`. `SqmAccueilComponent` gagne `ouvrirDerniereCampagne()` et une méthode privée `campagneReellementEnCours()` — réplique volontaire de la copie canonique `SqmShellComponent.campagneReellementEnCours` (le signal `progressionCampagne` reste non `null` après la première campagne, constat R12-04 ; commentaire de cross-référence ajouté aux deux endroits). Branche à deux cibles seulement (pas la branche « Brouillon » de la sidebar), conforme au plan.
+- **Cartes « Projets avec membre inconnu » et « Alertes actives »** → `<a routerLink="/liste-travail">`.
+- **Titre de la section « Alertes principales »** → lien `<a routerLink="/liste-travail">` autour du libellé du `<h2>`.
+- **Chaque ligne de « Alertes principales »** → `<a [routerLink]="['/fiche-projet', projetIdAlerte(alerte)]">` ; `projetIdAlerte` extrait le `projetId` de la clé stable de l'alerte (`typeAlerte|projetId|discriminant`, RG-026).
+- **Chaque ligne de « Projets non audités depuis longtemps »** → `<a [routerLink]="['/fiche-projet', projet.projetId]">`, sur le modèle de l'activation de ligne de la Synthèse des audits.
+
+`RouterLink` ajouté aux imports du composant ; `Router` et `EtatSessionService` injectés. SCSS : neutralisation de l'apparence native `<button>`/`<a>` pour conserver le rendu « carte » / « ligne » (`.accueil__carte--lien`, `.accueil__ligne-lien`, `.accueil__section-titre-lien`) avec état `:focus-visible` explicite (opérabilité clavier).
+
+Décisions de conception détaillée : cartes et lignes rendues actionnables par élément natif (`<a>`/`<button>`) plutôt que par `role`/`tabindex`/`(keydown)` sur un `<div>` — accessibilité et navigation clavier acquises sans code, cohérent avec le reste de l'application (`selecteur-vue`, sidebar).
+
+Tests ajoutés : `accueil.component.spec.ts` — `provideRouter([])` ajouté au module de test ; cartes + titre ciblant `/liste-travail` ; ligne d'alerte → `/fiche-projet/projet-1` ; ligne « non audité » → `/fiche-projet/projet-1` ; carte « Dernière campagne » routée vers Tableau de bord ou Synthèse selon l'état réel de la campagne (trois cas : aucune campagne, campagne en cours, campagne achevée).
+
+`13_conceptionDetaillee.md` : ligne « UI — Écrans et navigation » complétée. Documents `04`/`05`/`08`/`09` déjà à jour (incrément 1 documentaire ; `08` recense l'Accueil dans la matrice des liens contextuels).
+
+**Vérification fonctionnelle restant à faire par un humain.** `npm start` : depuis l'Accueil, chaque carte/ligne/titre mène à la bonne cible, au clic et au clavier ; carte « Dernière campagne » selon qu'une campagne est en cours ou non.
+
+Outillage (Codeur) : `npm run typecheck` exit 0, `npm run lint` propre, `npx prettier --write` sur le lot, `npx jest` sur l'écran Accueil **2 suites / 22 tests / 0 échec**.
+
+## Étape 32 — plan_16 (incrément 8) : liens contextuels du groupe 1.3 (parcours d'audit)
+
+### Codeur
+
+Développement assisté par l'IA (Claude Code). Huitième incrément de [plan_16_navigationFiltrageEtVues.md](../03_plan/plan_16_navigationFiltrageEtVues.md) (US-052), enchaîné à la suite de l'incrément 7 (lot 6 à 9 développé d'affilée à la demande explicite de l'utilisateur ; relecture isolée puis validation humaine préalables). Numérotation d'étape (`32`) à revérifier à la relecture.
+
+Périmètre livré — liens contextuels du groupe 1.3 de [plan_16, Partie A](../03_plan/plan_16_navigationFiltrageEtVues.md#a4-liens-contextuels-retenus) :
+
+- **Tableau de bord d'exécution** ([tableau-de-bord.component.html](../../src/app/ecrans/audits/tableau-de-bord/tableau-de-bord.component.html)) : nouveau bouton « Voir les résultats intégrés » (affiché une fois la campagne terminée, aux côtés du bouton « Accéder aux brouillons de campagne » existant, dans une rangée de liens de fin). `SqmTableauDeBordComponent.allerVersResultats()` : cible `/synthese-audits` si aucun brouillon ne reste, sinon `/audits/brouillon` (recalculée à l'activation).
+- **Brouillon et rapport d'anomalies** ([brouillon.component.html](../../src/app/ecrans/audits/brouillon/brouillon.component.html)) : lien `bouton bouton--discret` « Fiche projet » dans la rangée d'actions de chaque entrée de brouillon (`[routerLink]="['/fiche-projet', entree.projetId]"`) ; chaque nom de projet de la ligne « Projets concernés » du rapport d'anomalies devient un lien `<a [routerLink]>` vers sa Fiche projet. `RouterLink` ajouté aux imports du composant.
+- **Constitution de campagne** ([constitution-campagne.component.html](../../src/app/ecrans/audits/constitution-campagne/constitution-campagne.component.html)) : lien « Ajuster le périmètre » vers `/administration`, à côté du lien « Traiter le brouillon » du bandeau de blocage RG-019 (emplacement fixé par le plan).
+
+Décision de conception détaillée : le lien « Fiche projet » de chaque entrée de brouillon est placé dans la rangée d'actions (Intégrer / Rejeter) plutôt qu'autour du nom du projet, celui-ci étant à l'intérieur du `<label>` de la case de sélection (un lien imbriqué y déclencherait aussi la case).
+
+Tests ajoutés / adaptés :
+
+- `tableau-de-bord.component.spec.ts` : `allerVersResultats` → Synthèse des audits sans brouillon, Brouillon avec brouillon en attente.
+- `brouillon.component.spec.ts` et `constitution-campagne.component.spec.ts` : passage du `routerMock` minimal à `provideRouter([])` (le gabarit porte désormais des `routerLink` qui exigent `ActivatedRoute`), la navigation programmatique restant vérifiée par un espion `jest.spyOn(Router, 'navigateByUrl')` ; nouveau test DOM du lien « Fiche projet » d'une entrée et d'un lien du rapport d'anomalies (brouillon) ; nouveau test DOM des deux liens du bandeau de blocage, dans l'ordre attendu (constitution).
+
+`13_conceptionDetaillee.md` : ligne « UI — Écrans et navigation » complétée. Documents `04`/`05`/`08`/`09` déjà à jour (incrément 1 documentaire ; `08` recense Tableau de bord d'exécution, Brouillon et Constitution de campagne dans la matrice des liens contextuels).
+
+**Vérification fonctionnelle restant à faire par un humain.** `npm start` : après une campagne terminée, « Voir les résultats intégrés » mène à la Synthèse (ou au Brouillon s'il reste des entrées) ; depuis le Brouillon, « Fiche projet » d'une entrée et d'un projet du rapport d'anomalies ; depuis Constitution de campagne bloquée, « Ajuster le périmètre » mène à Administration.
+
+Outillage (Codeur) : `npm run typecheck` exit 0, `npm run lint` propre, `npx prettier --write` sur le lot, `npx jest` **107 suites / 1568 tests / 0 échec**.
+
+## Étape 33 — plan_16 (incrément 9) : parcours E2E complété, mesures de charge, note de version
+
+### Codeur
+
+Développement assisté par l'IA (Claude Code). Neuvième et dernier incrément de [plan_16_navigationFiltrageEtVues.md](../03_plan/plan_16_navigationFiltrageEtVues.md), enchaîné à la suite de l'incrément 8 (lot 6 à 9 développé d'affilée à la demande explicite de l'utilisateur ; relecture isolée finale puis validation humaine préalables à toute intégration). Numérotation d'étape (`33`) à revérifier à la relecture.
+
+#### Parcours E2E complété ([e2e/parcours-complet.spec.ts](../../e2e/parcours-complet.spec.ts))
+
+Ajouts au parcours unique, conformément à [plan_16 §Tests de bout en bout](../03_plan/plan_16_navigationFiltrageEtVues.md#impacts-sur-les-tests) et à `16_normesTests.md` :
+
+- **Étape 15** : après enregistrement de « Vue E2E » sur la Synthèse des audits, sortie puis retour sur l'écran et vérification que la vue reste proposée dans le sélecteur (US-028, RG-027 amendée).
+- **Étape 18** : le passage au Brouillon de la seconde campagne emprunte désormais le bouton contextuel « Voir les résultats intégrés » du Tableau de bord d'exécution (groupe 1.3), avec la même reprise que `naviguerVersBrouillon` (enregistrement du brouillon asynchrone).
+- **Étape 19b** : la modale Obsolescence est vérifiée pilotée par l'URL (`/obsolescence?projet=…`) ; le lien « Ouvrir la fiche projet » du pied de modale (groupe 1.1) est suivi ; retour à la modale puis fermeture par le bouton **Reculer** de la barre supérieure ; réaffichage par le bouton **Avancer**.
+- **Étape 19c** (nouvelle) : sélection d'un groupe dans la barre de filtres commune de la Synthèse des audits, puis vérification de la conservation de cette sélection sur l'écran Obsolescence (US-053, RG-053).
+- **Étape 19d** (nouvelle) : lien contextuel du groupe 1.2 — la carte « Dernière campagne » de l'Accueil mène à la Synthèse des audits (aucune campagne en cours).
+- **Étape 21b** (nouvelle) : onglet « Vues enregistrées » de Paramétrage — renommage puis suppression de « Vue E2E », chaque mutation redemandant le mot de passe (US-054, RG-002, RG-054).
+
+Deux `id` HTML ajoutés pour l'outillage E2E (sélecteurs `id` exigés par le parcours) : `#filtre-groupe-projet-groupe` / `#filtre-groupe-projet-projets` sur `SqmFiltreGroupeProjetComponent`, `#accueil-lien-derniere-campagne` sur la carte « Dernière campagne ». `#tableau-de-bord-bouton-resultats` et `#obsolescence-detail-fiche-projet` ont été introduits aux incréments 6 et 8.
+
+Le bouchon TypeScript de la façade expose `definir_vue` / `supprimer_vue` (`BouchonVuesUtils`, depuis l'incrément 4), exercés par les étapes 15 et 21b. Le palier de migration `9` → `10` est une opération du cœur natif (`migrer_schema`) : il n'est pas déclenché par le parcours, qui crée un fichier neuf déjà au schéma courant — nuance mineure vis-à-vis de la formulation de `16_normesTests.md` (« le bouchon expose … avec le comportement de migration `9` → `10` »), signalée au Relecteur.
+
+**Le parcours E2E n'a pas été exécuté par le Codeur** (nécessite `ng serve` + navigateurs Playwright, ~10 min) : `npm run test:e2e` reste à lancer par un humain, comme pour les incréments précédents. `npx eslint e2e/parcours-complet.spec.ts` propre. `npx tsc --noEmit -p e2e/tsconfig.json` sort en erreur sur un unique `TS5107` (`moduleResolution: node10` déprécié — anomalie préexistante de `e2e/tsconfig.json`, inchangée par cet incrément, non vérifiée en CI) ; le spec lui-même compile sans erreur de type.
+
+#### Mesures de charge
+
+Aucun fichier de test de charge automatisé n'existe dans le dépôt : les mesures de charge du projet sont une étape de la checklist de recette manuelle (`16_normesTests.md`, section « Tests de charge et de performance »), à rejouer avant mise à disposition d'une version sur un jeu synthétique à l'échelle RNF-006. La barre de filtres commune (`SqmFiltreGroupeProjetComponent`) est désormais montée sur la Synthèse des audits et l'Obsolescence : ses temps de rendu sont donc inclus dans les mesures de ces deux écrans (RNF-001 synthèse < 2 s ; RNF-003 calcul local < 500 ms/projet). Aucun nouveau seuil introduit (déjà acté à l'incrément 1 documentaire, `16_normesTests.md`). Ce point de recette reste à exécuter par un humain avant la prochaine mise à disposition.
+
+#### Note de version — changements de comportement visibles (plan_16)
+
+À reprendre dans la note de la prochaine version publiée :
+
+- **Historique de navigation** : deux boutons Reculer (`◀`) / Avancer (`▶`) en tête de la barre supérieure. Conservés au verrouillage, purgés au changement de fichier.
+- **Modale Obsolescence dans l'URL** : l'ouverture du détail d'un projet modifie l'URL (`/obsolescence?projet=…`) et constitue une étape d'historique (rafraîchissement F5 pris en charge).
+- **Filtre groupe/projet mutualisé** : sélecteur commun (groupe + projets) sur la Synthèse des audits, la Synthèse graphique, l'Obsolescence et la Liste de travail ; la sélection suit l'utilisateur d'un écran à l'autre pendant la session (jamais persistée dans le fichier). Sélectionner un groupe réinitialise la sélection de projets.
+- **Vues enregistrées** : ne mémorisent plus que la sélection de groupe et de projets (le filtre d'indicateur des vues « Synthèse des audits »/« Synthèse graphique » antérieures est abandonné à la migration `9` → `10`) ; périmètre étendu à l'Obsolescence ; nouvel onglet « Vues enregistrées » dans Paramétrage (renommer, dupliquer, supprimer, définir par défaut) ; toute mutation de vue est journalisée (RG-054).
+- **La Synthèse graphique n'a plus d'état « aucun projet sélectionné »** : zéro projet coché = tous les projets (comportement du sélecteur multi-projets commun).
+- **Liens contextuels** : modale Obsolescence → Fiche projet ; série de la Synthèse graphique → Fiche projet ; Fiche projet → Obsolescence pré-filtrée sur le groupe ; Accueil (cartes et lignes) → Liste de travail / Tableau de bord / Synthèse des audits / Fiche projet ; Tableau de bord d'exécution → « Voir les résultats intégrés » ; Brouillon et rapport d'anomalies → Fiche projet ; Constitution de campagne → « Ajuster le périmètre » (Administration).
+
+#### Relecture isolée finale
+
+La relecture isolée finale de l'ensemble du plan_16 (incréments 5 à 9) reste à conduire par un Relecteur en contexte isolé, puis à valider explicitement par un humain, avant toute intégration.
+
+Outillage (Codeur) : `npm run typecheck` exit 0, `npm run lint` propre, `npx prettier --write` sur le lot, `npx jest` **107 suites / 1568 tests / 0 échec**. `npm run test:e2e` non exécuté (humain requis).
+
+### Relecteur (incréments 6 à 9, relecture groupée)
+
+Deux relectures conduites le 2026-08-31 dans des contextes isolés de celui du Codeur (deux sous-agents dédiés, sans accès à son raisonnement) : l'une sur les incréments 6-7-8 (code des liens contextuels), l'autre sur l'incrément 9 (parcours E2E, documentation, note de version). Base : `git show` des quatre commits, plan `plan_16`, règles opérationnelles, sections « Étape 30 » à « Étape 33 » du présent rapport (vérifiées, jamais acceptées telles quelles). Aucune commande git modifiant l'état du dépôt exécutée.
+
+**Verdict des deux relectures : à intégrer après corrections mineures.** Aucun constat majeur. Points vérifiés conformes notamment : frontière `composants/` → `services/avecetat/` jamais franchie (le graphique émet un `output`, l'écran navigue) ; priorité RG-053 [B.4] n°1 correcte (lecture `snapshot` unique, `definirParUtilisateur`, effet d'amorçage par vue par défaut court-circuité) ; cycle de vie de la modale Obsolescence (`queryParamsHandling: 'merge'`, focus RNF-019, projet inconnu ignoré) ; réplique `campagneReellementEnCours` fidèle au canonique du shell ; accessibilité clavier réellement fournie (bouton « Ouvrir » par série, `<a>`/`<button>` natifs sur l'Accueil) ; tests des specs `audits/*` non affaiblis par le passage `routerMock` → `provideRouter([])` ; unicité des `id` E2E ajoutés ; tout le périmètre E2E exigé par le plan et par `16_normesTests.md` couvert ; aucun fichier Rust touché.
+
+Constats et suite donnée (arbitrage : traitement des retours par le Codeur avant validation humaine) :
+
+- **inc 7 — mineur (cross-référence manquante)** — le commentaire de `SqmAccueilComponent.campagneReellementEnCours` annonçait une cross-référence « aux deux endroits », absente côté `SqmShellComponent`. **Corrigé** : mention réciproque ajoutée au JSDoc de `SqmShellComponent.campagneReellementEnCours`.
+- **inc 6 — mineur (Prettier)** — `graphique-evolution.component.spec.ts` et `synthese-graphique.component.spec.ts` avaient dérivé du style Prettier (édités après le `--write` du lot). **Corrigé** : `prettier --write` rejoué.
+- **inc 8 — mineur (apparence des liens)** — les noms de projets du rapport d'anomalies du Brouillon (devenus des `<a>`) s'affichaient en lien bleu souligné par défaut, à rebours du soin pris sur l'Accueil. **Corrigé** : `.brouillon__anomalie-projet` neutralise `color`/`text-decoration` avec `:hover`/`:focus-visible` explicites.
+- **inc 7 — suggestion (HTML)** — deux `<div>` en contenu direct d'un `<button>` (carte « Dernière campagne »). **Corrigé** : passés en `<span class="d-block">`.
+- **inc 6 — suggestion (commentaire de test)** — commentaire « Même sélecteur que `piegerFocus` » imprécis (sous-ensemble en réalité). **Corrigé** : commentaire reformulé.
+- **inc 6 — suggestion (couverture)** — pas de test explicite « vue par défaut ignorée en présence de `?groupeId=` ». **Corrigé** : test ajouté à `obsolescence.component.spec.ts` (`filtreGroupeId()` vaut le paramètre d'URL, `filtreModifieParUtilisateur()` vaut `true`).
+- **inc 6 — suggestion (uniformité)** — `[routerLink]="'/fiche-projet/' + id"` en concaténation. **Corrigé** : forme tableau `['/fiche-projet', detail.projetId]`.
+- **inc 9 — mineur (robustesse E2E, étape 18)** — la reprise sur `#tableau-de-bord-bouton-resultats` (élément transitoire) pouvait se bloquer si le premier clic atterrissait sur `/synthese-audits`. **Corrigé** : le bouton est cliqué une fois (pour exercer le lien du groupe 1.3), puis `naviguerVersBrouillon()` (lien permanent de la sidebar) garantit l'arrivée sur le Brouillon.
+- **inc 9 — mineur (conformité au plan, étape 15)** — l'étape ne « rechargeait » pas la vue (vérifiait seulement qu'elle restait proposée). **Corrigé** : la vue est enregistrée avec une sélection de groupe non triviale, le filtre est remis à zéro, puis la vue est ré-appliquée et la restauration de sa sélection de groupe est asserée (`toHaveValue`).
+- **inc 9 — mineur (doc)** — `16_normesTests.md` affirmait « le bouchon expose `definirVue`/`supprimerVue` avec le comportement de migration `9` → `10` » (nom de commande erroné ; migration en réalité native, inatteignable en `ng serve`). **Corrigé** : ligne 71 reformulée (`definir_vue`/`supprimer_vue` ; migration renvoyée au cœur natif et hors parcours).
+- **inc 9 — mineur (compte-rendu)** — le rapport affirmait `tsc -p e2e/tsconfig.json` « propre » : la commande sort en réalité en erreur sur un `TS5107` préexistant (`moduleResolution: node10` déprécié), non lié à cet incrément et non vérifié en CI. **Corrigé** : formulation du rapport (Étape 33) rectifiée. Correctif de `e2e/tsconfig.json` (`ignoreDeprecations` ou `moduleResolution` moderne) laissé à un commit dédié, hors périmètre.
+- **inc 9 — suggestion (`avantChangementEcran`)** — non appelé sur les écrans transitoires des étapes 15/19b. **Non retenu** : aligné sur le pattern déjà lâche des étapes 16/17 ; l'ajouter alourdirait le parcours pour un gain marginal.
+- **inc 9 — avis du Relecteur, non bloquant** : renvoyer les « mesures de charge » à la checklist de recette manuelle est conforme à l'approche déjà actée du projet (aucune suite de charge automatisée) ; consigner la note de version dans le rapport est un emplacement intérimaire acceptable (aucun `CHANGELOG.md` n'existe, aucune release publiée) — un vrai `CHANGELOG.md` à créer à l'approche de la première mise à disposition. Aucune action requise à cet incrément.
+
+Après corrections : `npm run typecheck` exit 0, `npm run lint` propre, `npx jest` **107 suites / 1569 tests / 0 échec** (+1 test d'obsolescence), `prettier --check` propre sur le lot, `eslint e2e/parcours-complet.spec.ts` propre. Aucun fichier Rust touché (`cargo` non rejoué). **Vérification fonctionnelle humaine (`npm start`, `npm run test:e2e`) et relecture isolée de confirmation restant requises, ainsi que la validation humaine explicite du plan_16 avant toute intégration.**

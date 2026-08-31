@@ -46,6 +46,7 @@ import type {
   ProjetFiltrable,
   SelectionGroupeProjet,
 } from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
+import { Router } from '@angular/router';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
 import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
@@ -176,6 +177,7 @@ export class SqmSyntheseGraphiqueComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly router: Router = inject(Router);
 
   /**
    * Filtre groupe/projet mutualisé, partagé avec les autres écrans de restitution (RG-053). Exposé au gabarit pour
@@ -530,6 +532,17 @@ export class SqmSyntheseGraphiqueComponent {
         'Une erreur inattendue est survenue lors de la suppression de la vue.',
       );
     }
+  }
+
+  /**
+   * Ouvre la Fiche projet du projet dont la série a été sélectionnée dans le graphique (clic sur un point/tracé ou
+   * bouton « Ouvrir » de la légende, plan_16 groupe 1.1, US-052). L'identifiant de série émis par
+   * `SqmGraphiqueEvolutionComponent` est l'identifiant du projet (cf. {@link construireSerie}), utilisé tel quel
+   * comme segment de route, sur le modèle de `SqmSyntheseAuditsComponent.activerLigne`.
+   * @param projetId - Identifiant du projet dont la série a été sélectionnée.
+   */
+  public ouvrirFicheProjet(projetId: string): void {
+    void this.router.navigateByUrl(`/fiche-projet/${projetId}`);
   }
 
   /**

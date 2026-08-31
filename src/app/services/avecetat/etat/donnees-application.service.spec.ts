@@ -12,6 +12,7 @@ import type {
 } from './donnees-application.service';
 import { EtatFichier, EtatSessionService } from './etat-session.service';
 import { ContexteConsultationService } from './contexte-consultation.service';
+import { HistoriqueNavigationService } from './historique-navigation.service';
 import { StatutMembre, TypeCritereMembre, TypeSource } from './types-donnees';
 import type {
   DonneesRacine,
@@ -157,6 +158,16 @@ describe('DonneesApplicationService', () => {
     contexte.definirParUtilisateur({ groupeId: 'g2', projetIds: null });
     service.reinitialiser();
     expect(contexte.etat()).toEqual({ groupeId: null, projetIds: null });
+  });
+
+  it("purge l'historique de navigation interne au changement de fichier (RG-052)", () => {
+    const historique = TestBed.inject(HistoriqueNavigationService);
+    const purge = jest.spyOn(historique, 'reinitialiser');
+
+    service.chargerRacine(DonneesDeTest.racineVide());
+    service.reinitialiser();
+
+    expect(purge).toHaveBeenCalledTimes(2);
   });
 
   describe('mutations sans fichier chargé', () => {

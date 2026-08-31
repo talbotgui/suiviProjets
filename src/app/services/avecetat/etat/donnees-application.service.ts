@@ -45,6 +45,7 @@ import type { Instance } from '../../sansetat/commandes/types-facade';
 import { TriAlphabetiqueUtils } from '../../sansetat/jugement/tri-alphabetique.utils';
 import { EtatSessionService } from './etat-session.service';
 import { ContexteConsultationService } from './contexte-consultation.service';
+import { HistoriqueNavigationService } from './historique-navigation.service';
 import type {
   CategorieErreurAdministration,
   DonneesRacine,
@@ -178,6 +179,9 @@ export class DonneesApplicationService {
   private readonly contexteConsultation: ContexteConsultationService = inject(
     ContexteConsultationService,
   );
+  private readonly historiqueNavigation: HistoriqueNavigationService = inject(
+    HistoriqueNavigationService,
+  );
   private readonly facadeAdministration: FacadeAdministrationService = inject(
     FacadeAdministrationService,
   );
@@ -206,22 +210,25 @@ export class DonneesApplicationService {
 
   /**
    * Charge une racine nouvellement créée ou chargée (`creerFichier`/`chargerFichier`), remplaçant tout état
-   * précédent. Réinitialise également le filtre groupe/projet mutualisé de session (RG-053) : un changement de
-   * fichier de données en purge la sélection, sur le même modèle que la purge des credentials.
+   * précédent. Réinitialise également le filtre groupe/projet mutualisé de session (RG-053) et l'historique de
+   * navigation interne (RG-052) : un changement de fichier de données en purge la sélection et la pile, sur le même
+   * modèle que la purge des credentials.
    * @param racine - Racine des données désormais active.
    */
   public chargerRacine(racine: DonneesRacine): void {
     this.racineInterne.set(racine);
     this.contexteConsultation.reinitialiser();
+    this.historiqueNavigation.reinitialiser();
   }
 
   /**
    * Oublie la racine courante (fermeture du fichier) et réinitialise le filtre groupe/projet mutualisé de session
-   * (RG-053).
+   * (RG-053) ainsi que l'historique de navigation interne (RG-052).
    */
   public reinitialiser(): void {
     this.racineInterne.set(null);
     this.contexteConsultation.reinitialiser();
+    this.historiqueNavigation.reinitialiser();
   }
 
   /**

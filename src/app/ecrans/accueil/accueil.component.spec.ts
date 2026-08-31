@@ -1,8 +1,10 @@
 // Test de l'écran Accueil (cf. accueil.component.ts, US-005, RG-009, RG-026), généré avec l'assistance de l'IA
 // (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import {
   StatutMembre,
   StatutTraitementAlerte,
@@ -172,6 +174,7 @@ describe('SqmAccueilComponent', () => {
     jest.mocked(invoke).mockReset();
     await TestBed.configureTestingModule({
       imports: [SqmAccueilComponent],
+      providers: [provideRouter([])],
     }).compileComponents();
     donneesApplication = TestBed.inject(DonneesApplicationService);
   });
@@ -420,6 +423,79 @@ describe('SqmAccueilComponent', () => {
 
     expect(element.textContent).toContain('Aucune alerte active.');
     expect(element.textContent).toContain('Tous les projets ont été audités récemment.');
+  });
+
+  describe('liens contextuels du groupe 1.2 (plan_16, US-052)', () => {
+    it('câble les cartes « Alertes actives » et « Projets avec membre inconnu » et le titre « Alertes principales » vers la Liste de travail', () => {
+      const audit = DonneesDeTest.auditAvecMembres('2026-07-20T00:00:00Z', ['jdupont']);
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const liens = Array.from(
+        element.querySelectorAll<HTMLAnchorElement>('a[href="/liste-travail"]'),
+      );
+      const libelles = liens.map((lien) => lien.textContent?.replace(/\s+/g, ' ').trim());
+      expect(libelles).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('Projets avec membre inconnu'),
+          expect.stringContaining('Alertes actives'),
+          'Alertes principales',
+        ]),
+      );
+    });
+
+    it('ouvre la Fiche projet du projet concerné depuis une ligne de l’encart « Alertes principales »', () => {
+      const audit = DonneesDeTest.auditAvecMembres('2026-07-20T00:00:00Z', ['jdupont']);
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', [audit]);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const lien = element.querySelector<HTMLAnchorElement>(
+        '.accueil__liste .accueil__ligne-lien[href="/fiche-projet/projet-1"]',
+      );
+      expect(lien?.textContent).toContain('jdupont');
+    });
+
+    it('ouvre la Fiche projet depuis une ligne de l’encart « Projets non audités depuis longtemps »', () => {
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', []);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const lien = element.querySelector<HTMLAnchorElement>(
+        'a.accueil__ligne-lien[href="/fiche-projet/projet-1"]',
+      );
+      expect(lien?.textContent).toContain('API Facturation');
+    });
+
+    it('route la carte « Dernière campagne » vers le Tableau de bord d’exécution quand une campagne est réellement en cours, sinon vers la Synthèse des audits', () => {
+      const projet = DonneesDeTest.projet('projet-1', 'API Facturation', []);
+      donneesApplication.chargerRacine(DonneesDeTest.racine([projet]));
+      const etatSession = TestBed.inject(EtatSessionService);
+      const router = TestBed.inject(Router);
+      const navigate = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      const fixture = TestBed.createComponent(SqmAccueilComponent);
+      fixture.detectChanges();
+      const composant = fixture.componentInstance;
+
+      composant.ouvrirDerniereCampagne();
+      expect(navigate).toHaveBeenLastCalledWith('/synthese-audits');
+
+      etatSession.demarrerProgressionCampagne(['projet-1', 'projet-2']);
+      etatSession.mettreAJourProgressionProjet('projet-1', { statut: 'termine', dureeMs: 1_000 });
+      composant.ouvrirDerniereCampagne();
+      expect(navigate).toHaveBeenLastCalledWith('/audits/tableau-de-bord');
+
+      etatSession.mettreAJourProgressionProjet('projet-2', { statut: 'termine', dureeMs: 1_000 });
+      composant.ouvrirDerniereCampagne();
+      expect(navigate).toHaveBeenLastCalledWith('/synthese-audits');
+    });
   });
 
   it('affiche des valeurs neutres en l’absence de tout fichier chargé', () => {

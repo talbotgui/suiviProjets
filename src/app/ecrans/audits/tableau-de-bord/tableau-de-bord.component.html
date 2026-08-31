@@ -47,14 +47,27 @@
     </header>
 
     @if (!campagneEnCours()) {
-      <button
-        id="tableau-de-bord-bouton-brouillon"
-        type="button"
-        class="bouton bouton--principal exterieur-bas-4"
-        (click)="allerVersAudits()"
-      >
-        Accéder aux brouillons de campagne
-      </button>
+      <!-- Liens contextuels du parcours d'audit (plan_16 groupe 1.3, US-052) : accès aux brouillons de campagne
+           et, en tête, accès direct aux résultats intégrés (Synthèse des audits, ou Brouillon s'il reste des
+           entrées à traiter). Les deux cibles sont recalculées à l'activation. -->
+      <div class="tableau-de-bord__liens-fin d-flex retour-ligne ecart-2 exterieur-bas-4">
+        <button
+          id="tableau-de-bord-bouton-resultats"
+          type="button"
+          class="bouton bouton--principal"
+          (click)="allerVersResultats()"
+        >
+          Voir les résultats intégrés
+        </button>
+        <button
+          id="tableau-de-bord-bouton-brouillon"
+          type="button"
+          class="bouton"
+          (click)="allerVersAudits()"
+        >
+          Accéder aux brouillons de campagne
+        </button>
+      </div>
     }
 
     <div class="deborde-auto">

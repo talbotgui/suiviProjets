@@ -101,6 +101,11 @@
             >
               Rejeter
             </button>
+            <!-- Lien contextuel du parcours d'audit (plan_16 groupe 1.3, US-052) : ouvre la Fiche du projet
+                 concerné par cette entrée de brouillon. -->
+            <a class="bouton bouton--discret" [routerLink]="['/fiche-projet', entree.projetId]">
+              Fiche projet
+            </a>
           </div>
         </li>
       } @empty {
@@ -144,8 +149,14 @@
             </details>
             <p class="brouillon__anomalie-projets exterieur-haut-1 exterieur-bas-0">
               Projets concernés :
+              <!-- Lien contextuel du parcours d'audit (plan_16 groupe 1.3, US-052) : chaque projet concerné par
+                   l'anomalie ouvre sa Fiche projet. -->
               @for (projet of groupe.projets; track projet.projetId) {
-                <span class="brouillon__anomalie-projet">{{ projet.projetNom }}</span>
+                <a
+                  class="brouillon__anomalie-projet"
+                  [routerLink]="['/fiche-projet', projet.projetId]"
+                  >{{ projet.projetNom }}</a
+                >
               }
             </p>
           </li>

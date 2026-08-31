@@ -22,6 +22,12 @@
   gap: 0.4rem;
 }
 
+.graphique-evolution__serie {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .graphique-evolution__bouton-serie {
   display: inline-flex;
   align-items: center;
@@ -32,6 +38,20 @@
   border: 1px solid #ccc;
   background-color: #fff;
   cursor: pointer;
+}
+
+.graphique-evolution__bouton-ouvrir {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.graphique-evolution__bouton-ouvrir:focus-visible {
+  outline: 2px solid #1a56db;
+  outline-offset: 2px;
 }
 
 .graphique-evolution__bouton-serie--inactive {

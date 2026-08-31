@@ -2,6 +2,7 @@
 // de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import { Chart } from 'chart.js';
+import type { ChartEvent } from 'chart.js';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import type {
   LigneVerticaleGraphique,
@@ -354,6 +355,81 @@ describe('SqmGraphiqueEvolutionComponent', () => {
     const instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
     expect(instance?.data.datasets).toHaveLength(1);
     expect(instance?.data.datasets[0]?.hidden).toBe(true);
+  });
+
+  it('émet `serieSelectionnee` avec l’identifiant de la série quand son bouton « Ouvrir » de légende est actionné (équivalent clavier du clic, plan_16 groupe 1.1)', () => {
+    const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+    const series: readonly SerieGraphiqueEvolution[] = [
+      {
+        id: 'projet-1',
+        libelle: 'Projet 1',
+        couleur: '#1a56db',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 61.2 }],
+      },
+      {
+        id: 'projet-2',
+        libelle: 'Projet 2',
+        couleur: '#dc2626',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 38.4 }],
+      },
+    ];
+    fixture.componentRef.setInput('series', series);
+    fixture.detectChanges();
+
+    const emises: string[] = [];
+    fixture.componentInstance.serieSelectionnee.subscribe((id) => emises.push(id));
+
+    const boutonsOuvrir = Array.from(
+      DomTestUtils.obtenirElementNatif(fixture).querySelectorAll<HTMLButtonElement>(
+        '.graphique-evolution__bouton-ouvrir',
+      ),
+    );
+    expect(boutonsOuvrir).toHaveLength(2);
+    boutonsOuvrir[1].click();
+
+    expect(emises).toEqual(['projet-2']);
+  });
+
+  it('émet `serieSelectionnee` avec l’identifiant de la série cliquée dans le graphique (`onClick` chart.js, plan_16 groupe 1.1)', () => {
+    const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+    const series: readonly SerieGraphiqueEvolution[] = [
+      {
+        id: 'projet-1',
+        libelle: 'Projet 1',
+        couleur: '#1a56db',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 61.2 }],
+      },
+      {
+        id: 'projet-2',
+        libelle: 'Projet 2',
+        couleur: '#dc2626',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 38.4 }],
+      },
+    ];
+    fixture.componentRef.setInput('series', series);
+    fixture.detectChanges();
+
+    const emises: string[] = [];
+    fixture.componentInstance.serieSelectionnee.subscribe((id) => emises.push(id));
+
+    const instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
+    if (instance === undefined) {
+      throw new Error('instance chart.js absente');
+    }
+    // jsdom ne calcule aucune géométrie : la résolution de l'élément sous le curseur est simulée en stubant
+    // l'API publique `getElementsAtEventForMode` de l'instance (l'élément fourni est un vrai `PointElement` de la
+    // seconde série), puis en déclenchant le `onClick` de la config avec un évènement `chart.js` synthétique.
+    jest
+      .spyOn(instance, 'getElementsAtEventForMode')
+      .mockReturnValue([
+        { element: instance.getDatasetMeta(1).data[0], datasetIndex: 1, index: 0 },
+      ]);
+    const onClick = instance.options.onClick;
+    expect(typeof onClick).toBe('function');
+    const evenement: ChartEvent = { type: 'click', native: new MouseEvent('click'), x: 0, y: 0 };
+    onClick?.(evenement, [], instance);
+
+    expect(emises).toEqual(['projet-2']);
   });
 
   it('détruit proprement l’instance chart.js à la destruction du composant', () => {

@@ -2,7 +2,9 @@
 // (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md. La Façade de commandes est simulée
 // via le mock de `invoke`, sur le modèle de `tableau-de-bord.component.spec.ts`.
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { EMPTY } from 'rxjs';
+import { DomTestUtils } from '../../../testing/dom-test.utils';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../../services/sansetat/commandes/types-facade';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
@@ -172,17 +174,20 @@ class DonneesDeTest {
 
 describe('SqmBrouillonComponent', () => {
   let donneesApplication: DonneesApplicationService;
-  let routerMock: { navigateByUrl: jest.Mock };
+  // Router réel (routes vides) : le gabarit porte désormais des `routerLink` (liens contextuels du parcours
+  // d'audit, plan_16 groupe 1.3) qui exigent `ActivatedRoute` ; la navigation programmatique reste vérifiée via un
+  // espion sur `navigateByUrl`.
+  let navigateSpy: jest.SpyInstance;
   let composant: SqmBrouillonComponent;
 
   beforeEach(async () => {
     invokeSimule.mockReset();
     isTauriSimule.mockReturnValue(true);
-    routerMock = { navigateByUrl: jest.fn().mockResolvedValue(true) };
     await TestBed.configureTestingModule({
       imports: [SqmBrouillonComponent],
-      providers: [{ provide: Router, useValue: routerMock }],
+      providers: [provideRouter([])],
     }).compileComponents();
+    navigateSpy = jest.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     donneesApplication = TestBed.inject(DonneesApplicationService);
     donneesApplication.chargerRacine(DonneesDeTest.racineAvecBrouillonEnAttente());
     TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
@@ -287,6 +292,22 @@ describe('SqmBrouillonComponent', () => {
     expect(composant.actionEnAttente()).toBeNull();
   });
 
+  it('câble un lien « Fiche projet » par entrée de brouillon et un lien par projet du rapport d’anomalies (plan_16 groupe 1.3, US-052)', () => {
+    const fixture = TestBed.createComponent(SqmBrouillonComponent);
+    fixture.detectChanges();
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+
+    const lienEntree = element.querySelector<HTMLAnchorElement>(
+      '.brouillon__projet-actions a[href="/fiche-projet/projet-1"]',
+    );
+    expect(lienEntree?.textContent).toContain('Fiche projet');
+
+    const lienAnomalie = element.querySelector<HTMLAnchorElement>(
+      '.brouillon__anomalie-projets a[href="/fiche-projet/projet-1"]',
+    );
+    expect(lienAnomalie?.textContent).toContain('API Facturation');
+  });
+
   it.each([
     ['aucunBrouillonCourant', 'Ce brouillon a déjà été traité (peut-être depuis un autre onglet).'],
     [
@@ -331,7 +352,7 @@ describe('SqmBrouillonComponent', () => {
     );
     expect(composant.actionEnAttente()).toBeNull();
     expect(TestBed.inject(NotificationService).liste()).toEqual([]);
-    expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/constitution-campagne');
+    expect(navigateSpy).toHaveBeenCalledWith('/audits/constitution-campagne');
   });
 
   it('doit rejeter la sélection avec le motif saisi', async () => {
@@ -364,7 +385,7 @@ describe('SqmBrouillonComponent', () => {
       expect.objectContaining({ type: 'erreur', message: 'Mot de passe incorrect.' }),
     ]);
     expect(composant.actionEnAttente()).toBeNull();
-    expect(routerMock.navigateByUrl).not.toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
     expect(composant.brouillonPresent()).toBe(true);
   });
 
@@ -383,7 +404,9 @@ describe('SqmBrouillonComponent — campagne en échec total sans brouillon', ()
     isTauriSimule.mockReturnValue(true);
     await TestBed.configureTestingModule({
       imports: [SqmBrouillonComponent],
-      providers: [{ provide: Router, useValue: { navigateByUrl: jest.fn() } }],
+      providers: [
+        { provide: Router, useValue: { navigateByUrl: jest.fn(), url: '/', events: EMPTY } },
+      ],
     }).compileComponents();
     const donneesApplication = TestBed.inject(DonneesApplicationService);
     donneesApplication.chargerRacine(DonneesDeTest.racineAvecCampagneEnEchecTotalSansBrouillon());

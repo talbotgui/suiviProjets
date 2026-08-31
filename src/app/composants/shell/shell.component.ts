@@ -36,6 +36,13 @@
 //   raccourci arbitraire (à valider par un humain, cf. rapport de développement de cet incrément), faute de
 //   convention imposée par la documentation.
 //
+// Historique de navigation interne (US-052, RG-052, plan_16 incrément 5) : deux boutons `◀`/`▶` en tête de la
+// barre supérieure, chacun désactivé quand le déplacement correspondant est impossible, délèguent à
+// `HistoriqueNavigationService` (Store d'état applicatif dédié, qui s'abonne aux fins de navigation du routeur et
+// tient une pile d'URLs applicatives). Ce service n'est pas observé ici pour le cycle de vie : il est conservé au
+// verrouillage et purgé au changement de fichier par `DonneesApplicationService`, comme le filtre groupe/projet
+// partagé.
+//
 // Verrouillage manuel, sauvegarde et verrouillage automatique par inactivité (US-026, RG-001 à RG-005, RNF-014),
 // câblés par la tâche de comblement du trou de chargement de fichier côté Angular (cf. rapport de diagnostic ayant
 // motivé cette tâche) :
@@ -71,6 +78,7 @@ import { SqmRechercheTransversaleComponent } from '../recherche-transversale/rec
 import { SqmVerrouillageComponent } from '../verrouillage/verrouillage.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatFichier, EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import { HistoriqueNavigationService } from '../../services/avecetat/etat/historique-navigation.service';
 import type { StatutExecutionProjet } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { OuvreurLienUtils } from '../../services/sansetat/commandes/ouvreur-lien.utils';
@@ -112,7 +120,22 @@ export class SqmShellComponent {
     inject(DonneesApplicationService);
   private readonly etatSession: EtatSessionService = inject(EtatSessionService);
   private readonly notification: NotificationService = inject(NotificationService);
+  private readonly historiqueNavigation: HistoriqueNavigationService = inject(
+    HistoriqueNavigationService,
+  );
   private minuteurInactivite: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * Indique si un déplacement « Reculer » est possible dans l'historique de navigation interne (RG-052), pour
+   * activer ou désactiver le bouton `◀` de la barre supérieure.
+   */
+  public readonly peutReculer: Signal<boolean> = this.historiqueNavigation.peutReculer;
+
+  /**
+   * Indique si un déplacement « Avancer » est possible dans l'historique de navigation interne (RG-052), pour
+   * activer ou désactiver le bouton `▶` de la barre supérieure.
+   */
+  public readonly peutAvancer: Signal<boolean> = this.historiqueNavigation.peutAvancer;
 
   /**
    * Indique si la superposition de recherche transversale est actuellement affichée (US-021).
@@ -161,6 +184,20 @@ export class SqmShellComponent {
       }
     });
     inject(DestroyRef).onDestroy(() => this.desarmerMinuteurInactivite());
+  }
+
+  /**
+   * Recule d'une entrée dans l'historique de navigation interne (bouton `◀` de la barre supérieure, RG-052, US-052).
+   */
+  public reculer(): void {
+    this.historiqueNavigation.reculer();
+  }
+
+  /**
+   * Avance d'une entrée dans l'historique de navigation interne (bouton `▶` de la barre supérieure, RG-052, US-052).
+   */
+  public avancer(): void {
+    this.historiqueNavigation.avancer();
   }
 
   /**
@@ -384,6 +421,9 @@ export class SqmShellComponent {
   /**
    * Indique si la dernière campagne lancée est encore réellement en cours (au moins un projet de son périmètre
    * pas encore à un statut terminal), cf. {@link cibleAudits}.
+   *
+   * Répliqué à l'identique dans `SqmAccueilComponent.campagneReellementEnCours` (carte « Dernière campagne »,
+   * plan_16 incrément 7) : toute évolution de cette règle doit être reportée là-bas.
    * @returns `true` si une campagne est effectivement en cours d'exécution.
    */
   private campagneReellementEnCours(): boolean {

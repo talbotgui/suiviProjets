@@ -1,6 +1,14 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
+// Modale de détail pilotée par l'URL (plan_16, incrément 5 — US-052, RG-052) : l'ouverture de la modale du dernier
+// audit d'un projet n'est plus un état interne du composant mais un paramètre de requête `projet` de la route
+// `/obsolescence` (`withComponentInputBinding()`, `app.config.ts`), l'écran restant monté sous la modale. Ouvrir la
+// modale revient à naviguer vers `/obsolescence?projet=<id>` (nouvelle étape d'historique) ; la fermer revient à
+// reculer dans l'historique si possible, sinon à naviguer vers `/obsolescence` sans paramètre. Un paramètre
+// désignant un projet supprimé depuis est ignoré sans erreur (modale close). Les autres écrans n'exposent aucune
+// superposition dans l'URL ; seule cette modale l'est.
+//
 // Écran Obsolescence (US-051) : grille dense de tuiles, une par projet, portant un indicateur de retard en versions
 // majeures par catégorie de dépendance (RG-050, RG-051). Toutes les valeurs sont recalculées à l'affichage depuis
 // les constats bruts du dernier audit retenu de chaque projet et le référentiel courant (RG-011, RG-022) — aucun
@@ -30,11 +38,13 @@ import {
   computed,
   effect,
   inject,
+  input,
   signal,
   viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import type { Signal, WritableSignal } from '@angular/core';
+import type { InputSignal, Signal, WritableSignal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBarreMesureComponent } from '../../composants/barre-mesure/barre-mesure.component';
 import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
@@ -51,6 +61,7 @@ import type {
 } from '../../composants/filtre-groupe-projet/filtre-groupe-projet.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
+import { HistoriqueNavigationService } from '../../services/avecetat/etat/historique-navigation.service';
 import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import type { Audit } from '../../services/avecetat/etat/types-donnees';
@@ -162,6 +173,8 @@ interface LigneDetailDependance {
 
 /** Contenu de la modale de détail. */
 interface DetailProjet {
+  /** Identifiant du projet, pour le lien « Ouvrir la fiche projet » du pied de la modale (plan_16, groupe 1.1). */
+  readonly projetId: string;
   readonly nomProjet: string;
   readonly dateAudit: string;
   readonly lignes: readonly LigneDetailDependance[];
@@ -173,7 +186,12 @@ interface DetailProjet {
  */
 @Component({
   selector: 'app-obsolescence',
-  imports: [SqmBarreMesureComponent, SqmSelecteurVueComponent, SqmFiltreGroupeProjetComponent],
+  imports: [
+    SqmBarreMesureComponent,
+    SqmSelecteurVueComponent,
+    SqmFiltreGroupeProjetComponent,
+    RouterLink,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './obsolescence.component.html',
   styleUrl: './obsolescence.component.scss',
@@ -184,6 +202,9 @@ export class SqmObsolescenceComponent {
     inject(DonneesApplicationService);
   private readonly notification: NotificationService = inject(NotificationService);
   private readonly injector: Injector = inject(Injector);
+  private readonly router: Router = inject(Router);
+  private readonly routeActive: ActivatedRoute = inject(ActivatedRoute);
+  private readonly historique: HistoriqueNavigationService = inject(HistoriqueNavigationService);
 
   /**
    * Filtre groupe/projet mutualisé, partagé avec les autres écrans de restitution (RG-053). Exposé au gabarit pour
@@ -198,6 +219,17 @@ export class SqmObsolescenceComponent {
   private vueParDefautDejaAppliquee = false;
 
   public constructor() {
+    // Priorité RG-053 n°1 (plan_16 [B.4], groupe 1.1) : un lien contextuel pré-filtrant (« Fiche projet → voir
+    // l'obsolescence du groupe ») porte le paramètre de requête `groupeId` ; à l'entrée sur l'écran, il écrase le
+    // filtre partagé et la vue par défaut en repositionnant `ContexteConsultationService` (sélection utilisateur,
+    // `filtreModifieParUtilisateur` passe à `true`, ce qui neutralise l'amorçage par vue par défaut ci-dessous).
+    // Lecture du seul `snapshot` : le constructeur n'est exécuté qu'une fois par entrée sur l'écran, l'ouverture/
+    // fermeture de la modale ne réévaluant jamais ce paramètre (le filtre reste alors celui déjà mémorisé).
+    const groupeIdPreFiltre = this.routeActive.snapshot.queryParamMap.get('groupeId');
+    if (groupeIdPreFiltre !== null && groupeIdPreFiltre.length > 0) {
+      this.contexte.definirParUtilisateur({ groupeId: groupeIdPreFiltre, projetIds: null });
+    }
+
     effect(() => {
       if (this.vueParDefautDejaAppliquee) {
         return;
@@ -216,6 +248,26 @@ export class SqmObsolescenceComponent {
       }
       this.vueParDefautDejaAppliquee = true;
       this.appliquerVue(vueParDefaut, 'vueParDefaut');
+    });
+
+    // Gestion du focus de la modale de détail (RNF-019) : l'ouverture/fermeture étant désormais pilotée par l'URL
+    // (paramètre de requête `projet`), c'est cette transition d'affichage qui déplace le focus dans le panneau à
+    // l'ouverture et le rend à l'élément déclencheur à la fermeture, plutôt que les méthodes d'ouverture/fermeture
+    // (asynchrones depuis qu'elles naviguent).
+    effect(() => {
+      const affichee = this.detailProjetSelectionne() !== null;
+      if (affichee === this.modaleAffichee) {
+        return;
+      }
+      this.modaleAffichee = affichee;
+      if (affichee) {
+        afterNextRender(() => this.panneauModale()?.nativeElement.focus(), {
+          injector: this.injector,
+        });
+      } else {
+        this.elementFocusAvantModale?.focus();
+        this.elementFocusAvantModale = null;
+      }
     });
   }
 
@@ -258,8 +310,21 @@ export class SqmObsolescenceComponent {
     new Map<string, BornesFiltre>(),
   );
 
-  /** Projet dont la modale de détail est ouverte, `null` si aucune. */
-  public readonly projetSelectionne: WritableSignal<string | null> = signal<string | null>(null);
+  /**
+   * Identifiant du projet dont la modale de détail est ouverte, lié au paramètre de requête `projet` de la route
+   * `/obsolescence` (`withComponentInputBinding()`, US-052, RG-052). Absent hors modale ouverte.
+   */
+  public readonly projet: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Projet dont la modale de détail est ouverte, `null` si aucune : dérivé du paramètre de requête `projet`
+   * ({@link projet}). Un identifiant désignant un projet inconnu (supprimé depuis) est pris en compte ici mais
+   * ignoré sans erreur par {@link detailProjetSelectionne} (modale close).
+   */
+  public readonly projetSelectionne: Signal<string | null> = computed(() => this.projet() ?? null);
+
+  /** Vrai tant que la modale de détail est effectivement affichée, pour n'agir sur le focus qu'aux transitions. */
+  private modaleAffichee = false;
 
   /**
    * Date du jour au format `AAAA-MM-JJ` (locale du système).
@@ -517,7 +582,7 @@ export class SqmObsolescenceComponent {
       return null;
     }
     if (ligne.audit === undefined) {
-      return { nomProjet: ligne.nomProjet, dateAudit: 'jamais audité', lignes: [] };
+      return { projetId, nomProjet: ligne.nomProjet, dateAudit: 'jamais audité', lignes: [] };
     }
     const regles = this.regles();
     const libelleParCategorie = new Map(
@@ -543,6 +608,7 @@ export class SqmObsolescenceComponent {
       };
     });
     return {
+      projetId,
       nomProjet: ligne.nomProjet,
       dateAudit: ligne.audit.date.slice(0, 10),
       lignes: lignesDetail
@@ -713,26 +779,47 @@ export class SqmObsolescenceComponent {
   }
 
   /**
-   * Ouvre la modale de détail du dernier audit d'un projet et déplace le focus dans le panneau (RNF-019).
+   * Ouvre la modale de détail du dernier audit d'un projet, en naviguant vers `/obsolescence?projet=<id>` : une
+   * nouvelle étape d'historique de navigation (US-052, RG-052), l'écran restant monté sous la modale. Le focus est
+   * déplacé dans le panneau par l'effet dédié du constructeur, à la transition d'affichage.
+   *
+   * `queryParamsHandling: 'merge'` (plan_16, groupe 1.1) : le paramètre de pré-filtrage `groupeId` d'un lien
+   * contextuel (« Fiche projet → voir l'obsolescence du groupe ») survit à l'ouverture de la modale, de sorte
+   * qu'un rafraîchissement (F5) sur `/obsolescence?groupeId=<id>&projet=<id>` restaure le même contexte.
    * @param projetId - Identifiant du projet.
    */
   public ouvrirDetail(projetId: string): void {
     this.elementFocusAvantModale =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    this.projetSelectionne.set(projetId);
-    afterNextRender(() => this.panneauModale()?.nativeElement.focus(), {
-      injector: this.injector,
+    void this.router.navigate(['/obsolescence'], {
+      queryParams: { projet: projetId },
+      queryParamsHandling: 'merge',
     });
   }
 
-  /** Ferme la modale de détail et rend le focus à l'élément déclencheur (RNF-019). */
+  /**
+   * Ferme la modale de détail (bouton ou touche Échap) : recule dans l'historique de navigation si possible, sinon
+   * navigue vers `/obsolescence` sans paramètre (US-052, RG-052). Le focus est rendu à l'élément déclencheur par
+   * l'effet dédié du constructeur.
+   *
+   * Reculer suppose que l'étape d'historique précédente est l'écran sans paramètre `projet` — toujours vrai dans le
+   * périmètre actuel : la modale ne s'ouvre que via {@link ouvrirDetail} depuis l'écran lui-même, et le seul lien
+   * contextuel pré-filtrant atterrissant sur cet écran (plan_16, groupe 1.1) porte `groupeId`, jamais `projet`.
+   * La branche de repli retire le seul paramètre `projet` (`queryParamsHandling: 'merge'`), conservant un éventuel
+   * `groupeId` de pré-filtrage dans l'URL.
+   */
   public fermerDetail(): void {
     if (this.projetSelectionne() === null) {
       return;
     }
-    this.projetSelectionne.set(null);
-    this.elementFocusAvantModale?.focus();
-    this.elementFocusAvantModale = null;
+    if (this.historique.peutReculer()) {
+      this.historique.reculer();
+      return;
+    }
+    void this.router.navigate(['/obsolescence'], {
+      queryParams: { projet: null },
+      queryParamsHandling: 'merge',
+    });
   }
 
   /**

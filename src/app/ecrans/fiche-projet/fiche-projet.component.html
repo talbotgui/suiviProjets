@@ -711,7 +711,9 @@
           </section>
         </div>
 
-        <!-- Actions : Comparaison entre deux audits (US-018, Phase 6 incrément 6), export PNG. -->
+        <!-- Actions : Comparaison entre deux audits (US-018, Phase 6 incrément 6), Obsolescence pré-filtrée sur le
+             groupe (plan_16 groupe 1.1, US-052 : le paramètre de requête `groupeId` amorce le filtre mutualisé,
+             cf. RG-053 [B.4]), export PNG. -->
         <div class="fiche-projet__actions d-flex ecart-2">
           <a
             id="fiche-projet-lien-comparer"
@@ -719,6 +721,14 @@
             [routerLink]="'/comparaison-audits/' + donnees.projetId"
           >
             Comparer à un autre audit
+          </a>
+          <a
+            id="fiche-projet-lien-obsolescence-groupe"
+            class="fiche-projet__action bouton bouton--marque"
+            routerLink="/obsolescence"
+            [queryParams]="{ groupeId: donnees.groupeId }"
+          >
+            Voir l'obsolescence du groupe
           </a>
           <button
             type="button"

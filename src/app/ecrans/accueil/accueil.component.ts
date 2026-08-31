@@ -29,8 +29,11 @@
 // `membreInconnu|{projetId}|{username}`.
 import { DatePipe } from '@angular/common';
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { SqmBandeauAlerteComponent } from '../../composants/bandeau-alerte/bandeau-alerte.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
+import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
+import type { StatutExecutionProjet } from '../../services/avecetat/etat/etat-session.service';
 import type { Groupe } from '../../services/avecetat/etat/types-donnees';
 import { StatutTraitementAlerte } from '../../services/avecetat/etat/types-donnees';
 import { PerimetreCampagneUtils } from '../../services/avecetat/campagne/perimetre-campagne.utils';
@@ -72,7 +75,7 @@ interface ProjetNonAudite {
  */
 @Component({
   selector: 'app-accueil',
-  imports: [SqmBandeauAlerteComponent, DatePipe],
+  imports: [SqmBandeauAlerteComponent, DatePipe, RouterLink],
   templateUrl: './accueil.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './accueil.component.scss',
@@ -80,6 +83,8 @@ interface ProjetNonAudite {
 export class SqmAccueilComponent {
   private readonly donneesApplication: DonneesApplicationService =
     inject(DonneesApplicationService);
+  private readonly etatSession: EtatSessionService = inject(EtatSessionService);
+  private readonly router: Router = inject(Router);
 
   /**
    * Nombre de groupes actuellement chargés.
@@ -118,6 +123,52 @@ export class SqmAccueilComponent {
     return derniere === undefined
       ? 'Aucune campagne'
       : HorodatageUtils.formaterHorodatageCourt(derniere.date);
+  }
+
+  /**
+   * Navigue depuis la carte « Dernière campagne » (US-052, plan_16 groupe 1.2) vers le Tableau de bord d'exécution
+   * si une campagne est réellement en cours, sinon vers la Synthèse des audits. Cible recalculée à l'activation
+   * (bouton, pas `routerLink`), sur le modèle de l'entrée « Audits » de la sidebar (`SqmShellComponent.ouvrirAudits`).
+   */
+  public ouvrirDerniereCampagne(): void {
+    void this.router.navigateByUrl(
+      this.campagneReellementEnCours() ? '/audits/tableau-de-bord' : '/synthese-audits',
+    );
+  }
+
+  /**
+   * Identifiant du projet porté par une alerte active, extrait de sa clé stable (`typeAlerte|projetId|discriminant`,
+   * RG-026), pour le lien contextuel de chaque ligne de l'encart « Alertes principales » vers la Fiche projet
+   * (US-052, plan_16 groupe 1.2).
+   * @param alerte - Alerte active concernée.
+   * @returns L'identifiant de projet, chaîne vide si la clé ne respecte pas le gabarit attendu.
+   */
+  public projetIdAlerte(alerte: AlerteAccueil): string {
+    return alerte.cleAlerte.split('|')[1] ?? '';
+  }
+
+  /**
+   * Indique si la dernière campagne lancée est encore réellement en cours (au moins un projet de son périmètre pas
+   * encore à un statut terminal), cf. {@link ouvrirDerniereCampagne}. Réplique volontaire de
+   * `SqmShellComponent`.`campagneReellementEnCours` (copie canonique) : `EtatSessionService.progressionCampagne`
+   * reste non `null` pour le reste de la session dès la première campagne, un simple test `!== null` routerait donc
+   * en permanence vers le Tableau de bord (constat R12-04). Toute évolution de cette règle doit être reportée aux
+   * deux endroits.
+   * @returns `true` si une campagne est effectivement en cours d'exécution.
+   */
+  private campagneReellementEnCours(): boolean {
+    const progression = this.etatSession.progressionCampagne();
+    if (progression === null) {
+      return false;
+    }
+    const statutsTerminaux: ReadonlySet<StatutExecutionProjet> = new Set([
+      'termine',
+      'echoue',
+      'ignore',
+    ]);
+    return progression.perimetre.some(
+      (projetId) => !statutsTerminaux.has(progression.projets[projetId]?.statut ?? 'enAttente'),
+    );
   }
 
   /**

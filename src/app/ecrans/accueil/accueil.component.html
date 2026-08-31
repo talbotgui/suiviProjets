@@ -8,16 +8,28 @@
         {{ nombreGroupes() }} / {{ nombreProjets() }}
       </div>
     </div>
-    <div class="accueil__carte carte interieur-x-4 interieur-y-3">
-      <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
+
+    <!-- Lien contextuel (plan_16 groupe 1.2, US-052) : cible recalculée à l'activation (Tableau de bord
+         d'exécution si campagne réellement en cours, sinon Synthèse des audits) -> bouton, pas `routerLink`. -->
+    <button
+      id="accueil-lien-derniere-campagne"
+      type="button"
+      class="accueil__carte accueil__carte--lien carte interieur-x-4 interieur-y-3"
+      (click)="ouvrirDerniereCampagne()"
+    >
+      <!-- `<span class="d-block">` plutôt que `<div>` : contenu d'un `<button>` restreint au contenu de phrasé. -->
+      <span class="accueil__carte-libelle d-block texte-2xs texte-discret exterieur-bas-1">
         Dernière campagne
-      </div>
-      <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
+      </span>
+      <span class="accueil__carte-valeur d-block police-mono texte-2xl poids-demi-gras">
         {{ derniereCampagneLabel() }}
-      </div>
-    </div>
-    <div
-      class="accueil__carte carte interieur-x-4 interieur-y-3"
+      </span>
+    </button>
+
+    <!-- Lien contextuel (plan_16 groupe 1.2, US-052) : la carte pointe vers la Liste de travail. -->
+    <a
+      class="accueil__carte accueil__carte--lien carte interieur-x-4 interieur-y-3"
+      routerLink="/liste-travail"
       [class.accueil__carte--alerte]="membreInconnuDetecte()"
     >
       <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
@@ -26,15 +38,19 @@
       <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
         {{ nombreProjetsAvecMembreInconnu() }}
       </div>
-    </div>
-    <div class="accueil__carte carte interieur-x-4 interieur-y-3">
+    </a>
+
+    <a
+      class="accueil__carte accueil__carte--lien carte interieur-x-4 interieur-y-3"
+      routerLink="/liste-travail"
+    >
       <div class="accueil__carte-libelle texte-2xs texte-discret exterieur-bas-1">
         Alertes actives
       </div>
       <div class="accueil__carte-valeur police-mono texte-2xl poids-demi-gras">
         {{ alertesActives().length }}
       </div>
-    </div>
+    </a>
   </div>
 
   @if (membreInconnuDetecte()) {
@@ -45,7 +61,8 @@
     <h2
       class="accueil__section-titre texte-2xs poids-gras majuscules espace-lettres texte-discret exterieur-bas-3 exterieur-haut-0"
     >
-      Alertes principales
+      <!-- Lien contextuel (plan_16 groupe 1.2, US-052) : le titre de la section pointe vers la Liste de travail. -->
+      <a class="accueil__section-titre-lien" routerLink="/liste-travail">Alertes principales</a>
     </h2>
     @if (alertesPrincipales().length === 0) {
       <p class="accueil__vide texte-sm texte-secondaire exterieur-bas-0 exterieur-haut-0">
@@ -54,19 +71,24 @@
     } @else {
       <ul class="accueil__liste sans-liste">
         @for (alerte of alertesPrincipales(); track alerte.cleAlerte) {
-          <li
-            class="accueil__ligne d-flex aligne-centre ecart-3 interieur-y-3 texte-sm bordure-bas"
-          >
-            <span class="accueil__pastille" aria-hidden="true"></span>
-            <span class="accueil__ligne-libelle flex-1">{{ alerte.libelle }}</span>
-            @if (alerte.traitementAnterieur; as traitement) {
-              <span class="accueil__mention-traitement texte-2xs texte-discret">
-                traité précédemment le {{ traitement.horodatage | date: 'dd/MM/yyyy' }}
-                @if (traitement.commentaire) {
-                  — {{ traitement.commentaire }}
-                }
-              </span>
-            }
+          <li class="accueil__ligne bordure-bas">
+            <!-- Lien contextuel (plan_16 groupe 1.2, US-052) : chaque ligne d'alerte ouvre la Fiche projet du
+                 projet concerné (identifiant extrait de la clé stable de l'alerte, RG-026). -->
+            <a
+              class="accueil__ligne-lien d-flex aligne-centre ecart-3 interieur-y-3 texte-sm"
+              [routerLink]="['/fiche-projet', projetIdAlerte(alerte)]"
+            >
+              <span class="accueil__pastille" aria-hidden="true"></span>
+              <span class="accueil__ligne-libelle flex-1">{{ alerte.libelle }}</span>
+              @if (alerte.traitementAnterieur; as traitement) {
+                <span class="accueil__mention-traitement texte-2xs texte-discret">
+                  traité précédemment le {{ traitement.horodatage | date: 'dd/MM/yyyy' }}
+                  @if (traitement.commentaire) {
+                    — {{ traitement.commentaire }}
+                  }
+                </span>
+              }
+            </a>
           </li>
         }
       </ul>
@@ -86,13 +108,18 @@
     } @else {
       <ul class="accueil__liste sans-liste">
         @for (projet of projetsNonAuditesDepuisLongtemps(); track projet.projetId) {
-          <li
-            class="accueil__ligne d-flex aligne-centre ecart-3 interieur-y-3 texte-sm bordure-bas"
-          >
-            <span class="accueil__ligne-libelle flex-1">{{ projet.nomProjet }}</span>
-            <span class="accueil__ligne-groupe texte-2xs texte-discret">{{
-              projet.nomGroupe
-            }}</span>
+          <li class="accueil__ligne bordure-bas">
+            <!-- Lien contextuel (plan_16 groupe 1.2, US-052) : chaque ligne ouvre la Fiche projet, sur le modèle
+                 de l'activation de ligne de la Synthèse des audits. -->
+            <a
+              class="accueil__ligne-lien d-flex aligne-centre ecart-3 interieur-y-3 texte-sm"
+              [routerLink]="['/fiche-projet', projet.projetId]"
+            >
+              <span class="accueil__ligne-libelle flex-1">{{ projet.nomProjet }}</span>
+              <span class="accueil__ligne-groupe texte-2xs texte-discret">{{
+                projet.nomGroupe
+              }}</span>
+            </a>
           </li>
         }
       </ul>

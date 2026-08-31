@@ -2,6 +2,8 @@
 // l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
+import { EMPTY } from 'rxjs';
+import type { Observable } from 'rxjs';
 import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
@@ -69,13 +71,13 @@ class DonneesDeTest {
 describe('SqmTableauDeBordComponent', () => {
   let etatSession: EtatSessionService;
   let donneesApplication: DonneesApplicationService;
-  let routerMock: { navigateByUrl: jest.Mock };
+  let routerMock: { navigateByUrl: jest.Mock; url: string; events: Observable<never> };
   let composant: SqmTableauDeBordComponent;
   let projetId: string;
 
   beforeEach(async () => {
     invokeSimule.mockReset();
-    routerMock = { navigateByUrl: jest.fn().mockResolvedValue(true) };
+    routerMock = { navigateByUrl: jest.fn().mockResolvedValue(true), url: '/', events: EMPTY };
     await TestBed.configureTestingModule({
       imports: [SqmTableauDeBordComponent],
       providers: [{ provide: Router, useValue: routerMock }],
@@ -276,6 +278,29 @@ describe('SqmTableauDeBordComponent', () => {
       composant.allerVersAudits();
 
       expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/constitution-campagne');
+    });
+  });
+
+  describe('allerVersResultats (lien contextuel « Voir les résultats intégrés », plan_16 groupe 1.3, US-052)', () => {
+    it('navigue vers la Synthèse des audits quand aucun brouillon ne reste à traiter', () => {
+      composant.allerVersResultats();
+
+      expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/synthese-audits');
+    });
+
+    it('navigue vers le Brouillon tant qu’un brouillon reste à traiter', () => {
+      donneesApplication.chargerRacine({
+        ...DonneesDeTest.racineVide(),
+        brouillon: {
+          campagneId: 'campagne-1',
+          creeLe: '2026-08-15T08:00:00Z',
+          resultatsParProjet: [],
+        },
+      });
+
+      composant.allerVersResultats();
+
+      expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/audits/brouillon');
     });
   });
 });

@@ -127,7 +127,9 @@ describe('SqmShellComponent', () => {
     const element = DomTestUtils.obtenirElementNatif(fixture);
 
     // Plus aucune entrée « à venir » depuis la Phase 8 (Liste de travail, dernière entrée restée non interactive).
-    expect(element.querySelectorAll('[aria-disabled="true"]').length).toBe(0);
+    // Assertion restreinte à la sidebar : les boutons Reculer/Avancer de la barre supérieure portent légitimement
+    // `aria-disabled` quand le déplacement d'historique correspondant est impossible (US-052).
+    expect(element.querySelectorAll('.shell__sidebar [aria-disabled="true"]').length).toBe(0);
     const lienListeTravail = Array.from(element.querySelectorAll('a.shell__lien')).find(
       (candidat) => candidat.textContent?.includes('Liste de travail'),
     );
@@ -332,6 +334,42 @@ describe('SqmShellComponent', () => {
     fixture.detectChanges();
 
     expect(element.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  describe('historique de navigation interne (US-052, RG-052)', () => {
+    it('affiche les boutons Reculer et Avancer, désactivés tant qu’aucun déplacement n’est possible', () => {
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const reculer = element.querySelector<HTMLButtonElement>('#shell-bouton-reculer');
+      const avancer = element.querySelector<HTMLButtonElement>('#shell-bouton-avancer');
+      expect(reculer).not.toBeNull();
+      expect(avancer).not.toBeNull();
+      expect(reculer?.disabled).toBe(true);
+      expect(avancer?.disabled).toBe(true);
+    });
+
+    it('active Reculer après une navigation puis revient en arrière au clic, activant alors Avancer', async () => {
+      const fixture = TestBed.createComponent(SqmShellComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await router.navigateByUrl('/synthese-audits');
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const reculer = element.querySelector<HTMLButtonElement>('#shell-bouton-reculer');
+      expect(reculer?.disabled).toBe(false);
+
+      reculer?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(router.url).toBe('/');
+      expect(element.querySelector<HTMLButtonElement>('#shell-bouton-avancer')?.disabled).toBe(
+        false,
+      );
+    });
   });
 
   describe('verrouillage manuel et automatique (US-026, RNF-014)', () => {

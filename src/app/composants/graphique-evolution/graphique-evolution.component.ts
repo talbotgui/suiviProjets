@@ -41,12 +41,19 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
   viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import type { InputSignal, Signal, WritableSignal } from '@angular/core';
-import type { ChartConfiguration, ChartDataset, ScatterDataPoint, TooltipItem } from 'chart.js';
+import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@angular/core';
+import type {
+  ChartConfiguration,
+  ChartDataset,
+  ChartEvent,
+  ScatterDataPoint,
+  TooltipItem,
+} from 'chart.js';
 import {
   Chart,
   Legend,
@@ -204,6 +211,16 @@ export class SqmGraphiqueEvolutionComponent {
   );
 
   /**
+   * Émis quand l'utilisateur sélectionne une série, soit en cliquant sur l'un de ses points ou son tracé dans le
+   * graphique (interaction souris), soit via le bouton « Ouvrir » de la rangée de légende (équivalent clavier, sur
+   * le même principe que les boutons de bascule et de zoom qui doublent les interactions souris natives de
+   * `chart.js`). Porte l'identifiant de la série ({@link SerieGraphiqueEvolution.id}), que le composant appelant
+   * traduit en action (plan_16, groupe 1.1 : navigation vers la Fiche projet). Une série masquée n'émet jamais
+   * depuis le graphique (aucun tracé cliquable), mais reste sélectionnable via son bouton de légende.
+   */
+  public readonly serieSelectionnee: OutputEmitterRef<string> = output<string>();
+
+  /**
    * Élément canvas du graphique, absent tant que l'état « aucune donnée » est affiché (cf. gabarit).
    */
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
@@ -266,6 +283,15 @@ export class SqmGraphiqueEvolutionComponent {
       ensemble.add(serieId);
     }
     this.seriesMasquees.set(ensemble);
+  }
+
+  /**
+   * Sélectionne une série (équivalent clavier du clic sur le graphique) : émet {@link serieSelectionnee} avec
+   * l'identifiant de la série, y compris si elle est actuellement masquée.
+   * @param serieId - Identifiant de la série à sélectionner.
+   */
+  public selectionnerSerie(serieId: string): void {
+    this.serieSelectionnee.emit(serieId);
   }
 
   /**
@@ -343,6 +369,9 @@ export class SqmGraphiqueEvolutionComponent {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        // Clic sur un point ou le tracé d'une série -> sélection de la série (plan_16, groupe 1.1). Interaction
+        // souris ; l'équivalent clavier est le bouton « Ouvrir » de la rangée de légende (cf. gabarit).
+        onClick: (evenement: ChartEvent): void => this.selectionnerSerieDepuisClic(evenement),
         scales: {
           x: {
             type: 'linear',
@@ -377,6 +406,34 @@ export class SqmGraphiqueEvolutionComponent {
         },
       },
     };
+  }
+
+  /**
+   * Résout la série cliquée dans le graphique (point ou tracé, mode `nearest` sans exigence d'intersection stricte)
+   * et émet {@link serieSelectionnee} avec son identifiant. Sans effet si aucun élément n'est sous le curseur ou si
+   * l'évènement natif est absent (ex. contexte de test sans DOM réel).
+   * @param evenement - Évènement de clic `chart.js`.
+   */
+  private selectionnerSerieDepuisClic(evenement: ChartEvent): void {
+    const instance = this.instance;
+    const natif = evenement.native;
+    if (instance === undefined || natif === null) {
+      return;
+    }
+    const elements = instance.getElementsAtEventForMode(
+      natif,
+      'nearest',
+      { intersect: false },
+      false,
+    );
+    const premier = elements[0];
+    if (premier === undefined) {
+      return;
+    }
+    const serie = this.series()[premier.datasetIndex];
+    if (serie !== undefined) {
+      this.serieSelectionnee.emit(serie.id);
+    }
   }
 
   /**

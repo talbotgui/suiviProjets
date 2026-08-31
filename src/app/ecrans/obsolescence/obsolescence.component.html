@@ -176,6 +176,18 @@
         Dernier audit retenu : {{ detail.dateAudit }}
       </p>
 
+      <!-- Lien contextuel (plan_16, groupe 1.1, US-052) : ouvre la Fiche projet, libellé rappelant la date de
+           l'audit retenu affiché ci-dessus. -->
+      <p class="exterieur-0">
+        <a
+          id="obsolescence-detail-fiche-projet"
+          class="bouton bouton--marque"
+          [routerLink]="['/fiche-projet', detail.projetId]"
+        >
+          Ouvrir la fiche projet (audit du {{ detail.dateAudit }})
+        </a>
+      </p>
+
       @if (detail.lignes.length === 0) {
         <p class="texte-discret exterieur-0">Aucune dépendance relevée pour cet audit.</p>
       } @else {

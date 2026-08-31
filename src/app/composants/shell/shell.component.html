@@ -143,7 +143,35 @@
     <header
       class="shell__barre-superieure d-flex aligne-centre justifie-espace interieur-x-5 fond-blanc bordure-bas"
     >
-      <div class="shell__fichier poids-demi-gras texte-base tronque">{{ nomFichier() }}</div>
+      <div class="shell__navigation d-flex aligne-centre ecart-3 largeur-mini-nulle">
+        <div class="shell__navigation-historique d-flex aligne-centre ecart-1">
+          <button
+            id="shell-bouton-reculer"
+            type="button"
+            class="bouton bouton--discret rayon-md"
+            title="Reculer"
+            aria-label="Reculer"
+            [disabled]="!peutReculer()"
+            [attr.aria-disabled]="!peutReculer()"
+            (click)="reculer()"
+          >
+            <span aria-hidden="true">◀</span>
+          </button>
+          <button
+            id="shell-bouton-avancer"
+            type="button"
+            class="bouton bouton--discret rayon-md"
+            title="Avancer"
+            aria-label="Avancer"
+            [disabled]="!peutAvancer()"
+            [attr.aria-disabled]="!peutAvancer()"
+            (click)="avancer()"
+          >
+            <span aria-hidden="true">▶</span>
+          </button>
+        </div>
+        <div class="shell__fichier poids-demi-gras texte-base tronque">{{ nomFichier() }}</div>
+      </div>
       <div class="shell__actions-globales d-flex aligne-centre ecart-4">
         <span class="shell__statut-sauvegarde texte-xs texte-discret aucun-retour">{{
           statutSauvegarde()

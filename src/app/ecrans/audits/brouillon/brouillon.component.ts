@@ -19,7 +19,7 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
@@ -58,7 +58,7 @@ type ActionEnAttente =
  */
 @Component({
   selector: 'app-brouillon',
-  imports: [FormsModule, SqmConfirmationMotDePasseComponent],
+  imports: [FormsModule, RouterLink, SqmConfirmationMotDePasseComponent],
   templateUrl: './brouillon.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './brouillon.component.scss',

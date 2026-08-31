@@ -838,6 +838,17 @@ describe('SqmFicheProjetComponent', () => {
     },
   );
 
+  it('câble un lien « Voir l’obsolescence du groupe » portant le paramètre de requête `groupeId` du projet (plan_16 groupe 1.1, US-052, RG-053)', () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const lien = element.querySelector<HTMLAnchorElement>('#fiche-projet-lien-obsolescence-groupe');
+    expect(lien).not.toBeNull();
+    const params = new URLSearchParams(lien?.getAttribute('href')?.split('?')[1]);
+    expect(lien?.getAttribute('href')?.split('?')[0]).toBe('/obsolescence');
+    expect(params.get('groupeId')).toBe('groupe-1');
+  });
+
   it('n’affiche que les entrées de journal concernant spécifiquement ce projet', () => {
     const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
     const journal: DonneesRacine['journal'] = [

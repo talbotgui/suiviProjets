@@ -4,6 +4,7 @@
 <div class="filtre-groupe-projet d-flex retour-ligne aligne-centre ecart-3">
   <select
     #selectGroupe
+    id="filtre-groupe-projet-groupe"
     class="filtre-groupe-projet__groupe champ__controle"
     aria-label="Filtrer par groupe"
     (change)="onChangerGroupe(selectGroupe.value)"
@@ -16,6 +17,7 @@
 
   <select
     #selectProjets
+    id="filtre-groupe-projet-projets"
     multiple
     class="filtre-groupe-projet__projets champ__controle"
     aria-label="Filtrer par projet"

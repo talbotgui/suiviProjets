@@ -2,9 +2,11 @@
 // conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Component } from '@angular/core';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import { toPng } from 'html-to-image';
+import { ContexteConsultationService } from '../../services/avecetat/etat/contexte-consultation.service';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
@@ -158,16 +160,34 @@ class DonneesDeTest {
   }
 }
 
+/**
+ * Composant factice cible des routes de test (`/obsolescence` et repli) : seul son enregistrement importe, jamais
+ * son rendu ; le composant réellement sous test est instancié directement par `TestBed.createComponent`.
+ */
+@Component({ selector: 'app-composant-factice', template: '' })
+class ComposantFactice {}
+
 describe('SqmObsolescenceComponent', () => {
   let donneesApplication: DonneesApplicationService;
   let notification: NotificationService;
+  // Stub mutable d'`ActivatedRoute` : le constructeur du composant lit `snapshot.queryParamMap` pour amorcer le
+  // filtre partagé depuis un lien contextuel pré-filtrant (plan_16 groupe 1.1). Repositionné à vide avant chaque
+  // test, renseigné ponctuellement par les tests qui exercent ce pré-filtrage.
+  let routeStub: { snapshot: { queryParamMap: ReturnType<typeof convertToParamMap> } };
 
   beforeEach(async () => {
     jest.mocked(toPng).mockReset();
     jest.mocked(invoke).mockReset();
+    routeStub = { snapshot: { queryParamMap: convertToParamMap({}) } };
     await TestBed.configureTestingModule({
       imports: [SqmObsolescenceComponent],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([
+          { path: 'obsolescence', component: ComposantFactice },
+          { path: '**', component: ComposantFactice },
+        ]),
+        { provide: ActivatedRoute, useValue: routeStub },
+      ],
     }).compileComponents();
     donneesApplication = TestBed.inject(DonneesApplicationService);
     notification = TestBed.inject(NotificationService);
@@ -185,6 +205,22 @@ describe('SqmObsolescenceComponent', () => {
     const fixture = TestBed.createComponent(SqmObsolescenceComponent);
     fixture.detectChanges();
     return fixture;
+  }
+
+  /**
+   * Simule l'ouverture de la modale de détail par le paramètre de requête `projet` de la route (US-052, RG-052) :
+   * depuis le plan_16 incrément 5, `ouvrirDetail` navigue et c'est `withComponentInputBinding()` qui alimente en
+   * retour l'`input` `projet` ; ce raccourci pose directement cet `input` là où seul le contenu de la modale est
+   * sous test, sans dérouler un cycle de navigation complet.
+   * @param fixture - Fixture du composant.
+   * @param projetId - Identifiant de projet à porter dans le paramètre de requête, `undefined` pour refermer.
+   */
+  function poserParametreProjet(
+    fixture: ComponentFixture<SqmObsolescenceComponent>,
+    projetId: string | undefined,
+  ): void {
+    fixture.componentRef.setInput('projet', projetId);
+    fixture.detectChanges();
   }
 
   it('affiche le titre et le paragraphe d’introduction', () => {
@@ -348,7 +384,7 @@ describe('SqmObsolescenceComponent', () => {
     expect(composant.medianeParCategorie().get('cat-exec')).toBe(10);
   });
 
-  it('ouvre puis ferme la modale de détail, dépendances triées par référence', () => {
+  it('restitue le détail du dernier audit quand le paramètre de requête `projet` désigne un projet connu, dépendances triées par référence', () => {
     const racine = DonneesDeTest.racine([
       DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
         DonneesDeTest.audit('2026-06-01', [
@@ -357,10 +393,10 @@ describe('SqmObsolescenceComponent', () => {
         ]),
       ]),
     ]);
-    const composant = creer(racine).componentInstance;
+    const fixture = creer(racine);
 
-    composant.ouvrirDetail('p1');
-    const detail = composant.detailProjetSelectionne();
+    poserParametreProjet(fixture, 'p1');
+    const detail = fixture.componentInstance.detailProjetSelectionne();
     expect(detail?.nomProjet).toBe('Projet 1');
     expect(detail?.lignes.map((ligne) => ligne.reference)).toEqual([
       'java',
@@ -368,14 +404,70 @@ describe('SqmObsolescenceComponent', () => {
     ]);
     expect(detail?.lignes[0]).toMatchObject({ categorie: 'exec', retard: '4', estJava: true });
 
-    composant.fermerDetail();
-    expect(composant.detailProjetSelectionne()).toBeNull();
+    poserParametreProjet(fixture, undefined);
+    expect(fixture.componentInstance.detailProjetSelectionne()).toBeNull();
   });
 
-  it('ne restitue aucun détail pour un projet inexistant', () => {
-    const composant = creer(DonneesDeTest.racine([])).componentInstance;
-    composant.ouvrirDetail('inexistant');
-    expect(composant.detailProjetSelectionne()).toBeNull();
+  it('ouvre la modale via `ouvrirDetail` puis la referme en reculant dans l’historique de navigation (US-052, RG-052)', async () => {
+    const router = TestBed.inject(Router);
+    const fixture = creer(
+      DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '17', manifeste: 'pom.xml' },
+          ]),
+        ]),
+      ]),
+    );
+
+    await router.navigateByUrl('/obsolescence');
+    fixture.componentInstance.ouvrirDetail('p1');
+    await fixture.whenStable();
+    // `withComponentInputBinding()` alimenterait l'`input` `projet` sur un composant routé ; simulé ici (composant
+    // instancié directement) pour que la garde de `fermerDetail` voie la modale ouverte.
+    poserParametreProjet(fixture, 'p1');
+    expect(router.url).toContain('projet=p1');
+
+    fixture.componentInstance.fermerDetail();
+    await fixture.whenStable();
+    expect(router.url).toBe('/obsolescence');
+  });
+
+  it('ignore sans erreur un paramètre de requête `projet` désignant un projet inconnu, modale close (RG-052)', () => {
+    const fixture = creer(DonneesDeTest.racine([]));
+    poserParametreProjet(fixture, 'inexistant');
+    expect(fixture.componentInstance.detailProjetSelectionne()).toBeNull();
+  });
+
+  it('affiche dans le pied de la modale un lien « Ouvrir la fiche projet » ciblant la Fiche projet, libellé rappelant la date de l’audit retenu (plan_16 groupe 1.1, US-052)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '17', manifeste: 'pom.xml' },
+        ]),
+      ]),
+    ]);
+    const fixture = creer(racine);
+    poserParametreProjet(fixture, 'p1');
+
+    const lien = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLAnchorElement>(
+      '#obsolescence-detail-fiche-projet',
+    );
+    expect(lien?.getAttribute('href')).toBe('/fiche-projet/p1');
+    expect(lien?.textContent).toContain('2026-06-01');
+  });
+
+  it('amorce le filtre partagé depuis le paramètre de requête `groupeId` d’un lien contextuel pré-filtrant (plan_16 groupe 1.1, RG-053 [B.4])', () => {
+    routeStub.snapshot.queryParamMap = convertToParamMap({ groupeId: 'g2' });
+    const contexte = TestBed.inject(ContexteConsultationService);
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', []),
+      DonneesDeTest.groupe('g2', 'G2', 'p2', 'Projet 2', []),
+    ]);
+    creer(racine);
+
+    expect(contexte.etat().groupeId).toBe('g2');
+    expect(contexte.filtreModifieParUtilisateur()).toBe(true);
   });
 
   it('distingue une même dépendance déclarée dans deux manifestes, sans plantage de rendu (B1)', () => {
@@ -388,8 +480,7 @@ describe('SqmObsolescenceComponent', () => {
       ]),
     ]);
     const fixture = creer(racine);
-    fixture.componentInstance.ouvrirDetail('p1');
-    fixture.detectChanges();
+    poserParametreProjet(fixture, 'p1');
 
     const lignes = fixture.componentInstance.detailProjetSelectionne()?.lignes ?? [];
     expect(lignes).toHaveLength(2);
@@ -417,9 +508,12 @@ describe('SqmObsolescenceComponent', () => {
     declencheur?.focus();
     expect(document.activeElement).toBe(declencheur);
 
+    // `ouvrirDetail` mémorise l'élément déclencheur puis navigue ; `withComponentInputBinding()` alimenterait en
+    // retour l'`input` `projet`, simulé ici par `poserParametreProjet`. Idem au retour pour la fermeture.
     fixture.componentInstance.ouvrirDetail('p1');
-    fixture.detectChanges();
+    poserParametreProjet(fixture, 'p1');
     fixture.componentInstance.fermerDetail();
+    poserParametreProjet(fixture, undefined);
 
     expect(document.activeElement).toBe(declencheur);
     expect(fixture.componentInstance.detailProjetSelectionne()).toBeNull();
@@ -434,11 +528,14 @@ describe('SqmObsolescenceComponent', () => {
       ]),
     ]);
     const fixture = creer(racine);
-    fixture.componentInstance.ouvrirDetail('p1');
-    fixture.detectChanges();
+    poserParametreProjet(fixture, 'p1');
     const panneau =
       DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLElement>('.obsolescence-detail');
-    const focusables = panneau?.querySelectorAll<HTMLElement>('button') ?? [];
+    // Sous-ensemble du sélecteur de `piegerFocus` (sans `input`/`[tabindex]`, absents de cette modale), suffisant
+    // ici : le pied de la modale porte désormais un lien `<a>` (« Ouvrir la fiche projet », plan_16 groupe 1.1)
+    // en plus du bouton « Fermer », d'où le premier/dernier focusable qui ne sont plus tous deux des `button`.
+    const focusables =
+      panneau?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? [];
     const dernier = focusables[focusables.length - 1];
     dernier.focus();
 
@@ -452,9 +549,9 @@ describe('SqmObsolescenceComponent', () => {
 
   it('indique « jamais audité » dans la modale d’un projet sans audit retenu', () => {
     const racine = DonneesDeTest.racine([DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [])]);
-    const composant = creer(racine).componentInstance;
-    composant.ouvrirDetail('p1');
-    expect(composant.detailProjetSelectionne()).toMatchObject({
+    const fixture = creer(racine);
+    poserParametreProjet(fixture, 'p1');
+    expect(fixture.componentInstance.detailProjetSelectionne()).toMatchObject({
       nomProjet: 'Projet 1',
       dateAudit: 'jamais audité',
       lignes: [],
@@ -490,10 +587,10 @@ describe('SqmObsolescenceComponent', () => {
         ]),
       ]),
     ]);
-    const composant = creer(racine).componentInstance;
+    const fixture = creer(racine);
 
-    composant.ouvrirDetail('p1');
-    expect(composant.detailProjetSelectionne()?.lignes[0]).toMatchObject({
+    poserParametreProjet(fixture, 'p1');
+    expect(fixture.componentInstance.detailProjetSelectionne()?.lignes[0]).toMatchObject({
       reference: 'paquet-inconnu',
       categorie: '—',
       retard: '—',
@@ -686,6 +783,28 @@ describe('SqmObsolescenceComponent', () => {
 
       expect(composant.filtreGroupeId()).toBe('g1');
       expect(composant.contexte.filtreModifieParUtilisateur()).toBe(false);
+    });
+
+    it('fait primer le paramètre de requête `groupeId` sur la vue par défaut de l’écran (RG-053 [B.4] n°1)', () => {
+      routeStub.snapshot.queryParamMap = convertToParamMap({ groupeId: 'g2' });
+      const racine = DonneesDeTest.racine([]);
+      const racineAvecVueParDefaut: DonneesRacine = {
+        ...racine,
+        vuesEnregistrees: [
+          {
+            id: 'v1',
+            nom: 'Vue par défaut',
+            ecran: 'obsolescence',
+            versionFiltres: 1,
+            parDefaut: true,
+            filtres: { groupeId: 'g1', projetIds: null },
+          },
+        ],
+      };
+      const composant = creer(racineAvecVueParDefaut).componentInstance;
+
+      expect(composant.filtreGroupeId()).toBe('g2');
+      expect(composant.contexte.filtreModifieParUtilisateur()).toBe(true);
     });
 
     it('ignore une vue dont la version de filtres est obsolète et avertit l’utilisateur', () => {
