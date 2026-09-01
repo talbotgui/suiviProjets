@@ -2329,14 +2329,76 @@ fn fusionner_gestion_dependances(
         .collect()
 }
 
+/// `groupId` Maven du projet Spring Boot. Tous ses artefacts publiés (`spring-boot`, `spring-boot-actuator`,
+/// `spring-boot-starter-*`, `spring-boot-configuration-processor`…) portent, pour une release donnée, exactement la
+/// même version : celle du BOM `spring-boot-dependencies` et du parent `spring-boot-starter-parent`.
+const GROUPE_SPRING_BOOT: &str = "org.springframework.boot";
+
+/// `artifactId` des points d'entrée Spring Boot dont la `<version>` vaut la version de Spring Boot elle-même : le
+/// BOM importé dans un `<dependencyManagement>` (`spring-boot-dependencies`) et le parent de projet
+/// (`spring-boot-starter-parent`, qui importe lui-même ce BOM à la même version).
+const ARTEFACTS_VERSION_SPRING_BOOT: [&str; 2] =
+    ["spring-boot-dependencies", "spring-boot-starter-parent"];
+
+/// Déduit la version de Spring Boot applicable à un `pom.xml`, `None` si le dépôt audité ne permet pas de la
+/// connaître. Contourne de façon ciblée la limite du parseur best-effort — qui ne télécharge jamais le BOM externe
+/// `spring-boot-dependencies` ni le parent `spring-boot-starter-parent` situés hors du dépôt — en exploitant le
+/// fait que tout artefact du `groupId` [`GROUPE_SPRING_BOOT`] géré par ce BOM porte exactement la version du BOM.
+///
+/// Deux sources, la première disponible l'emportant :
+/// 1. un `<parent>` `org.springframework.boot:spring-boot-starter-parent` (ou `:spring-boot-dependencies`) déclaré
+///    par le pom lui-même **ou** par l'un de ses ancêtres disponibles ([`construire_chaine_parents`]), du plus
+///    proche au plus lointain — couvre le cas d'un parent Spring Boot situé hors du dépôt, jamais rattaché à la
+///    chaîne mais dont l'élément `<parent>` (coordonnées + version) reste capturé par [`parser_pom_xml_brut`] ;
+///    une `<version>` littérale non vide est exigée (un token `${...}` est ignoré, le `<parent>` Spring Boot
+///    étant en pratique toujours épinglé à une version littérale) ;
+/// 2. à défaut, une entrée `org.springframework.boot:spring-boot-dependencies` du `<dependencyManagement>` déjà
+///    fusionné (`gestion`), c'est-à-dire un import de BOM déclaré dans un `pom.xml` du dépôt.
+///
+/// Cet ordre (parent d'abord) est un choix best-effort : Maven, lui, ferait primer un BOM importé localement en
+/// `<dependencyManagement>` sur la gestion héritée d'un `<parent>` en cas de versions divergentes — configuration
+/// rare, non résolue à la manière de Maven ici, jugée hors périmètre de ce contournement.
+///
+/// **Décision arbitraire à valider par un humain** (cf. rapport de développement) : l'égalité « version d'un
+/// artefact `org.springframework.boot` == version du BOM » est vraie pour les artefacts du projet Spring Boot
+/// lui-même (publication groupée), mais fausse pour les dépendances tierces que ce BOM épingle à leur propre
+/// version (Jackson, Tomcat, Hibernate…). La déduction est donc strictement restreinte au `groupId` Spring Boot
+/// par l'appelant ([`resoudre_dependances_pom`]), jamais étendue au périmètre complet du BOM.
+fn deduire_version_spring_boot(
+    pom: &PomBrut,
+    chaine_parents: &[&PomBrut],
+    gestion: &HashMap<(String, String), String>,
+) -> Option<String> {
+    let version_via_parent = std::iter::once(pom)
+        .chain(chaine_parents.iter().copied())
+        .filter_map(|maillon| maillon.parent.as_ref())
+        .find(|parent| {
+            parent.group_id == GROUPE_SPRING_BOOT
+                && ARTEFACTS_VERSION_SPRING_BOOT.contains(&parent.artifact_id.as_str())
+                && !parent.version.is_empty()
+                && !parent.version.starts_with("${")
+        })
+        .map(|parent| parent.version.clone());
+
+    version_via_parent.or_else(|| {
+        gestion
+            .get(&(
+                GROUPE_SPRING_BOOT.to_string(),
+                "spring-boot-dependencies".to_string(),
+            ))
+            .cloned()
+    })
+}
+
 /// Produit les [`Dependance`] finales d'un pom.xml à partir de sa forme brute et de la chaîne de ses ancêtres
 /// disponibles déjà résolue ([`construire_chaine_parents`], éventuellement vide pour un pom sans parent ou dont le
 /// parent n'est pas dans le dépôt audité). Pour chaque `<dependency>` directement déclarée du pom (jamais celles
 /// de `dependencyManagement` lui-même, portée V1 préservée) : ignore silencieusement toute entrée sans
 /// `groupId`/`artifactId` ; retient la version littérale si déclarée, sinon celle du `dependencyManagement`
-/// fusionné pour la même coordonnée, sinon exclut silencieusement la dépendance (aucune version déterminable,
-/// comportement V1 préservé) ; substitue enfin les tokens `${...}` de la version retenue (token non résolu laissé
-/// littéral, cf. [`substituer_properties`]).
+/// fusionné pour la même coordonnée, sinon — pour le seul `groupId` `org.springframework.boot` — la version de
+/// Spring Boot déduite du BOM ou du parent ([`deduire_version_spring_boot`]), sinon exclut silencieusement la
+/// dépendance (aucune version déterminable, comportement V1 préservé) ; substitue enfin les tokens `${...}` de la
+/// version retenue (token non résolu laissé littéral, cf. [`substituer_properties`]).
 ///
 /// `chemin_manifeste` est le chemin réel du `pom.xml` dans le dépôt (ex. `module-a/pom.xml`), reporté tel quel
 /// dans [`Dependance::manifeste`] : il distingue les modules d'un même dépôt en aval (notamment la déduplication
@@ -2348,6 +2410,7 @@ fn resoudre_dependances_pom(
 ) -> Vec<Dependance> {
     let properties = fusionner_properties(pom, chaine_parents);
     let gestion = fusionner_gestion_dependances(pom, chaine_parents, &properties);
+    let version_spring_boot = deduire_version_spring_boot(pom, chaine_parents, &gestion);
 
     pom.dependances
         .iter()
@@ -2361,7 +2424,16 @@ fn resoudre_dependances_pom(
             let version_brute = dependance
                 .version
                 .clone()
-                .or_else(|| gestion.get(&(groupe.clone(), artefact.clone())).cloned())?;
+                .or_else(|| gestion.get(&(groupe.clone(), artefact.clone())).cloned())
+                .or_else(|| {
+                    // Repli restreint au seul groupId Spring Boot (cf. `deduire_version_spring_boot`) : jamais
+                    // appliqué à une dépendance tierce, que le BOM épingle à sa version propre.
+                    if groupe == GROUPE_SPRING_BOOT {
+                        version_spring_boot.clone()
+                    } else {
+                        None
+                    }
+                })?;
             Some(Dependance {
                 reference: format!("{groupe}:{artefact}"),
                 version: substituer_properties(&version_brute, &properties),
@@ -5248,6 +5320,350 @@ mod tests {
 
         assert_eq!(dependances.len(), 1);
         assert_eq!(dependances[0].version, "${spring.version}");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_deduit_la_version_spring_boot_du_parent_starter_parent_hors_depot()
+    {
+        // Projet mono-module héritant directement de `spring-boot-starter-parent` (jamais présent dans le dépôt
+        // audité) : une `<dependency>` `org.springframework.boot` sans `<version>` prend la version du `<parent>`.
+        let pom = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.2.1</version>
+            </parent>
+            <artifactId>service</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(
+            dependances[0].reference,
+            "org.springframework.boot:spring-boot-starter-web"
+        );
+        assert_eq!(dependances[0].version, "3.2.1");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_deduit_la_version_spring_boot_dun_parent_du_depot_heritant_de_starter_parent()
+     {
+        // Le `pom.xml` racine du dépôt hérite de `spring-boot-starter-parent` (hors dépôt) ; un module hérite du
+        // pom racine. La version de Spring Boot doit remonter la chaîne jusqu'à la dépendance sans version.
+        let racine = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.3.0</version>
+            </parent>
+            <groupId>com.example</groupId>
+            <artifactId>parent</artifactId>
+            <version>1.0.0</version>
+        </project>"#;
+        let module = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <artifactId>module-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-actuator</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let module_brut = parser_pom_xml_brut(module);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(racine));
+        poms_bruts.insert("module-a/pom.xml".to_string(), module_brut.clone());
+
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&module_brut, &chaine, "module-a/pom.xml");
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "3.3.0");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_deduit_la_version_spring_boot_dun_bom_importe_en_dependency_management()
+     {
+        // Le `pom.xml` racine du dépôt importe le BOM `spring-boot-dependencies` dans son `<dependencyManagement>`
+        // (`<scope>import</scope>`, ignoré par le parseur) ; un module en hérite et déclare `spring-boot-starter`
+        // sans version.
+        let racine = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>parent</artifactId>
+            <version>1.0.0</version>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>3.1.5</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+        </project>"#;
+        let module = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <artifactId>module-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let module_brut = parser_pom_xml_brut(module);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(racine));
+        poms_bruts.insert("module-a/pom.xml".to_string(), module_brut.clone());
+
+        let chaine = chaine_parents_de("module-a/pom.xml", &poms_bruts);
+        let dependances = resoudre_dependances_pom(&module_brut, &chaine, "module-a/pom.xml");
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "3.1.5");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_ne_deduit_la_version_spring_boot_que_pour_le_group_id_spring_boot()
+    {
+        // Le BOM `spring-boot-dependencies` gère aussi des dépendances tierces, mais à leur version propre : une
+        // `<dependency>` sans version hors du groupId Spring Boot reste exclue, jamais alignée sur la version du BOM.
+        let pom = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.2.1</version>
+            </parent>
+            <artifactId>service</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(
+            dependances[0].reference,
+            "org.springframework.boot:spring-boot-starter-web"
+        );
+        assert_eq!(dependances[0].version, "3.2.1");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_prefere_version_explicite_puis_dependency_management_a_la_deduction_spring_boot()
+     {
+        // La version littérale et l'entrée dédiée du `<dependencyManagement>` priment toutes deux sur la version
+        // déduite du BOM/parent Spring Boot (ordre de résolution : littéral -> gestion exacte -> déduction).
+        let pom = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.2.1</version>
+            </parent>
+            <artifactId>service</artifactId>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                        <version>3.0.0</version>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-security</artifactId>
+                    <version>3.1.0</version>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let mut dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
+        dependances.sort_by(|a, b| a.reference.cmp(&b.reference));
+
+        assert_eq!(dependances.len(), 2);
+        assert_eq!(
+            dependances[0].reference,
+            "org.springframework.boot:spring-boot-starter-security"
+        );
+        assert_eq!(dependances[0].version, "3.1.0");
+        assert_eq!(
+            dependances[1].reference,
+            "org.springframework.boot:spring-boot-starter-web"
+        );
+        assert_eq!(dependances[1].version, "3.0.0");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_exclut_une_dependance_spring_boot_sans_version_ni_marqueur_spring_boot()
+     {
+        // Aucun `<parent>` ni BOM Spring Boot : comportement historique inchangé, la dépendance sans version
+        // reste exclue faute de version déterminable.
+        let pom = r#"<project>
+            <groupId>com.example</groupId>
+            <artifactId>service</artifactId>
+            <version>1.0.0</version>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
+
+        assert!(dependances.is_empty());
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_deduit_la_version_spring_boot_dun_parent_spring_boot_dependencies()
+    {
+        // Second `artifactId` marqueur : `spring-boot-dependencies` déclaré directement en `<parent>` (projets qui
+        // ne peuvent pas hériter de `spring-boot-starter-parent`).
+        let pom = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.4.2</version>
+            </parent>
+            <artifactId>service</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "3.4.2");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_retient_le_parent_spring_boot_le_plus_proche_en_cas_de_versions_divergentes()
+     {
+        // Chaîne : module -> parent intermédiaire (spring-boot-starter-parent 3.3.0) -> racine
+        // (spring-boot-starter-parent 3.1.0). Le maillon le plus proche l'emporte (`once(pom).chain(...).find`).
+        let racine = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.1.0</version>
+            </parent>
+            <groupId>com.example</groupId>
+            <artifactId>racine</artifactId>
+            <version>1.0.0</version>
+        </project>"#;
+        let intermediaire = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>3.3.0</version>
+            </parent>
+            <groupId>com.example</groupId>
+            <artifactId>intermediaire</artifactId>
+            <version>1.0.0</version>
+        </project>"#;
+        let module = r#"<project>
+            <parent>
+                <groupId>com.example</groupId>
+                <artifactId>intermediaire</artifactId>
+                <version>1.0.0</version>
+            </parent>
+            <artifactId>module-a</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let module_brut = parser_pom_xml_brut(module);
+        let mut poms_bruts = HashMap::new();
+        poms_bruts.insert("pom.xml".to_string(), parser_pom_xml_brut(racine));
+        poms_bruts.insert(
+            "intermediaire/pom.xml".to_string(),
+            parser_pom_xml_brut(intermediaire),
+        );
+        poms_bruts.insert(
+            "intermediaire/module-a/pom.xml".to_string(),
+            module_brut.clone(),
+        );
+
+        let chaine = chaine_parents_de("intermediaire/module-a/pom.xml", &poms_bruts);
+        let dependances =
+            resoudre_dependances_pom(&module_brut, &chaine, "intermediaire/module-a/pom.xml");
+
+        assert_eq!(dependances.len(), 1);
+        assert_eq!(dependances[0].version, "3.3.0");
+    }
+
+    #[test]
+    fn resoudre_dependances_pom_ignore_une_version_de_parent_spring_boot_non_resolue() {
+        // `<parent>` Spring Boot dont la `<version>` est un token `${...}` non résoluble dans le dépôt : la
+        // déduction ne s'applique pas (garde `starts_with("${")`), la dépendance sans version reste exclue plutôt
+        // que d'apparaître avec une version littérale `${...}`.
+        let pom = r#"<project>
+            <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>${spring-boot.version}</version>
+            </parent>
+            <artifactId>service</artifactId>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </dependency>
+            </dependencies>
+        </project>"#;
+
+        let brut = parser_pom_xml_brut(pom);
+        let dependances = resoudre_dependances_pom(&brut, &[], "pom.xml");
+
+        assert!(dependances.is_empty());
     }
 
     #[test]
