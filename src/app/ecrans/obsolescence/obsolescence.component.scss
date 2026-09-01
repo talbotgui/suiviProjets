@@ -72,8 +72,20 @@
   margin: 0;
 }
 
+// Correction de bug (2026-09-01) : mêmes contraintes de largeur que le tableau des dépendances de la Fiche projet
+// (`fiche-projet.component.scss`) — références et chemins de manifestes longs provoquant un défilement horizontal
+// dans la modale de détail. Police et marges internes resserrées, spécifiques à ce tableau.
 .obsolescence-detail__tableau {
   overflow-x: auto;
+
+  .tableau {
+    font-size: var(--sqm-texte-xs);
+  }
+
+  th,
+  td {
+    padding: var(--sqm-espace-1) var(--sqm-espace-2);
+  }
 }
 
 .obsolescence-detail__java td {

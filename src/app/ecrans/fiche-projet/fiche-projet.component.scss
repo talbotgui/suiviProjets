@@ -98,3 +98,16 @@
 .fiche-projet__groupe-invite-titre {
   margin-top: var(--sqm-espace-2);
 }
+
+// Correction de bug (2026-09-01) : les références Maven/NPM et les chemins de manifestes affichés dans le tableau
+// des dépendances sont longs et débordaient la largeur de l'écran, imposant un défilement horizontal. Police et
+// marges internes du seul tableau des dépendances resserrées ; le motif générique `.tableau` (styles/_motifs.scss)
+// reste inchangé pour les autres écrans.
+.fiche-projet__table {
+  font-size: var(--sqm-texte-xs);
+
+  th,
+  td {
+    padding: var(--sqm-espace-1) var(--sqm-espace-2);
+  }
+}
