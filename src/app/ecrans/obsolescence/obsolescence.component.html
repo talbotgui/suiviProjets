@@ -125,9 +125,22 @@
             [title]="tuile.infobulle"
             (click)="ouvrirDetail(tuile.projetId)"
           >
-            <span class="obsolescence__nom-projet poids-demi-gras texte-sm">{{
-              tuile.nomProjet
-            }}</span>
+            <span class="obsolescence__ligne-nom d-flex aligne-centre ecart-2">
+              <span class="obsolescence__nom-projet poids-demi-gras texte-sm">{{
+                tuile.nomProjet
+              }}</span>
+              <!-- Langages principaux (US-057, RG-057), icônes réduites poussées en fin de ligne du nom ;
+                   absentes si la ventilation Sonar par langage de l'audit retenu est indisponible. -->
+              @if (tuile.langagesPrincipaux.length > 0) {
+                <span
+                  class="obsolescence__langages d-flex aligne-centre ecart-1 exterieur-gauche-auto"
+                >
+                  @for (langage of tuile.langagesPrincipaux; track langage.cleSonar) {
+                    <app-icone-langage [cleSonar]="langage.cleSonar" taille="sm" />
+                  }
+                </span>
+              }
+            </span>
             @for (mesure of tuile.mesures; track mesure.categorieId) {
               <app-barre-mesure
                 [sigle]="mesure.sigle"

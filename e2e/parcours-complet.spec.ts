@@ -482,6 +482,12 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
       await sectionsDependances.filter({ hasText: REGLE_DEPENDANCE.motif }).count(),
     ).toBeGreaterThan(0);
     expect(await sectionsDependances.filter({ hasText: 'obsolète' }).count()).toBeGreaterThan(0);
+
+    // US-057 : ligne « Langages principaux » au-dessus des dépendances, au moins une icône de langage
+    // (le bouchon Sonar de repli fournit une ventilation `ncloc_language_distribution` à deux langages).
+    const ligneLangages = page.locator('#fiche-projet-langages-principaux');
+    await expect(ligneLangages).toBeAttached();
+    expect(await ligneLangages.locator('app-icone-langage').count()).toBeGreaterThan(0);
   });
 
   // 17. Liste de travail — qualification d'un membre inconnu depuis une alerte, traitement d'une autre alerte.
@@ -594,6 +600,11 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('.obsolescence__legende')).toContainText('exec');
     const premiereTuile = page.locator('.obsolescence__tuile').first();
     await expect(premiereTuile).toBeVisible();
+
+    // US-057 : au moins une tuile porte une zone d'icônes de langage en fin de ligne du nom de projet.
+    await expect(
+      page.locator('.obsolescence__tuile .obsolescence__langages').first(),
+    ).toBeAttached();
 
     // La modale de détail est pilotée par le paramètre de requête `projet` (plan_16 incrément 5) : son ouverture
     // est une étape d'historique, un recul dans l'historique la referme.
@@ -774,7 +785,10 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await naviguerVersFicheProjet();
     // US-056 : la dépendance révisée relève d'une des sections repliables par écosystème.
     expect(
-      await page.locator('.fiche-projet__section-dependances').filter({ hasText: 'maintenu' }).count(),
+      await page
+        .locator('.fiche-projet__section-dependances')
+        .filter({ hasText: 'maintenu' })
+        .count(),
     ).toBeGreaterThan(0);
   });
 });

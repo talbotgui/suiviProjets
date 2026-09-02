@@ -47,6 +47,7 @@ import type { InputSignal, Signal, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBarreMesureComponent } from '../../composants/barre-mesure/barre-mesure.component';
+import { SqmIconeLangageComponent } from '../../composants/icone-langage/icone-langage.component';
 import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
 import type {
   DemandeEnregistrementVue,
@@ -64,7 +65,7 @@ import { ContexteConsultationService } from '../../services/avecetat/etat/contex
 import { HistoriqueNavigationService } from '../../services/avecetat/etat/historique-navigation.service';
 import type { EtatFiltreGroupeProjet } from '../../services/avecetat/etat/contexte-consultation.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import type { Audit } from '../../services/avecetat/etat/types-donnees';
+import type { Audit, Resultat } from '../../services/avecetat/etat/types-donnees';
 import { VuesEnregistreesUtils } from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import type {
   ResultatFiltrageVues,
@@ -72,6 +73,8 @@ import type {
 } from '../../services/sansetat/jugement/vues-enregistrees.utils';
 import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
+import { LangagesPrincipauxUtils } from '../../services/sansetat/jugement/langages-principaux.utils';
+import type { LangagePrincipal } from '../../services/sansetat/jugement/langages-principaux.utils';
 import {
   ObsolescenceRetardUtils,
   type ObsolescenceCategorie,
@@ -134,6 +137,11 @@ interface LigneObsolescence {
   readonly audit: Audit | undefined;
   /** Retard par identifiant de catégorie ; une catégorie absente signifie « aucune valeur » (jamais `0`). */
   readonly valeurParCategorie: ReadonlyMap<string, number>;
+  /**
+   * Langages principaux du projet (RG-057), sélectionnés à partir de la ventilation Sonar `ncloc_language_distribution`
+   * de l'audit retenu. Liste vide si la ventilation par langage est indisponible.
+   */
+  readonly langagesPrincipaux: readonly LangagePrincipal[];
   /** Texte de l'infobulle native de la tuile, précalculé. */
   readonly infobulle: string;
 }
@@ -152,6 +160,8 @@ interface TuileObsolescence {
   readonly projetId: string;
   readonly nomProjet: string;
   readonly infobulle: string;
+  /** Langages principaux du projet (RG-057), recopiés de la ligne source pour l'affichage en icônes sur la tuile. */
+  readonly langagesPrincipaux: readonly LangagePrincipal[];
   readonly mesures: readonly MesureCategorie[];
 }
 
@@ -188,6 +198,7 @@ interface DetailProjet {
   selector: 'app-obsolescence',
   imports: [
     SqmBarreMesureComponent,
+    SqmIconeLangageComponent,
     SqmSelecteurVueComponent,
     SqmFiltreGroupeProjetComponent,
     RouterLink,
@@ -424,6 +435,12 @@ export class SqmObsolescenceComponent {
         const valeurParCategorie = new Map(
           obsolescence.map((entree) => [entree.categorieId, entree.valeur]),
         );
+        const langagesPrincipaux =
+          audit === undefined
+            ? []
+            : LangagesPrincipauxUtils.selectionner(
+                SqmObsolescenceComponent.extraireParLangage(audit),
+              );
         lignes.push({
           projetId: projet.id,
           nomProjet: projet.nom,
@@ -431,11 +448,13 @@ export class SqmObsolescenceComponent {
           nomGroupe: groupe.nom,
           audit,
           valeurParCategorie,
+          langagesPrincipaux,
           infobulle: SqmObsolescenceComponent.construireInfobulle(
             projet.nom,
             groupe.nom,
             categories,
             valeurParCategorie,
+            langagesPrincipaux,
           ),
         });
       }
@@ -461,11 +480,26 @@ export class SqmObsolescenceComponent {
   }
 
   /**
+   * Extrait la ventilation Sonar par langage (`ncloc_language_distribution`) de l'audit retenu d'un projet
+   * (RG-057), sans assertion de type : type-guard sur le discriminant `sonar.ncloc` de l'union `Resultat`.
+   * @param audit - Audit retenu du projet.
+   * @returns La répartition `{ clé Sonar → lignes de code }`, objet vide si l'audit ne porte pas ce constat.
+   */
+  private static extraireParLangage(audit: Audit): Readonly<Record<string, number>> {
+    const resultat = audit.resultats.find(
+      (candidat): candidat is Extract<Resultat, { type: 'sonar.ncloc' }> =>
+        candidat.type === 'sonar.ncloc',
+    );
+    return resultat?.parLangage ?? {};
+  }
+
+  /**
    * Construit le texte de l'infobulle d'une tuile.
    * @param nomProjet - Nom du projet.
    * @param nomGroupe - Nom du groupe.
    * @param categories - Catégories du référentiel.
    * @param valeurParCategorie - Retard par identifiant de catégorie.
+   * @param langagesPrincipaux - Langages principaux du projet (RG-057), ligne ajoutée si la liste est non vide.
    * @returns Le texte de l'infobulle.
    */
   private static construireInfobulle(
@@ -473,6 +507,7 @@ export class SqmObsolescenceComponent {
     nomGroupe: string,
     categories: readonly CategorieDependance[],
     valeurParCategorie: ReadonlyMap<string, number>,
+    langagesPrincipaux: readonly LangagePrincipal[],
   ): string {
     const details = categories.map((categorie) => {
       const valeur = valeurParCategorie.get(categorie.id);
@@ -480,7 +515,13 @@ export class SqmObsolescenceComponent {
         valeur === undefined ? 'aucune dépendance' : `${valeur} version(s) majeure(s) de retard`;
       return `${categorie.libelle} : ${texte}`;
     });
-    return `${nomProjet} (${nomGroupe})\n${details.join('\n')}`;
+    // Point ouvert du plan (incrément 5) : la clé Sonar brute est affichée ici, faute d'extraire la table de
+    // correspondance libellé du composant d'icône ; décision arbitraire à valider par un humain.
+    const ligneLangages =
+      langagesPrincipaux.length === 0
+        ? []
+        : [`Langages : ${langagesPrincipaux.map((langage) => langage.cleSonar).join(', ')}`];
+    return [`${nomProjet} (${nomGroupe})`, ...details, ...ligneLangages].join('\n');
   }
 
   /**
@@ -537,6 +578,7 @@ export class SqmObsolescenceComponent {
       projetId: ligne.projetId,
       nomProjet: ligne.nomProjet,
       infobulle: ligne.infobulle,
+      langagesPrincipaux: ligne.langagesPrincipaux,
       mesures: categories.map((categorie) => ({
         categorieId: categorie.id,
         sigle: categorie.sigle,

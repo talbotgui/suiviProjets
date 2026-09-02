@@ -58,6 +58,16 @@
   }
 }
 
+// Ligne du nom : le nom garde la priorité d'espace, la zone d'icônes de langage (US-057) est poussée à droite
+// (`exterieur-gauche-auto` sur le gabarit) et peut repasser sous le nom sur un nom long, jamais le tronquer.
+.obsolescence__ligne-nom {
+  flex-wrap: wrap;
+}
+
+.obsolescence__langages {
+  flex: none;
+}
+
 // Hauteur réservée pour deux lignes de nom : toutes les tuiles s'alignent, quel que soit le nom du projet.
 .obsolescence__nom-projet {
   display: -webkit-box;

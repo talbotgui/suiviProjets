@@ -416,7 +416,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   type: 'sonar.ncloc',
                   sourceId: 'f0000000-0000-4000-8000-000000000002',
                   ncloc: 84210,
-                  parLangage: { java: 79800, xml: 4410, js: 0 },
+                  parLangage: { java: 59800, kotlin: 20000, xml: 4410 },
                 },
                 {
                   type: 'croise.fraicheur_sonar',
@@ -586,7 +586,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
                   type: 'sonar.ncloc',
                   sourceId: 'f0000000-0000-4000-8000-000000000002',
                   ncloc: 86950,
-                  parLangage: { java: 82100, xml: 4410, js: 440 },
+                  parLangage: { java: 62100, kotlin: 20440, xml: 4410 },
                 },
                 {
                   type: 'croise.fraicheur_sonar',

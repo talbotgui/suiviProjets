@@ -1,0 +1,28 @@
+Icônes de langage (RG-057, plan_17 chapitre 3)
+=============================================
+
+Ce dossier héberge un sous-ensemble de fichiers SVG Devicon (https://devicon.dev,
+licence MIT — voir LICENCE-devicon.txt) servis localement par le composant partagé
+SqmIconeLangageComponent (src/app/composants/icone-langage/). Aucune ressource
+externe n'est chargée à l'exécution : la CSP de l'application
+(src-tauri/tauri.conf.json) n'autorise que `img-src 'self' data:`.
+
+Les logos de langages sont des marques tierces : leur usage relève du domaine de
+vigilance renforcée « conformité aux référentiels externes » et doit être validé
+par un humain (cf. docs/04_rapports/rapportDeDeveloppement.md, Étape 36).
+
+Fichiers présents (nom de base = valeur `fichier` de la table CORRESPONDANCE du
+composant ; extension .svg). Toute clé Sonar sans fichier ici, ou dont le fichier
+ne se charge pas, tombe sur le repli textuel du composant, sans erreur :
+
+  java.svg        kotlin.svg      scala.svg       groovy.svg
+  javascript.svg  typescript.svg  html5.svg       css3.svg
+  sass.svg        python.svg      csharp.svg      c.svg
+  cplusplus.svg   objectivec.svg  go.svg          rust.svg
+  php.svg         ruby.svg        swift.svg       terraform.svg
+  docker.svg
+
+  LICENCE-devicon.txt   (licence MIT de Devicon + attribution)
+
+Procédure de (re)récupération : voir docs/04_rapports/rapportDeDeveloppement.md,
+Étape 36, incrément 3 (script shell fourni).

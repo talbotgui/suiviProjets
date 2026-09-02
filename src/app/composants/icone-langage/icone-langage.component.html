@@ -1,0 +1,22 @@
+<!-- Icône de langage servie localement (`<img src>` vers un SVG Devicon de public/langages/), jamais d'injection
+     HTML dynamique ([innerHTML]) : le libellé du langage est toujours porté par les attributs alt/title échappés
+     nativement par Angular (RG-057, .claude/rules/10-normes-securite.md). Repli textuel pour une clé Sonar non
+     reconnue, jamais une absence silencieuse. -->
+@if (source(); as src) {
+  <img
+    class="icone-langage"
+    [class.icone-langage--sm]="taille() === 'sm'"
+    [src]="src"
+    [alt]="libelle()"
+    [attr.title]="libelle()"
+    (error)="onErreurImage()"
+  />
+} @else {
+  <span
+    class="icone-langage icone-langage--repli"
+    [class.icone-langage--sm]="taille() === 'sm'"
+    [attr.title]="libelle()"
+    [attr.aria-label]="libelle()"
+    >{{ repli() }}</span
+  >
+}

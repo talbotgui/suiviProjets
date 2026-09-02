@@ -9,6 +9,10 @@
 # par ligne logique, sans reformatage automatique de la prose.
 docs/**
 
+# Assets tiers copiés tels quels dans le bundle (icônes SVG Devicon, licence MIT et notice) : jamais reformatés,
+# `prettier --check <chemin>` sur un `.svg`/`.txt` échouant faute de parseur (plan_17 chapitre 3, RG-057).
+public/langages/**
+
 # Artefacts de build/scaffolding, jamais suivis par Git (cf. .gitignore et src-tauri/.gitignore).
 dist/**
 .angular/**

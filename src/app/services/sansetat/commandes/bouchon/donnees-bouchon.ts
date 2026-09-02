@@ -373,7 +373,7 @@ export const CONSTATS_SONAR_BOUCHON: ReadonlyMap<string, ConstatSonarBouchon> = 
       dette: { detteMinutes: 13980, ratioDette: 3.1 },
       couverture: { couverture: 64.8, couvertureNouveauCode: 82.5 },
       notes: { fiabilite: 2.0, securite: 2.0, maintenabilite: 2.0, revueSecurite: 2.0 },
-      ncloc: { ncloc: 86950, parLangage: { java: 82100, xml: 4410, js: 440 } },
+      ncloc: { ncloc: 86950, parLangage: { java: 62100, kotlin: 20440, xml: 4410 } },
       derniereAnalyseLe: '2026-07-08',
     },
   ],
@@ -428,7 +428,7 @@ export const CONSTAT_SONAR_REPLI: ConstatSonarBouchon = {
   dette: DETTE_REPLI,
   couverture: { couverture: 60.0, couvertureNouveauCode: 70.0 },
   notes: { fiabilite: 2.0, securite: 2.0, maintenabilite: 2.0, revueSecurite: 2.0 },
-  ncloc: { ncloc: 10000, parLangage: { autre: 10000 } },
+  ncloc: { ncloc: 10000, parLangage: { java: 7000, kotlin: 3000 } },
   derniereAnalyseLe: null,
 };
 

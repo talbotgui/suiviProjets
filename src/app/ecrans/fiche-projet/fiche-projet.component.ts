@@ -17,6 +17,11 @@
 // (`dernierAuditLabel` et l'ensemble des indicateurs affichés) ignore désormais systématiquement les audits
 // historiques (`typeAudit: 'historique'`), jamais simplement `.at(-1)` ; un nouvel encart dédié
 // (`fiche-projet__audits-historiques`) liste séparément les audits historiques du projet, le cas échéant.
+//
+// Évolution plan_17 chapitre 3 (US-057, RG-057) : une ligne discrète « Langages principaux » en icônes Sonar
+// (`SqmIconeLangageComponent`) est insérée au-dessus de la section « Dépendances », alimentée par la ventilation
+// `sonar.ncloc.parLangage` du dernier audit régulier via `LangagesPrincipauxUtils.selectionner` ; elle est grisée
+// avec le bloc Sonar (`sonarKo`, RG-013) et absente quand la ventilation par langage est indisponible.
 import {
   Component,
   ElementRef,
@@ -40,6 +45,7 @@ import { SqmBoutonCopieComponent } from '../../composants/bouton-copie/bouton-co
 import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
+import { SqmIconeLangageComponent } from '../../composants/icone-langage/icone-langage.component';
 import { SqmModaleSaisieMasseComponent } from '../../composants/modale-saisie-masse/modale-saisie-masse.component';
 import type {
   ErreurLigneSaisieMasse,
@@ -80,6 +86,8 @@ import { DerniereCampagneUtils } from '../../services/sansetat/jugement/derniere
 import { EcosystemeDependanceUtils } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import type { EcosystemeDependance } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
+import { LangagesPrincipauxUtils } from '../../services/sansetat/jugement/langages-principaux.utils';
+import type { LangagePrincipal } from '../../services/sansetat/jugement/langages-principaux.utils';
 import { LienExterneSourceUtils } from '../../services/sansetat/jugement/lien-externe-source.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
 import type { ResultatNoteSonar } from '../../services/sansetat/jugement/note-sonar.utils';
@@ -443,6 +451,13 @@ interface DonneesFicheProjet {
    * seules les sections non vides sont présentes, dans l'ordre Maven, NPM, Autres.
    */
   readonly sectionsDependances: readonly SectionDependances[];
+  /**
+   * Langages principaux du projet (RG-057), sélectionnés à partir de la ventilation Sonar `ncloc_language_distribution`
+   * du dernier audit régulier retenu. Liste vide si la ventilation par langage est indisponible (aucun audit,
+   * audit historique, audit antérieur à la collecte). Restitués en icônes au-dessus des dépendances, grisés
+   * comme le bloc Sonar quand {@link sonarKo}.
+   */
+  readonly langagesPrincipaux: readonly LangagePrincipal[];
   /** Étiquette résumée des demandes de fusion ouvertes (nombre, conflits). */
   readonly mrResume: EtiquetteCouleur | undefined;
   /** Demandes de fusion ouvertes constatées, détaillées ligne par ligne. */
@@ -505,6 +520,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmBadgeComponent,
     SqmBoutonCopieComponent,
     SqmExplicationJugementComponent,
+    SqmIconeLangageComponent,
     SqmConfirmationMotDePasseComponent,
     SqmConfirmationSuppressionComponent,
     SqmModaleSaisieMasseComponent,
@@ -897,6 +913,13 @@ export class SqmFicheProjetComponent {
       dernierAudit === undefined
         ? undefined
         : this.trouverResultat(dernierAudit.resultats, 'gitlab.taille_depot');
+    // RG-057 : la ventilation Sonar par langage du dernier audit régulier alimente la ligne « Langages principaux ».
+    // `trouverResultat` opère sur le type `Resultat` complet, dont `sonar.ncloc` fait partie (contrairement au type
+    // restreint de `AgregationThemeFicheProjetUtils`).
+    const resultatNcloc =
+      dernierAudit === undefined
+        ? undefined
+        : this.trouverResultat(dernierAudit.resultats, 'sonar.ncloc');
     // `trouverTousResultats`, pas `trouverResultat` : un projet à plusieurs sources GitLab (ex. un dépôt back et un
     // dépôt front) produit un résultat `gitlab.merge_requests` par source dans `Audit.resultats` — ne retenir que le
     // premier en perdrait silencieusement les MR des sources suivantes (corrige R15-06, Phase 15, recette du
@@ -986,6 +1009,7 @@ export class SqmFicheProjetComponent {
       dependancesDisponibles: themes.dependancesDisponibles,
       dependances: lignesDependances,
       sectionsDependances: this.construireSectionsDependances(lignesDependances),
+      langagesPrincipaux: LangagesPrincipauxUtils.selectionner(resultatNcloc?.parLangage ?? {}),
       mrResume: this.construireResumeMr(mrOuvertesToutesSources, seuilsMrOuvertes, maintenant),
       mrOuvertes: mrOuvertesToutesSources.map((mr) => this.construireLigneMr(mr, maintenant)),
       membres,
@@ -1398,9 +1422,7 @@ export class SqmFicheProjetComponent {
    */
   private static rangStatutDependanceDecompte(label: string): number {
     const rang = SqmFicheProjetComponent.ORDRE_STATUTS_DEPENDANCE_DECOMPTE.indexOf(label);
-    return rang === -1
-      ? SqmFicheProjetComponent.ORDRE_STATUTS_DEPENDANCE_DECOMPTE.length
-      : rang;
+    return rang === -1 ? SqmFicheProjetComponent.ORDRE_STATUTS_DEPENDANCE_DECOMPTE.length : rang;
   }
 
   /**
@@ -1673,6 +1695,15 @@ export class SqmFicheProjetComponent {
    */
   public nombreDependancesNonReferencees(dependances: readonly LigneDependance[]): number {
     return dependances.filter((dependance) => dependance.nonReference).length;
+  }
+
+  /**
+   * Construit l'infobulle de la ligne « Langages principaux » (US-057) : chaque langage et sa part en pourcentage.
+   * @param langages - Langages principaux du projet, déjà sélectionnés par `LangagesPrincipauxUtils`.
+   * @returns Le résumé « clé (N %), clé (N %) », ou une chaîne vide si la liste est vide.
+   */
+  public resumeLangages(langages: readonly LangagePrincipal[]): string {
+    return langages.map((langage) => `${langage.cleSonar} (${langage.pourcentage} %)`).join(', ');
   }
 
   /**

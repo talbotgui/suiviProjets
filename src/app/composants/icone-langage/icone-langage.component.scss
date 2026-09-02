@@ -1,0 +1,38 @@
+// Résidu propre à ce composant (plan_17 chapitre 3, RG-057) : seul le dimensionnement carré sous-échelle de
+// l'icône (deux tailles `md`/`sm`, plus petites que toute classe utilitaire) et la mise en forme compacte du
+// texte de la puce de repli (taille de police réduite, capitales, troncature) ne sont pas exprimables par les
+// classes utilitaires génériques de src/styles/_utilitaires.scss. Couleurs et fond repris des tokens neutres.
+.icone-langage {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+  vertical-align: middle;
+  flex: none;
+}
+
+.icone-langage--sm {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.icone-langage--repli {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 0.15rem;
+  border-radius: var(--sqm-rayon-sm);
+  background-color: var(--sqm-neutre-150);
+  color: var(--sqm-neutre-900);
+  font-size: var(--sqm-texte-2xs);
+  font-weight: var(--sqm-poids-demi-gras);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  overflow: hidden;
+}
+
+.icone-langage--repli.icone-langage--sm {
+  font-size: 0.6rem;
+}

@@ -40,9 +40,16 @@
   gap: var(--sqm-espace-6);
 }
 
-.fiche-projet__bloc-sonar--grise {
+// Grisage mutualisé (RG-013) : le bloc Sonar et la ligne « Langages principaux » (US-057) partagent la même
+// déclaration d'atténuation quand les indicateurs Sonar du projet sont périmés.
+.fiche-projet__bloc-sonar--grise,
+.fiche-projet__langages--grise {
   opacity: 0.5;
   filter: grayscale(1);
+}
+
+.fiche-projet__langages {
+  flex-wrap: wrap;
 }
 
 .fiche-projet__ligne--inconnu {

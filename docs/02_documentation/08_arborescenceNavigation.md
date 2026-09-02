@@ -75,8 +75,8 @@ Composant transversal
 | Brouillon (et rapport d'anomalies) | [US-013](./04_casUsage.md#cas-dusage--user-stories), [US-014](./04_casUsage.md#cas-dusage--user-stories) |
 | Synthèse des audits | [US-015](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
 | Synthèse graphique | [US-016](./04_casUsage.md#cas-dusage--user-stories), [US-019](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
-| Obsolescence | [US-050](./04_casUsage.md#cas-dusage--user-stories), [US-051](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
-| Fiche projet | [US-017](./04_casUsage.md#cas-dusage--user-stories), [US-022](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-056](./04_casUsage.md#cas-dusage--user-stories) |
+| Obsolescence | [US-050](./04_casUsage.md#cas-dusage--user-stories), [US-051](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories), [US-057](./04_casUsage.md#cas-dusage--user-stories) |
+| Fiche projet | [US-017](./04_casUsage.md#cas-dusage--user-stories), [US-022](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-056](./04_casUsage.md#cas-dusage--user-stories), [US-057](./04_casUsage.md#cas-dusage--user-stories) |
 | Comparaison entre deux audits | [US-018](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-056](./04_casUsage.md#cas-dusage--user-stories) |
 | Liste de travail | [US-020](./04_casUsage.md#cas-dusage--user-stories), [US-028](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
 | Recherche transversale | [US-021](./04_casUsage.md#cas-dusage--user-stories) |

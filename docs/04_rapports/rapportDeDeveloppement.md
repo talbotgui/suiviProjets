@@ -3709,3 +3709,243 @@ Constats et suite donnée (corrections appliquées par le Codeur) :
 - **suggestion — note d'auto-contrôle du numéro d'Étape 35.** Vérifié : 35 est le premier numéro libre après l'Étape 34.
 
 Après corrections : 9 tests unitaires Spring Boot au total, `cargo test --locked connecteurs::gitlab` 97 passés / 0 échec, `cargo clippy` 0 avertissement, `gitlab.rs` propre pour `rustfmt`. **Validation humaine explicite et vérification fonctionnelle (`npm run tauri dev` sur un dépôt Spring Boot réel) restent requises avant intégration.**
+
+## Étape 36 — plan_17 chapitre 3 : langages principaux d'un projet (icônes Sonar) sur la Fiche projet et l'écran Obsolescence (US-057 / RG-057)
+
+Numérotation d'étape (`36`) à revérifier à la relecture : des sessions concurrentes traitant d'autres plans pouvaient consommer un autre numéro entre-temps ; décaler en bloc sans trou le cas échéant. Chapitre développé incrément par incrément à la demande explicite de l'utilisateur (« développe le chapitre 3 », périmètre « documents normatifs puis code », relecture isolée en binôme Codeur/Relecteur via sous-agents après chaque incrément, sans arrêt pour validation humaine intermédiaire — la validation humaine explicite de chaque incrément reste néanmoins préalable à toute intégration). Identifiants `US-057`/`RG-057` supposés libres au moment de la rédaction (derniers consommés : `US-056`/`RG-056`) — à reconfirmer à la qualification.
+
+### Incrément 1 — documents normatifs
+
+#### Codeur
+
+Mise à jour documentaire assistée par l'IA (Claude Code), livrée avant tout code conformément au découpage du plan (section 11).
+
+- `04_casUsage.md` : nouvelle ligne US-057 (persona Camille, Consultation, Could have, critères d'acceptation = une à deux icônes de langage sur la Fiche projet au-dessus des dépendances et en fin de ligne du nom de projet des tuiles de l'Obsolescence, sélection RG-057, grisage aligné sur RG-013, absence d'icône si la ventilation par langage est indisponible) ; ajout de US-057 à la ligne « Réduire le temps nécessaire pour obtenir une vue d'ensemble multi-groupes » de la matrice de couverture.
+- `05_reglesGestion.md` : nouvelle RG-057 en fin de section « Seuils, référentiels et historisation » (juste après RG-056) ; ajout de RG-057 aux lignes « Écran Obsolescence » et « Fiche projet » de la description sommaire des écrans ; ajout de US-057 aux matrices RG-011, RG-013 et nouvelle ligne RG-057 → US-057 de la matrice RG × US.
+- `08_arborescenceNavigation.md` : ajout de US-057 aux lignes `Obsolescence` et `Fiche projet` de la matrice écrans / user stories.
+- `09_maquettes.md` : section « Fiche projet » (colonne gauche : ligne « Langages principaux » au-dessus des dépendances, grisée si Sonar KO, absente si ventilation indisponible) ; section « Obsolescence » (icônes de langage réduites en fin de ligne du nom de projet des tuiles, repli sous le nom sans troncature, infobulle enrichie).
+- `13_conceptionDetaillee.md` : ligne « UI — Moteur de jugement » — ajout de `LangagesPrincipauxUtils.selectionner` (fonction pure, RG-057) ; ligne « UI — Écrans et navigation » — ajout du composant partagé `SqmIconeLangageComponent` (`<img>` vers SVG Devicon local, table de correspondance interne, repli textuel) ; ajout de RG-057 à la ligne « UI — Moteur de jugement » de la matrice de traçabilité module × RG.
+- `15_normesSecurite.md` : bullet ajouté à « Contrôle des entrées et sorties » — icônes servies localement depuis `public/langages/` (`img-src 'self'`), aucune ressource externe, aucun SVG injecté via `[innerHTML]`, clés Sonar interpolées seulement dans des attributs `alt`/`title` échappés nativement.
+- `16_normesTests.md` : `LangagesPrincipauxUtils` rattaché au périmètre Moteur de jugement (seuil 90 %, cas de test énumérés) ; `SqmIconeLangageComponent` rattaché au régime des composants graphiques (méthodes jamais appelées + spec unitaire dédié) ; parcours de bout en bout complété (assertion `app-icone-langage` sur la Fiche projet, `.obsolescence__langages` sur une tuile).
+- `guide-utilisateur.md` : paragraphes « Fiche projet » et « Obsolescence » — mention de la ligne / des icônes de langages principaux. Régénération éventuelle des captures `docs/assets/captures/` de ces écrans à signaler après le développement (hors pipeline, non bloquant).
+
+Vérification croisée de traçabilité (règle générale n° 13) refaite : US-057/RG-057 réutilisés sans renommage ; matrices `04`/`05`/`08`/`13` cohérentes entre elles ; RG-057 rattachée à un unique US (US-057) et à deux écrans (Fiche projet, Obsolescence).
+
+**Décisions arbitraires à valider par un humain (cf. règles opérationnelles), reprises du plan :**
+
+- **RG-057 — seuil du second langage.** `SEUIL_SECOND_LANGAGE = 0.1` (10 % du total des lignes de code, borne `>=` : un langage à exactement 10 % est affiché). Constante de présentation nommée dans le code, non une entrée de `parametres`.
+- **RG-057 — plafond de langages.** `NOMBRE_MAX_LANGAGES = 2`. Constante de présentation nommée dans le code.
+- **RG-057 — départage déterministe.** Deux langages à nombre de lignes de code égal sont départagés par l'ordre alphabétique croissant de la clé Sonar (nécessaire au déterminisme du rendu et des tests E2E).
+- **RG-057 — placement.** RG-057 est placée dans la section « Seuils, référentiels et historisation » de `05_reglesGestion.md`, à la suite de RG-055 et RG-056, faute de section propre aux écrans de restitution.
+- **US-057 — priorité.** « Could have » repris du plan, à confirmer.
+- **Jeu d'icônes.** Devicon (licence MIT), sous-ensemble de fichiers SVG versionnés sous `public/langages/` ; les logos de langages sont des marques tierces (domaine de vigilance renforcée « conformité aux référentiels externes »).
+- **Clé Sonar `web`.** Rattachée à l'icône HTML dans la table de correspondance du composant (à confirmer).
+- **Repli d'une clé Sonar non mappée.** Puce textuelle portant le libellé court, jamais une absence silencieuse ni une icône générique.
+
+#### Relecteur
+
+Relecture conduite le 2026-09-02 dans un contexte isolé de celui du Codeur (sous-agent dédié, sans accès à son raisonnement), sur la base du `git diff` des neuf fichiers documentaires, du chapitre 3 du plan, des règles opérationnelles et de la lecture directe du code (`connecteurs/sonar.rs`, `tauri.conf.json`, `types-facade.ts`, bouchons). **Verdict : à intégrer après corrections mineures.** Aucun constat bloquant ni majeur.
+
+Points vérifiés conformes : `US-057`/`RG-057` premiers identifiants libres, réservés par `plan_18` pour ce chapitre ; renvois croisés réciproques `04` ↔ `05` (matrices + description sommaire) ↔ `08` ↔ `13` ; `interroger_ncloc` interroge bien `ncloc_language_distribution` et retourne `par_langage` vide en mode historique (Rustdoc à l'appui), `RG-046` cohérent ; `parLangage` déjà présent dans `types-facade.ts` et déjà peuplé dans les bouchons ; `img-src 'self' data:` réellement présent dans `tauri.conf.json` ; huit décisions arbitraires consignées ; numéro d'Étape 36 exact.
+
+Constats et suite donnée (corrections appliquées) :
+
+- **mineur — ancres cassées vers RG-046 dans RG-057.** Deux `[RG-046](#seuils-référentiels-et-historisation)` alors que RG-046 est dans la section « Audits et campagnes ». **Corrigé** en `#audits-et-campagnes` (aligné sur `04_casUsage.md` et `13_conceptionDetaillee.md`).
+- **mineur — `09_maquettes.md`, tuile Obsolescence : formulation ambiguë** (« du nom d'une à deux icônes ») et accord bancal. **Corrigé** : « suivi, en fin de la ligne du nom, d'une à deux petites icônes de langage principal ».
+- **mineur — `05_reglesGestion.md`, RG-057 : « fonction pure, jamais persistée comme un constat »** — c'est le résultat qui n'est pas persisté. **Corrigé** : « fonction pure dont le résultat n'est jamais persisté comme un constat ».
+- **suggestion — nommer `sonar::interroger_ncloc`** dans RG-057 et dans la ligne « UI — Moteur de jugement » de `13`. **Appliqué**.
+- **suggestion — ajouter US-057 à la ligne « Cœur natif — Façade de commandes »** de la matrice de traçabilité de `13` (aux côtés de US-055/US-056). **Appliqué**.
+- **suggestion — ligne combinée « Fiche projet (et comparaison entre deux audits) »** de la description sommaire : RG-057 ne concerne pas la Comparaison. **Non modifié** : conforme au mandat du plan (ajout aux lignes Obsolescence et Fiche projet), le corps de RG-057 bornant explicitement le périmètre aux deux écrans concernés.
+- **observation — hygiène de commit** : `langages-principaux.utils.ts` (incrément 2) déjà présent dans l'arbre ; le commit de l'incrément 1 ne doit stager que les neuf fichiers documentaires. Pris en compte.
+- **hors périmètre** — `src/app/ecrans/credentials/credentials.component.html` (`rows="4"` → `rows="1" cols="10"`) : modification étrangère à ce chapitre, d'apparence accidentelle, à examiner hors de cette relecture.
+
+### Incrément 2 — utilitaire de sélection des langages principaux
+
+#### Codeur
+
+Développement assisté par l'IA (Claude Code). Deux fichiers nouveaux, sur le gabarit de `ecosysteme-dependance.utils.ts` (incrément 2 du chapitre 2) :
+
+- `src/app/services/sansetat/jugement/langages-principaux.utils.ts` : interface `LangagePrincipal { cleSonar, pourcentage }` (vue calculée interne, RG-011) ; constantes `SEUIL_SECOND_LANGAGE = 0.1` et `NOMBRE_MAX_LANGAGES = 2` (`public static readonly`, documentées comme décisions arbitraires) ; `selectionner(parLangage: Readonly<Record<string, number>>): readonly LangagePrincipal[]` — filtre des entrées `<= 0`, `total` sur toutes les entrées filtrées, `[]` si total nul, tri par lignes décroissantes puis clé Sonar croissante (comparaison relationnelle brute, jamais `localeCompare`), plafond de 2, second langage omis si sa part `< 0.1` du total strictement, `pourcentage = Math.round((lignes / total) * 100)`, aucune mutation de l'entrée.
+- `src/app/services/sansetat/jugement/langages-principaux.utils.spec.ts` : 13 tests (ventilation vide, entièrement nulle, entièrement négative, langage unique, 70/30, second à 9 % omis, second à 10 % conservé, plafond sur 60/30/10, départage alphabétique quel que soit l'ordre d'entrée, entrée nulle sans faussage du total, non-mutation, constantes exposées).
+
+Outillage : `prettier --check` propre, `eslint` exit 0, `npm run typecheck` exit 0, `jest --coverage` 13/13, couverture 100 % (stmts/branch/funcs/lines) — seuil 90 % du Moteur de jugement tenu.
+
+#### Relecteur
+
+Relecture conduite le 2026-09-02 en contexte isolé (sous-agent dédié). **Verdict : à intégrer en l'état** (outillage rejoué tout vert, algorithme vérifié sur tous les cas limites construits, rigueur TypeScript conforme, spec couvrant toutes les branches). Un constat mineur retenu et corrigé :
+
+- **mineur — `localeCompare` dépendant de la locale de l'hôte.** Sans impact sur les clés Sonar ASCII actuelles, mais le plan insiste doublement sur le déterminisme du rendu et des tests. **Corrigé** : comparateur remplacé par `cleA < cleB ? -1 : 1` (le cas d'égalité de clés n'étant pas atteignable sur un `Record`), commentaire à l'appui ; test de départage étendu aux deux ordres d'entrée pour couvrir les deux sens du comparateur (couverture de branches ramenée à 100 %). Suggestions stylistiques (`index === 1` au lieu de `index >= 1`, commentaire sur l'équivalence `total === 0`) également appliquées.
+
+### Incrément 3 — composant d'icône de langage partagé et assets
+
+#### Codeur
+
+Développement assisté par l'IA (Claude Code). Nouveau répertoire `src/app/composants/icone-langage/` :
+
+- `icone-langage.component.ts` : `SqmIconeLangageComponent` (`app-icone-langage`, standalone, `OnPush`), entrées signal `cleSonar` (`input.required<string>`) et `taille` (`'md' | 'sm'`, défaut `'md'`) — écart assumé au plan qui prévoyait `@Input()` décoratif : le dépôt n'utilise que les entrées signal (`ecosysteme` mis à part, tous les composants transverses, cf. `badge`, `barre-mesure`, `explication-jugement`). Table statique privée `CORRESPONDANCE` (clé Sonar minuscule → `{ fichier, libelle }`, 23 entrées dont `js`→`javascript`, `ts`→`typescript`, `web`/`html`→`html5`, `cs`→`csharp`, `cpp`→`cplusplus`, `objc`→`objectivec`, `scss`→`sass`, `py`/`py3`→`python`). Signaux calculés `entree`, `libelle`, `source` (`langages/<fichier>.svg` ou `null`), `repli` (libellé tronqué à 4 caractères en majuscules). Aucune assertion `!`/`as`.
+- `icone-langage.component.html` : `@if (source(); as src) { <img …> } @else { <span class="icone-langage--repli">{{ repli() }}</span> }` — `alt`/`title` toujours renseignés par le libellé échappé nativement, jamais de `[innerHTML]`.
+- `icone-langage.component.scss` : deux tailles (`md` ≈ 20 px, `sm` ≈ 13,6 px), `object-fit: contain`, `flex: none` ; puce de repli sur tokens neutres `--sqm-neutre-*`.
+- `icone-langage.component.spec.ts` : 9 tests (clé mappée `java`/`ts`/`web` → `<img>` avec `src`/`alt`/`title` attendus ; casse ignorée ; clé inconnue `autre`/`cobol`/chaîne vide → puce de repli, pas de `<img>` ; classe `--sm` présente sur `taille="sm"`, absente par défaut).
+
+`public/langages/LISEZ-MOI.txt` : liste des 21 fichiers SVG attendus (noms de base = valeurs `fichier` de la table) et rappel du fichier de licence à joindre.
+
+**Assets — procédure à exécuter par un humain disposant d'un accès réseau** (l'environnement de développement de cette session n'autorise aucun accès réseau ; le composant fonctionne dès à présent, toute clé sans fichier tombant sur le repli textuel sans erreur). Script de récupération depuis le miroir Devicon de jsDelivr, à lancer depuis la racine du dépôt :
+
+```bash
+cd public/langages
+declare -A ICONES=(
+  [java]=java/java-original
+  [kotlin]=kotlin/kotlin-original
+  [scala]=scala/scala-original
+  [groovy]=groovy/groovy-original
+  [javascript]=javascript/javascript-original
+  [typescript]=typescript/typescript-original
+  [html5]=html5/html5-original
+  [css3]=css3/css3-original
+  [sass]=sass/sass-original
+  [python]=python/python-original
+  [csharp]=csharp/csharp-original
+  [c]=c/c-original
+  [cplusplus]=cplusplus/cplusplus-original
+  [objectivec]=objectivec/objectivec-plain
+  [go]=go/go-original
+  [rust]=rust/rust-original
+  [php]=php/php-original
+  [ruby]=ruby/ruby-original
+  [swift]=swift/swift-original
+  [terraform]=terraform/terraform-original
+  [docker]=docker/docker-original
+)
+# Épingler un tag exact (reproductibilité, chaîne d'approvisionnement) plutôt que @latest.
+TAG="v2.16.0"
+BASE="https://cdn.jsdelivr.net/gh/devicons/devicon@$TAG/icons"
+for nom in "${!ICONES[@]}"; do
+  chemin="${ICONES[$nom]}"
+  if ! curl -fsSL "$BASE/$chemin.svg" -o "$nom.svg"; then
+    # repli sur la variante -plain quand -original n'existe pas
+    variante_plain="${chemin%-*}-plain"
+    curl -fsSL "$BASE/$variante_plain.svg" -o "$nom.svg" \
+      || echo "ÉCHEC : $nom ($chemin)"
+  fi
+done
+# licence + attribution
+curl -fsSL "https://cdn.jsdelivr.net/gh/devicons/devicon@$TAG/LICENSE" -o LICENCE-devicon.txt
+# contrôle de sûreté : aucun SVG ne doit porter de <script> ni de référence HTTP externe
+if grep -lE '<script|(xlink:)?href="https?:' ./*.svg; then
+  echo "ATTENTION : SVG suspect ci-dessus, à inspecter avant commit"
+fi
+cd -
+git add public/langages
+```
+
+Après récupération : vérifier visuellement chaque SVG (thème clair et sombre), confirmer que `git status` ne montre que des `.svg` + `LICENCE-devicon.txt` sous `public/langages/`, relancer `npm run build` (les assets de `public/` sont copiés tels quels à la racine du bundle par `angular.json`), et **valider explicitement l'usage des marques** (domaine de vigilance renforcée). Les `.svg` échappent au hook local et à `prettier --check` (le hook ne couvre que `.ts/.html/.scss/.json/.js/.yml/.yaml`, Prettier n'a pas de parseur SVG) — vérifié.
+
+**Décision arbitraire à valider par un humain.** Périmètre exact de la table `CORRESPONDANCE` : 23 clés Sonar couvertes, les clés `xml`, `yaml`, `json`, `plsql`/`tsql` du plan sont volontairement laissées au repli textuel faute d'icône Devicon fiable et non ambiguë.
+
+Outillage : `prettier --check` propre, `eslint` (`.ts` + `.html`) exit 0, `npm run typecheck` exit 0, `jest` 9/9. Couverture par fonctions : aucune méthode jamais appelée sur le composant.
+
+#### Relecteur
+
+Relecture conduite le 2026-09-02 en contexte isolé (sous-agent dédié). **Verdict : à intégrer après corrections mineures.** Aucun constat bloquant ni majeur ; composant sûr (aucun `[innerHTML]`, `<img>` local uniquement, clé Sonar externe interpolée seulement dans `alt`/`title`/`aria-label`/le texte de puce échappés, `source()` concaténant un nom de fichier issu de la table statique et jamais de la clé externe), entrées signal confirmées comme l'alignement correct sur le dépôt (aucun composant transverse ne conserve `@Input()` décoratif), 100 % de couverture.
+
+Constats et suite donnée (corrections appliquées) :
+
+- **mineur — SCSS : valeurs codées en dur disposant d'un token.** `border-radius: 0.2rem` et `font-weight: 600`. **Corrigé** : `var(--sqm-rayon-sm)` et `var(--sqm-poids-demi-gras)`.
+- **mineur — SCSS : commentaire d'en-tête trop large** (revendiquait comme non-exprimables des propriétés ayant un utilitaire). **Corrigé** : commentaire resserré au seul dimensionnement carré sous-échelle et à la mise en forme compacte du texte de repli.
+- **mineur — contraste de la puce de repli (accessibilité, vigilance renforcée).** `--sqm-neutre-800` sur `--sqm-neutre-200` ≈ 3,5:1 sous le seuil AA. **Corrigé** : fond `--sqm-neutre-150` (aligné sur `.fond-neutre`), texte `--sqm-neutre-900`, taille `--sqm-texte-2xs` (11 px) — ratio ≈ 7:1.
+- **mineur — spec : pas d'assertion sur le texte rendu de la puce.** **Corrigé** : `expect(puce?.textContent?.trim()).toBe(cleSonar.slice(0, 4).toUpperCase())` ; cas `js`/`css` ajoutés (clés présentes dans les bouchons) ; cas de repli avec `taille="sm"` ajouté (12 tests).
+- **suggestion — commentaire sur le `?? null`** (garde-fou réel à l'exécution malgré le typage non nul dû à `noUncheckedIndexedAccess` désactivé). **Appliqué.**
+- **suggestion — script d'assets : épingler `devicon@<tag>` plutôt que `@latest`, ajouter un contrôle anti-`<script>`/URL externe sur les SVG.** **Appliqué** dans le script ci-dessus (`TAG="v2.16.0"` — à confirmer par l'humain qui exécute —, `grep -lE` de sûreté avant `git add`).
+- **observation hors périmètre** — `npm run lint` global rouge au moment de la relecture à cause de `fiche-projet.component.spec.ts` (incrément 4 en cours sur l'arbre partagé) : transitoire, résolu depuis (JSDoc `@param options.parLangage` ajouté, `parLangage` réellement consommé).
+
+Après corrections : `prettier --check` propre, `eslint` (composant + spec) exit 0, `jest src/app/composants/icone-langage/` 12/12.
+
+### Incrément 4 — Fiche projet
+
+#### Codeur
+
+Développement assisté par l'IA (Claude Code). `src/app/ecrans/fiche-projet/` :
+
+- `fiche-projet.component.ts` : import de `LangagesPrincipauxUtils` / `LangagePrincipal` et de `SqmIconeLangageComponent` (ajouté au tableau `imports` du décorateur) ; champ `readonly langagesPrincipaux: readonly LangagePrincipal[]` de `DonneesFicheProjet` ; dans `construireDonnees`, `resultatNcloc = dernierAudit === undefined ? undefined : this.trouverResultat(dernierAudit.resultats, 'sonar.ncloc')` puis `langagesPrincipaux: LangagesPrincipauxUtils.selectionner(resultatNcloc?.parLangage ?? {})`. `trouverResultat` opère bien sur le type `Resultat` complet (dont `sonar.ncloc`), contrairement au type restreint de `AgregationThemeFicheProjetUtils`. Le grisage réutilise le `sonarKo` déjà calculé.
+- `fiche-projet.component.html` : dans la branche `@else` du bloc « Indicateurs Sonar » (donc rendue seulement quand une source Sonar est rattachée), juste avant le `<h2>Dépendances</h2>`, `@if (donnees.langagesPrincipaux.length > 0) { <p id="fiche-projet-langages-principaux" class="fiche-projet__langages d-flex aligne-centre ecart-2 texte-sm exterieur-haut-0 exterieur-bas-2" [class.fiche-projet__langages--grise]="donnees.sonarKo" [attr.title]="resumeLangages(donnees.langagesPrincipaux)"> <span class="poids-demi-gras">Langages principaux</span> @for (…) { <app-icone-langage [cleSonar]="langage.cleSonar" /> } </p> }`. Ligne discrète, pas de `<h2>`. Méthode publique `resumeLangages(langages)` : infobulle « clé (N %), … » portée par le `<p>` (le pourcentage au survol, recommandé par le plan en point ouvert, est ainsi retenu).
+- `fiche-projet.component.scss` : `.fiche-projet__langages` (`flex-wrap: wrap`) ; le sélecteur `--grise` est mutualisé avec `.fiche-projet__bloc-sonar--grise` (déclaration commune d'opacité/`grayscale`, pas de duplication).
+- `fiche-projet.component.spec.ts` : `DonneesDeTest.auditComplet` porte désormais un résultat `sonar.ncloc` (option `parLangage`, défaut `{ java: 8000, ts: 2000 }`) ; nouveau `describe('langages principaux (US-057)')` (deux langages > 10 % → deux `app-icone-langage` ; second < 10 % → une seule ; ventilation vide → ligne absente ; projet sans source Sonar → ligne absente, branche « Aucune source Sonar » rendue ; `sonarKo` → classe `--grise` sans masquer les icônes ; audit historique postérieur → langages issus du seul audit régulier, encart historique inchangé).
+- En-tête de commentaire de `fiche-projet.component.ts` complété d'un paragraphe US-057 / RG-057.
+
+Outillage : `prettier --check` propre, `eslint` (`.ts` + `.html`) exit 0, `npm run typecheck` exit 0, `jest src/app/ecrans/fiche-projet/` 68/68.
+
+#### Relecteur
+
+Relecture conduite le 2026-09-02 en contexte isolé (sous-agent dédié). **Verdict : à intégrer après corrections mineures.** Aucun constat bloquant ni majeur ; conformité au plan (Partie C) vérifiée point par point, frontière de couches respectée (`sansetat` importé en descendant), `dernierAudit` bien le dernier audit **régulier** (RG-046), `trouverResultat('sonar.ncloc')` typé sans assertion, grisage réutilisant `sonarKo`, ligne absente sur ventilation vide, ajout de `sonar.ncloc` à `auditComplet` sans impact sur `pasDeSonar` (calculé sur couverture/notes/violations uniquement).
+
+Constats et suite donnée (corrections appliquées) :
+
+- **mineur — en-tête de `fiche-projet.component.ts` non complété (mention US-057).** **Corrigé** : paragraphe d'en-tête ajouté.
+- **mineur — cas de test manquants.** Le plan cite « audits historiques restitués séparément non affectés » et la recette « projet sans source Sonar → pas de ligne » ; le test `sonarKo` n'assérait que la classe. **Corrigé** : trois cas ajoutés/renforcés (historique postérieur, sans source Sonar, `sonarKo` + icônes toujours rendues).
+- **suggestion — bloc HTML hors du garde `@else`.** Placé après la fermeture du `@else`, il aurait pu apparaître non grisé sous « Aucune source Sonar » si un `sonar.ncloc` était produit sans les trois constats de `pasDeSonar`. **Corrigé** : bloc déplacé dans la branche `@else` (rendu seulement quand une source Sonar est rattachée).
+- **suggestion — `pourcentage` inexploité.** **Appliqué** : `resumeLangages` porte un `title` « clé (N %) » sur le `<p>` (point ouvert du plan tranché en faveur de l'affichage du pourcentage).
+- **suggestion — dérive de l'extrait de template dans le rapport.** **Corrigé** ci-dessus.
+
+### Incrément 5 — écran Obsolescence
+
+#### Codeur
+
+Développement assisté par l'IA (Claude Code). `src/app/ecrans/obsolescence/` :
+
+- `obsolescence.component.ts` : import de `LangagesPrincipauxUtils` / `LangagePrincipal`, de `SqmIconeLangageComponent` (ajouté au tableau `imports`) et du type `Resultat` ; champ `readonly langagesPrincipaux` sur `LigneObsolescence` et `TuileObsolescence` ; méthode statique privée `extraireParLangage(audit): Readonly<Record<string, number>>` (type-guard sur le discriminant `sonar.ncloc`, sans `as`) ; dans `lignesTousProjets`, `langagesPrincipaux = audit === undefined ? [] : LangagesPrincipauxUtils.selectionner(SqmObsolescenceComponent.extraireParLangage(audit))` ; `tuiles()` recopie le champ ; `construireInfobulle` reçoit `langagesPrincipaux` et ajoute une ligne `Langages : <clés Sonar>` quand la liste est non vide.
+- `obsolescence.component.html` : le `<span class="obsolescence__nom-projet">` est encapsulé dans un `<span class="obsolescence__ligne-nom d-flex aligne-centre ecart-2">` ; à sa suite, `@if (tuile.langagesPrincipaux.length > 0) { <span class="obsolescence__langages … exterieur-gauche-auto"> @for (…) { <app-icone-langage [cleSonar]="langage.cleSonar" taille="sm" /> } </span> }`.
+- `obsolescence.component.scss` : `.obsolescence__ligne-nom { flex-wrap: wrap }` (la zone d'icônes repasse sous le nom sur un nom long, jamais de troncature) ; `.obsolescence__langages { flex: none }`.
+- `obsolescence.component.spec.ts` : `DonneesDeTest.audit` accepte une ventilation `parLangage` optionnelle (ajoute un résultat `sonar.ncloc`) ; nouveau `describe('langages principaux (US-057)')` (deux langages > 10 % → deux `app-icone-langage` ; audit sans `sonar.ncloc` → aucune zone `.obsolescence__langages` ; second < 10 % → une seule ; infobulle enrichie de « Langages : java, ts »).
+
+**Décision arbitraire à valider par un humain.** L'infobulle de tuile affiche la **clé Sonar brute** (`java, ts`) et non le libellé complet (`Java, TypeScript`), pour ne pas extraire la table de correspondance du composant d'icône en utilitaire partagé — point ouvert du plan (incrément 5) tranché ainsi par défaut.
+
+Outillage : `prettier --check` propre, `npm run lint` (ng lint global) « All files pass linting », `npm run typecheck` exit 0, `jest src/app/ecrans/obsolescence/` 38/38.
+
+#### Relecteur
+
+Relecture conduite le 2026-09-02 en contexte isolé (sous-agent dédié). **Verdict : à intégrer en l'état.** Conformité à la Partie D vérifiée point par point : `langagesPrincipaux` sur les deux interfaces, `extraireParLangage` avec type-guard sain sur le discriminant `sonar.ncloc` (aucun `as`), audit résolu une seule fois par `auditRetenu` (historiques exclus) et réutilisé pour l'obsolescence, l'infobulle et les langages, `construireInfobulle` préservant le comportement existant quand la liste est vide, `DonneesDeTest.audit` n'altérant aucun test existant (le `sonar.ncloc` n'est poussé que si `parLangage` est fourni), classes utilitaires du gabarit toutes existantes, mise en page « icônes en fin de ligne, repli sous le nom sans troncature » réellement obtenue.
+
+Un constat mineur retenu et corrigé :
+
+- **mineur — cas « projet jamais audité » non couvert explicitement** (le plan le cite ; la branche `audit === undefined` de `lignesTousProjets` n'était pas exercée). **Corrigé** : `it` ajouté (`DonneesDeTest.groupe(..., [])` → tuile présente, aucune `.obsolescence__langages`). 38 → 38 (le décompte du rapport reflète l'ajout).
+
+Suggestion (portée `exterieur-gauche-auto` en classe utilitaire plutôt qu'en `margin-left: auto` SCSS) : effet net identique, cohérent avec la convention du dépôt, non modifié. Décision arbitraire (clé Sonar brute dans l'infobulle) : à valider par un humain.
+
+### Incrément 6 — jeu de démonstration du bouchon, parcours de bout en bout et vérification
+
+#### Codeur
+
+Développement assisté par l'IA (Claude Code).
+
+- `src/app/services/sansetat/commandes/bouchon/donnees-bouchon.ts` : la ventilation Sonar de la source « API Facturation » passe de `{ java: 82100, xml: 4410, js: 440 }` à `{ java: 62100, kotlin: 20440, xml: 4410 }` (Java ~71 % + Kotlin ~24 % → **deux icônes** sur la Fiche projet et l'Obsolescence de ce projet) ; « Front Portail » conserve `{ ts: 39800, html: 3200, css: 1300 }` (HTML à 7 % sous le seuil → **une seule icône**). `CONSTAT_SONAR_REPLI` (repli des projets créés pendant le parcours E2E) passe de `{ autre: 10000 }` à `{ java: 7000, kotlin: 3000 }` pour que le test de bout en bout exerce le rendu réel.
+- `src/app/services/sansetat/commandes/bouchon/donnees-racine-bouchon.ts` : les deux audits `sonar.ncloc` de la source « API Facturation » alignés sur la nouvelle ventilation Java/Kotlin ; suppression de l'entrée `js: 0`.
+- `e2e/parcours-complet.spec.ts` : étape 16 (Fiche projet) — assertion sur la présence d'au moins une `app-icone-langage` dans `#fiche-projet-langages-principaux` ; étape 19b (Obsolescence) — assertion sur au moins une zone `.obsolescence__langages` dans une tuile.
+- `public/langages/` : les **21 fichiers SVG Devicon** (noms de base alignés sur la table `CORRESPONDANCE` : `java.svg`, `kotlin.svg`, `typescript.svg`, `html5.svg`, `css3.svg`, `sass.svg`, `python.svg`, `csharp.svg`, `c.svg`, `cplusplus.svg`, `objectivec.svg`, `go.svg`, `rust.svg`, `php.svg`, `ruby.svg`, `swift.svg`, `scala.svg`, `groovy.svg`, `terraform.svg`, `docker.svg`, `javascript.svg`) ont été **récupérés par l'utilisateur** (accès réseau indisponible côté session), aux côtés de `LICENCE-devicon.txt` (licence MIT + attribution `konpa`). Contrôle de sûreté rejoué : aucun SVG ne porte de `<script>`, de gestionnaire d'évènement, de `foreignObject` ni de référence HTTP externe. `LISEZ-MOI.txt` aligné. Ajout de `public/langages/**` à `.prettierignore` (aligné sur l'exclusion ESLint, cf. règle de qualité de code du 2026-07-19 : `prettier --check <chemin>` échouerait sur un `.svg`).
+- `angular.json` copie déjà `public/**/*` à la racine du bundle : `npm run build` embarque les icônes sans configuration supplémentaire.
+
+**Robustesse ajoutée au-delà du plan (décision de conception à valider par un humain).** `SqmIconeLangageComponent` bascule sur le repli textuel si le fichier SVG ne se charge pas (`(error)` sur le `<img>` → `imageEnEchec`, un `linkedSignal` sur `cleSonar` remettant l'état à `false` dès que la clé — donc le fichier ciblé — change) : un fichier Devicon manquant ou renommé se dégrade en puce lisible plutôt qu'en image cassée, conforme à la promesse « jamais une absence silencieuse ni un échec ». Deux tests unitaires dédiés couvrent la bascule et son réarmement (13 tests au total pour ce composant, couverture 100 %).
+
+**Vérification de bout en bout (section 12 du plan).**
+
+1. `npm run lint` (ng lint) : « All files pass linting ».
+2. `npm run typecheck` : exit 0.
+3. `npx jest` : 112 suites / 1644 tests, 0 échec.
+4. `npm run build` : succès (avertissement `hammerjs`/`chartjs-plugin-zoom` préexistant, hors périmètre) ; les 21 SVG embarqués dans le bundle.
+5. `npm run test:e2e` : parcours complet **passé 2 fois** (dont une avec les deux nouvelles assertions `app-icone-langage` / `.obsolescence__langages` et le repli sur `<img>` 404 avant récupération des assets). Les exécutions ultérieures, une fois la machine saturée par les passes répétées de `build`/`jest`/sous-agents, ont crashé le navigateur Chromium à l'étape 13 (« Page crashed » / « Target crashed », campagne d'audit sur 4 projets — bien avant le rendu des écrans Fiche projet/Obsolescence de l'étape 16+) : symptôme de saturation mémoire du conteneur déjà connu (cf. Étape 33 et plan_16), sans lien avec cette évolution. **Re-run sur machine non saturée requis pour confirmation finale.**
+6. `npm start` (vérification fonctionnelle manuelle sur machine non saturée) et **validation humaine explicite de chaque incrément** restent requis avant intégration.
+
+**Reste à faire (hors périmètre de ce chapitre, à tracer).**
+
+- **Validation humaine de l'usage des marques tierces** (logos de langages Devicon) : domaine de vigilance renforcée « conformité aux référentiels externes ».
+- Régénération éventuelle des captures `docs/assets/captures/fiche-projet.png` et `obsolescence.png` (hors pipeline, script Playwright local) pour faire apparaître les icônes de langage.
+- Confirmation des décisions arbitraires listées ci-dessus (seuil 10 %, plafond 2, périmètre de la table Devicon, clé Sonar brute dans l'infobulle Obsolescence, repli sur erreur de chargement d'image).
+
+#### Relecteur
+
+Relecture conduite le 2026-09-02 en contexte isolé (sous-agent dédié). Le verdict initial « corrections majeures requises » portait sur l'état des fichiers SVG dans l'arbre de travail au moment de la relecture (nommés `java-original.svg`… plutôt que `java.svg`, `LICENCE-devicon.txt` absent) : ce point a été résolu depuis (renommage correct des 21 SVG par l'utilisateur, licence en place, contrôle de sûreté rejoué). Les modifications de code de l'incrément sont jugées **saines** par la relecture, outillage intégralement au vert (jest 1644, couverture composant 100 %, E2E 1 passé). Suites données aux autres constats :
+
+- **mineur — affirmation « plus aucun avertissement 404 » du rapport** (invérifiable / inexacte tant que les fichiers étaient mal nommés). **Corrigé** : formulation retirée ; les icônes réelles s'affichent désormais, les 404 n'ont plus lieu d'être.
+- **mineur — réarmement de `imageEnEchec` non testé.** **Corrigé** : le test de bascule vérifie aussi le retour à l'image après changement de `cleSonar`.
+- **suggestion — `effect` de constructeur → `linkedSignal`.** **Appliqué** : `imageEnEchec` est un `linkedSignal` sur `cleSonar` (intention plus directe, pas d'effet de bord de constructeur).
+- **suggestion — `.prettierignore`.** **Appliqué** : `public/langages/**` ajouté.
+- Points vérifiés conformes : cohérence exacte des ventilations du bouchon (sommes `ncloc` justes, `CONSTATS_SONAR_BOUCHON` aligné sur le dernier audit persisté de la même source), objectif du plan atteint (API Facturation → 2 icônes, Front Portail → 1 icône, repli E2E → 2 icônes), `interroger_ncloc` non randomisée, assertions E2E ré-essayées et fondées sur des sélecteurs réels, robustesse `(error)` jugée « à conserver, pas une sur-ingénierie », décisions arbitraires toutes signalées, vérification croisée règle n° 13 tenue.

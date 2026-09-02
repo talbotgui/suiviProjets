@@ -164,7 +164,7 @@ La synthèse présente le dernier audit intégré de chaque projet dans un table
 
 ![Fiche projet](assets/captures/fiche-projet.png)
 
-La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (âge du dépôt, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
+La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (âge du dépôt, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Juste au-dessus des dépendances, une ligne « Langages principaux » affiche une à deux icônes des langages dominants du projet d'après Sonar (le second n'apparaît que s'il pèse au moins 10 % des lignes de code) ; elle est grisée quand les indicateurs Sonar le sont et absente quand l'audit retenu ne porte pas de répartition par langage. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
 
 ### Comparaison entre deux audits
 
@@ -182,7 +182,7 @@ La synthèse graphique trace l'évolution d'un indicateur dans le temps, projet 
 
 ![Obsolescence](assets/captures/obsolescence.png)
 
-L'écran d'obsolescence présente une grille de tuiles, une par projet, indiquant le retard maximal en versions majeures pour chaque catégorie de dépendance au dernier audit retenu (`0` signifie « à jour »). Les filtres min/max par catégorie et la date de référence permettent de cibler l'analyse ; un clic sur une tuile ouvre le détail du dernier audit du projet.
+L'écran d'obsolescence présente une grille de tuiles, une par projet, indiquant le retard maximal en versions majeures pour chaque catégorie de dépendance au dernier audit retenu (`0` signifie « à jour »). Chaque tuile affiche aussi, en fin de la ligne du nom du projet, une à deux petites icônes de ses langages principaux (mêmes langages que la fiche projet). Les filtres min/max par catégorie et la date de référence permettent de cibler l'analyse ; un clic sur une tuile ouvre le détail du dernier audit du projet, l'infobulle de la tuile rappelant par ailleurs ces langages.
 
 ## Traiter les alertes : la liste de travail
 

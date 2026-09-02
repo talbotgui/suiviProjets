@@ -59,14 +59,18 @@ class DonneesDeTest {
    * @param options.dernierCommitLe - Date du dernier commit constaté.
    * @param options.niveauAccesInconnu - Niveau d'accès GitLab du membre inconnu `inconnu1` (RG-010, 40 = gravité
    * élevée par défaut).
+   * @param options.parLangage - Ventilation Sonar par langage du résultat `sonar.ncloc` (RG-057) ; objet vide pour
+   * simuler une ventilation indisponible. Deux langages 80/20 par défaut.
    * @returns L'audit de test.
    */
   public static auditComplet(options: {
     readonly derniereAnalyseLe?: string;
     readonly dernierCommitLe?: string;
     readonly niveauAccesInconnu?: number;
+    readonly parLangage?: Readonly<Record<string, number>>;
   }): Audit {
     const dernierCommitLe = options.dernierCommitLe ?? DonneesDeTest.ilYA(-2);
+    const parLangage = options.parLangage ?? { java: 8000, ts: 2000 };
     return {
       id: 'audit-1',
       date: DonneesDeTest.ilYA(-1),
@@ -158,6 +162,12 @@ class DonneesDeTest {
           sourceId: 'source-sonar',
           parSeverite: { bloquant: 0, critique: 2, majeur: 1, mineur: 0, info: 0 },
           nouvellesViolations: 0,
+        },
+        {
+          type: 'sonar.ncloc',
+          sourceId: 'source-sonar',
+          ncloc: Object.values(parLangage).reduce((somme, lignes) => somme + lignes, 0),
+          parLangage,
         },
         {
           type: 'croise.fraicheur_sonar',
@@ -1284,9 +1294,9 @@ describe('SqmFicheProjetComponent', () => {
       const elementAvec = DomTestUtils.obtenirElementNatif(
         creerFixture('projet-1', DonneesDeTest.racine(avecInconnu)),
       );
-      expect(sectionDependances(elementAvec, 'Autres')?.querySelector('summary')?.textContent).toContain(
-        '(1)',
-      );
+      expect(
+        sectionDependances(elementAvec, 'Autres')?.querySelector('summary')?.textContent,
+      ).toContain('(1)');
 
       const sansInconnu = DonneesDeTest.projet('projet-1', [
         auditAvecDependances([
@@ -1321,6 +1331,110 @@ describe('SqmFicheProjetComponent', () => {
           element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-dependances'),
         ).map((section) => section.open),
       ).toEqual([false, false]);
+    });
+  });
+
+  describe('langages principaux (US-057)', () => {
+    /**
+     * Retrouve la ligne « Langages principaux » et ses icônes.
+     * @param element - Élément natif de la fixture rendue.
+     * @returns L'élément `<p>` de la ligne, ou `null` s'il est absent.
+     */
+    function ligneLangages(element: HTMLElement): HTMLElement | null {
+      return element.querySelector<HTMLElement>('#fiche-projet-langages-principaux');
+    }
+
+    it('affiche une icône par langage principal retenu quand deux langages dépassent 10 %', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditComplet({ parLangage: { java: 7000, ts: 3000 } }),
+      ]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      const ligne = ligneLangages(element);
+      expect(ligne).not.toBeNull();
+      expect(ligne?.querySelectorAll('app-icone-langage')).toHaveLength(2);
+      expect(ligne?.classList.contains('fiche-projet__langages--grise')).toBe(false);
+    });
+
+    it('n’affiche qu’une icône quand le second langage pèse moins de 10 %', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditComplet({ parLangage: { java: 9500, ts: 500 } }),
+      ]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      expect(ligneLangages(element)?.querySelectorAll('app-icone-langage')).toHaveLength(1);
+    });
+
+    it('n’affiche pas la ligne quand la ventilation par langage est indisponible', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditComplet({ parLangage: {} }),
+      ]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      expect(ligneLangages(element)).toBeNull();
+    });
+
+    it('n’affiche pas la ligne pour un projet sans source Sonar (branche « Aucune source Sonar »)', () => {
+      const auditComplet = DonneesDeTest.auditComplet({});
+      const auditSansSonar: Audit = {
+        ...auditComplet,
+        resultats: auditComplet.resultats.filter((resultat) => !resultat.type.startsWith('sonar.')),
+      };
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture(
+          'projet-1',
+          DonneesDeTest.racine(DonneesDeTest.projet('projet-1', [auditSansSonar])),
+        ),
+      );
+
+      expect(element.textContent).toContain('Aucune source Sonar rattachée à ce projet.');
+      expect(ligneLangages(element)).toBeNull();
+    });
+
+    it('grise la ligne des langages, sans la masquer, quand les indicateurs Sonar le sont (RG-013)', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditComplet({
+          dernierCommitLe: DonneesDeTest.ilYA(0),
+          derniereAnalyseLe: DonneesDeTest.ilYA(-60),
+          parLangage: { java: 7000, ts: 3000 },
+        }),
+      ]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      const ligne = ligneLangages(element);
+      expect(ligne?.classList.contains('fiche-projet__langages--grise')).toBe(true);
+      expect(ligne?.querySelectorAll('app-icone-langage')).toHaveLength(2);
+    });
+
+    it('sélectionne les langages du dernier audit régulier, jamais d’un audit historique postérieur', () => {
+      const auditRegulier = DonneesDeTest.auditComplet({ parLangage: { java: 7000, ts: 3000 } });
+      const auditHistorique: Audit = {
+        id: 'audit-historique-1',
+        date: DonneesDeTest.ilYA(-30),
+        campagneId: 'campagne-2',
+        typeAudit: 'historique',
+        dateExecution: DonneesDeTest.ilYA(0),
+        resultats: [],
+      };
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture(
+          'projet-1',
+          DonneesDeTest.racine(DonneesDeTest.projet('projet-1', [auditRegulier, auditHistorique])),
+        ),
+      );
+
+      expect(ligneLangages(element)?.querySelectorAll('app-icone-langage')).toHaveLength(2);
+      expect(element.querySelector('.fiche-projet__audits-historiques')?.textContent).toContain(
+        'Audits historiques (1)',
+      );
     });
   });
 

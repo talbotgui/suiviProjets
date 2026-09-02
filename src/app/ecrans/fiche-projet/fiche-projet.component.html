@@ -239,6 +239,23 @@
                   />
                 </div>
               </div>
+
+              <!-- Langages principaux (US-057, RG-057) : ligne discrète au-dessus des dépendances, une à deux
+                   icônes, rendue dans la branche « Sonar rattaché » seulement, grisée avec le bloc Sonar (RG-013),
+                   absente si la ventilation Sonar par langage est indisponible. -->
+              @if (donnees.langagesPrincipaux.length > 0) {
+                <p
+                  id="fiche-projet-langages-principaux"
+                  class="fiche-projet__langages d-flex aligne-centre ecart-2 texte-sm exterieur-haut-0 exterieur-bas-2"
+                  [class.fiche-projet__langages--grise]="donnees.sonarKo"
+                  [attr.title]="resumeLangages(donnees.langagesPrincipaux)"
+                >
+                  <span class="poids-demi-gras">Langages principaux</span>
+                  @for (langage of donnees.langagesPrincipaux; track langage.cleSonar) {
+                    <app-icone-langage [cleSonar]="langage.cleSonar" />
+                  }
+                </p>
+              }
             }
 
             <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Dépendances</h2>

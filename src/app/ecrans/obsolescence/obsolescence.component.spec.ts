@@ -10,7 +10,12 @@ import { ContexteConsultationService } from '../../services/avecetat/etat/contex
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
-import type { Audit, DonneesRacine, Groupe } from '../../services/avecetat/etat/types-donnees';
+import type {
+  Audit,
+  DonneesRacine,
+  Groupe,
+  Resultat,
+} from '../../services/avecetat/etat/types-donnees';
 import { DomTestUtils } from '../../testing/dom-test.utils';
 import { SqmObsolescenceComponent } from './obsolescence.component';
 
@@ -26,26 +31,41 @@ interface DependanceTest {
 /** Fabriques de données de test (classe à membres statiques uniquement). */
 class DonneesDeTest {
   /**
-   * Construit un audit régulier portant un unique résultat `gitlab.dependances`.
+   * Construit un audit régulier portant un résultat `gitlab.dependances` et, si une ventilation est fournie, un
+   * résultat `sonar.ncloc` (RG-057).
    * @param date - Date de l'audit (`AAAA-MM-JJ`).
    * @param dependances - Dépendances constatées.
+   * @param parLangage - Ventilation Sonar par langage ; omise pour simuler un audit sans `sonar.ncloc`.
    * @returns L'audit de test.
    */
-  public static audit(date: string, dependances: readonly DependanceTest[]): Audit {
+  public static audit(
+    date: string,
+    dependances: readonly DependanceTest[],
+    parLangage?: Readonly<Record<string, number>>,
+  ): Audit {
+    const resultats: Resultat[] = [
+      {
+        type: 'gitlab.dependances',
+        sourceId: 'source-1',
+        refEffective: 'main',
+        shaTete: 'abc',
+        dependances: dependances.map((dependance) => ({ ...dependance })),
+      },
+    ];
+    if (parLangage !== undefined) {
+      resultats.push({
+        type: 'sonar.ncloc',
+        sourceId: 'source-1',
+        ncloc: Object.values(parLangage).reduce((somme, lignes) => somme + lignes, 0),
+        parLangage,
+      });
+    }
     return {
       id: `audit-${date}`,
       date,
       campagneId: 'campagne-1',
       typeAudit: 'reguliere',
-      resultats: [
-        {
-          type: 'gitlab.dependances',
-          sourceId: 'source-1',
-          refEffective: 'main',
-          shaTete: 'abc',
-          dependances: dependances.map((dependance) => ({ ...dependance })),
-        },
-      ],
+      resultats,
     };
   }
 
@@ -610,6 +630,88 @@ describe('SqmObsolescenceComponent', () => {
     const infobulle = composant.projetsAffiches()[0].infobulle;
     expect(infobulle).toContain('exec : 4 version(s) majeure(s) de retard');
     expect(infobulle).toContain('fmkBack : aucune dépendance');
+  });
+
+  describe('langages principaux (US-057)', () => {
+    it('affiche une icône par langage principal en fin de ligne du nom sur la tuile quand deux langages dépassent 10 %', () => {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+          DonneesDeTest.audit(
+            '2026-06-01',
+            [{ reference: 'java', version: '17', manifeste: 'pom.xml' }],
+            {
+              java: 7000,
+              ts: 3000,
+            },
+          ),
+        ]),
+      ]);
+      const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+        '.obsolescence__tuile',
+      );
+      const langages = tuile?.querySelector('.obsolescence__langages');
+      expect(langages).not.toBeNull();
+      expect(langages?.querySelectorAll('app-icone-langage')).toHaveLength(2);
+    });
+
+    it('n’affiche aucune zone de langages quand l’audit retenu ne porte pas de ventilation par langage', () => {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '17', manifeste: 'pom.xml' },
+          ]),
+        ]),
+      ]);
+      const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+        '.obsolescence__tuile',
+      );
+      expect(tuile?.querySelector('.obsolescence__langages')).toBeNull();
+    });
+
+    it('n’affiche aucune zone de langages pour un projet jamais audité', () => {
+      const racine = DonneesDeTest.racine([DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [])]);
+      const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+        '.obsolescence__tuile',
+      );
+      expect(tuile).not.toBeNull();
+      expect(tuile?.querySelector('.obsolescence__langages')).toBeNull();
+    });
+
+    it('n’affiche qu’une icône quand le second langage pèse moins de 10 %', () => {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+          DonneesDeTest.audit(
+            '2026-06-01',
+            [{ reference: 'java', version: '17', manifeste: 'pom.xml' }],
+            {
+              java: 9500,
+              ts: 500,
+            },
+          ),
+        ]),
+      ]);
+      const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+        '.obsolescence__tuile',
+      );
+      expect(tuile?.querySelectorAll('.obsolescence__langages app-icone-langage')).toHaveLength(1);
+    });
+
+    it('enrichit l’infobulle d’une ligne « Langages : … » quand la liste est non vide', () => {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', [
+          DonneesDeTest.audit(
+            '2026-06-01',
+            [{ reference: 'java', version: '17', manifeste: 'pom.xml' }],
+            {
+              java: 7000,
+              ts: 3000,
+            },
+          ),
+        ]),
+      ]);
+      const infobulle = creer(racine).componentInstance.projetsAffiches()[0].infobulle;
+      expect(infobulle).toContain('Langages : java, ts');
+    });
   });
 
   it('exclut un projet sous la borne min resserrée d’une catégorie', () => {
