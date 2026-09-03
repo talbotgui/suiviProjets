@@ -39,16 +39,17 @@ Un rollback consiste à réinstaller une version antérieure : les exécutables 
 ## Stratégie de build, empaquetage et publication
 
 - Le build multiplateforme est produit par le pipeline d'intégration continue (cf. [mise en place du pipeline, étape 12](./18_pic.md#mise-en-place-du-pipeline)), via la commande de build Tauri, générant les formats natifs propres à chaque système d'exploitation. Sous Windows, un artefact `.zip` portable (le binaire compilé, autonome car sans runtime tiers requis, cf. [Prérequis](#prérequis-de-lenvironnement-de-production)) est produit en complément de l'installeur `.msi` ([WiX Toolset v3](https://wixtoolset.org/documentation/manual/v3/)) / `.exe` ([NSIS](https://nsis.sourceforge.io/Main_Page)), à destination des utilisateurs souhaitant s'en passer.
-- La publication est déclenchée manuellement depuis GitHub Actions (déclencheur `workflow_dispatch` unique avec saisie du numéro de version, cf. [déclencheurs, étape 12](./18_pic.md#mise-en-place-du-pipeline)), qui committe d'abord la montée de version directement sur `master`, crée lui-même le tag correspondant, puis poursuit le pipeline : il génère une GitHub Release associée, y attache les exécutables produits (dont l'archive portable) ainsi que le manifeste de mise à jour, et dérive un changelog des messages [Conventional Commits](./14_normesDeveloppement.md#stratégie-de-branches-et-de-contribution-git) constatés depuis le tag précédent.
-- L'archive `.zip` portable n'étant pas installée par un programme d'installation, sa participation exacte au mécanisme du updater Tauri (cf. [gestion des versions et des mises à jour](#gestion-des-versions-et-des-mises-à-jour)) reste à vérifier lors de la mise en œuvre effective : selon le comportement confirmé à ce moment-là, l'usage portable pourra nécessiter un remplacement manuel de l'archive plutôt qu'une mise à jour automatique.
+- La publication est déclenchée manuellement depuis GitHub Actions (déclencheur `workflow_dispatch` unique avec saisie du numéro de version, cf. [déclencheurs, étape 12](./18_pic.md#mise-en-place-du-pipeline)), qui committe d'abord la montée de version directement sur `master`, crée lui-même le tag correspondant, puis poursuit le pipeline : il génère une GitHub Release associée, y attache les exécutables produits (dont l'archive portable) et dérive un changelog des messages [Conventional Commits](./14_normesDeveloppement.md#stratégie-de-branches-et-de-contribution-git) constatés depuis le tag précédent.
 - Le dépôt contient déjà un fichier `LICENSE`, élément préexistant identifié en relecture à l'étape 10 (cf. [plan de mise en place de l'étape 10](../03_plan/plan_10_normesSecurite.md#actions-issues-de-létape-10--normes-de-sécurité-applicative)) : la licence [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) qui y figure est confirmée pour la publication de l'application. Toute redistribution de l'application, modifiée ou non, devra donc en fournir le code source sous la même licence.
-- Les exécutables et le manifeste de mise à jour sont signés, condition requise par le updater Tauri retenu ci-dessous ; la clé de signature est gérée comme un secret de la plateforme d'intégration continue (cf. [sécurité de la PIC, étape 12](./18_pic.md#sécurité-de-la-pic)).
+- Les exécutables sont signés (bonne pratique de distribution, indépendante de tout mécanisme de mise à jour automatique) ; lorsqu'une clé de signature est utilisée, elle est gérée comme un secret de la plateforme d'intégration continue (cf. [sécurité de la PIC, étape 12](./18_pic.md#sécurité-de-la-pic)).
 
 ## Gestion des versions et des mises à jour
 
 Le versionnage suit [SemVer](https://semver.org/) (majeure.mineure.correctif), dérivé directement des types de commit [Conventional Commits](./14_normesDeveloppement.md#stratégie-de-branches-et-de-contribution-git) retenus à l'étape 9 : un commit `fix` incrémente le correctif, un commit `feat` incrémente la version mineure, une rupture de compatibilité explicitement signalée incrémente la version majeure.
 
-La mise à jour est automatique, via le [updater intégré de Tauri](https://tauri.app/plugin/updater/) : l'application vérifie périodiquement le manifeste de version publié avec la dernière GitHub Release et propose l'installation à l'utilisateur, qui reste maître du moment de la mise à jour. Ce mécanisme introduit le seul appel réseau automatique de vérification de version de l'application ; il ne transmet et ne collecte aucune donnée d'usage, contrairement à un service de télémétrie, et reste ainsi cohérent avec le principe d'absence de télémétrie acté à l'étape 10 (cf. [journalisation des événements sensibles](./15_normesSecurite.md#journalisation-des-événements-sensibles)).
+La mise à jour est manuelle : l'utilisateur télécharge le nouvel exécutable (ou la nouvelle archive portable) depuis la page GitHub Releases du projet et remplace son installation. L'application n'effectue aucune vérification de version automatique et donc aucun appel réseau spontané, ce qui reste cohérent avec le principe d'absence de télémétrie acté à l'étape 10 (cf. [journalisation des événements sensibles](./15_normesSecurite.md#journalisation-des-événements-sensibles)).
+
+*Décision révisée le 2026-09-03 (arbitrage humain explicite, cf. [plan de développement, Phase 14](../03_plan/plan_13_developpement.md#phase-14--intégration-continue-empaquetage-et-publication)) : l'[updater intégré de Tauri](https://tauri.app/plugin/updater/), initialement retenu à l'étape 12 mais jamais intégré (plugin `tauri-plugin-updater` absent, aucune configuration `updater`), est abandonné au profit de la mise à jour manuelle décrite ci-dessus.*
 
 La compatibilité du fichier de données entre versions applicatives est garantie par le versionnage indépendant du schéma de données et de l'enveloppe chiffrée, déjà détaillé à l'étape 7 (cf. [stratégie de migration des données](./12_modeleDonnees.md#stratégie-de-migration-des-données)).
 
@@ -58,9 +59,11 @@ Le [journal des modifications](./12_modeleDonnees.md#entités-attributs-et-relat
 
 L'emplacement et la politique de rétention des journaux techniques, différés depuis l'étape 10, sont fixés à cette étape : les fichiers de journal sont écrits dans un dossier `logs/` situé à côté de l'exécutable, plutôt que dans un répertoire système partagé, cohérent avec l'absence d'installation imposée par l'archive `.zip` portable (cf. [Étapes d'installation de l'environnement](#étapes-dinstallation-de-lenvironnement)) ; ils tournent quotidiennement (un fichier par jour) et sont purgés automatiquement au-delà de 30 jours, valeur fixe non paramétrable jugée suffisante pour couvrir un diagnostic a posteriori sans laisser croître indéfiniment le dossier applicatif.
 
-Une erreur non gérée (panique du cœur natif, exception non interceptée côté UI) est capturée par un gestionnaire global qui la consigne dans le journal technique local et affiche un message explicite à l'utilisateur, plutôt que de provoquer une fermeture silencieuse de l'application ou de transmettre l'erreur à distance.
+Une erreur non gérée (panique du cœur natif, exception non interceptée côté UI) est capturée par un gestionnaire global qui la consigne dans le journal technique local et affiche un message explicite à l'utilisateur, plutôt que de provoquer une fermeture silencieuse de l'application ou de transmettre l'erreur à distance. Ce gestionnaire global est en place (`src/app/app.error-handler.ts` côté interface, commande `consignerErreurUi` de `src-tauri/src/commandes/diagnostic.rs` côté cœur natif).
 
-Une fonction d'export d'un rapport de diagnostic local est prévue, regroupant les journaux techniques récents (les 30 jours conservés localement, cf. ci-dessus, sans secret ni donnée personnelle), que l'utilisateur peut consulter lui-même ou joindre volontairement à une remontée de problème (par exemple une issue GitHub) — décision actée à cette étape en cohérence avec l'absence de télémétrie.
+Les journaux techniques restent directement accessibles à l'utilisateur dans le dossier `logs/` situé à côté de l'exécutable ; il peut les consulter ou en joindre un extrait à une remontée de problème (par exemple une issue GitHub), après s'être assuré de l'absence de secret ou de donnée personnelle.
+
+*Décision révisée le 2026-09-03 (arbitrage humain explicite, cf. [plan de développement, Phase 14](../03_plan/plan_13_developpement.md#phase-14--intégration-continue-empaquetage-et-publication)) : la « fonction d'export d'un rapport de diagnostic local » (regroupement des journaux récents en un fichier exportable depuis l'écran de paramétrage), initialement prévue à l'étape 12, est abandonnée. Les journaux du dossier `logs/` restent consultables directement ; seul le gestionnaire global d'erreurs non gérées, autre volet de cette décision d'étape, a été réalisé.*
 
 ## Supervision
 
@@ -68,7 +71,7 @@ Une fonction d'export d'un rapport de diagnostic local est prévue, regroupant l
 |---|---|
 | Aucune métrique distante suivie | Sans objet : conformément à la décision actée à cette étape et à l'absence de télémétrie retenue à l'étape 10, il n'existe ni collecte de métriques ni service d'alerting distant pour cette application locale et sans serveur |
 
-La « supervision » se limite ainsi à la consultation, par l'utilisateur lui-même et à sa demande, du rapport de diagnostic local décrit ci-dessus.
+La « supervision » se limite ainsi à la consultation, par l'utilisateur lui-même et à sa demande, des journaux techniques locaux du dossier `logs/` décrits ci-dessus.
 
 ## Plan de reprise d'activité
 
@@ -84,7 +87,7 @@ Aucune astreinte n'est mise en place : il s'agit d'une application locale, sans 
 
 | opération courante | procédure |
 |---|---|
-| Vérifier la disponibilité d'une nouvelle version | Automatique via le updater Tauri (cf. [gestion des versions et des mises à jour](#gestion-des-versions-et-des-mises-à-jour)) ; aucune action manuelle requise |
-| Exporter un rapport de diagnostic | Depuis l'écran de paramétrage (cf. [journalisation applicative et gestion des erreurs en production](#journalisation-applicative-et-gestion-des-erreurs-en-production)) |
+| Vérifier la disponibilité d'une nouvelle version | Manuel : consulter la page GitHub Releases du projet et télécharger le nouvel exécutable le cas échéant (cf. [gestion des versions et des mises à jour](#gestion-des-versions-et-des-mises-à-jour)) |
+| Consulter les journaux techniques | Dossier `logs/` à côté de l'exécutable (cf. [journalisation applicative et gestion des erreurs en production](#journalisation-applicative-et-gestion-des-erreurs-en-production)) |
 | Restaurer une sauvegarde de sécurité | Depuis l'écran d'accueil (cf. [plan de reprise d'activité](#plan-de-reprise-dactivité)) |
 | Purger ou agréger les audits anciens | Depuis l'écran de paramétrage (cf. [US-025](./04_casUsage.md#cas-dusage--user-stories)) |
