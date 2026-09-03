@@ -62,6 +62,8 @@ Un groupe porte un nom, une description et la liste de ses instances GitLab et S
 
 Le sous-onglet « Membres connus » gère les règles d'identification des membres d'un groupe : un critère (nom d'utilisateur, adresse électronique complète ou domaine de messagerie), son type, et le statut associé (`interne`, `client` ou `partenaire`). Ces règles permettent de qualifier par anticipation des personnes qui apparaîtront dans les futurs audits. La précédence est : nom d'utilisateur exact, puis adresse exacte, puis domaine. Deux règles de même niveau produisant des statuts contradictoires donnent un « conflit de règles », traité comme `inconnu` (RG-008).
 
+Un champ facultatif « Parti le » permet de documenter la date à laquelle la personne a quitté l'organisation. Il n'est pas disponible pour une règle de type domaine (un domaine ne « part » pas). Marquer un membre comme parti ne change rien à son statut ni au calcul de la date de prise en charge : ses anciens commits restent des commits internes légitimes (RG-061).
+
 ![Administration — Membres connus](assets/captures/administration-membres-connus.png)
 
 Le sous-onglet « Annotations » gère des annotations datées de portée groupe (une date, un libellé, une catégorie), qui apparaîtront comme repères sur les graphiques d'évolution.
@@ -130,7 +132,7 @@ Le parcours d'audit se déroule en trois écrans, accessibles par l'entrée « A
 
 ![Constitution de campagne](assets/captures/constitution-campagne.png)
 
-On choisit le périmètre à auditer : tout, un ou plusieurs groupes, une sélection manuelle de projets, ou un raccourci (« Rejouer les échecs de la dernière campagne », « Projets non audités depuis longtemps »). Le récapitulatif indique le nombre de projets et d'instances concernés, et signale en orange les credentials manquants. Le champ « Date ciblée » reste vide pour un audit régulier daté du jour ; une date passée déclenche un audit historique, au périmètre d'indicateurs réduit (RG-046). Le lancement redemande le mot de passe, puis bascule immédiatement sur le tableau de bord sans attendre la fin.
+On choisit le périmètre à auditer : tout, un ou plusieurs groupes, une sélection manuelle de projets, ou un raccourci (« Rejouer les échecs de la dernière campagne », « Projets non audités depuis longtemps »). Le récapitulatif indique le nombre de projets et d'instances concernés, et signale en orange les credentials manquants. Le champ « Date ciblée » reste vide pour un audit régulier daté du jour ; une date passée déclenche un audit historique, au périmètre d'indicateurs réduit (RG-046). Une carte « Options » porte une case à cocher, décochée par défaut, « Calculer la date de prise en charge des projets sélectionnés » (voir la section [Date de prise en charge](#date-de-prise-en-charge)). Le lancement redemande le mot de passe, puis bascule immédiatement sur le tableau de bord sans attendre la fin.
 
 Le lancement d'une nouvelle campagne est impossible tant qu'un brouillon précédent n'a pas été traité (RG-019).
 
@@ -164,7 +166,19 @@ La synthèse présente le dernier audit intégré de chaque projet dans un table
 
 ![Fiche projet](assets/captures/fiche-projet.png)
 
-La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (âge du dépôt, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Juste au-dessus des dépendances, une ligne « Langages principaux » affiche une à deux icônes des langages dominants du projet d'après Sonar (le second n'apparaît que s'il pèse au moins 10 % des lignes de code) ; elle est grisée quand les indicateurs Sonar le sont et absente quand l'audit retenu ne porte pas de répartition par langage. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
+La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (« Âge chez nous » — la [date de prise en charge](#date-de-prise-en-charge), avec son bouton « recalculer » —, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Juste au-dessus des dépendances, une ligne « Langages principaux » affiche une à deux icônes des langages dominants du projet d'après Sonar (le second n'apparaît que s'il pèse au moins 10 % des lignes de code) ; elle est grisée quand les indicateurs Sonar le sont et absente quand l'audit retenu ne porte pas de répartition par langage. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
+
+### Date de prise en charge
+
+La date de prise en charge d'un projet est la date du premier commit d'un membre interne sur l'un de ses dépôts GitLab : elle indique depuis quand l'organisation travaille réellement sur ce projet. Elle apparaît sur la fiche projet, dans la métadonnée « Âge chez nous ».
+
+Ce calcul n'est jamais fait automatiquement, car il peut être long sur un gros dépôt. On le déclenche de deux façons : en cochant la case « Calculer la date de prise en charge » lors de la constitution d'une campagne (le calcul n'est alors refait que pour les projets dont la date est absente, indéterminée, ou dont la liste des membres internes a changé depuis le dernier calcul), ou avec le bouton « recalculer » à côté de la métadonnée sur la fiche projet (qui refait toujours le calcul pour ce seul projet).
+
+Pour que le résultat soit utile, il faut d'abord avoir qualifié les membres du groupe : le calcul s'appuie sur les règles de statut `interne` reconnaissant un auteur par son adresse électronique exacte, un alias, ou son domaine (le nom d'utilisateur n'étant pas disponible sur un commit). Sans aucune règle `interne`, la fiche affiche « aucun membre interne qualifié pour ce groupe ». Les autres cas particuliers — aucun commit interne trouvé, dépôt trop volumineux pour être remonté entièrement, projet sans dépôt GitLab, dépôt vide — ont chacun leur libellé explicite.
+
+Un recalcul qui retrouve exactement la même date ne réécrit rien (pas de ressaisie du mot de passe, pas de sauvegarde) : la fiche affiche simplement « date de prise en charge inchangée ». Quand les membres internes du groupe ont changé depuis le dernier calcul, une mention discrète le signale à côté du bouton.
+
+Enfin, si un audit du projet (régulier ou historique) porte exactement cette date, l'écran de comparaison entre deux audits propose un raccourci « Depuis la prise en charge » ; sinon, il vous invite à lancer une campagne historique ciblant cette date.
 
 ### Comparaison entre deux audits
 

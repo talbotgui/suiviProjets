@@ -18,10 +18,10 @@ Le mode d'emploi de chaque écran (objectif, actions possibles, points d'attenti
 
 - [Démarrer : créer ou charger un fichier de données](../guide-utilisateur.md#démarrer--créer-ou-charger-un-fichier-de-données) — écran d'accueil, RG-001, RG-002.
 - [Fournir les accès : la gestion des credentials](../guide-utilisateur.md#fournir-les-accès--la-gestion-des-credentials) — RG-004, RG-037.
-- [Constituer son périmètre : l'administration](../guide-utilisateur.md#constituer-son-périmètre--ladministration) — groupes, membres connus, annotations, projets et politique IA, sources ; RG-006 à RG-008, RG-014.
+- [Constituer son périmètre : l'administration](../guide-utilisateur.md#constituer-son-périmètre--ladministration) — groupes, membres connus (dont date de départ `partiLe`), annotations, projets et politique IA, sources ; RG-006 à RG-008, RG-014, RG-061.
 - [Adapter l'outil à son contexte : le paramétrage](../guide-utilisateur.md#adapter-loutil-à-son-contexte--le-paramétrage) — seuils, référentiels, journal, purge des audits, export/import, sécurité ; RG-023, RG-030, RG-038, RG-039, RG-048.
-- [Lancer un audit : la campagne](../guide-utilisateur.md#lancer-un-audit--la-campagne) — constitution de campagne, tableau de bord d'exécution, brouillon et rapport d'anomalies ; RG-017 à RG-021, RG-046.
-- [Exploiter les résultats](../guide-utilisateur.md#exploiter-les-résultats) — synthèse des audits, fiche projet, comparaison entre deux audits, synthèse graphique, obsolescence ; RG-009 à RG-013, RG-047, RG-050.
+- [Lancer un audit : la campagne](../guide-utilisateur.md#lancer-un-audit--la-campagne) — constitution de campagne (dont carte « Options » : calcul de la date de prise en charge), tableau de bord d'exécution, brouillon et rapport d'anomalies ; RG-017 à RG-021, RG-046, RG-058.
+- [Exploiter les résultats](../guide-utilisateur.md#exploiter-les-résultats) — synthèse des audits, fiche projet, date de prise en charge, comparaison entre deux audits, synthèse graphique, obsolescence ; RG-009 à RG-013, RG-047, RG-050, RG-058, RG-059.
 - [Traiter les alertes : la liste de travail](../guide-utilisateur.md#traiter-les-alertes--la-liste-de-travail) — RG-009, RG-010, RG-026, RG-027.
 - [Au quotidien : recherche, sauvegarde, verrouillage](../guide-utilisateur.md#au-quotidien--recherche-sauvegarde-verrouillage) — recherche transversale, sauvegarde manuelle, verrouillage de session ; RG-002, RG-004, RG-005.
 
