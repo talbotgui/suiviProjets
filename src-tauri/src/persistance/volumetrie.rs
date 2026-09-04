@@ -226,6 +226,7 @@ mod tests {
             statut: StatutMembre::Interne,
             libelle: Some("Jean Dupont".to_string()),
             alias_email: None,
+            parti_le: None,
         });
         let avec_membre = calculer_metriques(&racine, None)
             .ventilation

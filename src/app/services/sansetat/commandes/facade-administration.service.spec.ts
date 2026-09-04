@@ -34,6 +34,7 @@ describe('FacadeAdministrationService', () => {
       statut: 'interne',
       libelle: undefined,
       aliasEmail: undefined,
+      partiLe: undefined,
       origine: 'Administration',
       motDePasse: 'mot-de-passe',
     });
@@ -48,6 +49,7 @@ describe('FacadeAdministrationService', () => {
       statut: 'interne',
       libelle: undefined,
       aliasEmail: undefined,
+      partiLe: undefined,
       origine: 'Administration',
       motDePasse: 'mot-de-passe',
     });
@@ -145,5 +147,43 @@ describe('FacadeAdministrationService', () => {
       chemin: null,
       donnees: { versionSchema: 10 },
     });
+  });
+
+  it('invoque calculer_prise_en_charge_projet avec projetId + donnees et renvoie la structure native (US-058)', async () => {
+    const premierCommit = {
+      statut: 'determine',
+      date: '2021-03-15',
+      sha: 'a1b2c3d4',
+      emailAuteur: 'julien.petit@entreprise.fr',
+      calculeLe: '2026-09-03',
+      empreinteReferentiel: 'sha256:4fd19ab0',
+    };
+    invokeSimule.mockResolvedValue(premierCommit);
+
+    const resultat = await service.calculerPriseEnChargeProjet({
+      projetId: 'projet-1',
+      donnees: { versionSchema: 11 },
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('calculer_prise_en_charge_projet', {
+      projetId: 'projet-1',
+      donnees: { versionSchema: 11 },
+    });
+    expect(resultat).toEqual(premierCommit);
+  });
+
+  it('invoque empreinte_referentiel_interne avec groupeId + donnees et renvoie le condensé natif (US-058)', async () => {
+    invokeSimule.mockResolvedValue('sha256:4fd19ab0');
+
+    const resultat = await service.empreinteReferentielInterne({
+      groupeId: 'groupe-1',
+      donnees: { versionSchema: 11 },
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('empreinte_referentiel_interne', {
+      groupeId: 'groupe-1',
+      donnees: { versionSchema: 11 },
+    });
+    expect(resultat).toBe('sha256:4fd19ab0');
   });
 });

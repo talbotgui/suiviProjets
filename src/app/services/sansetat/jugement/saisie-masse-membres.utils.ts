@@ -34,6 +34,12 @@
 // US-044/RG-041 (qui ne cite que « username/email/domaine + statut ») — une règle créée en masse ayant besoin de
 // l'un de ces deux champs reste modifiable ensuite via le formulaire unitaire d'administration.
 //
+// Extension plan_18 (US-061, RG-061) : une quatrième composante positionnelle optionnelle, la date de départ
+// `partiLe`, est acceptée en fin de ligne — `critere;typeCritere=statut;AAAA-MM-JJ` (ex.
+// `jdupont;username=interne;2025-06-30`). Validée par ligne selon les mêmes règles que le formulaire unitaire
+// (date `AAAA-MM-JJ` valide, non postérieure au jour de saisie, refusée sur un critère `domaineEmail`) ; une ligne
+// dont la date de départ est invalide est rejetée sans bloquer les autres.
+//
 // Clé de correspondance retenue pour le rejet d'un doublon (RG-041, points 1 et 2), décision arbitraire de ce
 // développement à valider par un humain : le couple (critère, type de critère), et non le seul critère — RG-041
 // justifie ce rejet par analogie avec « le blocage de doublon de username déjà posé par RG-008 », qui ne bloque
@@ -91,6 +97,11 @@ export interface EntreeSaisieMasseMembres {
   readonly typeCritere: TypeCritereMembreSaisieMasse;
   /** Statut saisi explicitement (RG-041 : jamais déduit ni pré-rempli). */
   readonly statut: StatutMembreSaisieMasse;
+  /**
+   * Date de départ optionnelle (`AAAA-MM-JJ`, RG-061), quatrième composante positionnelle de la ligne : absente si
+   * non saisie.
+   */
+  readonly partiLe?: string;
   /** Ligne originale ayant produit cette entrée, conservée pour restituer le texte de la modale en cas d'échec. */
   readonly ligneOriginale: string;
 }
@@ -156,7 +167,7 @@ export class SaisieMasseMembresUtils {
         continue;
       }
 
-      const { critere, typeCritereBrut, statutBrut } = analyseLigne;
+      const { critere, typeCritereBrut, statutBrut, partiLeBrut } = analyseLigne;
 
       const typeCritere = TYPES_CRITERE_RECONNUS.find((valeur) => valeur === typeCritereBrut);
       if (typeCritere === undefined) {
@@ -173,6 +184,12 @@ export class SaisieMasseMembresUtils {
           ligne,
           message: `Statut « ${statutBrut} » non reconnu : une valeur explicite parmi ${STATUTS_RECONNUS.join(', ')} est exigée sur chaque ligne (RG-041, aucune valeur pré-remplie par défaut).`,
         });
+        continue;
+      }
+
+      const messagePartiLe = SaisieMasseMembresUtils.validerPartiLe(partiLeBrut, typeCritere);
+      if (messagePartiLe !== null) {
+        erreurs.push({ ligne, message: messagePartiLe });
         continue;
       }
 
@@ -196,10 +213,37 @@ export class SaisieMasseMembresUtils {
       }
       clesDejaVues.add(cle);
 
-      entrees.push({ critere, typeCritere, statut, ligneOriginale: ligne });
+      entrees.push({ critere, typeCritere, statut, partiLe: partiLeBrut, ligneOriginale: ligne });
     }
 
     return { entrees, erreurs };
+  }
+
+  /**
+   * Valide la date de départ optionnelle d'une ligne de saisie en masse (RG-061), sur le modèle de
+   * `SqmMembresConnusAdminComponent.validerPartiLe` et de `persistance::administration::valider_parti_le`.
+   * @param partiLe - Quatrième composante brute de la ligne, `undefined` si non saisie.
+   * @param typeCritere - Type de critère déjà reconnu de la ligne.
+   * @returns Le message d'erreur à afficher, ou `null` si la date est absente ou valide.
+   */
+  private static validerPartiLe(
+    partiLe: string | undefined,
+    typeCritere: TypeCritereMembreSaisieMasse,
+  ): string | null {
+    if (partiLe === undefined) {
+      return null;
+    }
+    if (typeCritere === 'domaineEmail') {
+      return 'Une règle de type domaine ne peut pas porter de date de départ (RG-061).';
+    }
+    const horodatage = Date.parse(`${partiLe}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(partiLe) || Number.isNaN(horodatage)) {
+      return `Date de départ « ${partiLe} » invalide : format attendu AAAA-MM-JJ.`;
+    }
+    if (horodatage > Date.now()) {
+      return `Date de départ « ${partiLe} » invalide : elle ne peut pas être dans le futur.`;
+    }
+    return null;
   }
 
   /**
@@ -209,10 +253,13 @@ export class SaisieMasseMembresUtils {
    * @returns Le critère et les valeurs brutes de type de critère/statut analysées, `undefined` si la ligne est
    * malformée (séparateur `;` ou `=` absent, ou composante vide).
    */
-  private static analyserLigne(
-    ligne: string,
-  ):
-    | { readonly critere: string; readonly typeCritereBrut: string; readonly statutBrut: string }
+  private static analyserLigne(ligne: string):
+    | {
+        readonly critere: string;
+        readonly typeCritereBrut: string;
+        readonly statutBrut: string;
+        readonly partiLeBrut: string | undefined;
+      }
     | undefined {
     const indexSeparateur = ligne.indexOf(';');
     if (indexSeparateur <= 0 || indexSeparateur === ligne.length - 1) {
@@ -226,8 +273,17 @@ export class SaisieMasseMembresUtils {
       return undefined;
     }
     const typeCritereBrut = reste.slice(0, indexEgal).trim();
-    const statutBrut = reste.slice(indexEgal + 1).trim();
-
-    return { critere, typeCritereBrut, statutBrut };
+    // Après le `=`, le statut, puis éventuellement `;AAAA-MM-JJ` (date de départ, RG-061).
+    const apresEgal = reste.slice(indexEgal + 1).trim();
+    const indexPartiLe = apresEgal.indexOf(';');
+    if (indexPartiLe === -1) {
+      return { critere, typeCritereBrut, statutBrut: apresEgal, partiLeBrut: undefined };
+    }
+    const statutBrut = apresEgal.slice(0, indexPartiLe).trim();
+    const partiLeBrut = apresEgal.slice(indexPartiLe + 1).trim();
+    if (statutBrut.length === 0 || partiLeBrut.length === 0) {
+      return undefined;
+    }
+    return { critere, typeCritereBrut, statutBrut, partiLeBrut };
   }
 }

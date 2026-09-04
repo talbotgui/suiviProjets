@@ -70,6 +70,7 @@
             class="champ__controle"
             name="typeCritere"
             [(ngModel)]="typeCritere"
+            (ngModelChange)="surChangementTypeCritere()"
             aria-describedby="membres-connus-admin-champ-type-critere-aide"
           >
             @for (type of typesCritere; track type) {
@@ -98,6 +99,26 @@
           <span id="membres-connus-admin-champ-statut-aide" class="champ__aide">
             Statut attribué à tout membre ou contributeur dont le username, l'email ou le domaine
             correspond à ce critère.
+          </span>
+        </label>
+
+        <label class="champ">
+          Parti le
+          <input
+            id="membres-connus-admin-champ-parti-le"
+            type="date"
+            class="champ__controle"
+            name="partiLe"
+            [(ngModel)]="partiLe"
+            [disabled]="typeCritere === 'domaineEmail'"
+            [max]="dateAujourdhui"
+            aria-describedby="membres-connus-admin-champ-parti-le-aide"
+          />
+          <span id="membres-connus-admin-champ-parti-le-aide" class="champ__aide">
+            Facultatif : date à laquelle ce membre a quitté l'organisation. Renseignée, elle
+            documente qu'il ne devrait plus figurer dans les membres des dépôts du projet. Sans
+            objet pour une règle de type domaine. Ses anciens commits restent comptés pour la date
+            de prise en charge.
           </span>
         </label>
 
@@ -194,6 +215,11 @@
           <span class="membres-connus-admin__statut texte-discret texte-sm">{{
             regle.statut
           }}</span>
+          @if (regle.partiLe) {
+            <span class="membres-connus-admin__parti-le texte-discret texte-sm">
+              · parti le {{ regle.partiLe | date: 'dd/MM/yyyy' }}
+            </span>
+          }
           @if (estEnConflit(regle.id)) {
             <span class="membres-connus-admin__badge-conflit texte-orange poids-gras" role="alert"
               >Conflit de règles</span

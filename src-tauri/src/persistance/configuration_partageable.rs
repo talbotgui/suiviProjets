@@ -585,6 +585,7 @@ mod tests {
                 statut: crate::modele::racine::StatutMembre::Interne,
                 libelle: None,
                 alias_email: None,
+                parti_le: None,
             }],
             annotations: vec![],
             indicateurs_desactives: vec![],

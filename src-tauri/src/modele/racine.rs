@@ -83,7 +83,18 @@ use std::collections::HashMap;
 /// de filtres devenant commune. Une vue antérieure est ainsi migrée vers la forme courante plutôt qu'ignorée avec
 /// avertissement. Voir `migration_9_vers_10` enregistrée dans
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 10;
+///
+/// Passage de `10` à `11` (plan_18 — date de prise en charge, US-058/RG-058 ; date de départ d'un membre connu,
+/// US-061/RG-061) : palier **à transformation nulle**, comme `migration_1_vers_2`. Deux changements de forme
+/// additifs : `Projet.premierCommitInterne` devient une union discriminée sur `statut` ([`PremierCommitInterne`] +
+/// [`StatutPremierCommit`]) dont la variante `determine` sérialise à l'identique de la forme plate antérieure (les
+/// autres statuts n'ont jamais été persistés), et `MembreConnu.partiLe` est un champ optionnel ajouté (absent =
+/// membre actif). Conformément à la convention du projet pour tout changement de forme du schéma, `VERSION_SCHEMA_COURANTE`
+/// est néanmoins incrémentée et `migration_10_vers_11` ajoutée à
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`. La valeur `11` a été retenue en l'absence
+/// d'intégration préalable de `plan_17` chapitre 4 (qui incrémente aussi ce compteur) : le premier des deux plans
+/// intégré prend le palier suivant, sans trou.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 11;
 
 /// Version unique et partagée du schéma de filtres d'une [`VueEnregistree`], depuis le palier `9` → `10`
 /// (plan_16, incrément 2) : la forme de `filtres` (`{ groupeId, projetIds }`) est désormais commune à tous les
@@ -376,6 +387,13 @@ pub(crate) struct MembreConnu {
     /// Alias courriel optionnel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) alias_email: Option<String>,
+    /// Date de départ optionnelle de la personne (`AAAA-MM-JJ`), RG-061 : absente = membre actif. Indépendante du
+    /// `statut` (la personne conserve `interne`/`client`/`partenaire`) ; sans effet sur la résolution du statut
+    /// (`crate::commandes` / Moteur de jugement) ni sur la datation de la prise en charge (RG-058), et jamais
+    /// incluse dans l'empreinte du référentiel `interne`. Interdite sur une règle de `type_critere`
+    /// [`TypeCritere::DomaineEmail`] (revalidé côté cœur natif).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) parti_le: Option<String>,
 }
 
 /// Événement daté de portée groupe ou projet, affiché en repère sur les graphiques d'évolution.
@@ -398,22 +416,51 @@ pub(crate) struct Annotation {
     pub(crate) systeme: Option<bool>,
 }
 
-/// Attribut immuable recalculable identifiant la date du premier commit interne d'un projet.
+/// Statut d'un calcul de date de prise en charge d'un projet (US-058, RG-058, achèvement de F17), discriminant
+/// interne-taggé sur la clé `statut` (`docs/02_documentation/05_reglesGestion.md`). La forme sérialisée de la
+/// variante [`StatutPremierCommit::Determine`] (`statut: "determine"` avec `date`, `sha` et `emailAuteur`) est
+/// **identique** à la forme plate historique, ce qui rend le palier de migration `10` vers `11` à transformation
+/// nulle : voir `migration_10_vers_11` dans [`crate::persistance::migration::ETAPES_MIGRATION_REELLES`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "statut", rename_all = "snake_case")]
+pub(crate) enum StatutPremierCommit {
+    /// Premier commit interne identifié.
+    Determine {
+        /// Date calendaire UTC du premier commit interne (`AAAA-MM-JJ`), au même format que `audit.date`.
+        date: String,
+        /// SHA (éventuellement abrégé) du commit retenu.
+        sha: String,
+        /// Adresse courriel de l'auteur du commit retenu.
+        #[serde(rename = "emailAuteur")]
+        email_auteur: String,
+    },
+    /// Aucune règle de statut `interne` n'est définie pour le groupe (aucun appel réseau n'a été effectué).
+    AucuneRegleInterne,
+    /// Des règles `interne` existent, mais aucun commit correspondant n'a été trouvé dans la fenêtre parcourue.
+    AucunMembreInterne,
+    /// La fenêtre bornée de pages a été épuisée sans correspondance, ou l'API n'expose pas le nombre total de
+    /// pages (dépôt volumineux) : la remontée n'a pas pu être menée à son terme.
+    IndetermineTropDeCommits,
+    /// Le projet n'a aucune source GitLab exploitable.
+    NonApplicable,
+    /// Toutes les sources GitLab du projet ont un dépôt vide.
+    DepotVide,
+}
+
+/// Attribut stable, recalculable à la demande, identifiant la date de prise en charge d'un projet (premier commit
+/// interne, RG-058). `statut` et ses éventuelles données sont portés par [`StatutPremierCommit`] (aplati) ;
+/// `calcule_le` et `empreinte_referentiel`, toujours renseignés quelle que soit la variante, restent hors de
+/// l'énumération.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PremierCommitInterne {
-    /// Date du premier commit interne détecté.
-    pub(crate) date: String,
-    /// SHA (éventuellement abrégé) du commit.
-    pub(crate) sha: String,
-    /// Adresse courriel de l'auteur du commit.
-    pub(crate) email_auteur: String,
+    /// Statut du calcul et, pour la variante `determine`, les données du commit retenu.
+    #[serde(flatten)]
+    pub(crate) statut: StatutPremierCommit,
     /// Date à laquelle ce calcul a été effectué.
     pub(crate) calcule_le: String,
-    /// Empreinte du référentiel de membres connus utilisé au moment du calcul.
+    /// Empreinte du sous-ensemble `interne` des membres connus au moment du calcul (`sha256:…`).
     pub(crate) empreinte_referentiel: String,
-    /// Statut du calcul (ex. `determine`).
-    pub(crate) statut: String,
 }
 
 /// Type de source rattachée à un projet.
@@ -882,7 +929,8 @@ pub(crate) struct Projet {
     /// Date d'autorisation de l'IA, renseignée uniquement si `ia_autorisee` est ou a été vraie (RG-015).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) ia_autorisee_depuis: Option<String>,
-    /// Date du premier commit interne, une fois calculée.
+    /// Date de prise en charge du projet ([`PremierCommitInterne`], RG-058), une fois calculée à la demande ;
+    /// absente tant qu'aucun calcul n'a été effectué.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) premier_commit_interne: Option<PremierCommitInterne>,
     /// Sources rattachées au projet.
@@ -1274,6 +1322,82 @@ mod tests {
     use regex::Regex;
 
     #[test]
+    fn premier_commit_interne_determine_serialise_a_lidentique_de_la_forme_plate()
+    -> Result<(), serde_json::Error> {
+        let fragment = serde_json::json!({
+            "statut": "determine",
+            "date": "2021-03-15",
+            "sha": "a1b2c3d4",
+            "emailAuteur": "julien.petit@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:4fd19ab0"
+        });
+
+        let valeur: PremierCommitInterne = serde_json::from_value(fragment.clone())?;
+        assert_eq!(
+            valeur.statut,
+            StatutPremierCommit::Determine {
+                date: "2021-03-15".to_string(),
+                sha: "a1b2c3d4".to_string(),
+                email_auteur: "julien.petit@entreprise.fr".to_string(),
+            }
+        );
+        assert_eq!(serde_json::to_value(&valeur)?, fragment);
+        Ok(())
+    }
+
+    #[test]
+    fn premier_commit_interne_statuts_sans_donnees_portent_les_valeurs_de_rg058()
+    -> Result<(), serde_json::Error> {
+        for (statut, tag) in [
+            (
+                StatutPremierCommit::AucuneRegleInterne,
+                "aucune_regle_interne",
+            ),
+            (
+                StatutPremierCommit::AucunMembreInterne,
+                "aucun_membre_interne",
+            ),
+            (
+                StatutPremierCommit::IndetermineTropDeCommits,
+                "indetermine_trop_de_commits",
+            ),
+            (StatutPremierCommit::NonApplicable, "non_applicable"),
+            (StatutPremierCommit::DepotVide, "depot_vide"),
+        ] {
+            let valeur = PremierCommitInterne {
+                statut,
+                calcule_le: "2026-05-15".to_string(),
+                empreinte_referentiel: "sha256:x".to_string(),
+            };
+            let json = serde_json::to_value(&valeur)?;
+            assert_eq!(json["statut"], serde_json::json!(tag));
+            assert_eq!(json["calculeLe"], serde_json::json!("2026-05-15"));
+            assert!(json.get("date").is_none(), "{tag} ne porte pas de date");
+            assert_eq!(
+                serde_json::from_value::<PremierCommitInterne>(json)?,
+                valeur
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn membre_connu_parti_le_est_additif_et_optionnel() -> Result<(), serde_json::Error> {
+        let sans: MembreConnu = serde_json::from_value(serde_json::json!({
+            "id": "b1", "critere": "alice", "typeCritere": "username", "statut": "interne"
+        }))?;
+        assert_eq!(sans.parti_le, None);
+        assert!(serde_json::to_value(&sans)?.get("partiLe").is_none());
+
+        let avec: MembreConnu = serde_json::from_value(serde_json::json!({
+            "id": "b2", "critere": "bob", "typeCritere": "email", "statut": "interne", "partiLe": "2025-06-30"
+        }))?;
+        assert_eq!(avec.parti_le.as_deref(), Some("2025-06-30"));
+        Ok(())
+    }
+
+    #[test]
     fn canoniser_casse_statut_obsolescence_remappe_les_quatre_valeurs_et_ignore_le_reste() {
         assert_eq!(
             canoniser_casse_statut_obsolescence("MAINTENU"),
@@ -1353,6 +1477,7 @@ mod tests {
                 statut: StatutMembre::Interne,
                 libelle: None,
                 alias_email: None,
+                parti_le: None,
             }],
             annotations: vec![],
             indicateurs_desactives: vec![],

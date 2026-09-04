@@ -17,9 +17,10 @@
 //! [`migration_6_vers_7`] (Phase 16, amendement de RG-043 : normalisation de la casse du champ `statut` des bornes
 //! de version de `referentiels.reglesDependances`), [`migration_7_vers_8`] (correction du bug Sonar
 //! `new_coverage` : `ResultatSonarCouverture.couvertureNouveauCode` devient optionnel), [`migration_8_vers_9`]
-//! (US-017 : `MembreGitlab.herite` remplacé par `direct` + `groupesInvites`) et [`migration_9_vers_10`] (plan_16,
+//! (US-017 : `MembreGitlab.herite` remplacé par `direct` + `groupesInvites`), [`migration_9_vers_10`] (plan_16,
 //! incrément 2 : uniformisation de la forme du champ `filtres` de chaque `VueEnregistree` en `{ groupeId, projetIds }`,
-//! RG-027 amendée / RG-053).
+//! RG-027 amendée / RG-053) et [`migration_10_vers_11`] (plan_18 : `Projet.premierCommitInterne` en union
+//! discriminée sur `statut`, `MembreConnu.partiLe` optionnel — palier à transformation nulle, RG-058 / RG-061).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -177,6 +178,23 @@ fn migration_9_vers_10(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Dixième migration réelle du projet (plan_18 — date de prise en charge, US-058/RG-058 ; date de départ d'un
+/// membre connu, US-061/RG-061), faisant progresser `versionSchema` de `10` à `11`.
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : les deux
+/// changements de forme sont additifs. `Projet.premierCommitInterne` devient une union discriminée sur `statut`
+/// ([`crate::modele::racine::PremierCommitInterne`]) dont la variante `determine` sérialise à l'identique de la
+/// forme plate historique (`{ statut: "determine", date, sha, emailAuteur, calculeLe, empreinteReferentiel }`) —
+/// seule forme jamais persistée à ce jour, les autres statuts n'ayant jamais existé sur disque —, et
+/// `MembreConnu.partiLe` est un champ optionnel (`#[serde(default, skip_serializing_if = "Option::is_none")]`) dont
+/// l'absence se désérialise directement en `None`. Seule la version de schéma progresse.
+fn migration_10_vers_11(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(11));
+    }
+    Ok(())
+}
+
 /// Réécrit le champ `filtres` et le champ `versionFiltres` de chaque entrée de `document.vuesEnregistrees`
 /// (cf. [`migration_9_vers_10`]). Best-effort, comme [`inserer_regle_java_si_absente`].
 fn uniformiser_filtres_vues(document: &mut serde_json::Map<String, Value>) {
@@ -255,7 +273,7 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
 /// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`],
-/// [`migration_7_vers_8`], [`migration_8_vers_9`] et [`migration_9_vers_10`].
+/// [`migration_7_vers_8`], [`migration_8_vers_9`], [`migration_9_vers_10`] et [`migration_10_vers_11`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
@@ -266,6 +284,7 @@ pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (7, migration_7_vers_8),
     (8, migration_8_vers_9),
     (9, migration_9_vers_10),
+    (10, migration_10_vers_11),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -639,6 +658,93 @@ mod tests {
             );
             assert!(membre.groupes_invites.is_empty());
         }
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_10_vers_11_ne_perd_aucune_donnee_et_relit_les_formes_historiques()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant plan_18 : `versionSchema: 10`, un projet dont `premierCommitInterne` est à la
+        // forme plate historique (`statut: "determine"` + `date`/`sha`/`emailAuteur`), et deux règles de membre
+        // connu dont l'une porte déjà un `partiLe` (édition manuelle possible), l'autre non. La migration ne doit
+        // ni échouer ni altérer les données : `versionSchema` progresse, `premierCommitInterne` se désérialise en
+        // variante `Determine` sans perte, `partiLe` absent → `None`, `partiLe` présent → conservé.
+        let premier_commit_plat = json!({
+            "statut": "determine",
+            "date": "2021-03-15",
+            "sha": "a1b2c3d4",
+            "emailAuteur": "julien.petit@entreprise.fr",
+            "calculeLe": "2026-05-15",
+            "empreinteReferentiel": "sha256:4fd19ab0"
+        });
+        let mut valeur = json!({
+            "versionSchema": 10,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "groupes": [
+                {
+                    "id": "a0000000-0000-4000-8000-000000000001",
+                    "nom": "Groupe historique",
+                    "description": "",
+                    "instances": [],
+                    "membresConnus": [
+                        { "id": "b0000000-0000-4000-8000-000000000001", "critere": "alice", "typeCritere": "username", "statut": "interne" },
+                        { "id": "b0000000-0000-4000-8000-000000000002", "critere": "bob", "typeCritere": "username", "statut": "interne", "partiLe": "2025-06-30" }
+                    ],
+                    "annotations": [],
+                    "indicateursDesactives": [],
+                    "projets": [
+                        {
+                            "id": "d0000000-0000-4000-8000-000000000001",
+                            "nom": "Projet historique",
+                            "description": "",
+                            "iaAutorisee": false,
+                            "premierCommitInterne": premier_commit_plat.clone(),
+                            "sources": [],
+                            "annotations": [],
+                            "audits": []
+                        }
+                    ]
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        let membres = &racine.groupes[0].membres_connus;
+        assert_eq!(membres[0].parti_le, None);
+        assert_eq!(membres[1].parti_le.as_deref(), Some("2025-06-30"));
+
+        let Some(premier_commit) = racine.groupes[0].projets[0].premier_commit_interne.as_ref()
+        else {
+            return Err("premierCommitInterne doit être conservé par la migration".into());
+        };
+        assert_eq!(
+            premier_commit.statut,
+            crate::modele::racine::StatutPremierCommit::Determine {
+                date: "2021-03-15".to_string(),
+                sha: "a1b2c3d4".to_string(),
+                email_auteur: "julien.petit@entreprise.fr".to_string(),
+            }
+        );
+        assert_eq!(premier_commit.calcule_le, "2026-05-15");
+        assert_eq!(premier_commit.empreinte_referentiel, "sha256:4fd19ab0");
+
+        // Rétro-compatibilité : la forme resérialisée de la variante `Determine` est identique à la forme plate.
+        assert_eq!(
+            serde_json::to_value(premier_commit)?,
+            premier_commit_plat,
+            "la variante Determine doit sérialiser à l'identique de la forme plate historique"
+        );
         Ok(())
     }
 

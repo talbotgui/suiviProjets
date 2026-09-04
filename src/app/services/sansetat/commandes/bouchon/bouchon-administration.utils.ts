@@ -33,6 +33,7 @@ type CategorieAnomalieBouchon =
   | 'projetIntrouvable'
   | 'membreIntrouvable'
   | 'doublonUsernameMembreConnu'
+  | 'dateDepartInvalide'
   | 'brouillonDejaExistant'
   | 'aucunBrouillonCourant'
   | 'projetAbsentDuBrouillon';
@@ -53,18 +54,28 @@ class AnomalieAdministrationBouchon extends Error {
 }
 
 /**
- * Réponse brute d'une commande bouchonnée : soit la racine mise à jour, soit l'une des deux enveloppes propres à
- * `qualifier_membre`/`qualifier_membres`.
+ * Réponse brute d'une commande bouchonnée : la racine mise à jour, l'une des deux enveloppes propres à
+ * `qualifier_membre`/`qualifier_membres`, une structure `PremierCommitInterne` (`calculer_prise_en_charge_projet`),
+ * ou une simple chaîne (`empreinte_referentiel_interne`).
  */
 type ReponseBouchonAdministration =
   | Record<string, unknown>
   | { readonly donnees: Record<string, unknown>; readonly membresEnConflit: readonly string[] }
-  | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
+  | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] }
+  | string;
 
 /**
- * Bouchon TS des huit commandes de la Façade portées par `FacadeAdministrationService` (qualification des membres
+ * Délai artificiel fixe (jamais aléatoire) appliqué à `calculer_prise_en_charge_projet`, sur le modèle de
+ * `DELAI_INTERROGATION_AUDIT_MS` de `BouchonCommandesUtils` : cette commande interroge en réel les dépôts GitLab,
+ * le délai permet d'exercer l'indicateur de chargement du bouton « recalculer » de la Fiche projet en `ng serve`.
+ */
+const DELAI_CALCUL_PRISE_EN_CHARGE_MS = 800;
+
+/**
+ * Bouchon TS des dix commandes de la Façade portées par `FacadeAdministrationService` (qualification des membres
  * connus, unitaire et en masse, politique d'autorisation de l'IA, cycle de vie du brouillon d'une campagne,
- * volumétrie du fichier de données), activé hors contexte Tauri par `InvocationCommandeUtils`.
+ * volumétrie du fichier de données, calcul de la date de prise en charge d'un projet et empreinte du référentiel
+ * `interne`), activé hors contexte Tauri par `InvocationCommandeUtils`.
  */
 export class BouchonAdministrationUtils {
   /**
@@ -80,6 +91,8 @@ export class BouchonAdministrationUtils {
     'integrer_brouillon',
     'rejeter_brouillon',
     'calculer_metriques_volumetrie',
+    'calculer_prise_en_charge_projet',
+    'empreinte_referentiel_interne',
   ]);
 
   /**
@@ -99,6 +112,9 @@ export class BouchonAdministrationUtils {
     commande: string,
     parametres: Readonly<Record<string, unknown>>,
   ): Promise<ReponseBouchonAdministration> {
+    if (commande === 'calculer_prise_en_charge_projet') {
+      return BouchonAdministrationUtils.calculerPriseEnChargeProjet(parametres);
+    }
     try {
       return Promise.resolve(BouchonAdministrationUtils.resoudre(commande, parametres));
     } catch (erreur: unknown) {
@@ -117,6 +133,8 @@ export class BouchonAdministrationUtils {
     parametres: Readonly<Record<string, unknown>>,
   ): ReponseBouchonAdministration {
     switch (commande) {
+      case 'empreinte_referentiel_interne':
+        return BouchonAdministrationUtils.empreinteReferentielInterne(parametres);
       case 'qualifier_membre':
         return BouchonAdministrationUtils.qualifierMembre(parametres);
       case 'qualifier_membres':
@@ -152,7 +170,7 @@ export class BouchonAdministrationUtils {
    * Qualifie un membre connu (US-022, US-023) : met à jour la règle désignée par `membreId`, ou en crée une
    * nouvelle après contrôle de doublon (RG-006, RG-007) si absent.
    * @param parametres - Paramètres reçus (`groupeId`, `membreId`, `critere`, `typeCritere`, `statut`, `libelle`,
-   * `aliasEmail`, `donnees`).
+   * `aliasEmail`, `partiLe`, `donnees`).
    * @returns L'enveloppe `{ donnees, membresEnConflit }` attendue par `ReponseQualificationMembre`.
    */
   private static qualifierMembre(parametres: Readonly<Record<string, unknown>>): {
@@ -167,6 +185,8 @@ export class BouchonAdministrationUtils {
     const statut = BouchonAdministrationUtils.lireTexte(parametres, 'statut');
     const libelle = BouchonAdministrationUtils.lireTexteOptionnel(parametres, 'libelle');
     const aliasEmail = BouchonAdministrationUtils.lireTexteOptionnel(parametres, 'aliasEmail');
+    const partiLe = BouchonAdministrationUtils.lireTexteOptionnel(parametres, 'partiLe');
+    BouchonAdministrationUtils.validerPartiLe(partiLe, typeCritere);
 
     const nouvelleRacine = BouchonAdministrationUtils.horodater(
       BouchonAdministrationUtils.miseAJourGroupe(donnees, groupeId, (groupe) => {
@@ -186,6 +206,7 @@ export class BouchonAdministrationUtils {
             statut,
             libelle,
             aliasEmail,
+            partiLe,
           };
           return { ...groupe, membresConnus: nouveauxMembres };
         }
@@ -205,6 +226,7 @@ export class BouchonAdministrationUtils {
           statut,
           libelle,
           aliasEmail,
+          partiLe,
         };
         return { ...groupe, membresConnus: [...membresConnus, nouvelleEntree] };
       }),
@@ -246,6 +268,7 @@ export class BouchonAdministrationUtils {
           statut: entreeBrute['statut'],
           libelle: entreeBrute['libelle'],
           aliasEmail: entreeBrute['aliasEmail'],
+          partiLe: entreeBrute['partiLe'],
         });
         donnees = resultat.donnees;
         reussites.push(true);
@@ -504,6 +527,182 @@ export class BouchonAdministrationUtils {
   }
 
   /**
+   * Résout `calculer_prise_en_charge_projet` (US-058, RG-058) de façon déterministe et rejouable, après un délai
+   * artificiel fixe ({@link DELAI_CALCUL_PRISE_EN_CHARGE_MS}). Reproduit une version simplifiée de la logique du
+   * cœur natif (`src-tauri/src/persistance/prise_en_charge.rs`) : `aucune_regle_interne` si le groupe n'a aucune
+   * règle `interne`, `non_applicable` sans source GitLab, sinon `determine`. Pour rester rejouable (recette :
+   * « recalculer sans rien changer → inchangé »), la date retenue est celle déjà stockée tant que l'empreinte du
+   * référentiel `interne` n'a pas changé depuis le dernier calcul ; elle est resynthétisée depuis l'empreinte
+   * courante sinon (ou au premier calcul), pour donner à voir un changement après modification des membres.
+   * @param parametres - Paramètres reçus (`projetId`, `donnees`).
+   * @returns Une structure de forme `PremierCommitInterne`.
+   */
+  private static async calculerPriseEnChargeProjet(
+    parametres: Readonly<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>> {
+    const donnees = BouchonAdministrationUtils.exigerObjet(parametres['donnees']);
+    const projetId = BouchonAdministrationUtils.lireTexte(parametres, 'projetId');
+    const cible = BouchonAdministrationUtils.trouverGroupeEtProjet(donnees, projetId);
+    if (cible === undefined) {
+      throw new AnomalieAdministrationBouchon('projetIntrouvable');
+    }
+    await new Promise((resoudre) => setTimeout(resoudre, DELAI_CALCUL_PRISE_EN_CHARGE_MS));
+
+    const { groupe, projet } = cible;
+    const empreinteReferentiel = BouchonAdministrationUtils.empreinteDeGroupe(groupe);
+    const calculeLe = new Date().toISOString().slice(0, 10);
+    const base = { calculeLe, empreinteReferentiel };
+
+    const reglesInternes = BouchonAdministrationUtils.reglesInternes(groupe);
+    if (reglesInternes.length === 0) {
+      return { ...base, statut: 'aucune_regle_interne' };
+    }
+    const sourcesGitlab = BouchonAdministrationUtils.lireListe(projet, 'sources').filter(
+      (source) => BouchonAdministrationUtils.lireTexte(source, 'type') === 'depotGitlab',
+    );
+    if (sourcesGitlab.length === 0) {
+      return { ...base, statut: 'non_applicable' };
+    }
+
+    const existant = projet['premierCommitInterne'];
+    const existantDetermine =
+      BouchonAdministrationUtils.estObjet(existant) &&
+      BouchonAdministrationUtils.lireTexte(existant, 'statut') === 'determine'
+        ? existant
+        : undefined;
+    const empreinteInchangee =
+      existantDetermine !== undefined &&
+      BouchonAdministrationUtils.lireTexte(existantDetermine, 'empreinteReferentiel') ===
+        empreinteReferentiel;
+
+    if (existantDetermine !== undefined && empreinteInchangee) {
+      return {
+        ...base,
+        statut: 'determine',
+        date: BouchonAdministrationUtils.lireTexte(existantDetermine, 'date'),
+        sha: BouchonAdministrationUtils.lireTexte(existantDetermine, 'sha'),
+        emailAuteur: BouchonAdministrationUtils.lireTexte(existantDetermine, 'emailAuteur'),
+      };
+    }
+    const premiereRegle = reglesInternes[0];
+    const emailAuteur =
+      BouchonAdministrationUtils.lireTexteOptionnel(premiereRegle, 'aliasEmail') ??
+      BouchonAdministrationUtils.lireTexte(premiereRegle, 'critere');
+    return {
+      ...base,
+      statut: 'determine',
+      date: BouchonAdministrationUtils.dateSynthetiqueDepuisEmpreinte(empreinteReferentiel),
+      sha: `bouchon-${empreinteReferentiel.slice(7, 15)}`,
+      emailAuteur,
+    };
+  }
+
+  /**
+   * Résout `empreinte_referentiel_interne` (US-058, RG-058, décision 15 du plan_18) : un condensé stable, de forme
+   * `sha256:…` compatible avec le cœur natif, dérivé des seules règles `interne` du groupe (jamais `partiLe`), qui
+   * change dès que ces règles changent. N'est pas un vrai SHA-256 (hachage de chaîne suffisant : l'interface ne
+   * fait que comparer des chaînes, décision 15).
+   * @param parametres - Paramètres reçus (`groupeId`, `donnees`).
+   * @returns Le condensé bouchonné.
+   */
+  private static empreinteReferentielInterne(
+    parametres: Readonly<Record<string, unknown>>,
+  ): string {
+    const donnees = BouchonAdministrationUtils.exigerObjet(parametres['donnees']);
+    const groupeId = BouchonAdministrationUtils.lireTexte(parametres, 'groupeId');
+    const groupe = BouchonAdministrationUtils.lireListe(donnees, 'groupes').find(
+      (candidat) => BouchonAdministrationUtils.lireTexte(candidat, 'id') === groupeId,
+    );
+    if (groupe === undefined) {
+      throw new AnomalieAdministrationBouchon('groupeIntrouvable');
+    }
+    return BouchonAdministrationUtils.empreinteDeGroupe(groupe);
+  }
+
+  /**
+   * Règles de membre connu de statut `interne` d'un groupe.
+   * @param groupe - Groupe source.
+   * @returns Les règles `interne`, jamais `undefined`.
+   */
+  private static reglesInternes(
+    groupe: Record<string, unknown>,
+  ): readonly Record<string, unknown>[] {
+    return BouchonAdministrationUtils.lireListe(groupe, 'membresConnus').filter(
+      (membre) => BouchonAdministrationUtils.lireTexte(membre, 'statut') === 'interne',
+    );
+  }
+
+  /**
+   * Condensé bouchonné du sous-ensemble `interne` des membres connus d'un groupe : triplet trié
+   * `(critere, typeCritere, aliasEmail)`, jamais `partiLe` (décision 11 du plan_18).
+   * @param groupe - Groupe source.
+   * @returns Une chaîne `sha256:…`.
+   */
+  private static empreinteDeGroupe(groupe: Record<string, unknown>): string {
+    const triplets = BouchonAdministrationUtils.reglesInternes(groupe)
+      .map(
+        (membre) =>
+          `${BouchonAdministrationUtils.lireTexte(membre, 'critere')}|` +
+          `${BouchonAdministrationUtils.lireTexte(membre, 'typeCritere')}|` +
+          `${BouchonAdministrationUtils.lireTexteOptionnel(membre, 'aliasEmail') ?? ''}`,
+      )
+      .sort((gauche, droite) => gauche.localeCompare(droite));
+    return `sha256:${BouchonAdministrationUtils.hachageStable(triplets.join('\n'))}`;
+  }
+
+  /**
+   * Hachage déterministe (variante de DJB2) d'une chaîne, rendu en hexadécimal sur 8 caractères. Suffisant pour un
+   * bouchon : sert uniquement à obtenir une valeur stable qui change avec l'entrée.
+   * @param valeur - Chaîne à hacher.
+   * @returns Huit caractères hexadécimaux.
+   */
+  private static hachageStable(valeur: string): string {
+    let accumulateur = 5381;
+    for (let index = 0; index < valeur.length; index += 1) {
+      accumulateur = (accumulateur * 33) ^ valeur.charCodeAt(index);
+    }
+    return (accumulateur >>> 0).toString(16).padStart(8, '0');
+  }
+
+  /**
+   * Date `AAAA-MM-JJ` plausible et déterministe dérivée d'une empreinte : décalage borné à partir du 1ᵉʳ janvier
+   * 2016, pour que deux empreintes distinctes donnent des dates distinctes et qu'une même empreinte redonne
+   * toujours la même date.
+   * @param empreinte - Empreinte `sha256:…`.
+   * @returns Une date calendaire `AAAA-MM-JJ`.
+   */
+  private static dateSynthetiqueDepuisEmpreinte(empreinte: string): string {
+    const graine = Number.parseInt(BouchonAdministrationUtils.hachageStable(empreinte), 16);
+    const base = Date.UTC(2016, 0, 1);
+    const decalageJours = graine % 2920;
+    return new Date(base + decalageJours * 86_400_000).toISOString().slice(0, 10);
+  }
+
+  /**
+   * Recherche un projet par son identifiant dans tous les groupes, en restituant aussi son groupe de rattachement
+   * (lecture seule, à la différence de {@link miseAJourProjetParId}).
+   * @param donnees - Racine courante.
+   * @param projetId - Identifiant du projet recherché.
+   * @returns Le couple `{ groupe, projet }`, ou `undefined` si aucun projet ne porte cet identifiant.
+   */
+  private static trouverGroupeEtProjet(
+    donnees: Record<string, unknown>,
+    projetId: string,
+  ):
+    | { readonly groupe: Record<string, unknown>; readonly projet: Record<string, unknown> }
+    | undefined {
+    for (const groupe of BouchonAdministrationUtils.lireListe(donnees, 'groupes')) {
+      const projet = BouchonAdministrationUtils.lireListe(groupe, 'projets').find(
+        (candidat) => BouchonAdministrationUtils.lireTexte(candidat, 'id') === projetId,
+      );
+      if (projet !== undefined) {
+        return { groupe, projet };
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Taille en octets (approchée : longueur de chaîne) de la sérialisation JSON de `valeur`, `0` si `valeur` n'est
    * pas sérialisable.
    * @param valeur - Valeur à mesurer.
@@ -677,5 +876,29 @@ export class BouchonAdministrationUtils {
   ): string | undefined {
     const valeur = objet[cle];
     return typeof valeur === 'string' && valeur.length > 0 ? valeur : undefined;
+  }
+
+  /**
+   * Revalide la date de départ optionnelle d'une règle de membre connu (RG-061), sur le modèle de
+   * `persistance::administration::valider_parti_le` côté cœur natif : interdite sur un critère `domaineEmail`, doit
+   * être une date `AAAA-MM-JJ` valide et non postérieure au jour courant.
+   * @param partiLe - Date de départ soumise, ou `undefined`.
+   * @param typeCritere - Type du critère de la règle qualifiée.
+   * @throws {AnomalieAdministrationBouchon} `dateDepartInvalide` si la date est invalide.
+   */
+  private static validerPartiLe(partiLe: string | undefined, typeCritere: string): void {
+    if (partiLe === undefined) {
+      return;
+    }
+    const format = /^\d{4}-\d{2}-\d{2}$/;
+    const horodatage = Date.parse(`${partiLe}T00:00:00Z`);
+    const invalide =
+      typeCritere === 'domaineEmail' ||
+      !format.test(partiLe) ||
+      Number.isNaN(horodatage) ||
+      horodatage > Date.now();
+    if (invalide) {
+      throw new AnomalieAdministrationBouchon('dateDepartInvalide');
+    }
   }
 }

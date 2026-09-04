@@ -15,6 +15,12 @@
 //! distincte de l'autocomplétion US-008 ci-dessous) sont livrés à l'incrément de rattrapage de la Phase 5, précédant
 //! la Phase 6 : cf. `interroger_dependances` et `interroger_branches_completes` plus bas.
 //!
+//! `rechercher_premier_commit_interne` (US-058, RG-058, achèvement de F17 « premier commit interne », plan_18
+//! incrément 1) recherche la date de prise en charge d'un projet : pagination de `GET /repository/commits` depuis la
+//! dernière page (helper `entete_total_pages`), avec repli en parcours avant borné quand l'API omet `x-total-pages`
+//! pour un dépôt volumineux. Cette opération n'est pas appelée par l'Orchestrateur de campagne pour un audit
+//! régulier : elle est déclenchée à la demande par le module de coordination `crate::persistance::prise_en_charge`.
+//!
 //! Décision arbitraire (cf. rapport de développement de cette phase) : le délai de requête reste le délai fixe
 //! partagé de `commun.rs` (`DELAI_REQUETE`, appliqué par `client_http_avec_proxy()` depuis la Phase 10, incrément 8
 //! — auparavant `client_http()`, supprimée à cette occasion) plutôt que le délai configurable envisagé par
@@ -454,6 +460,21 @@ fn detecter_marqueurs(
 fn entete_page_suivante(entetes: &reqwest::header::HeaderMap) -> Option<u32> {
     entetes
         .get("x-next-page")?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u32>()
+        .ok()
+}
+
+/// Nombre total de pages d'une réponse paginée de l'API GitLab, lu dans l'en-tête `x-total-pages` : `None`
+/// lorsqu'il est absent, vide ou non numérique. GitLab **omet** `x-total`/`x-total-pages` pour les collections
+/// dépassant environ 10 000 éléments (`gitlab-org/gitlab`, limite `Kaminari.config.max_pages`) : un dépôt à très
+/// gros volume de commits tombe dans ce cas, d'où le repli explicite de [`rechercher_premier_commit_interne`].
+/// Pendant de [`entete_page_suivante`] pour la pagination « depuis la dernière page ».
+fn entete_total_pages(entetes: &reqwest::header::HeaderMap) -> Option<u32> {
+    entetes
+        .get("x-total-pages")?
         .to_str()
         .ok()?
         .trim()
@@ -1147,6 +1168,310 @@ pub(crate) async fn interroger_contributeurs(
         fenetre_jours: FENETRE_CONTRIBUTEURS_JOURS,
         contributeurs,
     })
+}
+
+/// Table de correspondance « auteur de commit → membre interne » (US-058, RG-058), restreinte aux trois canaux
+/// exploitables sur un commit de l'API GitLab : courriel exact, alias courriel, domaine de courriel. Le username
+/// (canal le plus fiable de RG-007) n'étant jamais exposé par l'API des commits, une règle `interne` de type
+/// `username` sans alias courriel reste sans effet ici (`docs/02_documentation/05_reglesGestion.md`).
+///
+/// Construite par `crate::persistance::prise_en_charge::construire_correspondance_interne` à partir des seules
+/// règles de statut `interne` du groupe, sans filtrer sur `parti_le` (un membre interne parti date une prise en
+/// charge au même titre qu'un membre actif). La résolution de la précédence face à une règle plus spécifique de
+/// statut non `interne` (ex. un courriel exact `client` masquant une règle de domaine `interne`) est de la
+/// responsabilité de ce constructeur, ce type ne portant que des données `interne`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct CorrespondanceInterne {
+    courriels_exacts: HashSet<String>,
+    alias_courriels: HashSet<String>,
+    domaines: HashSet<String>,
+}
+
+impl CorrespondanceInterne {
+    /// Construit la table à partir des trois ensembles de valeurs déjà extraites des règles `interne`. Toutes les
+    /// valeurs sont normalisées (espaces de bordure retirés, minuscules ; `@` de tête retiré d'un domaine) pour que
+    /// la comparaison à un courriel d'auteur soit insensible à la casse et au formatage.
+    pub(crate) fn nouvelle(
+        courriels_exacts: impl IntoIterator<Item = String>,
+        alias_courriels: impl IntoIterator<Item = String>,
+        domaines: impl IntoIterator<Item = String>,
+    ) -> Self {
+        let normaliser = |valeur: String| valeur.trim().to_lowercase();
+        Self {
+            courriels_exacts: courriels_exacts.into_iter().map(normaliser).collect(),
+            alias_courriels: alias_courriels.into_iter().map(normaliser).collect(),
+            domaines: domaines
+                .into_iter()
+                .map(|domaine| domaine.trim().trim_start_matches('@').to_lowercase())
+                .collect(),
+        }
+    }
+
+    /// `true` si aucune règle `interne` n'alimente cette table : l'appelant peut alors conclure au statut
+    /// `aucune_regle_interne` sans aucun appel réseau (RG-058).
+    pub(crate) fn est_vide(&self) -> bool {
+        self.courriels_exacts.is_empty()
+            && self.alias_courriels.is_empty()
+            && self.domaines.is_empty()
+    }
+
+    /// `true` si `courriel` (courriel d'auteur d'un commit) correspond à une règle `interne`, en appliquant la
+    /// précédence de RG-007 restreinte aux canaux d'un commit : courriel exact, puis alias courriel, puis domaine.
+    /// Un courriel vide ou sans `@` exploitable ne correspond jamais.
+    pub(crate) fn correspond(&self, courriel: &str) -> bool {
+        let courriel = courriel.trim().to_lowercase();
+        if courriel.is_empty() {
+            return false;
+        }
+        if self.courriels_exacts.contains(&courriel) || self.alias_courriels.contains(&courriel) {
+            return true;
+        }
+        match courriel.rsplit_once('@') {
+            Some((_, domaine)) if !domaine.is_empty() => self.domaines.contains(domaine),
+            _ => false,
+        }
+    }
+}
+
+/// Issue de [`rechercher_premier_commit_interne`] : le premier commit interne trouvé sur une source GitLab, ou la
+/// raison pour laquelle il n'a pu être déterminé. Traduite ensuite en variante de `PremierCommitInterne` par le
+/// module de coordination `crate::persistance::prise_en_charge` (US-058, RG-058).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ResultatPremierCommitInterne {
+    /// Premier commit interne identifié : `date` calendaire **UTC** (`AAAA-MM-JJ`), `sha` du commit et courriel
+    /// d'auteur tel que renvoyé par l'API.
+    Trouve {
+        /// Date calendaire UTC du commit retenu (`AAAA-MM-JJ`).
+        date: String,
+        /// SHA complet du commit retenu.
+        sha: String,
+        /// Courriel de l'auteur du commit retenu.
+        email_auteur: String,
+    },
+    /// La totalité des commits accessibles a été parcourue sans aucune correspondance `interne`.
+    AucunCommitInterne,
+    /// La fenêtre bornée de pages a été épuisée sans correspondance, ou l'API n'expose pas le nombre total de pages
+    /// (dépôt volumineux) : la remontée n'a pas pu être menée à son terme.
+    TropDeCommits,
+    /// Le dépôt ne contient aucun commit (`empty_repo`).
+    DepotVide,
+}
+
+/// Une page de `GET /projects/{id}/repository/commits` : les commits désérialisés et le nombre total de pages
+/// annoncé par l'en-tête `x-total-pages` (`None` pour un dépôt volumineux, cf. [`entete_total_pages`]).
+struct PageCommits {
+    commits: Vec<ReponseCommit>,
+    total_pages: Option<u32>,
+}
+
+/// Récupère une page de commits de la ref effective, avec la même gestion d'erreurs typées que les autres appels
+/// paginés du module (401 → [`ErreurConnecteur::AuthentificationRefusee`], 403 →
+/// [`ErreurConnecteur::DroitsInsuffisants`], autre statut non `2xx` → [`ErreurConnecteur::ReponseInattendue`],
+/// transport → [`erreur_depuis_reqwest`]).
+async fn recuperer_page_commits(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    ref_effective: &str,
+    page: u32,
+    client: &reqwest::Client,
+) -> Result<PageCommits, ErreurConnecteur> {
+    let url = format!(
+        "{}/api/v4/projects/{}/repository/commits",
+        url_base.trim_end_matches('/'),
+        id_externe
+    );
+    let page = page.to_string();
+    let reponse = client
+        .get(url)
+        .header("PRIVATE-TOKEN", credential)
+        .query(&[
+            ("ref_name", ref_effective),
+            ("per_page", TAILLE_PAGE_AUDIT),
+            ("page", page.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+    let statut = reponse.status();
+    if statut.as_u16() == 401 {
+        return Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if statut.as_u16() == 403 {
+        return Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    if !statut.is_success() {
+        return Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        });
+    }
+    let total_pages = entete_total_pages(reponse.headers());
+    let commits = reponse
+        .json::<Vec<ReponseCommit>>()
+        .await
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
+    Ok(PageCommits {
+        commits,
+        total_pages,
+    })
+}
+
+/// Tronque un horodatage `committed_date` de l'API GitLab (RFC 3339 avec fuseau) à sa date calendaire **en UTC**
+/// (`AAAA-MM-JJ`) : forme identique à celle de `audit.date`, seule à rendre fiable l'égalité stricte de RG-059.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::ReponseInattendue`] si l'horodatage n'est pas un RFC 3339 valide.
+fn tronquer_date_utc(committed_date: &str) -> Result<chrono::NaiveDate, ErreurConnecteur> {
+    chrono::DateTime::parse_from_rfc3339(committed_date)
+        .map(|horodatage| horodatage.with_timezone(&chrono::Utc).date_naive())
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: format!("Horodatage de commit « {committed_date} » invalide : {erreur}"),
+        })
+}
+
+/// Recherche, sur la ref auditée d'un dépôt GitLab, le premier commit dont l'auteur (identifié par courriel)
+/// correspond à une règle de membre connu de statut `interne` du groupe (US-058, RG-058, achèvement de F17).
+///
+/// L'API renvoie les commits du plus récent au plus ancien et n'expose l'en-tête `x-total-pages` que pour les
+/// collections sous environ 10 000 éléments :
+///
+/// - **cas nominal** (`x-total-pages` présent) : les `borne_pages` dernières pages sont parcourues (les commits les
+///   plus anciens) ; le résultat est marqué tronqué si ces pages ne couvrent pas tout l'historique ;
+/// - **cas de repli** (`x-total-pages` absent, dépôt volumineux) : les `borne_pages` premières pages (commits les
+///   plus récents) sont parcourues ; faute d'atteindre les commits les plus anciens, un auteur interne n'est
+///   retrouvé que s'il a aussi commité récemment, sinon [`ResultatPremierCommitInterne::TropDeCommits`].
+///
+/// Sur l'ensemble des commits parcourus, le commit retenu est celui de `committed_date` **minimale** (tronquée à sa
+/// date calendaire UTC) — pas le premier rencontré, l'API ne garantissant pas un tri strict par date sur toute la
+/// profondeur.
+///
+/// # Erreurs
+///
+/// `Ok(`[`ResultatPremierCommitInterne::DepotVide`]`)` (pas une erreur) si le dépôt ne contient aucun commit ; les
+/// autres catégories de [`ErreurConnecteur`] selon le statut ou la forme des réponses (cf.
+/// [`resoudre_ref_effective`]). Un `author_email` absent n'est jamais une anomalie : le commit est ignoré.
+pub(crate) async fn rechercher_premier_commit_interne(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    ref_auditee: Option<&str>,
+    correspondance: &CorrespondanceInterne,
+    borne_pages: u32,
+    client: &reqwest::Client,
+) -> Result<ResultatPremierCommitInterne, ErreurConnecteur> {
+    let resolue =
+        match resoudre_ref_effective(url_base, credential, id_externe, ref_auditee, client).await {
+            Ok(resolue) => resolue,
+            Err(ErreurConnecteur::DepotVide { .. }) => {
+                return Ok(ResultatPremierCommitInterne::DepotVide);
+            }
+            Err(autre) => return Err(autre),
+        };
+    let borne_pages = borne_pages.max(1);
+
+    let premiere = recuperer_page_commits(
+        url_base,
+        credential,
+        id_externe,
+        &resolue.ref_effective,
+        1,
+        client,
+    )
+    .await?;
+
+    let (commits, tronquee) = match premiere.total_pages {
+        Some(total_pages) if total_pages >= 1 => {
+            let arret = total_pages
+                .saturating_sub(borne_pages)
+                .saturating_add(1)
+                .max(1);
+            let tronquee = arret > 1;
+            let mut commits = if arret == 1 {
+                premiere.commits
+            } else {
+                Vec::new()
+            };
+            for page in arret.max(2)..=total_pages {
+                let suivante = recuperer_page_commits(
+                    url_base,
+                    credential,
+                    id_externe,
+                    &resolue.ref_effective,
+                    page,
+                    client,
+                )
+                .await?;
+                commits.extend(suivante.commits);
+            }
+            (commits, tronquee)
+        }
+        // `x-total-pages` renvoyé mais nul : dépôt sans commit sur cette ref malgré une résolution de tête réussie,
+        // cas très improbable — traité comme « aucun commit interne » plutôt que comme une anomalie d'instance.
+        Some(_) => (Vec::new(), false),
+        None => {
+            let page_un_vide = premiere.commits.is_empty();
+            let mut commits = premiere.commits;
+            let mut tronquee = false;
+            if !page_un_vide {
+                let mut page = 2u32;
+                loop {
+                    if page > borne_pages {
+                        tronquee = true;
+                        break;
+                    }
+                    let suivante = recuperer_page_commits(
+                        url_base,
+                        credential,
+                        id_externe,
+                        &resolue.ref_effective,
+                        page,
+                        client,
+                    )
+                    .await?;
+                    if suivante.commits.is_empty() {
+                        break;
+                    }
+                    commits.extend(suivante.commits);
+                    page += 1;
+                }
+            }
+            (commits, tronquee)
+        }
+    };
+
+    let mut meilleur: Option<(chrono::NaiveDate, String, String)> = None;
+    for commit in commits {
+        let Some(courriel) = commit.author_email else {
+            continue;
+        };
+        if !correspondance.correspond(&courriel) {
+            continue;
+        }
+        let date = tronquer_date_utc(&commit.committed_date)?;
+        if meilleur
+            .as_ref()
+            .is_none_or(|(date_min, _, _)| date < *date_min)
+        {
+            meilleur = Some((date, commit.id, courriel));
+        }
+    }
+
+    match meilleur {
+        Some((date, sha, email_auteur)) => Ok(ResultatPremierCommitInterne::Trouve {
+            date: date.format("%Y-%m-%d").to_string(),
+            sha,
+            email_auteur,
+        }),
+        None if tronquee => Ok(ResultatPremierCommitInterne::TropDeCommits),
+        None => Ok(ResultatPremierCommitInterne::AucunCommitInterne),
+    }
 }
 
 /// Réponse d'une demande de fusion de l'API GitLab, réduite aux champs exploités ici. `merged_at`/`closed_at`
@@ -3737,6 +4062,563 @@ mod tests {
         assert_eq!(resultat.contributeurs.len(), 1);
         assert_eq!(resultat.contributeurs[0].email, "marie@entreprise.fr");
         Ok(())
+    }
+
+    /// Construit une [`CorrespondanceInterne`] à partir de courriels exacts, sans alias ni domaine — le cas le plus
+    /// courant en test.
+    fn correspondance_courriels(courriels: &[&str]) -> CorrespondanceInterne {
+        CorrespondanceInterne::nouvelle(
+            courriels.iter().map(|c| c.to_string()),
+            std::iter::empty(),
+            std::iter::empty(),
+        )
+    }
+
+    #[test]
+    fn correspondance_interne_applique_les_trois_canaux_dun_commit() {
+        let correspondance = CorrespondanceInterne::nouvelle(
+            ["Marie@Corp.FR".to_string()],
+            ["m.durand@perso.net".to_string()],
+            ["@interne.org".to_string()],
+        );
+
+        assert!(correspondance.correspond("marie@corp.fr"), "courriel exact");
+        assert!(correspondance.correspond("MARIE@CORP.FR"), "casse ignorée");
+        assert!(
+            correspondance.correspond("  m.durand@perso.net "),
+            "alias courriel"
+        );
+        assert!(
+            correspondance.correspond("bob@interne.org"),
+            "domaine de courriel"
+        );
+        assert!(
+            !correspondance.correspond("bob@autre.com"),
+            "domaine non interne"
+        );
+        assert!(!correspondance.correspond(""), "courriel vide");
+        assert!(!correspondance.correspond("sans-arobase"), "pas de domaine");
+        assert!(!CorrespondanceInterne::default().correspond("marie@corp.fr"));
+        assert!(CorrespondanceInterne::default().est_vide());
+        assert!(!correspondance.est_vide());
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_retient_le_commit_dune_page_intermediaire()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // `x-total-pages` = 3 : les trois pages sont dans la fenêtre (borne large).
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "3")
+                    .set_body_json(serde_json::json!([
+                        { "id": "recent", "committed_date": "2026-01-10T08:00:00Z", "author_email": "ext@client.com" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "premier-interne", "committed_date": "2023-05-04T14:00:00Z", "author_email": "marie@entreprise.fr" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "3"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "ancien", "committed_date": "2022-02-02T09:00:00Z", "author_email": "ext@partenaire.com" }
+            ])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            ResultatPremierCommitInterne::Trouve {
+                date: "2023-05-04".to_string(),
+                sha: "premier-interne".to_string(),
+                email_auteur: "marie@entreprise.fr".to_string(),
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_retient_la_date_minimale_sur_un_ordre_non_chronologique()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // Deux commits internes renvoyés dans un ordre non chronologique : le plus ancien doit l'emporter.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "1")
+                    .set_body_json(serde_json::json!([
+                        { "id": "b", "committed_date": "2022-05-01T00:00:00Z", "author_email": "marie@entreprise.fr" },
+                        { "id": "a", "committed_date": "2020-01-15T00:00:00Z", "author_email": "marie@entreprise.fr" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            ResultatPremierCommitInterne::Trouve {
+                date: "2020-01-15".to_string(),
+                sha: "a".to_string(),
+                email_auteur: "marie@entreprise.fr".to_string(),
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_tronque_la_date_en_utc()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "1")
+                    .set_body_json(serde_json::json!([
+                        { "id": "sansbascule", "committed_date": "2019-09-02T23:30:00.000Z", "author_email": "marie@entreprise.fr" },
+                        { "id": "avecoffset", "committed_date": "2019-09-03T01:30:00+03:00", "author_email": "marie@entreprise.fr" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        // Les deux horodatages tombent le 2019-09-02 en UTC ; aucun ne bascule au jour suivant.
+        match resultat {
+            ResultatPremierCommitInterne::Trouve { date, .. } => assert_eq!(date, "2019-09-02"),
+            autre => panic!("attendu Trouve, obtenu {autre:?}"),
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_reconnait_alias_et_domaine()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "1")
+                    .set_body_json(serde_json::json!([
+                        { "id": "exact", "committed_date": "2021-06-01T00:00:00Z", "author_email": "marie@corp.fr" },
+                        { "id": "alias", "committed_date": "2020-06-01T00:00:00Z", "author_email": "m.durand@perso.net" },
+                        { "id": "domaine", "committed_date": "2019-06-01T00:00:00Z", "author_email": "bob@interne.org" },
+                        { "id": "externe", "committed_date": "2018-06-01T00:00:00Z", "author_email": "vieux@autre.com" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+
+        let correspondance = CorrespondanceInterne::nouvelle(
+            ["marie@corp.fr".to_string()],
+            ["m.durand@perso.net".to_string()],
+            ["interne.org".to_string()],
+        );
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance,
+            50,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        // Le commit externe (2018) est plus ancien mais ignoré ; le plus ancien commit interne est celui reconnu
+        // par domaine (2019).
+        assert_eq!(
+            resultat,
+            ResultatPremierCommitInterne::Trouve {
+                date: "2019-06-01".to_string(),
+                sha: "domaine".to_string(),
+                email_auteur: "bob@interne.org".to_string(),
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_ignore_un_commit_sans_courriel_dauteur()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "1")
+                    .set_body_json(serde_json::json!([
+                        { "id": "anonyme", "committed_date": "2018-01-01T00:00:00Z" },
+                        { "id": "interne", "committed_date": "2021-01-01T00:00:00Z", "author_email": "marie@entreprise.fr" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            ResultatPremierCommitInterne::Trouve {
+                date: "2021-01-01".to_string(),
+                sha: "interne".to_string(),
+                email_auteur: "marie@entreprise.fr".to_string(),
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_signale_trop_de_commits_dans_la_fenetre_bornee()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // `x-total-pages` = 5, borne = 2 → seules les pages 4 et 5 sont parcourues ; l'unique commit interne est
+        // page 1, hors fenêtre → TropDeCommits.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "5")
+                    .set_body_json(serde_json::json!([
+                        { "id": "interne-hors-fenetre", "committed_date": "2015-01-01T00:00:00Z", "author_email": "marie@entreprise.fr" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+        for page in ["4", "5"] {
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/1234/repository/commits"))
+                .and(query_param("page", page))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    { "id": format!("c{page}"), "committed_date": "2016-01-01T00:00:00Z", "author_email": "ext@client.com" }
+                ])))
+                .mount(&serveur)
+                .await;
+        }
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            2,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat, ResultatPremierCommitInterne::TropDeCommits);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_replie_vers_lavant_sans_entete_total_pages()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // Pas d'en-tête `x-total-pages` : parcours avant borné à 2 pages. Aucune correspondance, page 2 pleine →
+        // TropDeCommits.
+        for page in ["1", "2"] {
+            Mock::given(method("GET"))
+                .and(path("/api/v4/projects/1234/repository/commits"))
+                .and(query_param("page", page))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                    { "id": format!("c{page}"), "committed_date": "2026-01-01T00:00:00Z", "author_email": "ext@client.com" }
+                ])))
+                .mount(&serveur)
+                .await;
+        }
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            2,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat, ResultatPremierCommitInterne::TropDeCommits);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_replie_vers_lavant_et_trouve_un_commit_recent()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "recent-interne", "committed_date": "2026-01-05T00:00:00Z", "author_email": "marie@entreprise.fr" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            5,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            ResultatPremierCommitInterne::Trouve {
+                date: "2026-01-05".to_string(),
+                sha: "recent-interne".to_string(),
+                email_auteur: "marie@entreprise.fr".to_string(),
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_parcourt_tout_lhistorique_sans_correspondance()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        // `x-total-pages` = 2 ≤ borne : tout l'historique est parcouru, aucune correspondance → AucunCommitInterne.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("x-total-pages", "2")
+                    .set_body_json(serde_json::json!([
+                        { "id": "c1", "committed_date": "2026-01-01T00:00:00Z", "author_email": "ext@client.com" }
+                    ])),
+            )
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "c2", "committed_date": "2020-01-01T00:00:00Z", "author_email": "ext@partenaire.com" }
+            ])))
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(resultat, ResultatPremierCommitInterne::AucunCommitInterne);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_renvoie_depot_vide() {
+        let serveur = MockServer::start().await;
+        // Ref auditée absente → résolution de la branche par défaut via `GET /projects/1234` : dépôt vide.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "empty_repo": true
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            None,
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert_eq!(resultat, Ok(ResultatPremierCommitInterne::DepotVide));
+    }
+
+    /// Monte la résolution de ref puis une page 1 de commits répondant `statut`, et retourne l'issue de
+    /// `rechercher_premier_commit_interne` — utilitaire des trois tests de propagation d'anomalie RG-021 ci-dessous.
+    async fn rechercher_premier_commit_interne_avec_statut_page(
+        statut: u16,
+    ) -> Result<ResultatPremierCommitInterne, ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(wiremock::matchers::query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(statut))
+            .mount(&serveur)
+            .await;
+
+        rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_propage_une_authentification_refusee() {
+        assert!(matches!(
+            rechercher_premier_commit_interne_avec_statut_page(401).await,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_propage_des_droits_insuffisants() {
+        assert!(matches!(
+            rechercher_premier_commit_interne_avec_statut_page(403).await,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_propage_une_reponse_inattendue() {
+        assert!(matches!(
+            rechercher_premier_commit_interne_avec_statut_page(500).await,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn rechercher_premier_commit_interne_signale_un_delai_depasse() {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        monter_mock_resolution_ref(&serveur).await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/projects/1234/repository/commits"))
+            .and(query_param("page", "1"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_delay(Duration::from_millis(500))
+                    .set_body_json(serde_json::json!([])),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = rechercher_premier_commit_interne(
+            &serveur.uri(),
+            "jeton-valide",
+            "1234",
+            Some("develop"),
+            &correspondance_courriels(&["marie@entreprise.fr"]),
+            50,
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
     }
 
     #[tokio::test]

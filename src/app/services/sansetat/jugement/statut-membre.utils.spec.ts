@@ -118,6 +118,72 @@ describe('StatutMembreUtils', () => {
     });
   });
 
+  describe('resoudreRegleNominative', () => {
+    it('résout la règle username exacte (précédence 1)', () => {
+      expect(
+        StatutMembreUtils.resoudreRegleNominative({ username: 'mdurand' }, REGLES),
+      ).toEqual(REGLES[1]);
+    });
+
+    it('résout la règle email exacte (précédence 2)', () => {
+      expect(
+        StatutMembreUtils.resoudreRegleNominative({ email: 'client@partenaire.io' }, REGLES),
+      ).toEqual(REGLES[3]);
+    });
+
+    it('résout, via l’alias courriel, la règle username porteuse de cet alias (précédence 2)', () => {
+      expect(
+        StatutMembreUtils.resoudreRegleNominative({ email: 'a.lopez@presta-dev.io' }, REGLES),
+      ).toEqual(REGLES[2]);
+    });
+
+    it('ne redescend jamais au niveau domaine (RG-061 : une règle domaine ne peut porter partiLe)', () => {
+      expect(
+        StatutMembreUtils.resoudreRegleNominative(
+          { email: 'nouveau.venu@entreprise.fr' },
+          REGLES,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('restitue undefined si l’identifiant ne porte ni username ni email', () => {
+      expect(StatutMembreUtils.resoudreRegleNominative({}, REGLES)).toBeUndefined();
+    });
+
+    it('restitue undefined en cas de correspondances username contradictoires à ce niveau', () => {
+      const regles: readonly RegleMembreConnu<StatutTest>[] = [
+        { critere: 'jdupont', typeCritere: 'username', statut: 'interne' },
+        { critere: 'jdupont', typeCritere: 'username', statut: 'client' },
+      ];
+      expect(
+        StatutMembreUtils.resoudreRegleNominative({ username: 'jdupont' }, regles),
+      ).toBeUndefined();
+    });
+
+    it('restitue undefined en cas de correspondances email contradictoires à ce niveau', () => {
+      const regles: readonly RegleMembreConnu<StatutTest>[] = [
+        { critere: 'x@entreprise.fr', typeCritere: 'email', statut: 'interne' },
+        { critere: 'x@entreprise.fr', typeCritere: 'email', statut: 'client' },
+      ];
+      expect(
+        StatutMembreUtils.resoudreRegleNominative({ email: 'x@entreprise.fr' }, regles),
+      ).toBeUndefined();
+    });
+
+    it('restitue l’objet règle d’origine, avec ses champs additionnels (ex. partiLe)', () => {
+      interface RegleAvecPartiLe extends RegleMembreConnu<StatutTest> {
+        readonly id: string;
+        readonly partiLe?: string;
+      }
+      const regles: readonly RegleAvecPartiLe[] = [
+        { id: 'm1', critere: 'jdupont', typeCritere: 'username', statut: 'interne', partiLe: '2025-06-30' },
+      ];
+      expect(
+        StatutMembreUtils.resoudreRegleNominative({ username: 'jdupont' }, regles),
+      ).toEqual(regles[0]);
+    });
+  });
+
   describe('calculerGraviteAlerteMembreInconnu', () => {
     it('restitue elevee pour un niveau d’accès mainteneur (40)', () => {
       expect(StatutMembreUtils.calculerGraviteAlerteMembreInconnu(40)).toBe('elevee');

@@ -44,6 +44,11 @@ pub(crate) enum ErreurAdministration {
         "cette règle entre en conflit avec une autre règle du groupe portant le même critère et un statut différent"
     )]
     ConflitReglesMembreConnu,
+    /// La date de départ (`partiLe`, RG-061) soumise est invalide : posée sur une règle de `typeCritere`
+    /// `domaineEmail` (un domaine ne « part » pas), non analysable comme date `AAAA-MM-JJ`, ou postérieure au jour
+    /// de la qualification. Revalidation côté cœur natif du contrôle déjà fait à la saisie côté interface.
+    #[error("la date de départ (partiLe) soumise est invalide")]
+    DateDepartInvalide,
 }
 
 /// Qualifie un membre connu d'un groupe (US-022, US-023) : ajoute une nouvelle règle ou met à jour une règle
@@ -76,7 +81,7 @@ pub(crate) enum ErreurAdministration {
 /// purement informatif et sans effet sur la saisie courante.
 #[allow(
     clippy::too_many_arguments,
-    reason = "un `MembreConnu` complet (5 champs métier) plus les métadonnées de journalisation (origine, horodatage) et les identifiants de résolution (groupe, membre) ; regrouper ces paramètres dans une structure dédiée n'apporterait pas de clarté supplémentaire pour un seul point d'appel"
+    reason = "un `MembreConnu` complet (6 champs métier, dont `partiLe` RG-061) plus les métadonnées de journalisation (origine, horodatage) et les identifiants de résolution (groupe, membre) ; regrouper ces paramètres dans une structure dédiée n'apporterait pas de clarté supplémentaire pour un seul point d'appel"
 )]
 pub(crate) fn qualifier_membre(
     donnees: &mut DonneesRacine,
@@ -87,9 +92,12 @@ pub(crate) fn qualifier_membre(
     statut: StatutMembre,
     libelle: Option<String>,
     alias_email: Option<String>,
+    parti_le: Option<String>,
     origine: String,
     horodatage: String,
 ) -> Result<Vec<String>, ErreurAdministration> {
+    valider_parti_le(parti_le.as_deref(), type_critere, &horodatage)?;
+
     let groupe = donnees
         .groupes
         .iter_mut()
@@ -150,6 +158,7 @@ pub(crate) fn qualifier_membre(
         statut,
         libelle,
         alias_email,
+        parti_le,
     };
     let apres = serde_json::to_value(&membre_qualifie).unwrap_or(serde_json::Value::Null);
 
@@ -189,6 +198,10 @@ pub(crate) struct EntreeQualificationMembre {
     pub(crate) statut: StatutMembre,
     pub(crate) libelle: Option<String>,
     pub(crate) alias_email: Option<String>,
+    /// Date de départ optionnelle (`partiLe`, RG-061) : validée par ligne selon les mêmes règles que la saisie
+    /// unitaire (cf. [`valider_parti_le`]) ; une ligne invalide échoue sans bloquer les autres (RG-041).
+    #[serde(default)]
+    pub(crate) parti_le: Option<String>,
 }
 
 /// Qualifie plusieurs membres connus d'un même groupe en une seule fois (US-044, RG-041), appelée par la commande
@@ -233,6 +246,7 @@ pub(crate) fn qualifier_membres(
                 entree.statut,
                 entree.libelle,
                 entree.alias_email,
+                entree.parti_le,
                 origine.clone(),
                 horodatage.clone(),
             )
@@ -241,10 +255,39 @@ pub(crate) fn qualifier_membres(
         .collect()
 }
 
+/// Valide la date de départ optionnelle d'une règle de membre connu (`partiLe`, RG-061), en complément du contrôle
+/// déjà effectué côté interface : refusée sur une règle de `typeCritere` `domaineEmail` (un domaine ne « part »
+/// pas), doit être une date `AAAA-MM-JJ` valide et non postérieure au jour de la qualification (dérivé de
+/// `horodatage`, pour rester déterministe à horodatage fixé). `partiLe` est sans effet sur la datation de la prise
+/// en charge (RG-058) : cette validation ne fait que garantir la cohérence de la donnée saisie.
+fn valider_parti_le(
+    parti_le: Option<&str>,
+    type_critere: TypeCritere,
+    horodatage: &str,
+) -> Result<(), ErreurAdministration> {
+    let Some(parti_le) = parti_le else {
+        return Ok(());
+    };
+    if type_critere == TypeCritere::DomaineEmail {
+        return Err(ErreurAdministration::DateDepartInvalide);
+    }
+    let depart = chrono::NaiveDate::parse_from_str(parti_le, "%Y-%m-%d")
+        .map_err(|_| ErreurAdministration::DateDepartInvalide)?;
+    let aujourdhui = horodatage
+        .get(0..10)
+        .and_then(|jour| chrono::NaiveDate::parse_from_str(jour, "%Y-%m-%d").ok())
+        .unwrap_or_else(|| chrono::Utc::now().date_naive());
+    if depart > aujourdhui {
+        return Err(ErreurAdministration::DateDepartInvalide);
+    }
+    Ok(())
+}
+
 /// Détecte les règles de membres connus en conflit au sein d'un même groupe (RG-008) : deux règles distinctes
 /// portant le même `typeCritere` et le même `critere` mais un `statut` différent. Fonction pure, opérant
 /// uniquement sur la liste de règles fournie, sans aucune donnée d'audit (hors périmètre de cette phase, cf.
-/// Moteur de jugement, Phase 6).
+/// Moteur de jugement, Phase 6). `parti_le` (RG-061) n'entre volontairement pas dans cette comparaison : deux
+/// règles ne diffèrent jamais « en conflit » par leur seule date de départ.
 fn identifiants_en_conflit(membres: &[MembreConnu]) -> Vec<String> {
     let mut en_conflit = Vec::new();
     for (index, membre) in membres.iter().enumerate() {
@@ -433,6 +476,7 @@ mod tests {
             statut,
             libelle: None,
             alias_email: None,
+            parti_le: None,
         }
     }
 
@@ -501,6 +545,7 @@ mod tests {
             StatutMembre::Interne,
             Some("Domaine interne".to_string()),
             None,
+            None,
             "Administration".to_string(),
             "2026-07-21T09:00:00Z".to_string(),
         )?;
@@ -541,6 +586,7 @@ mod tests {
             "alice".to_string(),
             TypeCritere::Username,
             StatutMembre::Partenaire,
+            None,
             None,
             None,
             "Administration".to_string(),
@@ -587,6 +633,7 @@ mod tests {
             StatutMembre::Client,
             None,
             None,
+            None,
             "Administration".to_string(),
             "2026-07-21T09:10:00Z".to_string(),
         );
@@ -629,6 +676,7 @@ mod tests {
             "bob@x.fr".to_string(),
             TypeCritere::Email,
             StatutMembre::Client,
+            None,
             None,
             None,
             "Administration".to_string(),
@@ -680,6 +728,7 @@ mod tests {
             StatutMembre::Interne,
             Some("Domaine interne (libellé mis à jour)".to_string()),
             None,
+            None,
             "Administration".to_string(),
             "2026-07-21T09:16:00Z".to_string(),
         )?;
@@ -725,6 +774,7 @@ mod tests {
             StatutMembre::Partenaire,
             None,
             None,
+            None,
             "Administration".to_string(),
             "2026-07-21T09:17:00Z".to_string(),
         )?;
@@ -750,6 +800,7 @@ mod tests {
             statut,
             libelle: None,
             alias_email: None,
+            parti_le: None,
         }
     }
 
@@ -872,6 +923,7 @@ mod tests {
             StatutMembre::Interne,
             None,
             None,
+            None,
             "Administration".to_string(),
             "2026-07-21T09:20:00Z".to_string(),
         );
@@ -890,6 +942,7 @@ mod tests {
             "alice".to_string(),
             TypeCritere::Username,
             StatutMembre::Interne,
+            None,
             None,
             None,
             "Administration".to_string(),
@@ -1089,5 +1142,115 @@ mod tests {
         );
 
         assert_eq!(resultat, Err(ErreurAdministration::ProjetIntrouvable));
+    }
+
+    #[test]
+    fn qualifier_membre_enregistre_une_date_de_depart_valide_sur_une_regle_username()
+    -> Result<(), ErreurAdministration> {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        qualifier_membre(
+            &mut racine,
+            "g1",
+            None,
+            "alice".to_string(),
+            TypeCritere::Username,
+            StatutMembre::Interne,
+            None,
+            None,
+            Some("2025-06-30".to_string()),
+            "Administration".to_string(),
+            "2026-09-03T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.groupes[0].membres_connus[0].parti_le.as_deref(),
+            Some("2025-06-30")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn qualifier_membre_rejette_une_date_de_depart_sur_une_regle_domaine() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        let resultat = qualifier_membre(
+            &mut racine,
+            "g1",
+            None,
+            "*@entreprise.fr".to_string(),
+            TypeCritere::DomaineEmail,
+            StatutMembre::Interne,
+            None,
+            None,
+            Some("2025-06-30".to_string()),
+            "Administration".to_string(),
+            "2026-09-03T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurAdministration::DateDepartInvalide));
+        assert!(racine.groupes[0].membres_connus.is_empty());
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn qualifier_membre_rejette_une_date_de_depart_future_ou_non_analysable() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+        let appel = |racine: &mut DonneesRacine, parti_le: &str| {
+            qualifier_membre(
+                racine,
+                "g1",
+                None,
+                "alice".to_string(),
+                TypeCritere::Username,
+                StatutMembre::Interne,
+                None,
+                None,
+                Some(parti_le.to_string()),
+                "Administration".to_string(),
+                "2026-09-03T09:00:00Z".to_string(),
+            )
+        };
+
+        assert_eq!(
+            appel(&mut racine, "2026-09-04"),
+            Err(ErreurAdministration::DateDepartInvalide),
+            "date postérieure au jour de la qualification"
+        );
+        assert_eq!(
+            appel(&mut racine, "30/06/2025"),
+            Err(ErreurAdministration::DateDepartInvalide),
+            "format non ISO"
+        );
+    }
+
+    #[test]
+    fn qualifier_membres_une_date_de_depart_invalide_nechoue_que_sa_propre_ligne() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+        let mut ligne_domaine = entree_qualification(
+            "*@entreprise.fr",
+            TypeCritere::DomaineEmail,
+            StatutMembre::Interne,
+        );
+        ligne_domaine.parti_le = Some("2025-06-30".to_string());
+        let mut ligne_valide =
+            entree_qualification("bob", TypeCritere::Username, StatutMembre::Client);
+        ligne_valide.parti_le = Some("2025-01-15".to_string());
+
+        let reussites = qualifier_membres(
+            &mut racine,
+            "g1",
+            vec![ligne_domaine, ligne_valide],
+            "Administration".to_string(),
+            "2026-09-03T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(reussites, vec![false, true]);
+        assert_eq!(racine.groupes[0].membres_connus.len(), 1);
+        assert_eq!(racine.groupes[0].membres_connus[0].critere, "bob");
+        assert_eq!(
+            racine.groupes[0].membres_connus[0].parti_le.as_deref(),
+            Some("2025-01-15")
+        );
     }
 }

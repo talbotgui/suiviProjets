@@ -334,23 +334,61 @@ export interface Parametres {
 }
 
 /**
- * Attribut immuable recalculable identifiant la date du premier commit interne d'un projet, mirroir de
- * `PremierCommitInterne` côté cœur natif.
+ * Statut d'un calcul de date de prise en charge autre que `determine` (RG-058), tel que sérialisé par le cœur
+ * natif (`snake_case`, à l'identique de la clé `statut` du fichier de données) :
+ * - `aucune_regle_interne` : aucune règle de statut `interne` n'est définie pour le groupe ;
+ * - `aucun_membre_interne` : des règles existent, mais aucun commit correspondant dans la fenêtre remontée ;
+ * - `indetermine_trop_de_commits` : remontée non menée à terme (fenêtre bornée épuisée, ou dépôt trop volumineux) ;
+ * - `non_applicable` : aucune source GitLab exploitable ;
+ * - `depot_vide` : toutes les sources GitLab du projet ont un dépôt vide.
  */
-export interface PremierCommitInterne {
-  /** Date du premier commit interne détecté. */
-  readonly date: string;
-  /** SHA (éventuellement abrégé) du commit. */
-  readonly sha: string;
-  /** Adresse courriel de l'auteur du commit. */
-  readonly emailAuteur: string;
+export type StatutPremierCommitNonDetermine =
+  | 'aucune_regle_interne'
+  | 'aucun_membre_interne'
+  | 'indetermine_trop_de_commits'
+  | 'non_applicable'
+  | 'depot_vide';
+
+/**
+ * Champs communs à toutes les variantes de {@link PremierCommitInterne}, toujours renseignés quel que soit le
+ * statut (hors de l'énumération discriminante côté cœur natif).
+ */
+export interface PremierCommitInterneBase {
   /** Date à laquelle ce calcul a été effectué. */
   readonly calculeLe: string;
-  /** Empreinte du référentiel de membres connus utilisé au moment du calcul. */
+  /** Empreinte (`sha256:…`) du sous-ensemble `interne` des membres connus au moment du calcul. */
   readonly empreinteReferentiel: string;
-  /** Statut du calcul (ex. `determine`). */
-  readonly statut: string;
 }
+
+/**
+ * Variante `determine` de {@link PremierCommitInterne} : un premier commit interne a été identifié. Sa forme
+ * sérialisée est identique à la forme plate historique de `premierCommitInterne`.
+ */
+export interface PremierCommitInterneDetermine extends PremierCommitInterneBase {
+  /** Discriminant. */
+  readonly statut: 'determine';
+  /** Date calendaire UTC du premier commit interne (`AAAA-MM-JJ`), au même format que `Audit.date`. */
+  readonly date: string;
+  /** SHA (éventuellement abrégé) du commit retenu. */
+  readonly sha: string;
+  /** Adresse courriel de l'auteur du commit retenu. */
+  readonly emailAuteur: string;
+}
+
+/**
+ * Variante de {@link PremierCommitInterne} pour laquelle aucun premier commit interne n'a pu être déterminé :
+ * seuls `calculeLe` et `empreinteReferentiel` sont renseignés.
+ */
+export interface PremierCommitInterneAutre extends PremierCommitInterneBase {
+  /** Discriminant. */
+  readonly statut: StatutPremierCommitNonDetermine;
+}
+
+/**
+ * Attribut stable, recalculable à la demande, identifiant la date de prise en charge d'un projet (premier commit
+ * interne, RG-058), mirroir de l'union `PremierCommitInterne` côté cœur natif, discriminée sur `statut`.
+ */
+export type PremierCommitInterne = PremierCommitInterneDetermine | PremierCommitInterneAutre;
 
 /**
  * Statut de traitement d'une alerte (RG-026), mirroir de `StatutTraitementAlerte` côté cœur natif.
@@ -420,6 +458,12 @@ export interface MembreConnu {
   readonly libelle?: string;
   /** Alias courriel optionnel. */
   readonly aliasEmail?: string;
+  /**
+   * Date de départ optionnelle de la personne (`AAAA-MM-JJ`, RG-061) : absente = membre actif. Indépendante du
+   * `statut` et sans effet sur la résolution du statut ni sur la datation de la prise en charge (RG-058) ;
+   * interdite sur une règle de `typeCritere` `domaineEmail` (revalidée côté cœur natif).
+   */
+  readonly partiLe?: string;
 }
 
 /**
@@ -762,6 +806,7 @@ export type CategorieErreurAdministration =
   | 'membreIntrouvable'
   | 'doublonUsernameMembreConnu'
   | 'conflitReglesMembreConnu'
+  | 'dateDepartInvalide'
   | 'brouillonDejaExistant'
   | 'aucunBrouillonCourant'
   | 'projetAbsentDuBrouillon'
@@ -836,6 +881,19 @@ export type ResultatQualificationMembresMasse =
  */
 export type ResultatMutationAdministration =
   { readonly type: 'succes' } | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
+
+/**
+ * Résultat typé du calcul à la demande de la date de prise en charge d'un projet (US-058, RG-058),
+ * exposé par `DonneesApplicationService.calculerPriseEnChargeProjet` : le calcul lui-même n'écrit rien.
+ * `inchange` — le résultat reproduit la valeur stockée (même statut, même date) : aucune écriture, aucune
+ * ressaisie de mot de passe (décision 6 du plan_18). `change` — porte le nouveau `premierCommitInterne`, que
+ * l'appelant persiste ensuite via `enregistrerPriseEnChargeProjet` après ressaisie du mot de passe. `echec` —
+ * porte un message lisible (anomalie de connecteur GitLab, projet/instance introuvable).
+ */
+export type ResultatCalculPriseEnCharge =
+  | { readonly type: 'inchange' }
+  | { readonly type: 'change'; readonly premierCommitInterne: PremierCommitInterne }
+  | { readonly type: 'echec'; readonly message: string };
 
 /**
  * Résultat typé d'un déverrouillage de session (`DonneesApplicationService.deverrouillerSession`, US-026) : à la

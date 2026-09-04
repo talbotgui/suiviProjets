@@ -55,7 +55,9 @@ pub(crate) struct ReponseQualificationMembre {
 /// rapport à celle citée par sa séquence (`qualifierMembre(groupeId, critère, typeCritère, statut)`) : décision
 /// arbitraire documentée dans le compte-rendu de développement de cette phase. `membreId` permet à l'écran
 /// d'Administration (US-023) de désigner sans ambiguïté la règle à modifier même si son critère change ;
-/// `libelle`/`aliasEmail` complètent le modèle `MembreConnu` ; `origine` distingue une saisie directe en
+/// `libelle`/`aliasEmail`/`partiLe` complètent le modèle `MembreConnu` (`partiLe` : date de départ optionnelle,
+/// RG-061, revalidée côté cœur natif — interdite sur une règle `domaineEmail`, non postérieure au jour courant) ;
+/// `origine` distingue une saisie directe en
 /// administration (US-023, valeur `Administration` envoyée par l'écran) d'une éventuelle qualification déclenchée
 /// depuis une alerte (US-020, Phase 8, toujours hors périmètre à cette phase — la Liste de travail construite à
 /// cette phase ne fait que marquer une alerte vue/traitée via `qualifierAlerte`, sans jamais qualifier elle-même le
@@ -66,8 +68,8 @@ pub(crate) struct ReponseQualificationMembre {
 /// # Erreurs
 ///
 /// Voir [`persistance::administration::qualifier_membre`] pour le détail des anomalies de validation métier
-/// (groupe/membre introuvable, doublon de username) ; les anomalies de sauvegarde héritées de
-/// [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+/// (groupe/membre introuvable, doublon de username, date de départ invalide) ; les anomalies de sauvegarde héritées
+/// de [`crate::persistance::erreurs::ErreurPersistance`] sinon.
 #[allow(
     clippy::too_many_arguments,
     reason = "gabarit `sauvegarderFichier` (chemin, données, mot de passe, état) augmenté des seuls champs métier strictement nécessaires à cette commande, cf. commentaire d'en-tête du module"
@@ -83,6 +85,7 @@ pub(crate) fn qualifier_membre(
     statut: StatutMembre,
     libelle: Option<String>,
     alias_email: Option<String>,
+    parti_le: Option<String>,
     origine: String,
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
@@ -101,6 +104,7 @@ pub(crate) fn qualifier_membre(
             statut,
             libelle,
             alias_email,
+            parti_le,
             origine,
             horodatage,
         )?;

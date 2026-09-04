@@ -22,7 +22,7 @@ interface DonneesTest {
 }
 
 describe('BouchonAdministrationUtils', () => {
-  it('doit exposer les huit commandes de FacadeAdministrationService dans COMMANDES', () => {
+  it('doit exposer les dix commandes de FacadeAdministrationService dans COMMANDES', () => {
     expect([...BouchonAdministrationUtils.COMMANDES]).toEqual([
       'qualifier_membre',
       'qualifier_membres',
@@ -32,6 +32,8 @@ describe('BouchonAdministrationUtils', () => {
       'integrer_brouillon',
       'rejeter_brouillon',
       'calculer_metriques_volumetrie',
+      'calculer_prise_en_charge_projet',
+      'empreinte_referentiel_interne',
     ]);
   });
 
@@ -570,6 +572,203 @@ describe('BouchonAdministrationUtils', () => {
       await expect(
         BouchonAdministrationUtils.invoquer('integrer_brouillon', {
           donnees: racineAvecEntreeOrpheline,
+        }),
+      ).rejects.toMatchObject({ type: 'projetIntrouvable' });
+    });
+  });
+
+  describe('empreinte_referentiel_interne (US-058, RG-058, plan_18)', () => {
+    const groupeAvecInternes = {
+      id: 'groupe-1',
+      membresConnus: [
+        { id: 'm1', critere: '*@entreprise.fr', typeCritere: 'domaineEmail', statut: 'interne' },
+        { id: 'm2', critere: 'mdurand', typeCritere: 'username', statut: 'interne' },
+        { id: 'm3', critere: 'a.lopez@presta.io', typeCritere: 'email', statut: 'partenaire' },
+      ],
+      projets: [],
+    };
+
+    it('doit renvoyer un condensé de forme sha256:… stable pour un même ensemble de règles interne', async () => {
+      const racine = { groupes: [groupeAvecInternes], brouillon: null, campagnes: [], meta: {} };
+      const premier = await BouchonAdministrationUtils.invoquer<string>(
+        'empreinte_referentiel_interne',
+        { groupeId: 'groupe-1', donnees: racine },
+      );
+      const second = await BouchonAdministrationUtils.invoquer<string>(
+        'empreinte_referentiel_interne',
+        { groupeId: 'groupe-1', donnees: racine },
+      );
+
+      expect(premier).toMatch(/^sha256:[0-9a-f]{8}$/);
+      expect(second).toBe(premier);
+    });
+
+    it('doit changer de condensé quand une règle interne est ajoutée, pas quand une règle non interne l’est', async () => {
+      const base = await BouchonAdministrationUtils.invoquer<string>(
+        'empreinte_referentiel_interne',
+        {
+          groupeId: 'groupe-1',
+          donnees: { groupes: [groupeAvecInternes], brouillon: null, campagnes: [], meta: {} },
+        },
+      );
+
+      const avecRegleNonInterne = await BouchonAdministrationUtils.invoquer<string>(
+        'empreinte_referentiel_interne',
+        {
+          groupeId: 'groupe-1',
+          donnees: {
+            groupes: [
+              {
+                ...groupeAvecInternes,
+                membresConnus: [
+                  ...groupeAvecInternes.membresConnus,
+                  { id: 'm4', critere: 'client.fr', typeCritere: 'domaineEmail', statut: 'client' },
+                ],
+              },
+            ],
+            brouillon: null,
+            campagnes: [],
+            meta: {},
+          },
+        },
+      );
+      expect(avecRegleNonInterne).toBe(base);
+
+      const avecRegleInterne = await BouchonAdministrationUtils.invoquer<string>(
+        'empreinte_referentiel_interne',
+        {
+          groupeId: 'groupe-1',
+          donnees: {
+            groupes: [
+              {
+                ...groupeAvecInternes,
+                membresConnus: [
+                  ...groupeAvecInternes.membresConnus,
+                  { id: 'm5', critere: 'jpetit', typeCritere: 'username', statut: 'interne' },
+                ],
+              },
+            ],
+            brouillon: null,
+            campagnes: [],
+            meta: {},
+          },
+        },
+      );
+      expect(avecRegleInterne).not.toBe(base);
+    });
+
+    it('doit rejeter un groupe introuvable', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('empreinte_referentiel_interne', {
+          groupeId: 'groupe-inconnu',
+          donnees: RACINE_VIDE,
+        }),
+      ).rejects.toMatchObject({ type: 'groupeIntrouvable' });
+    });
+  });
+
+  describe('calculer_prise_en_charge_projet (US-058, RG-058, plan_18)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ advanceTimers: true });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    const groupeComplet = {
+      id: 'groupe-1',
+      membresConnus: [
+        { id: 'm1', critere: '*@entreprise.fr', typeCritere: 'domaineEmail', statut: 'interne' },
+      ],
+      projets: [
+        {
+          id: 'projet-1',
+          sources: [{ id: 's1', type: 'depotGitlab', idExterne: '1234' }],
+          audits: [],
+        },
+      ],
+    };
+    const racineComplete = {
+      groupes: [groupeComplet],
+      brouillon: null,
+      campagnes: [],
+      meta: {},
+    };
+
+    it('doit renvoyer « aucune_regle_interne » quand le groupe n’a aucune règle interne', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
+        'calculer_prise_en_charge_projet',
+        {
+          projetId: 'projet-1',
+          donnees: {
+            groupes: [{ ...groupeComplet, membresConnus: [] }],
+            brouillon: null,
+            campagnes: [],
+            meta: {},
+          },
+        },
+      );
+
+      expect(resultat['statut']).toBe('aucune_regle_interne');
+      expect(resultat['empreinteReferentiel']).toMatch(/^sha256:/);
+      expect(resultat['calculeLe']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('doit renvoyer « non_applicable » quand le projet n’a aucune source GitLab', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
+        'calculer_prise_en_charge_projet',
+        {
+          projetId: 'projet-1',
+          donnees: {
+            groupes: [
+              {
+                ...groupeComplet,
+                projets: [
+                  { id: 'projet-1', sources: [{ id: 's1', type: 'projetSonar' }], audits: [] },
+                ],
+              },
+            ],
+            brouillon: null,
+            campagnes: [],
+            meta: {},
+          },
+        },
+      );
+
+      expect(resultat['statut']).toBe('non_applicable');
+    });
+
+    it('doit renvoyer « determine » et rester rejouable (même date à empreinte inchangée)', async () => {
+      const premier = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
+        'calculer_prise_en_charge_projet',
+        { projetId: 'projet-1', donnees: racineComplete },
+      );
+      expect(premier['statut']).toBe('determine');
+
+      const racineAvecResultat = {
+        ...racineComplete,
+        groupes: [
+          {
+            ...groupeComplet,
+            projets: [{ ...groupeComplet.projets[0], premierCommitInterne: premier }],
+          },
+        ],
+      };
+      const second = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
+        'calculer_prise_en_charge_projet',
+        { projetId: 'projet-1', donnees: racineAvecResultat },
+      );
+
+      expect(second['date']).toBe(premier['date']);
+      expect(second['statut']).toBe('determine');
+    });
+
+    it('doit rejeter un projet introuvable', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('calculer_prise_en_charge_projet', {
+          projetId: 'projet-inconnu',
+          donnees: racineComplete,
         }),
       ).rejects.toMatchObject({ type: 'projetIntrouvable' });
     });

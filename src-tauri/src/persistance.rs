@@ -19,9 +19,12 @@
 //! (statut vu/traité, `alertes`). Périmètre de la Phase 9, incrément 1 (US-028 ; RG-027) : création, mise à jour et
 //! suppression d'une vue enregistrée (`vues`). Évolution du 2026-08-31 (US-055 ; RG-055) : s'y ajoute le calcul de
 //! volumétrie du fichier de données pour l'onglet « Métriques » de l'écran Administration (`volumetrie`),
-//! consultation pure sans mutation. Ces modules opèrent tous en mémoire sur une
-//! [`crate::modele::racine::DonneesRacine`] déjà chargée ; seul `volumetrie` lit le disque, en lecture seule
-//! (`std::fs::metadata`), pour la taille du fichier chiffré.
+//! consultation pure sans mutation. Évolution du plan_18 (US-058 ; RG-058, achèvement de F17) : s'y ajoute
+//! `prise_en_charge`, module de coordination du calcul de la date de prise en charge d'un projet (premier commit
+//! interne) — empreinte du référentiel `interne`, table de correspondance des courriels d'auteur, agrégation du
+//! plus ancien commit interne des sources GitLab via un connecteur injecté, sans aucune écriture disque. Ces
+//! modules opèrent tous en mémoire sur une [`crate::modele::racine::DonneesRacine`] déjà chargée ; seul
+//! `volumetrie` lit le disque, en lecture seule (`std::fs::metadata`), pour la taille du fichier chiffré.
 
 pub(crate) mod administration;
 pub(crate) mod alertes;
@@ -33,6 +36,7 @@ pub(crate) mod kdf;
 pub(crate) mod migration;
 pub(crate) mod moteur;
 pub(crate) mod parametrage;
+pub(crate) mod prise_en_charge;
 pub(crate) mod purge;
 pub(crate) mod volumetrie;
 pub(crate) mod vues;

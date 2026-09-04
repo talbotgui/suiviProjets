@@ -30,5 +30,6 @@ pub(crate) mod diagnostic;
 pub(crate) mod etat_session;
 pub(crate) mod fichier;
 pub(crate) mod parametrage;
+pub(crate) mod prise_en_charge;
 pub(crate) mod purge;
 pub(crate) mod vues;

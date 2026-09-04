@@ -457,6 +457,7 @@ export class SqmBrouillonComponent {
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
       case 'conflitReglesMembreConnu':
+      case 'dateDepartInvalide':
       case 'brouillonDejaExistant':
       case 'cleSeuilIntrouvable':
       case 'typeReferentielInconnu':

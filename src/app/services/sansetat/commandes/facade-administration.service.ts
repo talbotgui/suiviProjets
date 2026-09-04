@@ -53,6 +53,11 @@ export interface ParametresQualificationMembre<TDonnees> {
   readonly libelle: string | undefined;
   /** Alias courriel optionnel. */
   readonly aliasEmail: string | undefined;
+  /**
+   * Date de départ optionnelle (`AAAA-MM-JJ`, RG-061) : revalidée côté cœur natif (interdite sur un critère
+   * `domaineEmail`, non postérieure au jour courant).
+   */
+  readonly partiLe: string | undefined;
   /** Origine consignée au journal des modifications (RG-023). */
   readonly origine: string;
   /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
@@ -75,6 +80,11 @@ export interface EntreeQualificationMembreMasse {
   readonly libelle: string | undefined;
   /** Alias courriel optionnel. */
   readonly aliasEmail: string | undefined;
+  /**
+   * Date de départ optionnelle (`AAAA-MM-JJ`, RG-061), validée par ligne : une ligne invalide échoue sans bloquer
+   * les autres (RG-041).
+   */
+  readonly partiLe: string | undefined;
 }
 
 /**
@@ -191,14 +201,41 @@ export interface ParametresCalculMetriquesVolumetrie<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `calculerPriseEnChargeProjet` (US-058, RG-058, plan_18), génériques
+ * sur le type concret de la racine (`TDonnees`) pour ne jamais importer ce type depuis `services/avecetat/etat/`.
+ * Recherche à la demande du premier commit interne : ne persiste rien, retourne la structure calculée (l'écriture
+ * chiffrée conditionnelle, décision 6 du plan, reste à la charge de l'appelant via `sauvegarderFichier`).
+ */
+export interface ParametresCalculPriseEnCharge<TDonnees> {
+  /** Identifiant du projet dont on calcule la date de prise en charge. */
+  readonly projetId: string;
+  /** Racine des données courante (résolution du groupe et du projet, lecture de la borne de pages). */
+  readonly donnees: TDonnees;
+}
+
+/**
+ * Paramètres transmis à la commande native `empreinteReferentielInterne` (US-058, RG-058, plan_18, décision 15 :
+ * seule implémentation du condensé, jamais recalculé côté interface), génériques sur le type concret de la racine.
+ */
+export interface ParametresEmpreinteReferentielInterne<TDonnees> {
+  /** Identifiant du groupe dont on veut l'empreinte du sous-ensemble `interne` des membres connus. */
+  readonly groupeId: string;
+  /** Racine des données courante. */
+  readonly donnees: TDonnees;
+}
+
+/**
  * Client typé de la Façade de commandes, dédié en Phase 4 à la qualification des membres connus d'un groupe et à
  * la politique d'autorisation de l'IA d'un projet (US-022 à US-024), et en Phase 5 (incrément 2) au cycle de vie
  * du brouillon d'une campagne (US-014). Complétée le 2026-08-24 par la qualification en masse de membres connus
- * (US-044, RG-041). Chaque méthode invoque une commande Tauri identique côté cœur natif (`qualifier_membre`,
- * `qualifier_membres`, `definir_politique_ia`, `supprimer_membre_connu`, `enregistrer_brouillon`,
- * `integrer_brouillon`, `rejeter_brouillon`) et reste générique sur le type concret de la racine échangée (cf.
- * commentaire d'en-tête de ce fichier) : c'est l'appelant (`DonneesApplicationService`) qui porte la connaissance
- * du type `DonneesRacine`.
+ * (US-044, RG-041), le 2026-08-31 par la volumétrie du fichier (US-055), et par le plan_18 par le calcul à la
+ * demande de la date de prise en charge d'un projet et l'empreinte du référentiel `interne` (US-058, RG-058).
+ * Chaque méthode invoque une commande Tauri identique côté cœur natif (`qualifier_membre`, `qualifier_membres`,
+ * `definir_politique_ia`, `supprimer_membre_connu`, `enregistrer_brouillon`, `integrer_brouillon`,
+ * `rejeter_brouillon`, `calculer_metriques_volumetrie`, `calculer_prise_en_charge_projet`,
+ * `empreinte_referentiel_interne`) et reste générique sur le type concret de la racine échangée (cf. commentaire
+ * d'en-tête de ce fichier) : c'est l'appelant (`DonneesApplicationService`) qui porte la connaissance du type
+ * `DonneesRacine`.
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeAdministrationService {
@@ -261,6 +298,38 @@ export class FacadeAdministrationService {
     parametres: ParametresCalculMetriquesVolumetrie<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('calculer_metriques_volumetrie', {
+      ...parametres,
+    });
+  }
+
+  /**
+   * Calcule à la demande la date de prise en charge d'un projet (premier commit interne, US-058, RG-058) : pour
+   * chaque source GitLab du projet, recherche le premier commit dont l'auteur correspond à une règle de membre
+   * connu `interne` du groupe, et retient la plus ancienne date obtenue. Ne persiste rien : l'appelant compare le
+   * résultat à la valeur stockée (cf. `PriseEnChargeUtils.identique`) et ne sauvegarde qu'en cas de changement
+   * (décision 6 du plan_18).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresCalculPriseEnCharge}.
+   * @returns La structure `PremierCommitInterne` calculée, typée par l'appelant via `TReponse`.
+   */
+  public async calculerPriseEnChargeProjet<TDonnees, TReponse>(
+    parametres: ParametresCalculPriseEnCharge<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('calculer_prise_en_charge_projet', {
+      ...parametres,
+    });
+  }
+
+  /**
+   * Retourne l'empreinte (`sha256:…`) du sous-ensemble `interne` des membres connus d'un groupe (US-058, RG-058,
+   * décision 15 du plan_18 : seule implémentation du condensé). L'interface la compare telle quelle
+   * (`PriseEnChargeUtils.recalculNecessaire`, suggestion de la Fiche projet) sans jamais recalculer de SHA-256.
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresEmpreinteReferentielInterne}.
+   * @returns Le condensé, sous la forme d'une chaîne préfixée `sha256:`.
+   */
+  public async empreinteReferentielInterne<TDonnees>(
+    parametres: ParametresEmpreinteReferentielInterne<TDonnees>,
+  ): Promise<string> {
+    return InvocationCommandeUtils.invoquer<string>('empreinte_referentiel_interne', {
       ...parametres,
     });
   }

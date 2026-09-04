@@ -8,10 +8,11 @@
 // Phase 10 incrément 8, C10-04 : création et suppression des annotations de portée groupe, également porté par
 // `Groupe`), construit sur le même patron que le sous-onglet Membres connus.
 //
-// Entrées `groupeIdPreselectionne`/`critere`/`typeCritere`, relayées telles quelles depuis `SqmAdministrationComponent`
-// (paramètres de requête portés par le lien « Qualifier ce membre » de la Fiche projet) : un simple effet
-// (constructeur) bascule une fois pour toutes sur le sous-onglet Membres connus dès que `groupeIdPreselectionne`
-// est renseigné, sur le modèle de `vueParDefautDejaAppliquee` (`SqmListeTravailComponent`).
+// Entrées `groupeIdPreselectionne`/`critere`/`typeCritere`/`partiLe`, relayées telles quelles depuis
+// `SqmAdministrationComponent` (paramètres de requête portés par les liens « Qualifier ce membre » et « Marquer
+// comme parti » de la Fiche projet) : un simple effet (constructeur) bascule une fois pour toutes sur le sous-onglet
+// Membres connus dès que `groupeIdPreselectionne` est renseigné, sur le modèle de `vueParDefautDejaAppliquee`
+// (`SqmListeTravailComponent`).
 import {
   Component,
   ElementRef,
@@ -104,6 +105,12 @@ export class SqmGroupesAdminComponent {
    * Type du critère à pré-remplir (cf. {@link critere}).
    */
   public readonly typeCritere: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Date de départ à pré-remplir (lien « Marquer comme parti » de la Fiche projet, RG-061, §8.5 du plan `plan_18`),
+   * relayée telle quelle vers `SqmMembresConnusAdminComponent` (cf. commentaire d'en-tête).
+   */
+  public readonly partiLe: InputSignal<string | undefined> = input<string>();
 
   /**
    * Indique que la présélection du sous-onglet Membres connus a déjà été appliquée une fois pour cette instance

@@ -471,4 +471,80 @@ describe('SqmMembresConnusAdminComponent', () => {
       });
     },
   );
+
+  describe(
+    'présélection depuis la Fiche projet (lien « Marquer comme parti », RG-061, §8.5 du plan plan_18 : ' +
+      'groupeIdPreselectionne/critereInitial/typeCritereInitial désignant une règle déjà existante, ' +
+      'partiLeInitial)',
+    () => {
+      it(
+        'ouvre la règle existante en modification et pré-remplit partiLe à la valeur transmise ' +
+          "(règle sans date de départ jusqu'ici)",
+        () => {
+          const racineAvecMembre: DonneesRacine = {
+            ...DonneesDeTest.racineActuelle(donneesApplication),
+            groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+              g.id === groupeId ? { ...g, membresConnus: [DonneesDeTest.membre('m1')] } : g,
+            ),
+          };
+          donneesApplication.chargerRacine(racineAvecMembre);
+
+          const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+          fixture.componentRef.setInput('groupeIdPreselectionne', groupeId);
+          fixture.componentRef.setInput('critereInitial', 'alice');
+          fixture.componentRef.setInput('typeCritereInitial', 'username');
+          fixture.componentRef.setInput('partiLeInitial', '2026-09-04');
+
+          fixture.detectChanges();
+
+          expect(fixture.componentInstance.membreEnEditionId).toBe('m1');
+          expect(fixture.componentInstance.formulaireVisible()).toBe(true);
+          expect(fixture.componentInstance.critere).toBe('alice');
+          expect(fixture.componentInstance.partiLe).toBe('2026-09-04');
+        },
+      );
+
+      it("n'écrase pas une date de départ déjà enregistrée sur la règle existante", () => {
+        const racineAvecMembre: DonneesRacine = {
+          ...DonneesDeTest.racineActuelle(donneesApplication),
+          groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+            g.id === groupeId
+              ? { ...g, membresConnus: [{ ...DonneesDeTest.membre('m1'), partiLe: '2025-01-01' }] }
+              : g,
+          ),
+        };
+        donneesApplication.chargerRacine(racineAvecMembre);
+
+        const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+        fixture.componentRef.setInput('groupeIdPreselectionne', groupeId);
+        fixture.componentRef.setInput('critereInitial', 'alice');
+        fixture.componentRef.setInput('typeCritereInitial', 'username');
+        fixture.componentRef.setInput('partiLeInitial', '2026-09-04');
+
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.membreEnEditionId).toBe('m1');
+        expect(fixture.componentInstance.partiLe).toBe('2025-01-01');
+      });
+
+      it(
+        'ouvre le formulaire de création (pas de règle existante), même si partiLeInitial est fourni ' +
+          '(membre réellement inconnu, cf. autre describe ci-dessus)',
+        () => {
+          const fixture = TestBed.createComponent(SqmMembresConnusAdminComponent);
+          fixture.componentRef.setInput('groupeIdPreselectionne', groupeId);
+          fixture.componentRef.setInput('critereInitial', 'bob');
+          fixture.componentRef.setInput('typeCritereInitial', 'username');
+          fixture.componentRef.setInput('partiLeInitial', '2026-09-04');
+
+          fixture.detectChanges();
+
+          expect(fixture.componentInstance.membreEnEditionId).toBeNull();
+          expect(fixture.componentInstance.formulaireVisible()).toBe(true);
+          expect(fixture.componentInstance.critere).toBe('bob');
+          expect(fixture.componentInstance.partiLe).toBe('');
+        },
+      );
+    },
+  );
 });

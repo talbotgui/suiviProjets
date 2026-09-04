@@ -56,6 +56,38 @@ describe('SaisieMasseMembresUtils', () => {
       ]);
     });
 
+    it('analyse une quatrième composante optionnelle : la date de départ (RG-061)', () => {
+      const resultat = SaisieMasseMembresUtils.analyser('jdupont;username=interne;2025-06-30', []);
+
+      expect(resultat.erreurs).toEqual([]);
+      expect(resultat.entrees).toEqual([
+        {
+          critere: 'jdupont',
+          typeCritere: 'username',
+          statut: 'interne',
+          partiLe: '2025-06-30',
+          ligneOriginale: 'jdupont;username=interne;2025-06-30',
+        },
+      ]);
+    });
+
+    it('rejette une date de départ sur une ligne de type domaine, non analysable ou future (RG-061)', () => {
+      const domaine = SaisieMasseMembresUtils.analyser(
+        'exemple.test;domaineEmail=interne;2025-06-30',
+        [],
+      );
+      expect(domaine.entrees).toEqual([]);
+      expect(domaine.erreurs).toHaveLength(1);
+
+      const nonIso = SaisieMasseMembresUtils.analyser('jdupont;username=interne;30/06/2025', []);
+      expect(nonIso.entrees).toEqual([]);
+      expect(nonIso.erreurs).toHaveLength(1);
+
+      const future = SaisieMasseMembresUtils.analyser('jdupont;username=interne;2999-01-01', []);
+      expect(future.entrees).toEqual([]);
+      expect(future.erreurs).toHaveLength(1);
+    });
+
     it('ignore les espaces superflus autour du critère, du type de critère et du statut', () => {
       const resultat = SaisieMasseMembresUtils.analyser('  jdupont ; username = interne  ', []);
 

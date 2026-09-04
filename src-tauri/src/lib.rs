@@ -75,6 +75,8 @@ pub fn run() {
             commandes::administration::definir_politique_ia,
             commandes::administration::supprimer_membre_connu,
             commandes::administration::calculer_metriques_volumetrie,
+            commandes::prise_en_charge::calculer_prise_en_charge_projet,
+            commandes::prise_en_charge::empreinte_referentiel_interne,
             commandes::audit::interroger_vitalite,
             commandes::audit::interroger_taille_depot,
             commandes::audit::interroger_contributeurs,

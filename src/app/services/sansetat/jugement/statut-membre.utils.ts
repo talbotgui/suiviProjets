@@ -141,6 +141,54 @@ export class StatutMembreUtils {
   }
 
   /**
+   * Résout la règle de membre connu ayant permis de rattacher ce membre ou contributeur via un canal **nominatif**
+   * (précédences 1 et 2 de RG-007 uniquement : `username` exact, ou `email` exact / alias courriel d'une règle
+   * `username`) — ne redescend jamais au niveau domaine, une règle `domaineEmail` ne pouvant jamais porter `partiLe`
+   * (RG-061). Utilisée exclusivement pour construire le lien « Marquer comme parti » de la Fiche projet (décision
+   * 10 du plan `plan_18`) : l'appelant ne doit l'invoquer que pour un membre déjà résolu `connu` par
+   * {@link calculerStatutMembre}, auquel cas une correspondance sans conflit à l'un de ces deux niveaux est garantie
+   * par construction (le résultat `undefined` d'un niveau contradictoire n'est donc pas attendu en pratique, mais
+   * reste géré sans exception pour rester une fonction pure totale).
+   * Générique sur le type concret des règles fourni ({@link TRegle}, contraint à structurellement étendre
+   * {@link RegleMembreConnu}) plutôt que sur `RegleMembreConnu<TStatut>` lui-même, pour restituer la règle
+   * d'origine telle quelle — avec ses champs additionnels éventuels (ex. `id`, `partiLe` de `MembreConnu`,
+   * volontairement absents de {@link RegleMembreConnu}, cf. commentaire d'en-tête) — plutôt qu'une copie appauvrie.
+   * @param identifiant - Identifiant (username et/ou email) du membre ou contributeur à résoudre.
+   * @param regles - Règles de membres connus du groupe (`Groupe.membresConnus`).
+   * @returns La règle nominative correspondante, `undefined` en l'absence de correspondance aux précédences 1/2 ou
+   * en cas de correspondances contradictoires à un même niveau.
+   */
+  public static resoudreRegleNominative<TStatut, TRegle extends RegleMembreConnu<TStatut>>(
+    identifiant: IdentifiantMembre,
+    regles: readonly TRegle[],
+  ): TRegle | undefined {
+    const { username, email } = identifiant;
+    const reglesUsername =
+      username === undefined
+        ? []
+        : regles.filter((regle) => regle.typeCritere === 'username' && regle.critere === username);
+    if (reglesUsername.length > 0) {
+      return new Set(reglesUsername.map((regle) => regle.statut)).size === 1
+        ? reglesUsername[0]
+        : undefined;
+    }
+    const reglesEmail =
+      email === undefined
+        ? []
+        : regles.filter(
+            (regle) =>
+              (regle.typeCritere === 'email' && regle.critere === email) ||
+              (regle.typeCritere === 'username' && regle.aliasEmail === email),
+          );
+    if (reglesEmail.length > 0) {
+      return new Set(reglesEmail.map((regle) => regle.statut)).size === 1
+        ? reglesEmail[0]
+        : undefined;
+    }
+    return undefined;
+  }
+
+  /**
    * Module la gravité de l'alerte associée à un membre `inconnu` ou en `conflit` selon son niveau d'accès GitLab
    * (RG-010 : un statut inconnu avec des droits de mainteneur ou d'administration est plus grave qu'un statut
    * inconnu en lecture seule). Seuil retenu (à valider par un humain, aucune valeur chiffrée fournie par RG-010) :
@@ -164,7 +212,10 @@ export type TypeCritereMembreConnu = 'username' | 'email' | 'domaineEmail';
 
 /**
  * Forme structurelle d'une règle de membre connu consommée par ce module, générique sur le type du statut restitué
- * (cf. commentaire d'en-tête).
+ * (cf. commentaire d'en-tête). La résolution du statut ne lit que `critere`, `typeCritere`, `statut` et
+ * `aliasEmail` : la date de départ `partiLe` d'une règle (RG-061) n'y figure volontairement pas et n'a aucun effet
+ * sur la résolution du statut (RG-006 à RG-008) — un membre parti conserve exactement le statut qu'il aurait sans
+ * cette date.
  */
 export interface RegleMembreConnu<TStatut> {
   /** Motif de reconnaissance (login, email ou motif glob de domaine selon `typeCritere`). */

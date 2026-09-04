@@ -12,10 +12,11 @@
 // `SqmAnnotationsGroupeAdminComponent`, lui-même troisième sous-onglet de `SqmGroupesAdminComponent` (aux côtés de
 // Groupes et Membres connus), et non par cet écran directement.
 //
-// Paramètres de requête `groupeId`/`critere`/`typeCritere` (`withComponentInputBinding()`, `app.config.ts`) ajoutés
-// pour le seul besoin du lien « Qualifier ce membre » de la Fiche projet (`fiche-projet.component.ts`) : relayés
-// tels quels vers `SqmGroupesAdminComponent`, qui porte la présélection du groupe et du sous-onglet Membres
-// connus. Aucun effet local ici : l'onglet par défaut de cet écran est déjà « groupes ».
+// Paramètres de requête `groupeId`/`critere`/`typeCritere`/`partiLe` (`withComponentInputBinding()`,
+// `app.config.ts`) ajoutés pour le seul besoin des liens « Qualifier ce membre » et « Marquer comme parti »
+// (RG-061, §8.5 du plan `plan_18`) de la Fiche projet (`fiche-projet.component.ts`) : relayés tels quels vers
+// `SqmGroupesAdminComponent`, qui porte la présélection du groupe et du sous-onglet Membres connus. Aucun effet
+// local ici : l'onglet par défaut de cet écran est déjà « groupes ».
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import type { InputSignal } from '@angular/core';
 import { SqmGroupesAdminComponent } from './groupes/groupes-admin.component';
@@ -61,6 +62,12 @@ export class SqmAdministrationComponent {
    * Type du critère à pré-remplir, lié au paramètre de requête homonyme. Cf. {@link critere}.
    */
   public readonly typeCritere: InputSignal<string | undefined> = input<string>();
+
+  /**
+   * Date de départ à pré-remplir (lien « Marquer comme parti », RG-061), liée au paramètre de requête homonyme. Cf.
+   * commentaire d'en-tête.
+   */
+  public readonly partiLe: InputSignal<string | undefined> = input<string>();
 
   /**
    * Onglet actuellement affiché.

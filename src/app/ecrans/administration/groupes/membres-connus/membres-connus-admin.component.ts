@@ -7,11 +7,16 @@
 // une commande native qui sauvegarde effectivement le fichier (RG-002 : le mot de passe est donc redemandé à
 // chaque enregistrement ou suppression, cf. `SqmConfirmationMotDePasseComponent`).
 //
-// Entrées `groupeIdPreselectionne`/`critere`/`typeCritere`, relayées depuis `SqmGroupesAdminComponent` (lien
-// « Qualifier ce membre » de la Fiche projet, cf. `fiche-projet.component.ts`) : un effet (constructeur) présélectionne
-// une fois pour toutes le groupe visé puis, si `critere`/`typeCritere` sont tous deux présents et reconnus, ouvre
-// directement le formulaire de création pré-rempli (membre `inconnu`) ; sinon (absents : membre en `conflit`), le
-// groupe est simplement présélectionné et sa liste de règles existantes reste affichée sans ouvrir de formulaire.
+// Entrées `groupeIdPreselectionne`/`critere`/`typeCritere`/`partiLe`, relayées depuis `SqmGroupesAdminComponent`
+// (liens « Qualifier ce membre » et « Marquer comme parti » de la Fiche projet, cf. `fiche-projet.component.ts`) :
+// un effet (constructeur) présélectionne une fois pour toutes le groupe visé puis, si `critere`/`typeCritere` sont
+// tous deux présents et reconnus, recherche une règle déjà existante du groupe portant exactement ce critère et ce
+// type. Si elle existe (« Marquer comme parti », RG-061, §8.5 du plan `plan_18`), le formulaire de modification de
+// cette règle s'ouvre, avec `partiLe` pré-rempli à la valeur transmise si la règle n'en porte pas déjà une (jamais
+// d'écrasement silencieux d'une date déjà enregistrée). Sinon (« Qualifier ce membre », membre `inconnu`), le
+// formulaire de création s'ouvre pré-rempli avec `critere`/`typeCritere`. Si `critere`/`typeCritere` sont tous deux
+// absents (membre en `conflit`), le groupe est simplement présélectionné et sa liste de règles existantes reste
+// affichée sans ouvrir de formulaire.
 import {
   Component,
   ElementRef,
@@ -25,6 +30,7 @@ import {
   input,
 } from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
@@ -52,7 +58,12 @@ const ORIGINE_ADMINISTRATION = 'Administration';
  */
 @Component({
   selector: 'app-membres-connus-admin',
-  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
+  imports: [
+    DatePipe,
+    FormsModule,
+    SqmConfirmationSuppressionComponent,
+    SqmConfirmationMotDePasseComponent,
+  ],
   templateUrl: './membres-connus-admin.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './membres-connus-admin.component.scss',
@@ -88,6 +99,13 @@ export class SqmMembresConnusAdminComponent {
   public readonly typeCritereInitial: InputSignal<string | undefined> = input<string>();
 
   /**
+   * Date de départ à pré-remplir (lien « Marquer comme parti », cf. commentaire d'en-tête), appliquée uniquement
+   * quand {@link critereInitial}/{@link typeCritereInitial} désignent une règle déjà existante du groupe (bascule
+   * alors en modification plutôt qu'en création) et que celle-ci ne porte pas déjà de date de départ.
+   */
+  public readonly partiLeInitial: InputSignal<string | undefined> = input<string>();
+
+  /**
    * Indique que la présélection depuis {@link groupeIdPreselectionne} a déjà été appliquée une fois pour cette
    * instance (cf. commentaire d'en-tête, même patron que `SqmListeTravailComponent.vueParDefautDejaAppliquee`).
    */
@@ -103,11 +121,23 @@ export class SqmMembresConnusAdminComponent {
       this.selectionnerGroupe(groupeCible);
       const typeCritereCible = this.analyserTypeCritere(this.typeCritereInitial());
       const critereCible = this.critereInitial();
-      if (typeCritereCible !== undefined && critereCible !== undefined && critereCible.length > 0) {
-        this.ouvrirCreation();
-        this.typeCritere = typeCritereCible;
-        this.critere = critereCible;
+      if (typeCritereCible === undefined || critereCible === undefined || critereCible.length === 0) {
+        return;
       }
+      const regleExistante = this.membresConnus().find(
+        (regle) => regle.typeCritere === typeCritereCible && regle.critere === critereCible,
+      );
+      if (regleExistante !== undefined) {
+        this.ouvrirEdition(regleExistante.id);
+        const partiLeCible = this.partiLeInitial();
+        if (partiLeCible !== undefined && this.partiLe.length === 0) {
+          this.partiLe = partiLeCible;
+        }
+        return;
+      }
+      this.ouvrirCreation();
+      this.typeCritere = typeCritereCible;
+      this.critere = critereCible;
     });
   }
 
@@ -180,6 +210,21 @@ export class SqmMembresConnusAdminComponent {
    * Alias courriel saisi dans le formulaire.
    */
   public aliasEmail = '';
+
+  /**
+   * Date de départ (`partiLe`, RG-061) saisie dans le formulaire, chaîne vide = non renseignée. Sans objet pour un
+   * critère de type domaine : le champ est alors désactivé et vidé (cf. {@link surChangementTypeCritere}).
+   */
+  public partiLe = '';
+
+  /**
+   * Date du jour au format `AAAA-MM-JJ`, plafond du champ « Parti le » : une date de départ future est refusée
+   * (RG-061), aussi bien par ce plafond côté interface que par la revalidation côté cœur natif.
+   * @returns La date du jour, formatée pour l'attribut `max` d'un champ `type="date"`.
+   */
+  public get dateAujourdhui(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   /**
    * Message d'erreur de validation ou de rejet par le cœur natif, `null` si aucune erreur en cours.
@@ -266,9 +311,20 @@ export class SqmMembresConnusAdminComponent {
     this.statut = StatutMembre.Interne;
     this.libelle = '';
     this.aliasEmail = '';
+    this.partiLe = '';
     this.messageErreur = null;
     this.formulaireVisible.set(true);
     this.focusPremierChampApresRendu();
+  }
+
+  /**
+   * Réagit à un changement de type de critère : une règle de type domaine ne peut porter de date de départ
+   * (RG-061), le champ « Parti le » est donc vidé lorsque l'utilisateur bascule sur ce type.
+   */
+  public surChangementTypeCritere(): void {
+    if (this.typeCritere === TypeCritereMembre.DomaineEmail) {
+      this.partiLe = '';
+    }
   }
 
   /**
@@ -286,6 +342,7 @@ export class SqmMembresConnusAdminComponent {
     this.statut = regle.statut;
     this.libelle = regle.libelle ?? '';
     this.aliasEmail = regle.aliasEmail ?? '';
+    this.partiLe = regle.partiLe ?? '';
     this.messageErreur = null;
     this.formulaireVisible.set(true);
     this.focusPremierChampApresRendu();
@@ -318,8 +375,36 @@ export class SqmMembresConnusAdminComponent {
       this.messageErreur = 'Le critère est obligatoire.';
       return;
     }
+    const erreurPartiLe = this.validerPartiLe();
+    if (erreurPartiLe !== null) {
+      this.messageErreur = erreurPartiLe;
+      return;
+    }
     this.messageErreur = null;
     this.actionEnAttenteMotDePasse.set('enregistrement');
+  }
+
+  /**
+   * Valide la date de départ saisie (RG-061), en complément de la revalidation côté cœur natif : interdite sur un
+   * critère de type domaine, doit être une date valide et non postérieure au jour courant.
+   * @returns Le message d'erreur à afficher, ou `null` si la date est absente ou valide.
+   */
+  private validerPartiLe(): string | null {
+    const partiLe = this.partiLe.trim();
+    if (partiLe.length === 0) {
+      return null;
+    }
+    if (this.typeCritere === TypeCritereMembre.DomaineEmail) {
+      return 'Une règle de type domaine ne peut pas porter de date de départ.';
+    }
+    const horodatage = Date.parse(`${partiLe}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(partiLe) || Number.isNaN(horodatage)) {
+      return 'La date de départ est invalide.';
+    }
+    if (partiLe > this.dateAujourdhui) {
+      return 'La date de départ ne peut pas être dans le futur.';
+    }
+    return null;
   }
 
   /**
@@ -338,6 +423,7 @@ export class SqmMembresConnusAdminComponent {
       statut: this.statut,
       libelle: this.libelle.trim().length > 0 ? this.libelle.trim() : undefined,
       aliasEmail: this.aliasEmail.trim().length > 0 ? this.aliasEmail.trim() : undefined,
+      partiLe: this.partiLe.trim().length > 0 ? this.partiLe.trim() : undefined,
     };
 
     this.enCours.set(true);
@@ -434,6 +520,8 @@ export class SqmMembresConnusAdminComponent {
         return 'Ce username est déjà utilisé par une autre règle de ce groupe.';
       case 'conflitReglesMembreConnu':
         return 'Cette règle entre en conflit avec une autre règle de ce groupe portant le même critère et un statut différent.';
+      case 'dateDepartInvalide':
+        return 'La date de départ est invalide : elle ne peut pas être dans le futur ni figurer sur une règle de type domaine.';
       case 'groupeIntrouvable':
         return 'Le groupe sélectionné est introuvable.';
       case 'membreIntrouvable':

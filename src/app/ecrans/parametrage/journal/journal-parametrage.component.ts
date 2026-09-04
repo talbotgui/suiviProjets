@@ -150,6 +150,7 @@ export class SqmJournalParametrageComponent {
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
       case 'conflitReglesMembreConnu':
+      case 'dateDepartInvalide':
       case 'brouillonDejaExistant':
       case 'aucunBrouillonCourant':
       case 'projetAbsentDuBrouillon':

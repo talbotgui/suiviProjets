@@ -19,7 +19,9 @@ import type {
   Audit,
   DonneesRacine,
   Groupe,
+  PremierCommitInterne,
   Projet,
+  StatutPremierCommitNonDetermine,
 } from '../../services/avecetat/etat/types-donnees';
 import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
 import type { MembreGitlab } from '../../services/sansetat/commandes/types-facade';
@@ -338,6 +340,10 @@ describe('SqmFicheProjetComponent', () => {
     const fixture = TestBed.createComponent(SqmFicheProjetComponent);
     fixture.componentRef.setInput('projetId', projetId);
     fixture.detectChanges();
+    // L'effet de chargement de l'empreinte du référentiel `interne` (suggestion « membres internes changés »,
+    // plan_18 US-058) invoque `empreinte_referentiel_interne` dès le premier rendu : neutralisé ici pour que les
+    // tests comptant les appels `invoke` déclenchés par une action ultérieure ne le comptabilisent pas.
+    jest.mocked(invoke).mockClear();
     return fixture;
   }
 
@@ -2136,6 +2142,165 @@ describe('SqmFicheProjetComponent', () => {
       expect(resultat.nombreReussies).toBe(0);
       expect(resultat.erreurs).toHaveLength(1);
       expect(resultat.texteRestant).toBe('inconnu1;username=');
+    });
+  });
+
+  describe('date de prise en charge (US-058, RG-058, plan_18)', () => {
+    /**
+     * Construit un projet de test dont le `premierCommitInterne` est remplacé (ou retiré si `undefined`).
+     * @param premierCommitInterne - Valeur à placer sur le projet, ou `undefined` pour un projet jamais calculé.
+     * @returns Le projet de test.
+     */
+    function projetAvecPriseEnCharge(
+      premierCommitInterne: PremierCommitInterne | undefined,
+    ): Projet {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      return { ...projet, premierCommitInterne };
+    }
+
+    /**
+     * Bloc de métadonnée « Âge chez nous » de l'écran rendu.
+     * @param element - Élément natif de l'écran.
+     * @returns Le bloc, ou `null`.
+     */
+    function metadonneeAge(element: HTMLElement): Element | null {
+      return (
+        Array.from(element.querySelectorAll('.fiche-projet__metadonnee')).find((bloc) =>
+          bloc.textContent?.includes('Âge chez nous'),
+        ) ?? null
+      );
+    }
+
+    it.each<[StatutPremierCommitNonDetermine, string]>([
+      ['aucune_regle_interne', 'aucun membre interne qualifié pour ce groupe'],
+      ['aucun_membre_interne', 'aucun commit interne trouvé'],
+      ['indetermine_trop_de_commits', 'non déterminé (dépôt trop volumineux)'],
+      ['non_applicable', '— (aucune source GitLab)'],
+      ['depot_vide', '— (dépôt vide)'],
+    ])('affiche le libellé propre au statut « %s »', (statut, libelleAttendu) => {
+      const premierCommitInterne: PremierCommitInterne = {
+        statut,
+        calculeLe: '2026-01-01',
+        empreinteReferentiel: 'sha256:test',
+      };
+      const fixture = creerFixture(
+        'projet-1',
+        DonneesDeTest.racine(projetAvecPriseEnCharge(premierCommitInterne)),
+      );
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(metadonneeAge(element)?.textContent).toContain(libelleAttendu);
+    });
+
+    it('affiche « non calculée » quand aucun calcul n’a jamais eu lieu', () => {
+      const fixture = creerFixture(
+        'projet-1',
+        DonneesDeTest.racine(projetAvecPriseEnCharge(undefined)),
+      );
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(metadonneeAge(element)?.textContent).toContain('non calculée');
+    });
+
+    it('recalcul sans changement : notification « inchangée », aucune sauvegarde (décision 6)', async () => {
+      jest.mocked(invoke).mockImplementation((commande) => {
+        if (commande === 'calculer_prise_en_charge_projet') {
+          return Promise.resolve({
+            statut: 'determine',
+            date: '2021-01-01',
+            sha: 'zzz',
+            emailAuteur: 'x@entreprise.fr',
+            calculeLe: '2026-09-03',
+            empreinteReferentiel: 'sha256:test',
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+      const fixture = creerFixture(
+        'projet-1',
+        DonneesDeTest.racine(DonneesDeTest.projet('projet-1', [])),
+      );
+
+      await fixture.componentInstance.recalculerPriseEnCharge();
+
+      expect(fixture.componentInstance.attenteMotDePassePriseEnCharge()).toBe(false);
+      expect(invoke).not.toHaveBeenCalledWith('sauvegarder_fichier', expect.anything());
+      const notifications = TestBed.inject(NotificationService).liste();
+      expect(notifications.at(-1)?.type).toBe('succes');
+      expect(notifications.at(-1)?.message).toContain('inchangée');
+    });
+
+    it('recalcul avec changement : ouvre la ressaisie du mot de passe puis sauvegarde (RG-002)', async () => {
+      jest.mocked(invoke).mockImplementation((commande) => {
+        if (commande === 'calculer_prise_en_charge_projet') {
+          return Promise.resolve({
+            statut: 'determine',
+            date: '2018-06-30',
+            sha: 'nouveau',
+            emailAuteur: 'x@entreprise.fr',
+            calculeLe: '2026-09-03',
+            empreinteReferentiel: 'sha256:test',
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+      const fixture = creerFixture(
+        'projet-1',
+        DonneesDeTest.racine(DonneesDeTest.projet('projet-1', [])),
+      );
+
+      await fixture.componentInstance.recalculerPriseEnCharge();
+      expect(fixture.componentInstance.attenteMotDePassePriseEnCharge()).toBe(true);
+
+      await fixture.componentInstance.confirmerRecalculPriseEnCharge('mot-de-passe');
+
+      expect(fixture.componentInstance.attenteMotDePassePriseEnCharge()).toBe(false);
+      expect(invoke).toHaveBeenCalledWith(
+        'sauvegarder_fichier',
+        expect.objectContaining({ motDePasse: 'mot-de-passe' }),
+      );
+      const notifications = TestBed.inject(NotificationService).liste();
+      expect(notifications.at(-1)?.type).toBe('succes');
+      expect(notifications.at(-1)?.message).toContain('mise à jour');
+    });
+
+    it('recalcul en échec de connecteur : notification d’erreur, pas de ressaisie de mot de passe', async () => {
+      jest.mocked(invoke).mockResolvedValue(undefined);
+      const fixture = creerFixture(
+        'projet-1',
+        DonneesDeTest.racine(DonneesDeTest.projet('projet-1', [])),
+      );
+      jest
+        .mocked(invoke)
+        .mockRejectedValueOnce({ type: 'instanceInjoignable', message: 'timeout' });
+
+      await fixture.componentInstance.recalculerPriseEnCharge();
+
+      expect(fixture.componentInstance.attenteMotDePassePriseEnCharge()).toBe(false);
+      expect(TestBed.inject(NotificationService).liste().at(-1)?.type).toBe('erreur');
+    });
+
+    it('affiche la suggestion quand l’empreinte courante diffère de celle du dernier calcul (F17)', async () => {
+      jest.mocked(invoke).mockImplementation((commande) => {
+        if (commande === 'empreinte_referentiel_interne') {
+          return Promise.resolve('sha256:differente');
+        }
+        return Promise.resolve(undefined);
+      });
+      const fixture = creerFixture(
+        'projet-1',
+        DonneesDeTest.racine(DonneesDeTest.projet('projet-1', [])),
+      );
+      // L'effet de chargement d'empreinte enchaîne plusieurs microtâches (façade → indicateur de chargement →
+      // `invoke`) : deux tours de boucle d'événements garantissent que la continuation a mis à jour le signal.
+      await new Promise((resoudre) => setTimeout(resoudre, 0));
+      await new Promise((resoudre) => setTimeout(resoudre, 0));
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(fixture.componentInstance.suggestionEmpreintePerimee()).toBe(true);
+      expect(element.textContent).toContain('Les membres internes ont changé depuis ce calcul.');
     });
   });
 });

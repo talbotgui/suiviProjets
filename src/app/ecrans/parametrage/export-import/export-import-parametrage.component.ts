@@ -322,6 +322,7 @@ export class SqmExportImportParametrageComponent {
       case 'membreIntrouvable':
       case 'doublonUsernameMembreConnu':
       case 'conflitReglesMembreConnu':
+      case 'dateDepartInvalide':
       case 'brouillonDejaExistant':
       case 'aucunBrouillonCourant':
       case 'projetAbsentDuBrouillon':

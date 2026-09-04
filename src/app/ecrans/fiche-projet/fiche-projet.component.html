@@ -70,6 +70,23 @@
             <span class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras">{{
               donnees.ageChezNousLabel
             }}</span>
+            <div
+              class="fiche-projet__hors-capture d-flex direction-colonne ecart-1 exterieur-haut-1"
+            >
+              <button
+                type="button"
+                class="bouton bouton--discret texte-xs"
+                [disabled]="recalculPriseEnChargeEnCours()"
+                (click)="recalculerPriseEnCharge()"
+              >
+                {{ recalculPriseEnChargeEnCours() ? 'Recalcul en cours…' : 'Recalculer' }}
+              </button>
+              @if (suggestionEmpreintePerimee()) {
+                <span class="texte-2xs italique texte-orange">
+                  Les membres internes ont changé depuis ce calcul.
+                </span>
+              }
+            </div>
           </div>
           <div
             class="fiche-projet__metadonnee d-flex direction-colonne interieur-x-3 interieur-y-2 rayon-lg"
@@ -103,6 +120,16 @@
             }}</span>
           </div>
         </section>
+
+        @if (attenteMotDePassePriseEnCharge()) {
+          <div class="fiche-projet__hors-capture">
+            <app-confirmation-mot-de-passe
+              message="Ressaisissez le mot de passe du fichier pour enregistrer la nouvelle date de prise en charge."
+              (confirmee)="confirmerRecalculPriseEnCharge($event)"
+              (annulee)="annulerRecalculPriseEnCharge()"
+            />
+          </div>
+        }
 
         <!-- Anomalie technique (état particulier : dernière campagne en échec, indicateurs de la campagne
              précédente conservés ci-dessous, jamais un écran vide). -->
@@ -575,6 +602,13 @@
                       >Qualifier ce membre</a
                     >
                   }
+                  @if (membre.critereMarquerParti) {
+                    <a
+                      routerLink="/administration"
+                      [queryParams]="queryParamsMarquerParti(groupeId, membre)"
+                      >Marquer comme parti</a
+                    >
+                  }
                 </li>
               </ng-template>
             }
@@ -597,7 +631,12 @@
                   <code class="police-mono">interne</code>, <code class="police-mono">client</code>,
                   <code class="police-mono">partenaire</code> — jamais pré-rempli, une valeur
                   explicite est exigée sur chaque ligne. Une ligne dont le critère correspond à une
-                  règle déjà existante est rejetée (saisie strictement additive).
+                  règle déjà existante est rejetée (saisie strictement additive). Une date de départ
+                  facultative peut être ajoutée en fin de ligne, au format
+                  <code class="police-mono">critere;typeCritere=statut;AAAA-MM-JJ</code>, ex.
+                  <code class="police-mono">jdupont;username=interne;2025-06-30</code> — refusée sur
+                  un critère <code class="police-mono">domaineEmail</code> ou si la date est dans le
+                  futur.
                 </p>
               </app-modale-saisie-masse>
             }

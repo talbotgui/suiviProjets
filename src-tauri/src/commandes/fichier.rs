@@ -59,6 +59,10 @@ pub(crate) enum ErreurFacade {
     /// La règle soumise, de type email/domaineEmail, entre en conflit avec une autre règle du groupe portant le
     /// même critère et un statut différent (Phase 4, Phase 10 R10-07, RG-008).
     ConflitReglesMembreConnu,
+    /// La date de départ (`partiLe`) soumise pour une règle de membre connu est invalide : posée sur une règle de
+    /// type `domaineEmail`, non analysable, ou postérieure au jour courant (plan_18, US-061, RG-061) —
+    /// revalidation côté cœur natif du contrôle déjà fait à la saisie.
+    DateDepartInvalide,
     /// Un brouillon existe déjà et doit être traité avant d'en enregistrer un nouveau (Phase 5, incrément 2,
     /// `enregistrerBrouillon`, RG-019).
     BrouillonDejaExistant,
@@ -201,6 +205,7 @@ impl From<crate::persistance::administration::ErreurAdministration> for ErreurFa
             ErreurAdministration::MembreIntrouvable => Self::MembreIntrouvable,
             ErreurAdministration::DoublonUsernameMembreConnu => Self::DoublonUsernameMembreConnu,
             ErreurAdministration::ConflitReglesMembreConnu => Self::ConflitReglesMembreConnu,
+            ErreurAdministration::DateDepartInvalide => Self::DateDepartInvalide,
         }
     }
 }

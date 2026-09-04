@@ -28,9 +28,11 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
   viewChild,
   ChangeDetectionStrategy,
 } from '@angular/core';
@@ -65,6 +67,7 @@ import type {
   EntreeJournal,
   EntreeReglesDependances,
   Groupe,
+  PremierCommitInterne,
   Projet,
   Resultat,
   Source,
@@ -281,6 +284,14 @@ interface LigneMembre {
    */
   readonly critereParDefautQualification:
     { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
+  /**
+   * Critère et type de critère de la règle ayant résolu ce membre comme `interne` via un canal nominatif
+   * (`username` ou `email`, cf. {@link StatutMembreUtils.resoudreRegleNominative}), présent uniquement pour un
+   * membre `interne` non déjà marqué parti (`partiLe` absent) — pour le lien « Marquer comme parti » (RG-061,
+   * décision 10 du plan `plan_18`, §8.5). `undefined` pour tout autre statut, une résolution par domaine (une règle
+   * `domaineEmail` ne peut jamais porter `partiLe`), ou un membre déjà marqué parti.
+   */
+  readonly critereMarquerParti: { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
   /** `true` si le membre est nominativement membre direct du dépôt (US-017, première section). */
   readonly direct: boolean;
   /**
@@ -406,8 +417,14 @@ interface DonneesFicheProjet {
   readonly sonarKo: boolean;
   /** `true` si au moins un membre du dépôt est de statut `inconnu`/`conflit` (RG-006 à RG-009). */
   readonly membreInconnuDetecte: boolean;
-  /** Libellé de l'âge du projet chez nous (`Projet.premierCommitInterne`). */
+  /** Libellé de l'âge du projet chez nous (`Projet.premierCommitInterne`), six variantes selon le statut (RG-058). */
   readonly ageChezNousLabel: string;
+  /**
+   * Empreinte du référentiel `interne` figée lors du dernier calcul de prise en charge (`sha256:…`), absente si
+   * jamais calculée. Comparée à l'empreinte courante (commande `empreinteReferentielInterne`) pour afficher la
+   * suggestion discrète « les membres internes ont changé depuis ce calcul » (plan_18, US-058).
+   */
+  readonly empreinteReferentielPriseEnCharge: string | undefined;
   /**
    * Libellé de la date du dernier audit **régulier** intégré (C15-14, US-046, RG-046 : un audit historique n'est
    * jamais sélectionné ici, cf. {@link auditsHistoriques} pour l'encart dédié), libellé de repli si jamais audité.
@@ -581,6 +598,74 @@ export class SqmFicheProjetComponent {
    * État complet de l'écran, recalculé à chaque changement de {@link projetId} ou de la racine courante.
    */
   public readonly etat: Signal<EtatFicheProjet> = computed(() => this.calculerEtat());
+
+  /**
+   * Empreinte courante du référentiel `interne` du groupe du projet affiché (`sha256:…`, commande native
+   * `empreinteReferentielInterne`, décision 15 du plan_18 : jamais recalculée côté interface), `null` tant qu'elle
+   * n'est pas chargée ou si le chargement a échoué. Comparée à
+   * {@link DonneesFicheProjet.empreinteReferentielPriseEnCharge} pour {@link suggestionEmpreintePerimee}.
+   */
+  private readonly empreinteReferentielCourante: WritableSignal<string | null> = signal(null);
+
+  /**
+   * `true` si les règles de membres connus `interne` du groupe ont changé depuis le dernier calcul de la date de
+   * prise en charge du projet : l'empreinte stockée diffère de l'empreinte courante (plan_18, US-058, exigence
+   * F17). Suggestion discrète, jamais bloquante.
+   */
+  public readonly suggestionEmpreintePerimee: Signal<boolean> = computed(() => {
+    const etatCourant = this.etat();
+    const empreinteCourante = this.empreinteReferentielCourante();
+    if (etatCourant.type !== 'trouve' || empreinteCourante === null) {
+      return false;
+    }
+    const empreinteStockee = etatCourant.donnees.empreinteReferentielPriseEnCharge;
+    return empreinteStockee !== undefined && empreinteStockee !== empreinteCourante;
+  });
+
+  /**
+   * Indique qu'un recalcul unitaire de la date de prise en charge est en cours (bouton « recalculer »), pour
+   * désactiver le bouton et afficher un indicateur. Signal (et non propriété) : mis à jour depuis une continuation
+   * asynchrone, hors planification automatique de détection de changement en application zoneless.
+   */
+  public readonly recalculPriseEnChargeEnCours: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Indique si la ressaisie du mot de passe (RG-002) est en cours d'affichage pour l'enregistrement d'un recalcul
+   * de date de prise en charge qui diffère de la valeur stockée (décision 6 du plan_18).
+   */
+  public readonly attenteMotDePassePriseEnCharge: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Résultat du recalcul de prise en charge en attente de confirmation du mot de passe, `null` hors de ce cas.
+   * Conservé entre la recherche (sans mot de passe) et l'écriture effective (avec mot de passe).
+   */
+  private readonly resultatPriseEnChargeEnAttente: WritableSignal<PremierCommitInterne | null> =
+    signal(null);
+
+  /**
+   * Identité du groupe du projet affiché, ou `null` si le projet n'est pas résolu : source unique de déclenchement
+   * de {@link rechargementEmpreinteReferentiel}, pour ne pas relancer l'appel à chaque mutation sans rapport de la
+   * racine (annotations, autres projets…).
+   */
+  private readonly groupeIdCourant: Signal<string | null> = computed(() => {
+    const etatCourant = this.etat();
+    return etatCourant.type === 'trouve' ? etatCourant.donnees.groupeId : null;
+  });
+
+  /**
+   * Recharge l'empreinte courante du référentiel `interne` dès que le groupe du projet affiché est résolu ou
+   * change. `untracked` autour de l'appel asynchrone : l'effet ne dépend que de l'identité du groupe.
+   */
+  private readonly rechargementEmpreinteReferentiel = effect(() => {
+    const groupeId = this.groupeIdCourant();
+    if (groupeId === null) {
+      this.empreinteReferentielCourante.set(null);
+      return;
+    }
+    untracked(() => {
+      void this.chargerEmpreinteReferentiel(groupeId);
+    });
+  });
 
   /**
    * Indique si le formulaire de création d'une annotation (US-019, portée projet) est actuellement affiché.
@@ -766,6 +851,88 @@ export class SqmFicheProjetComponent {
   }
 
   /**
+   * Charge l'empreinte courante du référentiel `interne` du groupe (`empreinteReferentielInterne`, décision 15 du
+   * plan_18). Échec silencieux (empreinte laissée à `null`, aucune suggestion affichée) : cette information n'est
+   * qu'un confort, jamais bloquante.
+   * @param groupeId - Identifiant du groupe du projet affiché.
+   */
+  private async chargerEmpreinteReferentiel(groupeId: string): Promise<void> {
+    const empreinte = await this.donneesApplication.empreinteReferentielInterne(groupeId);
+    this.empreinteReferentielCourante.set(empreinte);
+  }
+
+  /**
+   * Recalcule à la demande la date de prise en charge du projet affiché (US-058, RG-058, bouton « recalculer ») :
+   * recalcul **systématique** (le pré-filtre de campagne n'est pas appliqué ici). Si le résultat reproduit la
+   * valeur stockée (même statut, même date), aucune écriture ni ressaisie de mot de passe — notification « date de
+   * prise en charge inchangée » (décision 6 du plan_18). Sinon, ouvre la ressaisie du mot de passe avant
+   * l'écriture effective. Une anomalie de connecteur est notifiée à l'utilisateur.
+   */
+  public async recalculerPriseEnCharge(): Promise<void> {
+    const etatCourant = this.etat();
+    if (etatCourant.type !== 'trouve' || this.recalculPriseEnChargeEnCours()) {
+      return;
+    }
+    this.recalculPriseEnChargeEnCours.set(true);
+    const resultat = await this.donneesApplication.calculerPriseEnChargeProjet(
+      etatCourant.donnees.groupeId,
+      etatCourant.donnees.projetId,
+    );
+    this.recalculPriseEnChargeEnCours.set(false);
+
+    switch (resultat.type) {
+      case 'inchange':
+        this.notification.succes('La date de prise en charge est inchangée.');
+        return;
+      case 'echec':
+        this.notification.erreur(resultat.message);
+        return;
+      case 'change':
+        this.resultatPriseEnChargeEnAttente.set(resultat.premierCommitInterne);
+        this.attenteMotDePassePriseEnCharge.set(true);
+        return;
+    }
+  }
+
+  /**
+   * Enregistre le recalcul de date de prise en charge après confirmation du mot de passe (US-058, RG-002, RG-023).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerRecalculPriseEnCharge(motDePasse: string): Promise<void> {
+    const etatCourant = this.etat();
+    const resultatEnAttente = this.resultatPriseEnChargeEnAttente();
+    this.attenteMotDePassePriseEnCharge.set(false);
+    if (etatCourant.type !== 'trouve' || resultatEnAttente === null) {
+      return;
+    }
+    this.recalculPriseEnChargeEnCours.set(true);
+    const resultat = await this.donneesApplication.enregistrerPriseEnChargeProjet(
+      etatCourant.donnees.groupeId,
+      etatCourant.donnees.projetId,
+      resultatEnAttente,
+      motDePasse,
+    );
+    this.recalculPriseEnChargeEnCours.set(false);
+    this.resultatPriseEnChargeEnAttente.set(null);
+
+    if (resultat.type === 'echec') {
+      this.notification.erreur(
+        'Une erreur inattendue est survenue lors de l’enregistrement de la date de prise en charge.',
+      );
+      return;
+    }
+    this.notification.succes('La date de prise en charge a été mise à jour.');
+  }
+
+  /**
+   * Annule la ressaisie du mot de passe en cours pour l'enregistrement d'un recalcul de prise en charge.
+   */
+  public annulerRecalculPriseEnCharge(): void {
+    this.attenteMotDePassePriseEnCharge.set(false);
+    this.resultatPriseEnChargeEnAttente.set(null);
+  }
+
+  /**
    * Exporte la fiche courante (bandeau/encart d'anomalie technique inclus, même conteneur que le reste de l'écran)
    * en image PNG et déclenche son téléchargement.
    */
@@ -787,7 +954,13 @@ export class SqmFicheProjetComponent {
     const replisInitiaux = sectionsRepliables.map((section) => section.open);
     sectionsRepliables.forEach((section) => (section.open = true));
     try {
-      const dataUrl = await toPng(conteneur);
+      // Les contrôles interactifs propres à l'écran (bouton « Recalculer » de la date de prise en charge,
+      // suggestion d'empreinte périmée, ressaisie de mot de passe) portent la classe `fiche-projet__hors-capture`
+      // et sont exclus de l'image exportée (plan_18 §6.4).
+      const dataUrl = await toPng(conteneur, {
+        filter: (noeud) =>
+          !(noeud instanceof HTMLElement && noeud.classList.contains('fiche-projet__hors-capture')),
+      });
       this.declencherTelechargementPng(dataUrl, etatCourant.donnees.nomProjet);
     } finally {
       sectionsRepliables.forEach(
@@ -964,6 +1137,7 @@ export class SqmFicheProjetComponent {
       sonarKo,
       membreInconnuDetecte: membres.some((membre) => membre.inconnu),
       ageChezNousLabel: this.construireAgeChezNousLabel(projet.premierCommitInterne, maintenant),
+      empreinteReferentielPriseEnCharge: projet.premierCommitInterne?.empreinteReferentiel,
       dernierAuditLabel:
         dernierAudit === undefined ? 'jamais audité' : this.formaterDateCourte(dernierAudit.date),
       auditsHistoriques: this.construireAuditsHistoriques(projet.audits),
@@ -1131,13 +1305,30 @@ export class SqmFicheProjetComponent {
     premierCommitInterne: Projet['premierCommitInterne'],
     maintenant: Date,
   ): string {
+    // Les six libellés de statut (RG-058, plan_18) : seule la variante `determine` produit un libellé
+    // d'ancienneté, chaque autre statut un libellé explicite distinct (`aucune_regle_interne` invite à qualifier,
+    // `aucun_membre_interne` signale une recherche menée à son terme sans correspondance, etc.).
     if (premierCommitInterne === undefined) {
-      return 'non déterminé';
+      return 'non calculée';
     }
-    const jours = this.joursDepuis(premierCommitInterne.date, maintenant);
-    const annees = Math.floor(jours / 365);
-    const ancienneteLabel = annees > 0 ? `${annees} an${annees > 1 ? 's' : ''}` : `${jours} j`;
-    return `${ancienneteLabel} (depuis ${this.formaterDateCourte(premierCommitInterne.date)})`;
+    switch (premierCommitInterne.statut) {
+      case 'determine': {
+        const jours = this.joursDepuis(premierCommitInterne.date, maintenant);
+        const annees = Math.floor(jours / 365);
+        const ancienneteLabel = annees > 0 ? `${annees} an${annees > 1 ? 's' : ''}` : `${jours} j`;
+        return `${ancienneteLabel} (depuis ${this.formaterDateCourte(premierCommitInterne.date)})`;
+      }
+      case 'aucune_regle_interne':
+        return 'aucun membre interne qualifié pour ce groupe';
+      case 'aucun_membre_interne':
+        return 'aucun commit interne trouvé';
+      case 'indetermine_trop_de_commits':
+        return 'non déterminé (dépôt trop volumineux)';
+      case 'non_applicable':
+        return '— (aucune source GitLab)';
+      case 'depot_vide':
+        return '— (dépôt vide)';
+    }
   }
 
   /**
@@ -1514,9 +1705,37 @@ export class SqmFicheProjetComponent {
         resolution.type === 'inconnu'
           ? this.calculerCritereParDefautQualification(membre)
           : undefined,
+      critereMarquerParti: this.calculerCritereMarquerParti(membre, resolution, membresConnus),
       direct: membre.direct,
       groupesInvites: membre.groupesInvites,
     };
+  }
+
+  /**
+   * Calcule le critère à transmettre au lien « Marquer comme parti » (RG-061, §8.5 du plan `plan_18`), présent
+   * uniquement pour un membre `interne` résolu via un canal nominatif (`username` ou `email`) et non déjà marqué
+   * parti.
+   * @param membre - Membre du dépôt constaté.
+   * @param resolution - Résolution du statut de rattachement déjà calculée pour ce membre.
+   * @param membresConnus - Règles de membres connus du groupe de rattachement.
+   * @returns Le critère et son type, `undefined` si le lien ne doit pas être proposé.
+   */
+  private calculerCritereMarquerParti(
+    membre: MembreGitlab,
+    resolution: ResolutionStatutMembre<StatutMembre>,
+    membresConnus: Groupe['membresConnus'],
+  ): { type: TypeCritereMembre; valeur: string } | undefined {
+    if (resolution.type !== 'connu' || resolution.statut !== StatutMembre.Interne) {
+      return undefined;
+    }
+    const regleNominative = StatutMembreUtils.resoudreRegleNominative(
+      { username: membre.username, email: membre.emailPublic },
+      membresConnus,
+    );
+    if (regleNominative === undefined || regleNominative.partiLe !== undefined) {
+      return undefined;
+    }
+    return { type: regleNominative.typeCritere, valeur: regleNominative.critere };
   }
 
   /**
@@ -1664,6 +1883,28 @@ export class SqmFicheProjetComponent {
       groupeId,
       typeCritere: membre.critereParDefautQualification.type,
       critere: membre.critereParDefautQualification.valeur,
+    };
+  }
+
+  /**
+   * Construit les paramètres de requête du lien « Marquer comme parti » (RG-061, §8.5 du plan `plan_18`), qui ouvre
+   * l'écran Administration sur la règle nominative ayant résolu ce membre `interne`, avec la date de départ
+   * pré-remplie à la date du jour (laissée à ajuster par l'utilisateur avant enregistrement, cf. sous-onglet
+   * Membres connus). Sur le même patron que {@link queryParamsQualification}, dont ce lien réutilise le mécanisme.
+   * @param groupeId - Identifiant du groupe de rattachement du projet affiché.
+   * @param membre - Ligne d'affichage du membre concerné, dont {@link LigneMembre.critereMarquerParti} doit être
+   * défini (l'appelant du gabarit ne doit afficher ce lien que dans ce cas).
+   * @returns Les paramètres de requête à transmettre à `routerLink`.
+   */
+  public queryParamsMarquerParti(groupeId: string, membre: LigneMembre): Params {
+    if (membre.critereMarquerParti === undefined) {
+      return { groupeId };
+    }
+    return {
+      groupeId,
+      typeCritere: membre.critereMarquerParti.type,
+      critere: membre.critereMarquerParti.valeur,
+      partiLe: new Date().toISOString().slice(0, 10),
     };
   }
 
@@ -2048,6 +2289,7 @@ export class SqmFicheProjetComponent {
         critere: entree.critere,
         typeCritere: this.convertirTypeCritereSaisieMasse(entree.typeCritere),
         statut: this.convertirStatutSaisieMasse(entree.statut),
+        partiLe: entree.partiLe,
       }));
       // Un seul appel batch pour l'ensemble des lignes (US-044, RG-041) : une seule sauvegarde effective du
       // fichier, contre une par ligne saisie jusqu'ici. `donneesApplication.qualifierMembres` ne propage jamais

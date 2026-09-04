@@ -41,7 +41,9 @@ import { FacadeConfigurationPartageableService } from '../../sansetat/commandes/
 import { FacadeFichierService } from '../../sansetat/commandes/facade-fichier.service';
 import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
 import { FacadeVuesService } from '../../sansetat/commandes/facade-vues.service';
-import type { Instance } from '../../sansetat/commandes/types-facade';
+import { ErreurConnecteurUtils } from '../../sansetat/commandes/erreur-connecteur.utils';
+import type { CategorieErreurConnecteur, Instance } from '../../sansetat/commandes/types-facade';
+import { PriseEnChargeUtils } from '../../sansetat/jugement/prise-en-charge.utils';
 import { TriAlphabetiqueUtils } from '../../sansetat/jugement/tri-alphabetique.utils';
 import { EtatSessionService } from './etat-session.service';
 import { ContexteConsultationService } from './contexte-consultation.service';
@@ -55,6 +57,7 @@ import type {
   ModePurgeAge,
   DifferentielImportConfiguration,
   MetriquesVolumetrie,
+  PremierCommitInterne,
   PrevisualisationPurge,
   PrevisualisationPurgeJournal,
   Projet,
@@ -62,6 +65,7 @@ import type {
   ReponseQualificationMembre,
   ReponseQualificationMembres,
   ResultatBrouillonProjet,
+  ResultatCalculPriseEnCharge,
   ResultatDefinitionReferentielsMasse,
   ResultatDeverrouillage,
   ResultatMetriquesVolumetrie,
@@ -150,6 +154,11 @@ export interface DonneesMembreConnu {
   readonly libelle?: string;
   /** Alias courriel optionnel. */
   readonly aliasEmail?: string;
+  /**
+   * Date de départ optionnelle (`AAAA-MM-JJ`, RG-061) : sans effet sur la datation de la prise en charge ;
+   * interdite sur un critère `domaineEmail`, revalidée côté cœur natif.
+   */
+  readonly partiLe?: string;
 }
 
 /**
@@ -690,6 +699,7 @@ export class DonneesApplicationService {
         statut: donnees.statut,
         libelle: donnees.libelle,
         aliasEmail: donnees.aliasEmail,
+        partiLe: donnees.partiLe,
         origine,
         motDePasse,
       });
@@ -737,6 +747,7 @@ export class DonneesApplicationService {
           statut: entree.statut,
           libelle: entree.libelle,
           aliasEmail: entree.aliasEmail,
+          partiLe: entree.partiLe,
         })),
         origine,
         motDePasse,
@@ -786,6 +797,169 @@ export class DonneesApplicationService {
     } catch (erreur: unknown) {
       return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
     }
+  }
+
+  /**
+   * Calcule à la demande la date de prise en charge d'un projet (premier commit interne, US-058, RG-058) : invoque
+   * la commande native `calculerPriseEnChargeProjet` (recherche du premier commit interne sur les sources GitLab,
+   * **aucune écriture, aucun mot de passe**), puis compare le résultat à la valeur stockée sur le projet. Ne
+   * persiste jamais : en cas de changement, c'est l'appelant qui redemande le mot de passe puis appelle
+   * {@link enregistrerPriseEnChargeProjet} (décision 6 du plan_18 : un recalcul qui reproduit la valeur stockée
+   * n'entraîne ni ressaisie de mot de passe, ni sauvegarde, ni entrée de journal).
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param projetId - Identifiant du projet dont on (re)calcule la date de prise en charge.
+   * @returns `inchange`, `change` (avec le nouveau résultat) ou `echec` (avec un message lisible).
+   * @throws {Error} Si aucun fichier n'est chargé (erreur de programmation de l'écran appelant).
+   */
+  public async calculerPriseEnChargeProjet(
+    groupeId: string,
+    projetId: string,
+  ): Promise<ResultatCalculPriseEnCharge> {
+    const racine = this.racineActuelle();
+    try {
+      const resultat = await this.facadeAdministration.calculerPriseEnChargeProjet<
+        DonneesRacine,
+        PremierCommitInterne
+      >({ projetId, donnees: racine });
+      const existant = this.trouverProjet(groupeId, projetId).premierCommitInterne;
+      if (existant !== undefined && PriseEnChargeUtils.identique(existant, resultat)) {
+        return { type: 'inchange' };
+      }
+      return { type: 'change', premierCommitInterne: resultat };
+    } catch (erreur: unknown) {
+      return { type: 'echec', message: this.messageErreurConnecteur(erreur) };
+    }
+  }
+
+  /**
+   * Retourne l'empreinte courante (`sha256:…`) du sous-ensemble `interne` des membres connus d'un groupe (US-058,
+   * RG-058, décision 15 du plan_18 : condensé produit uniquement par le cœur natif). Consultation pure, sans mot de
+   * passe. `null` en cas d'échec : cette information alimente une suggestion discrète et non bloquante côté écran.
+   * @param groupeId - Identifiant du groupe.
+   * @returns L'empreinte, ou `null` si le calcul échoue.
+   */
+  public async empreinteReferentielInterne(groupeId: string): Promise<string | null> {
+    const racine = this.racineActuelle();
+    try {
+      return await this.facadeAdministration.empreinteReferentielInterne<DonneesRacine>({
+        groupeId,
+        donnees: racine,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Persiste le résultat d'un recalcul de date de prise en charge (US-058, RG-058) qui **diffère** de la valeur
+   * stockée : applique le nouveau `premierCommitInterne` au projet, consigne une entrée au journal des
+   * modifications (RG-023, décision 7 du plan_18 : une entrée par projet effectivement modifié), horodate la
+   * racine et sauvegarde effectivement le fichier (RG-002, RG-003) via la commande native `sauvegarderFichier`. La
+   * racine en mémoire n'est substituée qu'après une écriture disque réussie (un mot de passe erroné ne mute pas
+   * l'état).
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param projetId - Identifiant du projet concerné.
+   * @param premierCommitInterne - Résultat du recalcul à appliquer (issu de {@link calculerPriseEnChargeProjet}).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async enregistrerPriseEnChargeProjet(
+    groupeId: string,
+    projetId: string,
+    premierCommitInterne: PremierCommitInterne,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    const projet = this.trouverProjet(groupeId, projetId);
+    const entreeJournal: EntreeJournal = {
+      id: this.genererId(),
+      horodatage: new Date().toISOString(),
+      objet: `groupes/${groupeId}/projets/${projetId}/premierCommitInterne`,
+      avant: this.descripteurPriseEnCharge(projet.premierCommitInterne),
+      apres: this.descripteurPriseEnCharge(premierCommitInterne),
+      origine: ORIGINE_ADMINISTRATION,
+    };
+    const nouvelleRacine: DonneesRacine = {
+      ...racine,
+      meta: { ...racine.meta, modifieLe: new Date().toISOString() },
+      groupes: racine.groupes.map((groupe) =>
+        groupe.id === groupeId
+          ? {
+              ...groupe,
+              projets: groupe.projets.map((candidat) =>
+                candidat.id === projetId ? { ...candidat, premierCommitInterne } : candidat,
+              ),
+            }
+          : groupe,
+      ),
+      journal: [...racine.journal, entreeJournal],
+    };
+    try {
+      await this.facadeFichier.sauvegarderFichier(chemin, nouvelleRacine, motDePasse);
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Descripteur compact et lisible d'un résultat de prise en charge, consigné au journal des modifications
+   * (RG-023) : `AAAA-MM-JJ (determine)` pour un premier commit interne daté, `— (statut)` sinon, `—` si aucun
+   * calcul n'existait.
+   * @param premierCommitInterne - Résultat de prise en charge, ou `undefined` si jamais calculé.
+   * @returns Le descripteur.
+   */
+  private descripteurPriseEnCharge(premierCommitInterne: PremierCommitInterne | undefined): string {
+    if (premierCommitInterne === undefined) {
+      return '—';
+    }
+    if (premierCommitInterne.statut === 'determine') {
+      return `${premierCommitInterne.date} (determine)`;
+    }
+    return `— (${premierCommitInterne.statut})`;
+  }
+
+  /**
+   * Résout une anomalie levée par une commande de connecteur GitLab vers un message lisible, sans assertion `as`
+   * non justifiée : libellé de catégorie connu (`ErreurConnecteurUtils.libelleCategorie`) si `erreur` porte un
+   * `type` reconnu, message générique sinon.
+   * @param erreur - Valeur interceptée (`ErreurConnecteur` côté frontière IPC, non garantie à la compilation).
+   * @returns Un message lisible.
+   */
+  private messageErreurConnecteur(erreur: unknown): string {
+    const categorie = this.resoudreCategorieConnecteur(erreur);
+    if (categorie !== undefined) {
+      return ErreurConnecteurUtils.libelleCategorie(categorie);
+    }
+    return 'Le calcul de la date de prise en charge a échoué.';
+  }
+
+  /**
+   * Résout une valeur `unknown` vers une catégorie connue de `CategorieErreurConnecteur`, sur le modèle de
+   * {@link anomalieAdministration}.
+   * @param erreur - Valeur à résoudre.
+   * @returns La catégorie connue, ou `undefined`.
+   */
+  private resoudreCategorieConnecteur(erreur: unknown): CategorieErreurConnecteur | undefined {
+    if (typeof erreur !== 'object' || erreur === null || !('type' in erreur)) {
+      return undefined;
+    }
+    const type: unknown = erreur.type;
+    const categories: readonly CategorieErreurConnecteur[] = [
+      'authentificationRefusee',
+      'refIntrouvable',
+      'instanceInjoignable',
+      'delaiDepasse',
+      'reponseInattendue',
+      'droitsInsuffisants',
+      'credentialAbsent',
+      'instanceIntrouvable',
+      'depotVide',
+    ];
+    return categories.find((candidate) => candidate === type);
   }
 
   /**
@@ -1728,6 +1902,7 @@ export class DonneesApplicationService {
       'membreIntrouvable',
       'doublonUsernameMembreConnu',
       'conflitReglesMembreConnu',
+      'dateDepartInvalide',
       'brouillonDejaExistant',
       'aucunBrouillonCourant',
       'projetAbsentDuBrouillon',

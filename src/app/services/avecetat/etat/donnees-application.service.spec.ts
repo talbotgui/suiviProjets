@@ -16,6 +16,7 @@ import { HistoriqueNavigationService } from './historique-navigation.service';
 import { StatutMembre, TypeCritereMembre, TypeSource } from './types-donnees';
 import type {
   DonneesRacine,
+  PremierCommitInterne,
   ReponseQualificationMembre,
   ResultatBrouillonProjet,
   Verdict,
@@ -1411,6 +1412,162 @@ describe('DonneesApplicationService', () => {
         });
         expect(etatSession.echecsDeverrouillage()).toBe(0);
       });
+    });
+  });
+
+  describe('prise en charge d’un projet (US-058, RG-058)', () => {
+    const DETERMINE_STOCKE: PremierCommitInterne = {
+      statut: 'determine',
+      date: '2021-03-15',
+      sha: 'abc',
+      emailAuteur: 'a@corp.fr',
+      calculeLe: '2026-01-01',
+      empreinteReferentiel: 'sha256:aaa',
+    };
+    const DETERMINE_AUTRE_DATE: PremierCommitInterne = {
+      statut: 'determine',
+      date: '2019-02-01',
+      sha: 'def',
+      emailAuteur: 'b@corp.fr',
+      calculeLe: '2026-09-03',
+      empreinteReferentiel: 'sha256:bbb',
+    };
+
+    let groupeId: string;
+    let projetId: string;
+
+    /**
+     * Charge une racine avec un groupe et un projet, ce dernier portant éventuellement un `premierCommitInterne`.
+     * @param premierCommitInterne - Valeur à placer sur le projet, ou `undefined` pour un projet jamais calculé.
+     */
+    function preparerProjet(premierCommitInterne?: PremierCommitInterne): void {
+      service.chargerRacine(DonneesDeTest.racineVide());
+      groupeId = service.creerGroupe(DONNEES_GROUPE);
+      projetId = service.creerProjet(groupeId, DONNEES_PROJET);
+      if (premierCommitInterne !== undefined) {
+        const racine = DonneesDeTest.racineActuelle(service);
+        service.chargerRacine({
+          ...racine,
+          groupes: racine.groupes.map((groupe) =>
+            groupe.id === groupeId
+              ? {
+                  ...groupe,
+                  projets: groupe.projets.map((projet) =>
+                    projet.id === projetId ? { ...projet, premierCommitInterne } : projet,
+                  ),
+                }
+              : groupe,
+          ),
+        });
+      }
+    }
+
+    beforeEach(() => {
+      TestBed.inject(EtatSessionService).ouvrirFichier('/tmp/donnees-test.sqm');
+    });
+
+    it('renvoie « inchange » quand le recalcul reproduit le statut et la date stockés (décision 6)', async () => {
+      preparerProjet(DETERMINE_STOCKE);
+      invokeSimule.mockResolvedValue({
+        ...DETERMINE_STOCKE,
+        sha: 'zzz',
+        emailAuteur: 'autre@corp.fr',
+        calculeLe: '2026-09-03',
+        empreinteReferentiel: 'sha256:bbb',
+      });
+
+      const resultat = await service.calculerPriseEnChargeProjet(groupeId, projetId);
+
+      expect(resultat).toEqual({ type: 'inchange' });
+      expect(invokeSimule).toHaveBeenCalledWith('calculer_prise_en_charge_projet', {
+        projetId,
+        donnees: service.racine(),
+      });
+    });
+
+    it('renvoie « change » avec le nouveau résultat quand la date diffère', async () => {
+      preparerProjet(DETERMINE_STOCKE);
+      invokeSimule.mockResolvedValue(DETERMINE_AUTRE_DATE);
+
+      const resultat = await service.calculerPriseEnChargeProjet(groupeId, projetId);
+
+      expect(resultat).toEqual({ type: 'change', premierCommitInterne: DETERMINE_AUTRE_DATE });
+    });
+
+    it('renvoie « change » quand aucune valeur n’était stockée', async () => {
+      preparerProjet(undefined);
+      invokeSimule.mockResolvedValue({
+        statut: 'aucun_membre_interne',
+        calculeLe: '2026-09-03',
+        empreinteReferentiel: 'sha256:bbb',
+      });
+
+      const resultat = await service.calculerPriseEnChargeProjet(groupeId, projetId);
+
+      expect(resultat.type).toBe('change');
+    });
+
+    it('convertit une anomalie de connecteur en « echec » avec un message lisible', async () => {
+      preparerProjet(DETERMINE_STOCKE);
+      invokeSimule.mockRejectedValue({ type: 'authentificationRefusee', message: '401' });
+
+      const resultat = await service.calculerPriseEnChargeProjet(groupeId, projetId);
+
+      expect(resultat.type).toBe('echec');
+      if (resultat.type === 'echec') {
+        expect(resultat.message.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('enregistrerPriseEnChargeProjet applique le résultat, ajoute une entrée de journal et sauvegarde', async () => {
+      preparerProjet(DETERMINE_STOCKE);
+      invokeSimule.mockResolvedValue(undefined);
+
+      const resultat = await service.enregistrerPriseEnChargeProjet(
+        groupeId,
+        projetId,
+        DETERMINE_AUTRE_DATE,
+        'mot-de-passe',
+      );
+
+      expect(resultat).toEqual({ type: 'succes' });
+      const racine = DonneesDeTest.racineActuelle(service);
+      expect(racine.groupes[0].projets[0].premierCommitInterne).toEqual(DETERMINE_AUTRE_DATE);
+      expect(racine.journal).toHaveLength(1);
+      expect(racine.journal[0].objet).toBe(
+        `groupes/${groupeId}/projets/${projetId}/premierCommitInterne`,
+      );
+      expect(racine.journal[0].avant).toBe('2021-03-15 (determine)');
+      expect(racine.journal[0].apres).toBe('2019-02-01 (determine)');
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'sauvegarder_fichier',
+        expect.objectContaining({ chemin: '/tmp/donnees-test.sqm', motDePasse: 'mot-de-passe' }),
+      );
+    });
+
+    it('enregistrerPriseEnChargeProjet ne mute pas la racine si la sauvegarde échoue', async () => {
+      preparerProjet(DETERMINE_STOCKE);
+      const racineAvant = service.racine();
+      invokeSimule.mockRejectedValue({ type: 'motDePasseSessionDivergent' });
+
+      const resultat = await service.enregistrerPriseEnChargeProjet(
+        groupeId,
+        projetId,
+        DETERMINE_AUTRE_DATE,
+        'mauvais',
+      );
+
+      expect(resultat.type).toBe('echec');
+      expect(service.racine()).toBe(racineAvant);
+    });
+
+    it('empreinteReferentielInterne renvoie le condensé natif, ou null en cas d’échec', async () => {
+      preparerProjet(DETERMINE_STOCKE);
+      invokeSimule.mockResolvedValue('sha256:courante');
+      expect(await service.empreinteReferentielInterne(groupeId)).toBe('sha256:courante');
+
+      invokeSimule.mockRejectedValue({ type: 'groupeIntrouvable' });
+      expect(await service.empreinteReferentielInterne(groupeId)).toBeNull();
     });
   });
 });
