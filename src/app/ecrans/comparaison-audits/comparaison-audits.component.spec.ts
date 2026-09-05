@@ -17,6 +17,7 @@ import type {
   Audit,
   DonneesRacine,
   Groupe,
+  PremierCommitInterne,
   Projet,
 } from '../../services/avecetat/etat/types-donnees';
 import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
@@ -176,6 +177,8 @@ class DonneesDeTest {
    * @param audits - Historique des audits du projet.
    * @param annotations - Annotations du projet, vide par défaut.
    * @param iaAutorisee - Politique d'autorisation de l'IA du projet, `false` (interdite) par défaut.
+   * @param premierCommitInterne - Date de prise en charge du projet (US-058, US-059, plan_18 incrément 7), absente
+   * par défaut.
    * @returns Le projet de test.
    */
   public static projet(
@@ -183,6 +186,7 @@ class DonneesDeTest {
     audits: readonly Audit[],
     annotations: Projet['annotations'] = [],
     iaAutorisee = false,
+    premierCommitInterne?: Projet['premierCommitInterne'],
   ): Projet {
     return {
       id,
@@ -200,6 +204,7 @@ class DonneesDeTest {
       ],
       annotations,
       audits,
+      premierCommitInterne,
     };
   }
 
@@ -382,6 +387,323 @@ describe('SqmComparaisonAuditsComponent', () => {
       expect(optionReguliere?.textContent).not.toContain('(historique)');
     },
   );
+
+  describe('repère « prise en charge » (US-058, US-059, RG-058, RG-059, plan_18 incrément 7)', () => {
+    const PREMIER_COMMIT_INTERNE: PremierCommitInterne = {
+      statut: 'determine',
+      date: '2020-01-15',
+      sha: 'abc123',
+      emailAuteur: 'interne@exemple.test',
+      calculeLe: '2026-07-24',
+      empreinteReferentiel: 'sha256:empreinte-test',
+    };
+
+    /** Audit historique dont la date correspond exactement à {@link PREMIER_COMMIT_INTERNE}. */
+    const AUDIT_PRISE_EN_CHARGE: Audit = {
+      id: 'audit-prise-en-charge',
+      date: PREMIER_COMMIT_INTERNE.date,
+      campagneId: 'campagne-historique',
+      typeAudit: 'historique',
+      dateExecution: DonneesDeTest.ilYA(-1),
+      resultats: [],
+    };
+
+    it("n'affiche pas le bouton du raccourci quand premierCommitInterne est absent (rien à proposer)", () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        DonneesDeTest.auditMinimal('a0', -30, 10),
+        DonneesDeTest.auditMinimal('a1', -1, 20),
+      ]);
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(
+        element.querySelector('#comparaison-audits-bouton-raccourci-prise-en-charge'),
+      ).toBeNull();
+    });
+
+    it("n'affiche pas le bouton du raccourci quand premierCommitInterne n'est pas determine", () => {
+      const projet = DonneesDeTest.projet(
+        'projet-1',
+        [DonneesDeTest.auditMinimal('a0', -30, 10), DonneesDeTest.auditMinimal('a1', -1, 20)],
+        [],
+        false,
+        {
+          statut: 'aucun_membre_interne',
+          calculeLe: '2026-07-24',
+          empreinteReferentiel: 'sha256:x',
+        },
+      );
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(
+        element.querySelector('#comparaison-audits-bouton-raccourci-prise-en-charge'),
+      ).toBeNull();
+    });
+
+    it(
+      'suffixe « (prise en charge) », cumulable avec « (historique) », l’audit dont la date correspond ' +
+        'exactement à premierCommitInterne.date',
+      () => {
+        const projet = DonneesDeTest.projet(
+          'projet-1',
+          [AUDIT_PRISE_EN_CHARGE, DonneesDeTest.auditMinimal('a1', -1, 20)],
+          [],
+          false,
+          PREMIER_COMMIT_INTERNE,
+        );
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        const optionsAvant = Array.from(
+          element.querySelectorAll<HTMLOptionElement>('#comparaison-audits-avant option'),
+        );
+        const optionPriseEnCharge = optionsAvant.find(
+          (option) => option.value === 'audit-prise-en-charge',
+        );
+        const optionAutre = optionsAvant.find((option) => option.value === 'a1');
+        expect(optionPriseEnCharge?.textContent).toContain('(historique, prise en charge)');
+        expect(optionAutre?.textContent).not.toContain('prise en charge');
+      },
+    );
+
+    it('désactive le bouton du raccourci et affiche une invite quand aucun audit ne correspond exactement à la date', () => {
+      const projet = DonneesDeTest.projet(
+        'projet-1',
+        [DonneesDeTest.auditMinimal('a0', -30, 10), DonneesDeTest.auditMinimal('a1', -1, 20)],
+        [],
+        false,
+        PREMIER_COMMIT_INTERNE,
+      );
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      const bouton = element.querySelector<HTMLButtonElement>(
+        '#comparaison-audits-bouton-raccourci-prise-en-charge',
+      );
+      expect(bouton?.disabled).toBe(true);
+      expect(element.textContent).toContain('Aucun audit à la date de prise en charge');
+      expect(element.querySelector('a[href="/audits/constitution-campagne"]')).not.toBeNull();
+    });
+
+    it('active le bouton du raccourci et sélectionne l’audit correspondant contre le dernier audit régulier', () => {
+      const projet = DonneesDeTest.projet(
+        'projet-1',
+        [
+          AUDIT_PRISE_EN_CHARGE,
+          DonneesDeTest.auditMinimal('a1', -30, 20),
+          DonneesDeTest.auditMinimal('a2', -1, 30),
+        ],
+        [],
+        false,
+        PREMIER_COMMIT_INTERNE,
+      );
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+      fixture.componentInstance.appliquerRaccourci('priseEnCharge');
+      fixture.detectChanges();
+
+      const etat = fixture.componentInstance.etat();
+      if (etat.type !== 'pret') {
+        throw new Error('État "pret" attendu.');
+      }
+      expect(etat.donnees.idAvant).toBe('audit-prise-en-charge');
+      expect(etat.donnees.idApres).toBe('a2');
+    });
+
+    it(
+      'affiche l’avertissement « audit historique partiel » quand la borne gauche est l’audit historique de la ' +
+        'prise en charge sélectionné via le raccourci dédié (texte normatif RG-059)',
+      () => {
+        const projet = DonneesDeTest.projet(
+          'projet-1',
+          [AUDIT_PRISE_EN_CHARGE, DonneesDeTest.auditMinimal('a1', -1, 20)],
+          [],
+          false,
+          PREMIER_COMMIT_INTERNE,
+        );
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+        fixture.componentInstance.appliquerRaccourci('priseEnCharge');
+        fixture.detectChanges();
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        expect(element.textContent).toContain('Audit historique partiel');
+      },
+    );
+
+    it("n'affiche pas l'avertissement « audit historique partiel » quand la borne gauche n'est pas l'audit de la prise en charge", () => {
+      const projet = DonneesDeTest.projet(
+        'projet-1',
+        [
+          AUDIT_PRISE_EN_CHARGE,
+          DonneesDeTest.auditMinimal('a1', -30, 20),
+          DonneesDeTest.auditMinimal('a2', -1, 30),
+        ],
+        [],
+        false,
+        PREMIER_COMMIT_INTERNE,
+      );
+      const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+      // Sélection manuelle : borne gauche = a1 (régulier), jamais AUDIT_PRISE_EN_CHARGE.
+      fixture.componentInstance.definirIdAvant('a1');
+      fixture.detectChanges();
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+
+      expect(element.textContent).not.toContain('Audit historique partiel');
+    });
+
+    it(
+      "n'affiche pas l'avertissement quand la borne gauche coïncide avec l'audit de prise en charge par simple " +
+        'sélection manuelle (jamais via le raccourci) — RG-059 : « sélectionné via ce raccourci », pas une simple ' +
+        'coïncidence de date',
+      () => {
+        const projet = DonneesDeTest.projet(
+          'projet-1',
+          [AUDIT_PRISE_EN_CHARGE, DonneesDeTest.auditMinimal('a1', -1, 20)],
+          [],
+          false,
+          PREMIER_COMMIT_INTERNE,
+        );
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+        // Sélection manuelle explicite de l'audit de prise en charge comme borne gauche, sans passer par le
+        // raccourci « Depuis la prise en charge ».
+        fixture.componentInstance.definirIdAvant('audit-prise-en-charge');
+        fixture.componentInstance.definirIdApres('a1');
+        fixture.detectChanges();
+        const etat = fixture.componentInstance.etat();
+        if (etat.type !== 'pret') {
+          throw new Error('État "pret" attendu.');
+        }
+        expect(etat.donnees.idAvant).toBe('audit-prise-en-charge');
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        expect(element.textContent).not.toContain('Audit historique partiel');
+      },
+    );
+
+    it(
+      'retire l’avertissement « audit historique partiel » dès qu’une nouvelle sélection manuelle est faite après ' +
+        'le raccourci',
+      () => {
+        const projet = DonneesDeTest.projet(
+          'projet-1',
+          [
+            AUDIT_PRISE_EN_CHARGE,
+            DonneesDeTest.auditMinimal('a1', -30, 20),
+            DonneesDeTest.auditMinimal('a2', -1, 30),
+          ],
+          [],
+          false,
+          PREMIER_COMMIT_INTERNE,
+        );
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+
+        fixture.componentInstance.appliquerRaccourci('priseEnCharge');
+        fixture.componentInstance.definirIdApres('a1');
+        fixture.detectChanges();
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        expect(element.textContent).not.toContain('Audit historique partiel');
+      },
+    );
+
+    it(
+      'ne conserve pas l’avertissement après une navigation vers un autre projet réutilisant la même instance ' +
+        'de composant (corrigé en relecture : viaRaccourciPriseEnCharge ne se réinitialisait pas sur projetId)',
+      () => {
+        const projetA = DonneesDeTest.projet(
+          'projet-1',
+          [AUDIT_PRISE_EN_CHARGE, DonneesDeTest.auditMinimal('a1', -1, 20)],
+          [],
+          false,
+          PREMIER_COMMIT_INTERNE,
+        );
+        // projet-2 n'a, par défaut, aucun lien avec la prise en charge de projet-1 : son audit le plus ancien est
+        // historique (sélection par défaut), sans jamais passer par le raccourci « Depuis la prise en charge ».
+        const auditHistoriqueAutre: Audit = {
+          id: 'audit-historique-autre',
+          date: '2019-06-01',
+          campagneId: 'campagne-autre',
+          typeAudit: 'historique',
+          dateExecution: DonneesDeTest.ilYA(-5),
+          resultats: [],
+        };
+        const projetB = DonneesDeTest.projet('projet-2', [
+          auditHistoriqueAutre,
+          DonneesDeTest.auditMinimal('b1', -1, 40),
+        ]);
+        const racine = DonneesDeTest.racine(projetA);
+        const racineDeuxProjets: DonneesRacine = {
+          ...racine,
+          groupes: [{ ...racine.groupes[0], projets: [projetA, projetB] }],
+        };
+        const fixture = creerFixture('projet-1', racineDeuxProjets);
+
+        fixture.componentInstance.appliquerRaccourci('priseEnCharge');
+        fixture.detectChanges();
+        expect(DomTestUtils.obtenirElementNatif(fixture).textContent).toContain(
+          'Audit historique partiel',
+        );
+
+        fixture.componentRef.setInput('projetId', 'projet-2');
+        fixture.detectChanges();
+        const etat = fixture.componentInstance.etat();
+        if (etat.type !== 'pret') {
+          throw new Error('État "pret" attendu.');
+        }
+        expect(etat.donnees.idAvant).toBe('audit-historique-autre');
+        expect(DomTestUtils.obtenirElementNatif(fixture).textContent).not.toContain(
+          'Audit historique partiel',
+        );
+      },
+    );
+
+    it(
+      'désactive le bouton du raccourci avec une invite dédiée quand un audit correspond mais qu’aucun audit ' +
+        'régulier n’est disponible (corrigé en relecture)',
+      () => {
+        const auditPriseEnChargeSeul: Audit = {
+          ...AUDIT_PRISE_EN_CHARGE,
+        };
+        const autreAuditHistorique: Audit = {
+          id: 'audit-historique-autre',
+          date: '2021-03-01',
+          campagneId: 'campagne-autre',
+          typeAudit: 'historique',
+          dateExecution: DonneesDeTest.ilYA(-2),
+          resultats: [],
+        };
+        const projet = DonneesDeTest.projet(
+          'projet-1',
+          [auditPriseEnChargeSeul, autreAuditHistorique],
+          [],
+          false,
+          PREMIER_COMMIT_INTERNE,
+        );
+        const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        const bouton = element.querySelector<HTMLButtonElement>(
+          '#comparaison-audits-bouton-raccourci-prise-en-charge',
+        );
+        expect(bouton?.disabled).toBe(true);
+        expect(element.textContent).toContain('ne compte plus aucun audit régulier');
+
+        fixture.componentInstance.appliquerRaccourci('priseEnCharge');
+        fixture.detectChanges();
+        const etat = fixture.componentInstance.etat();
+        if (etat.type !== 'pret') {
+          throw new Error('État "pret" attendu.');
+        }
+        // Le clic (même simulé directement) ne doit produire aucun effet : la sélection par défaut est inchangée.
+        expect(etat.donnees.idAvant).toBe('audit-prise-en-charge');
+        expect(etat.donnees.idApres).toBe('audit-historique-autre');
+      },
+    );
+  });
 
   describe('sélection par défaut et raccourcis', () => {
     /**
@@ -645,7 +967,9 @@ describe('SqmComparaisonAuditsComponent', () => {
       expect(npm?.querySelector('summary')?.textContent).toContain('1 Ajout');
       expect(npm?.querySelector('summary')?.textContent).toContain('1 Retrait');
       expect(
-        Array.from(sections).some((s) => s.querySelector('summary')?.textContent?.includes('Autres')),
+        Array.from(sections).some((s) =>
+          s.querySelector('summary')?.textContent?.includes('Autres'),
+        ),
       ).toBe(false);
     });
 
@@ -671,9 +995,7 @@ describe('SqmComparaisonAuditsComponent', () => {
       expect(element.textContent).toContain(
         'Aucune évolution des dépendances entre les deux audits comparés.',
       );
-      expect(
-        element.querySelectorAll('.comparaison-audits__section-dependances'),
-      ).toHaveLength(0);
+      expect(element.querySelectorAll('.comparaison-audits__section-dependances')).toHaveLength(0);
     });
 
     it('exporterPng déplie les sections de dépendances le temps de la capture puis restaure leur état (US-056)', async () => {

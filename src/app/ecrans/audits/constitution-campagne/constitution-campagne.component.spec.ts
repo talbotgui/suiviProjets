@@ -306,7 +306,12 @@ describe('SqmConstitutionCampagneComponent', () => {
 
       composant.confirmerLancement('mot-de-passe');
 
-      expect(lancerCampagneSimule).toHaveBeenCalledWith([projetId], 'mot-de-passe', '2026-05-01');
+      expect(lancerCampagneSimule).toHaveBeenCalledWith(
+        [projetId],
+        'mot-de-passe',
+        '2026-05-01',
+        false,
+      );
     });
 
     it('ne doit transmettre aucune date ciblée à OrchestrateurCampagneService.lancerCampagne quand le champ est vide (comportement inchangé)', () => {
@@ -318,7 +323,44 @@ describe('SqmConstitutionCampagneComponent', () => {
 
       composant.confirmerLancement('mot-de-passe');
 
-      expect(lancerCampagneSimule).toHaveBeenCalledWith([projetId], 'mot-de-passe', undefined);
+      expect(lancerCampagneSimule).toHaveBeenCalledWith(
+        [projetId],
+        'mot-de-passe',
+        undefined,
+        false,
+      );
+    });
+  });
+
+  describe('option « Calculer la date de prise en charge » (US-058, RG-058, plan_18 incrément 6)', () => {
+    it('doit être décochée par défaut', () => {
+      expect(composant.calculerPriseEnCharge()).toBe(false);
+    });
+
+    it('doit basculer via definirCalculerPriseEnCharge', () => {
+      composant.definirCalculerPriseEnCharge(true);
+      expect(composant.calculerPriseEnCharge()).toBe(true);
+
+      composant.definirCalculerPriseEnCharge(false);
+      expect(composant.calculerPriseEnCharge()).toBe(false);
+    });
+
+    it('doit propager la case cochée à OrchestrateurCampagneService.lancerCampagne', () => {
+      const orchestrateurCampagne = TestBed.inject(OrchestrateurCampagneService);
+      const lancerCampagneSimule = jest
+        .spyOn(orchestrateurCampagne, 'lancerCampagne')
+        .mockResolvedValue({ type: 'succes' });
+      composant.basculerProjet(projetId);
+      composant.definirCalculerPriseEnCharge(true);
+
+      composant.confirmerLancement('mot-de-passe');
+
+      expect(lancerCampagneSimule).toHaveBeenCalledWith(
+        [projetId],
+        'mot-de-passe',
+        undefined,
+        true,
+      );
     });
   });
 });

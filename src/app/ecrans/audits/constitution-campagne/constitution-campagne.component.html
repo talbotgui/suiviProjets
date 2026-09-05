@@ -95,6 +95,26 @@
       }
     </section>
 
+    <section class="constitution-campagne__options carte interieur-4 exterieur-y-4">
+      <h3 class="texte-sm poids-gras exterieur-bas-2 exterieur-haut-0">Options</h3>
+      <label class="d-flex aligne-centre ecart-2 texte-sm">
+        <input
+          id="constitution-campagne-case-prise-en-charge"
+          type="checkbox"
+          [ngModel]="calculerPriseEnCharge()"
+          (ngModelChange)="definirCalculerPriseEnCharge($event)"
+          aria-describedby="constitution-campagne-prise-en-charge-aide"
+        />
+        Calculer la date de prise en charge des projets sélectionnés
+      </label>
+      <span id="constitution-campagne-prise-en-charge-aide" class="champ__aide">
+        Recherche le premier commit d'un membre interne sur les dépôts GitLab. Cette option n'est
+        utile que si les membres connus du groupe sont, en grande partie, qualifiés par courriel
+        exact, alias courriel ou domaine (une règle interne de type identifiant sans alias courriel
+        reste invisible pour ce calcul). Sans effet sur les projets dont la date est déjà à jour.
+      </span>
+    </section>
+
     <section class="constitution-campagne__date-ciblee carte interieur-4 exterieur-y-4">
       <h3 class="texte-sm poids-gras exterieur-bas-2 exterieur-haut-0">Date d'analyse</h3>
       <div class="champ">

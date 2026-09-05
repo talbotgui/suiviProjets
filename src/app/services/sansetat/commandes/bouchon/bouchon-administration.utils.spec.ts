@@ -476,6 +476,46 @@ describe('BouchonAdministrationUtils', () => {
         }),
       ).rejects.toMatchObject({ type: 'brouillonDejaExistant' });
     });
+
+    it('doit reporter prisesEnCharge sur le brouillon quand elle contient au moins une entrée (US-058, RG-058, plan_18)', async () => {
+      const premierCommitInterne = { statut: 'determine', date: '2020-01-15' };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'enregistrer_brouillon',
+        {
+          donnees: RACINE_VIDE,
+          campagneId: 'campagne-1',
+          date: '2026-07-28',
+          perimetre: ['projet-1'],
+          verdicts: [{ projetId: 'projet-1', statut: 'succes' }],
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'brouillon' },
+          ],
+          prisesEnCharge: { 'projet-1': premierCommitInterne },
+        },
+      );
+
+      expect(donnees.brouillon?.['prisesEnCharge']).toEqual({ 'projet-1': premierCommitInterne });
+    });
+
+    it('ne doit pas créer de clé prisesEnCharge sur le brouillon quand elle est absente ou vide', async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'enregistrer_brouillon',
+        {
+          donnees: RACINE_VIDE,
+          campagneId: 'campagne-1',
+          date: '2026-07-28',
+          perimetre: ['projet-1'],
+          verdicts: [{ projetId: 'projet-1', statut: 'succes' }],
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'brouillon' },
+          ],
+          prisesEnCharge: {},
+        },
+      );
+
+      expect(donnees.brouillon?.['prisesEnCharge']).toBeUndefined();
+    });
   });
 
   describe('integrer_brouillon / rejeter_brouillon', () => {
@@ -574,6 +614,173 @@ describe('BouchonAdministrationUtils', () => {
           donnees: racineAvecEntreeOrpheline,
         }),
       ).rejects.toMatchObject({ type: 'projetIntrouvable' });
+    });
+
+    it('doit appliquer prisesEnCharge au projet correspondant lors de l’intégration (US-058, RG-058, plan_18)', async () => {
+      const premierCommitInterne = { statut: 'determine', date: '2020-01-15' };
+      const racineAvecPriseEnCharge = {
+        ...racineAvecBrouillon,
+        brouillon: {
+          ...racineAvecBrouillon.brouillon,
+          prisesEnCharge: { 'projet-1': premierCommitInterne },
+        },
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>('integrer_brouillon', {
+        donnees: racineAvecPriseEnCharge,
+      });
+
+      expect(donnees.groupes[0]?.projets[0]?.['premierCommitInterne']).toEqual(
+        premierCommitInterne,
+      );
+      expect(donnees.brouillon).toBeNull();
+    });
+
+    it('ne doit jamais appliquer prisesEnCharge lors d’un rejet (§5.4 : aucune application partielle)', async () => {
+      const premierCommitInterne = { statut: 'determine', date: '2020-01-15' };
+      const racineAvecPriseEnCharge = {
+        ...racineAvecBrouillon,
+        brouillon: {
+          ...racineAvecBrouillon.brouillon,
+          prisesEnCharge: { 'projet-1': premierCommitInterne },
+        },
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>('rejeter_brouillon', {
+        donnees: racineAvecPriseEnCharge,
+      });
+
+      expect(donnees.groupes[0]?.projets[0]?.['premierCommitInterne']).toBeUndefined();
+      expect(donnees.brouillon).toBeNull();
+    });
+
+    it('ne doit appliquer que la prise en charge ciblée par la sélection, en laissant l’autre en attente', async () => {
+      const groupeDeuxProjets = {
+        id: 'groupe-1',
+        membresConnus: [],
+        projets: [
+          { id: 'projet-1', iaAutorisee: false, annotations: [], audits: [] },
+          { id: 'projet-2', iaAutorisee: false, annotations: [], audits: [] },
+        ],
+      };
+      const premierCommitInterne1 = { statut: 'determine', date: '2020-01-15' };
+      const premierCommitInterne2 = { statut: 'determine', date: '2021-06-01' };
+      const racineDeuxEntrees = {
+        groupes: [groupeDeuxProjets],
+        brouillon: {
+          campagneId: 'campagne-1',
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+            { projetId: 'projet-2', audit: { id: 'audit-2' }, statut: 'enAttente' },
+          ],
+          prisesEnCharge: {
+            'projet-1': premierCommitInterne1,
+            'projet-2': premierCommitInterne2,
+          },
+        },
+        campagnes: [],
+        meta: {},
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>('integrer_brouillon', {
+        donnees: racineDeuxEntrees,
+        selection: ['projet-1'],
+      });
+
+      expect(donnees.groupes[0]?.projets[0]?.['premierCommitInterne']).toEqual(
+        premierCommitInterne1,
+      );
+      expect(donnees.groupes[0]?.projets[1]?.['premierCommitInterne']).toBeUndefined();
+      expect(donnees.brouillon?.['prisesEnCharge']).toEqual({ 'projet-2': premierCommitInterne2 });
+    });
+
+    it(
+      'ne doit pas purger le brouillon tant qu’une prise en charge orpheline (sans entrée resultatsParProjet) ' +
+        'reste en attente (corrigé en relecture)',
+      async () => {
+        const groupeDeuxProjets = {
+          id: 'groupe-1',
+          membresConnus: [],
+          projets: [
+            { id: 'projet-1', iaAutorisee: false, annotations: [], audits: [] },
+            { id: 'projet-2', iaAutorisee: false, annotations: [], audits: [] },
+          ],
+        };
+        const premierCommitInterne2 = { statut: 'determine', date: '2020-01-15' };
+        const racineAvecOrphelin = {
+          groupes: [groupeDeuxProjets],
+          brouillon: {
+            campagneId: 'campagne-1',
+            resultatsParProjet: [
+              { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+            ],
+            prisesEnCharge: { 'projet-2': premierCommitInterne2 },
+          },
+          campagnes: [],
+          meta: {},
+        };
+
+        const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+          'integrer_brouillon',
+          { donnees: racineAvecOrphelin, selection: ['projet-1'] },
+        );
+
+        expect(donnees.brouillon).not.toBeNull();
+        expect(donnees.brouillon?.['prisesEnCharge']).toEqual({
+          'projet-2': premierCommitInterne2,
+        });
+        expect(donnees.groupes[0]?.projets[1]?.['premierCommitInterne']).toBeUndefined();
+      },
+    );
+
+    it(
+      'doit accepter une sélection ciblant un projet présent uniquement dans prisesEnCharge (corrigé en ' +
+        'relecture, sur le modèle du cœur natif)',
+      async () => {
+        const groupeDeuxProjets = {
+          id: 'groupe-1',
+          membresConnus: [],
+          projets: [
+            { id: 'projet-1', iaAutorisee: false, annotations: [], audits: [] },
+            { id: 'projet-2', iaAutorisee: false, annotations: [], audits: [] },
+          ],
+        };
+        const premierCommitInterne2 = { statut: 'determine', date: '2020-01-15' };
+        const racineAvecOrphelin = {
+          groupes: [groupeDeuxProjets],
+          brouillon: {
+            campagneId: 'campagne-1',
+            resultatsParProjet: [
+              { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+            ],
+            prisesEnCharge: { 'projet-2': premierCommitInterne2 },
+          },
+          campagnes: [],
+          meta: {},
+        };
+
+        const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+          'integrer_brouillon',
+          { donnees: racineAvecOrphelin, selection: ['projet-2'] },
+        );
+
+        expect(donnees.groupes[0]?.projets[1]?.['premierCommitInterne']).toEqual(
+          premierCommitInterne2,
+        );
+        // projet-1 reste en attente : le brouillon reste ouvert pour lui.
+        expect(donnees.brouillon?.['resultatsParProjet']).toEqual([
+          { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'enAttente' },
+        ]);
+      },
+    );
+
+    it('doit rejeter toujours un identifiant totalement inconnu (ni resultatsParProjet ni prisesEnCharge)', async () => {
+      await expect(
+        BouchonAdministrationUtils.invoquer('integrer_brouillon', {
+          donnees: racineAvecBrouillon,
+          selection: ['projet-totalement-inconnu'],
+        }),
+      ).rejects.toMatchObject({ type: 'projetAbsentDuBrouillon' });
     });
   });
 

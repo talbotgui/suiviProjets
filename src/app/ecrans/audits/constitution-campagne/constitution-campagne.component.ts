@@ -26,6 +26,11 @@
 // `SqmSyntheseGraphiqueComponent`/`SqmSyntheseAuditsComponent`, « N vue(s) ignorée(s) »), plutôt que le composant
 // transverse `SqmBandeauAlerteComponent` (réservé par sa propre documentation à un signal prioritaire de type
 // RG-009/RG-037, non un simple rappel de périmètre).
+//
+// Évolution plan_18 incrément 6 (US-058, RG-058) : carte « Options » dédiée (décision 8 du plan), portant la case
+// à cocher « Calculer la date de prise en charge des projets sélectionnés » (décochée par défaut, décision 1),
+// propagée à `OrchestrateurCampagneService.lancerCampagne`. Distincte de la carte « Date d'analyse » : prête à
+// accueillir d'éventuelles options futures, sans lien avec le mode audit historique.
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -75,6 +80,14 @@ export class SqmConstitutionCampagneComponent {
    * audit régulier à la date du jour (comportement par défaut, strictement inchangé).
    */
   public readonly dateCiblee: WritableSignal<string> = signal('');
+
+  /**
+   * Option de campagne « Calculer la date de prise en charge des projets sélectionnés » (US-058, RG-058, plan_18
+   * incrément 6, décochée par défaut, décision 1 du plan) : transmise à `OrchestrateurCampagneService.
+   * lancerCampagne`, sans effet sur les projets déjà à jour (pré-filtre `PriseEnChargeUtils.recalculNecessaire`,
+   * décision 2 du plan).
+   */
+  public readonly calculerPriseEnCharge: WritableSignal<boolean> = signal(false);
 
   /**
    * Groupes actuellement chargés.
@@ -245,6 +258,15 @@ export class SqmConstitutionCampagneComponent {
   }
 
   /**
+   * Met à jour l'option de campagne « Calculer la date de prise en charge des projets sélectionnés » (US-058,
+   * RG-058, plan_18 incrément 6).
+   * @param valeur - Nouvel état de la case à cocher.
+   */
+  public definirCalculerPriseEnCharge(valeur: boolean): void {
+    this.calculerPriseEnCharge.set(valeur);
+  }
+
+  /**
    * Indique si le mode audit historique est actif, c'est-à-dire qu'une date ciblée a été saisie (C15-14, US-046,
    * RG-046) : pilote l'affichage du bandeau d'avertissement de périmètre réduit.
    * @returns `true` si une date ciblée est actuellement saisie.
@@ -283,6 +305,7 @@ export class SqmConstitutionCampagneComponent {
         Array.from(this.selectionProjetIds),
         motDePasse,
         dateCiblee.length > 0 ? dateCiblee : undefined,
+        this.calculerPriseEnCharge(),
       )
       .then((resultat) => {
         if (resultat.type === 'echec') {

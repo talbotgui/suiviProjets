@@ -1781,6 +1781,9 @@ export class DonneesApplicationService {
    * @param perimetre - Identifiants des projets du périmètre de la campagne.
    * @param verdicts - Verdicts d'exécution par projet, y compris les projets échoués ou ignorés (RG-018).
    * @param resultatsParProjet - Résultats en attente de validation, par projet.
+   * @param prisesEnCharge - Résultats de calcul de la date de prise en charge à appliquer aux projets
+   * correspondants lors d'une future intégration du brouillon (US-058, RG-058, plan_18 incrément 6), par
+   * identifiant de projet ; absent ou vide, comportement strictement inchangé.
    * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
    * @returns Le Résultat typé de l'opération.
    * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
@@ -1791,6 +1794,7 @@ export class DonneesApplicationService {
     perimetre: readonly string[],
     verdicts: readonly Verdict[],
     resultatsParProjet: readonly ResultatBrouillonProjet[],
+    prisesEnCharge: Readonly<Record<string, PremierCommitInterne>> | undefined,
     motDePasse: string,
   ): Promise<ResultatMutationAdministration> {
     const racine = this.racineActuelle();
@@ -1800,6 +1804,7 @@ export class DonneesApplicationService {
         DonneesRacine,
         Verdict,
         ResultatBrouillonProjet,
+        PremierCommitInterne,
         DonneesRacine
       >({
         chemin,
@@ -1809,6 +1814,9 @@ export class DonneesApplicationService {
         perimetre,
         verdicts,
         resultatsParProjet,
+        ...(prisesEnCharge !== undefined && Object.keys(prisesEnCharge).length > 0
+          ? { prisesEnCharge }
+          : {}),
         motDePasse,
       });
       this.racineInterne.set(nouvelleRacine);

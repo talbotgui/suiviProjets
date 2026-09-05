@@ -1242,6 +1242,17 @@ pub(crate) struct Brouillon {
     /// Résultats en attente de validation, par projet.
     #[serde(default)]
     pub(crate) resultats_par_projet: Vec<ResultatBrouillonProjet>,
+    /// Résultats de calcul de la date de prise en charge en attente d'application, par identifiant de projet
+    /// (US-058, RG-058, plan_18 incrément 6) : alimenté par l'orchestrateur de campagne (UI) quand l'option
+    /// « Calculer la date de prise en charge » est cochée, uniquement pour les projets dont le résultat diffère de
+    /// la valeur déjà stockée (décision 6 du plan). Appliqué aux `Projet` correspondants au même moment que
+    /// l'intégration des résultats d'audit ([`crate::persistance::audit::integrer_brouillon`]), dans la même
+    /// sauvegarde ; abandonné sans application lors d'un rejet
+    /// ([`crate::persistance::audit::rejeter_brouillon`]). Indépendant de `resultats_par_projet` : un projet peut
+    /// porter une entrée ici sans y avoir de résultat d'audit exploitable (échec de tous les indicateurs, succès
+    /// du seul calcul de prise en charge), ou inversement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) prises_en_charge: Option<HashMap<String, PremierCommitInterne>>,
 }
 
 /// Statut de traitement d'une alerte (RG-026).

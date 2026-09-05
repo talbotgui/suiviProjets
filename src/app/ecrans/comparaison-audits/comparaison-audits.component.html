@@ -103,6 +103,22 @@
             >
               Il y a trois mois
             </button>
+            @if (donnees.priseEnCharge; as priseEnCharge) {
+              <button
+                id="comparaison-audits-bouton-raccourci-prise-en-charge"
+                type="button"
+                class="bouton bouton--marque"
+                [disabled]="!priseEnCharge.raccourciDisponible"
+                [attr.aria-describedby]="
+                  priseEnCharge.raccourciDisponible
+                    ? null
+                    : 'comparaison-audits-invite-prise-en-charge'
+                "
+                (click)="appliquerRaccourci('priseEnCharge')"
+              >
+                Depuis la prise en charge
+              </button>
+            }
           </div>
           <p
             class="comparaison-audits__intervalle largeur-pleine texte-sm texte-tenue exterieur-bas-0 exterieur-haut-0"
@@ -115,6 +131,37 @@
               role="status"
             >
               {{ messageSelectionRepliee }}
+            </p>
+          }
+          @if (donnees.priseEnCharge; as priseEnCharge) {
+            @if (priseEnCharge.auditId === undefined) {
+              <p
+                id="comparaison-audits-invite-prise-en-charge"
+                class="comparaison-audits__invite-prise-en-charge largeur-pleine texte-sm texte-tenue"
+              >
+                Aucun audit à la date de prise en charge ({{ priseEnCharge.date }}). Lancez une
+                campagne historique ciblant cette date pour rendre la comparaison possible.
+                <a routerLink="/audits/constitution-campagne">Constituer une campagne</a>
+              </p>
+            } @else if (!priseEnCharge.raccourciDisponible) {
+              <p
+                id="comparaison-audits-invite-prise-en-charge"
+                class="comparaison-audits__invite-prise-en-charge largeur-pleine texte-sm texte-tenue"
+              >
+                Un audit correspond à la date de prise en charge ({{ priseEnCharge.date }}), mais ce
+                projet ne compte plus aucun audit régulier auquel le comparer.
+              </p>
+            }
+          }
+          @if (donnees.avertissementPriseEnChargeHistorique) {
+            <p
+              class="comparaison-audits__avertissement-historique largeur-pleine texte-xs texte-orange"
+              role="status"
+            >
+              Audit historique partiel : la borne « prise en charge » n'interroge ni les membres du
+              dépôt, ni sa taille, ni le calcul croisé « IA sur le nouveau code » (RG-046). Ces
+              indicateurs apparaissent absents côté prise en charge dans le différentiel ci-dessous,
+              ce qui est attendu.
             </p>
           }
         </section>
@@ -252,7 +299,10 @@
                           </td>
                         </tr>
                       }
-                      @for (ligne of section.modifications; track ligne.reference + ligne.manifeste) {
+                      @for (
+                        ligne of section.modifications;
+                        track ligne.reference + ligne.manifeste
+                      ) {
                         <tr>
                           <td>Changement de statut</td>
                           <td>{{ ligne.reference }}</td>

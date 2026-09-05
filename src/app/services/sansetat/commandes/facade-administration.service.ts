@@ -149,10 +149,16 @@ export interface ParametresSuppressionMembreConnu<TDonnees> {
 
 /**
  * Paramètres transmis à la commande native `enregistrerBrouillon` (US-009, US-014, Phase 5 incrément 2),
- * génériques sur le type concret de la racine échangée et des deux structures propres au brouillon (`TVerdict`,
- * `TResultatBrouillonProjet`), pour ne jamais importer ces types depuis `services/avecetat/etat/`.
+ * génériques sur le type concret de la racine échangée et des trois structures propres au brouillon (`TVerdict`,
+ * `TResultatBrouillonProjet`, `TPremierCommitInterne`), pour ne jamais importer ces types depuis
+ * `services/avecetat/etat/`.
  */
-export interface ParametresEnregistrementBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet> {
+export interface ParametresEnregistrementBrouillon<
+  TDonnees,
+  TVerdict,
+  TResultatBrouillonProjet,
+  TPremierCommitInterne,
+> {
   /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
   readonly chemin: string;
   /** Racine des données courante, réécrite intégralement par la sauvegarde. */
@@ -167,6 +173,13 @@ export interface ParametresEnregistrementBrouillon<TDonnees, TVerdict, TResultat
   readonly verdicts: readonly TVerdict[];
   /** Résultats en attente de validation, par projet. */
   readonly resultatsParProjet: readonly TResultatBrouillonProjet[];
+  /**
+   * Résultats de calcul de la date de prise en charge à appliquer aux projets correspondants lors d'une future
+   * intégration du brouillon (US-058, RG-058, plan_18 incrément 6), par identifiant de projet ; absent ou vide,
+   * comportement strictement inchangé. Déjà filtré côté appelant (Orchestrateur de campagne) aux seuls projets
+   * dont le résultat diffère de la valeur stockée (décision 6 du plan).
+   */
+  readonly prisesEnCharge?: Readonly<Record<string, TPremierCommitInterne>>;
   /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
   readonly motDePasse: string;
 }
@@ -340,8 +353,19 @@ export class FacadeAdministrationService {
    * @param parametres - Paramètres de la commande, cf. {@link ParametresEnregistrementBrouillon}.
    * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
    */
-  public async enregistrerBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet, TReponse>(
-    parametres: ParametresEnregistrementBrouillon<TDonnees, TVerdict, TResultatBrouillonProjet>,
+  public async enregistrerBrouillon<
+    TDonnees,
+    TVerdict,
+    TResultatBrouillonProjet,
+    TPremierCommitInterne,
+    TReponse,
+  >(
+    parametres: ParametresEnregistrementBrouillon<
+      TDonnees,
+      TVerdict,
+      TResultatBrouillonProjet,
+      TPremierCommitInterne
+    >,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('enregistrer_brouillon', { ...parametres });
   }

@@ -24,6 +24,17 @@
 // audit historique (« (historique) ») dans le sélecteur, sans autre changement — le mécanisme de sélection/
 // différentiel existant (`DifferentielAuditsUtils`) reste inchangé, un audit historique restant comparable à un
 // audit régulier au même titre.
+//
+// Évolution plan_18 incrément 7 (US-059, RG-059) : repère « prise en charge » sur l'audit dont la date correspond
+// exactement à `Projet.premierCommitInterne.date` (`determine` uniquement), suffixe cumulable avec « (historique) »
+// dans les sélecteurs ; raccourci `priseEnCharge` (borne gauche = cet audit, borne droite = le dernier audit
+// régulier), désactivé avec une invite (lien vers la constitution de campagne) si aucun audit ne correspond
+// exactement ; avertissement discret quand la borne gauche est un audit historique **sélectionné via ce raccourci**
+// (texte normatif de RG-059, cf. `viaRaccourciPriseEnCharge` : une coïncidence de date obtenue par sélection
+// manuelle ne déclenche jamais l'avertissement) — périmètre d'indicateurs structurellement réduit dans ce cas
+// (RG-059 M8), attendu et non une régression. Le calcul du différentiel proprement dit (`DifferentielAuditsUtils`)
+// n'est pas modifié : un audit « prise en charge » est un audit du projet comme un autre, simplement mis en
+// évidence.
 import {
   Component,
   ElementRef,
@@ -41,7 +52,13 @@ import { SqmBadgeComponent } from '../../composants/badge/badge.component';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { StatutMembre } from '../../services/avecetat/etat/types-donnees';
-import type { Annotation, Audit, Groupe, Projet } from '../../services/avecetat/etat/types-donnees';
+import type {
+  Annotation,
+  Audit,
+  Groupe,
+  Projet,
+  TypeAudit,
+} from '../../services/avecetat/etat/types-donnees';
 import type { Marqueur } from '../../services/sansetat/commandes/types-facade';
 import type {
   DependanceDifferentielle,
@@ -90,6 +107,16 @@ interface OptionAudit {
   readonly date: string;
   /** Libellé court affiché dans le sélecteur. */
   readonly label: string;
+  /**
+   * Catégorie de l'audit (C15-14, RG-046), nécessaire à la résolution du raccourci « prise en charge » (RG-059,
+   * plan_18 incrément 7 : « le dernier audit régulier »).
+   */
+  readonly typeAudit: TypeAudit;
+  /**
+   * `true` si la date de cet audit correspond exactement à `Projet.premierCommitInterne.date` (US-059, RG-058,
+   * RG-059, plan_18 incrément 7).
+   */
+  readonly priseEnCharge: boolean;
 }
 
 /** Ligne affichée du premier volet (indicateurs avant/après/delta). */
@@ -207,6 +234,20 @@ interface DonneesComparaisonAudits {
    * silencieux), absent sinon.
    */
   readonly messageSelectionRepliee?: string;
+  /**
+   * Rattachement à la date de prise en charge du projet (US-059, RG-058, RG-059), absent si jamais calculée ou
+   * calcul non `determine` (rien à proposer).
+   */
+  readonly priseEnCharge?: InfoPriseEnCharge;
+  /**
+   * `true` si la sélection courante provient du raccourci « Depuis la prise en charge » **et** que l'audit le plus
+   * ancien comparé est historique (RG-059, M8, texte normatif : « … sélectionné via ce raccourci ») : pilote
+   * l'avertissement de périmètre d'indicateurs réduit côté « prise en charge » (`gitlab.membres`,
+   * `gitlab.taille_depot`, `croise.ia_nouveau_code`, métriques « nouveau code »), attendu et non une régression.
+   * Une coïncidence de date obtenue par sélection manuelle des mêmes deux audits ne déclenche jamais cet
+   * avertissement.
+   */
+  readonly avertissementPriseEnChargeHistorique: boolean;
   /** Premier volet : indicateurs avant/après/delta. */
   readonly indicateurs: readonly LigneIndicateurAffiche[];
   /**
@@ -243,7 +284,32 @@ type EtatComparaisonAudits =
   | { readonly type: 'pret'; readonly donnees: DonneesComparaisonAudits };
 
 /** Raccourci de sélection des deux dates comparées (cf. `docs/02_documentation/09_maquettes.md`). */
-export type RaccourciComparaisonAudits = 'dernierPrecedent' | 'unMois' | 'troisMois';
+export type RaccourciComparaisonAudits =
+  'dernierPrecedent' | 'unMois' | 'troisMois' | 'priseEnCharge';
+
+/**
+ * Rattachement de l'écran à la date de prise en charge du projet (US-059, RG-058, RG-059, plan_18 incrément 7),
+ * dérivé de `Projet.premierCommitInterne` uniquement quand son statut est `determine` (absent sinon : rien à
+ * proposer). `auditId` est absent si aucun audit du projet ne porte, exactement, cette date (décision 4 du plan :
+ * comparaison stricte de chaînes, jamais une tolérance de quelques jours) — cas attendu, un audit régulier portant
+ * un horodatage complet ne coïncide jamais avec la date calendaire `AAAA-MM-JJ` de la prise en charge (RG-058,
+ * décision 16) ; seul un audit historique ciblant exactement cette date peut y correspondre.
+ */
+interface InfoPriseEnCharge {
+  /** Date calendaire UTC de la prise en charge (`AAAA-MM-JJ`). */
+  readonly date: string;
+  /** Identifiant de l'audit dont la date correspond exactement, absent si aucun audit ne porte cette date. */
+  readonly auditId?: string;
+  /**
+   * `true` si le raccourci « Depuis la prise en charge » peut effectivement être appliqué : un audit correspond
+   * exactement à la date de prise en charge **et** le projet compte au moins un audit régulier (borne droite du
+   * raccourci, cf. {@link resoudreRaccourciPriseEnCharge}). Corrigé en relecture : sans ce second critère, un
+   * projet dont l'unique audit de prise en charge est historique mais qui ne compte plus aucun audit régulier
+   * laissait le bouton actif pour un clic sans aucun effet (`resoudreRaccourciPriseEnCharge` renvoyant `undefined`
+   * silencieusement).
+   */
+  readonly raccourciDisponible: boolean;
+}
 
 /**
  * Écran Comparaison entre deux audits (US-018) : sélection de deux dates parmi les audits réellement enregistrés
@@ -290,6 +356,25 @@ export class SqmComparaisonAuditsComponent {
   private readonly idApresSelectionne: WritableSignal<string | null> = signal(null);
 
   /**
+   * Identifiant du projet pour lequel la sélection courante provient précisément du raccourci « Depuis la prise
+   * en charge » (US-059, RG-059, plan_18 incrément 7), `null` sinon. Comparé au projet courant dans
+   * {@link calculerEtat} (`viaRaccourciPriseEnCharge = this.origineRaccourciPriseEnCharge() === this.projetId()`)
+   * plutôt qu'un simple booléen : pilote seul l'avertissement « audit historique partiel »
+   * (`avertissementPriseEnChargeHistorique`), conformément au texte normatif de RG-059 (« … quand la borne gauche
+   * est un audit historique **sélectionné via ce raccourci** »).
+   *
+   * Corrigé en relecture : un simple booléen remis à `false` par {@link definirIdAvant}/{@link definirIdApres}
+   * mais jamais par un changement de {@link projetId} restait vrai après une navigation vers un autre projet
+   * réutilisant la même instance de composant (route `comparaison-audits/:projetId`), déclenchant à tort
+   * l'avertissement sur ce nouveau projet si sa sélection par défaut retombait sur un audit historique — à la
+   * différence de {@link idAvantSelectionne}/{@link idApresSelectionne}, qui s'auto-corrigent via le repli de
+   * {@link resoudreId} quand l'id sélectionné n'appartient plus aux options du nouveau projet. Comparer l'identifiant
+   * de projet plutôt qu'un booléen rend cette origine caduque de la même façon, structurellement, sans
+   * réinitialisation explicite à ajouter à chaque nouveau point d'entrée de sélection.
+   */
+  private readonly origineRaccourciPriseEnCharge: WritableSignal<string | null> = signal(null);
+
+  /**
    * État complet de l'écran, recalculé à chaque changement de {@link projetId}, de la racine courante ou de la
    * sélection courante des deux audits comparés.
    */
@@ -301,6 +386,7 @@ export class SqmComparaisonAuditsComponent {
    */
   public definirIdAvant(id: string): void {
     this.idAvantSelectionne.set(id);
+    this.origineRaccourciPriseEnCharge.set(null);
   }
 
   /**
@@ -309,6 +395,7 @@ export class SqmComparaisonAuditsComponent {
    */
   public definirIdApres(id: string): void {
     this.idApresSelectionne.set(id);
+    this.origineRaccourciPriseEnCharge.set(null);
   }
 
   /**
@@ -322,8 +409,15 @@ export class SqmComparaisonAuditsComponent {
       return;
     }
     const resolution = this.resoudreRaccourci(raccourci, options);
+    if (resolution === undefined) {
+      // Raccourci « prise en charge » sans audit correspondant ou sans audit régulier disponible (RG-059) : le
+      // bouton est déjà désactivé dans ce cas côté gabarit (`donnees.priseEnCharge?.auditId`), ce garde ne fait que
+      // sécuriser un appel direct (test, régression de gabarit) sans effet de bord sur la sélection courante.
+      return;
+    }
     this.idAvantSelectionne.set(resolution.idAvant);
     this.idApresSelectionne.set(resolution.idApres);
+    this.origineRaccourciPriseEnCharge.set(raccourci === 'priseEnCharge' ? this.projetId() : null);
   }
 
   /**
@@ -385,15 +479,19 @@ export class SqmComparaisonAuditsComponent {
    * @param raccourci - Raccourci à résoudre.
    * @param options - Options de sélection disponibles pour le projet courant, triées de la plus ancienne à la plus
    * récente, au moins deux éléments.
-   * @returns Les identifiants des deux audits résolus.
+   * @returns Les identifiants des deux audits résolus, `undefined` si le raccourci « prise en charge » n'a pas
+   * d'audit correspondant ou aucun audit régulier disponible (RG-059) — n'arrive jamais pour les autres raccourcis.
    */
   private resoudreRaccourci(
     raccourci: RaccourciComparaisonAudits,
     options: readonly OptionAudit[],
-  ): { readonly idAvant: string; readonly idApres: string } {
+  ): { readonly idAvant: string; readonly idApres: string } | undefined {
     const dernier = options[options.length - 1];
     if (raccourci === 'dernierPrecedent') {
       return { idAvant: options[options.length - 2].id, idApres: dernier.id };
+    }
+    if (raccourci === 'priseEnCharge') {
+      return this.resoudreRaccourciPriseEnCharge(options);
     }
     const nombreMois = raccourci === 'unMois' ? 1 : 3;
     const echeance = new Date(dernier.date);
@@ -406,6 +504,28 @@ export class SqmComparaisonAuditsComponent {
       return ecartCandidat < ecartMeilleur ? candidat : meilleur;
     });
     return { idAvant: plusProche.id, idApres: dernier.id };
+  }
+
+  /**
+   * Résout le raccourci « Depuis la prise en charge » (US-059, RG-059, plan_18 incrément 7, décision 4 du plan) :
+   * borne gauche = l'audit dont la date correspond exactement à la prise en charge (`OptionAudit.priseEnCharge`) ;
+   * borne droite = le dernier audit **régulier** (jamais un audit historique, même postérieur en date : un audit
+   * historique n'a par nature aucun sens comme référence « courante », cf. C15-14).
+   * @param options - Options de sélection disponibles pour le projet courant.
+   * @returns Les identifiants résolus, `undefined` si aucun audit ne correspond exactement à la prise en charge ou
+   * si le projet ne compte aucun audit régulier.
+   */
+  private resoudreRaccourciPriseEnCharge(
+    options: readonly OptionAudit[],
+  ): { readonly idAvant: string; readonly idApres: string } | undefined {
+    const auditPriseEnCharge = options.find((option) => option.priseEnCharge);
+    const dernierRegulier = [...options]
+      .reverse()
+      .find((option) => option.typeAudit === 'reguliere');
+    if (auditPriseEnCharge === undefined || dernierRegulier === undefined) {
+      return undefined;
+    }
+    return { idAvant: auditPriseEnCharge.id, idApres: dernierRegulier.id };
   }
 
   /**
@@ -433,21 +553,62 @@ export class SqmComparaisonAuditsComponent {
    * Un audit historique à date passée (C15-14, US-046, RG-046, `typeAudit: 'historique'`) reste sélectionnable au
    * même titre qu'un audit régulier (le mécanisme de différentiel existant, `DifferentielAuditsUtils`, reste
    * inchangé), mais porte un libellé suffixé explicite (« (historique) ») pour ne jamais laisser croire qu'il
-   * s'agit d'un audit régulier à la date affichée.
+   * s'agit d'un audit régulier à la date affichée. Un audit dont la date correspond exactement à la date de prise
+   * en charge du projet (US-059, RG-059, plan_18 incrément 7) porte de même un suffixe « (prise en charge) »,
+   * cumulable avec « (historique) » (décision 4 du plan).
    * @param projet - Projet concerné.
    * @returns Les options de sélection.
    */
   private construireOptions(projet: Projet): readonly OptionAudit[] {
+    const datePriseEnCharge =
+      projet.premierCommitInterne?.statut === 'determine'
+        ? projet.premierCommitInterne.date
+        : undefined;
     return [...projet.audits]
       .sort((a, b) => (a.date < b.date ? -1 : 1))
-      .map((audit) => ({
-        id: audit.id,
-        date: audit.date,
-        label:
-          audit.typeAudit === 'historique'
-            ? `${this.formaterDateCourte(audit.date)} (historique)`
-            : this.formaterDateCourte(audit.date),
-      }));
+      .map((audit) => {
+        const estPriseEnCharge =
+          datePriseEnCharge !== undefined && audit.date === datePriseEnCharge;
+        const suffixes = [
+          audit.typeAudit === 'historique' ? 'historique' : undefined,
+          estPriseEnCharge ? 'prise en charge' : undefined,
+        ].filter((suffixe): suffixe is string => suffixe !== undefined);
+        return {
+          id: audit.id,
+          date: audit.date,
+          label:
+            suffixes.length > 0
+              ? `${this.formaterDateCourte(audit.date)} (${suffixes.join(', ')})`
+              : this.formaterDateCourte(audit.date),
+          typeAudit: audit.typeAudit,
+          priseEnCharge: estPriseEnCharge,
+        };
+      });
+  }
+
+  /**
+   * Construit le rattachement de l'écran à la date de prise en charge du projet (US-059, RG-058, RG-059, plan_18
+   * incrément 7), à partir de `Projet.premierCommitInterne` et des options déjà construites (`construireOptions`,
+   * seule source de vérité pour la correspondance exacte de date, décision 15 du plan_18 : aucune comparaison de
+   * date recalculée ici).
+   * @param projet - Projet concerné.
+   * @param options - Options de sélection déjà construites (`construireOptions`).
+   * @returns Le rattachement, `undefined` si `premierCommitInterne` est absent ou non `determine`.
+   */
+  private construireInfoPriseEnCharge(
+    projet: Projet,
+    options: readonly OptionAudit[],
+  ): InfoPriseEnCharge | undefined {
+    if (projet.premierCommitInterne?.statut !== 'determine') {
+      return undefined;
+    }
+    const auditId = options.find((option) => option.priseEnCharge)?.id;
+    return {
+      date: projet.premierCommitInterne.date,
+      auditId,
+      raccourciDisponible:
+        auditId !== undefined && options.some((option) => option.typeAudit === 'reguliere'),
+    };
   }
 
   /**
@@ -550,6 +711,7 @@ export class SqmComparaisonAuditsComponent {
         racine.parametres.seuils,
         racine.referentiels,
         messageSelectionRepliee,
+        this.origineRaccourciPriseEnCharge() === this.projetId(),
       ),
     };
   }
@@ -577,6 +739,8 @@ export class SqmComparaisonAuditsComponent {
    * @param referentielsBruts - Valeur brute de `referentiels`.
    * @param messageSelectionRepliee - Message explicite à restituer si la sélection a dû être ajustée
    * automatiquement (R10-15), absent sinon.
+   * @param viaRaccourciPriseEnCharge - `true` si la sélection courante provient du raccourci « Depuis la prise en
+   * charge » (US-059, RG-059, plan_18 incrément 7), pilote seul `avertissementPriseEnChargeHistorique`.
    * @returns Les données complètes de l'écran.
    */
   private construireDonnees(
@@ -588,6 +752,7 @@ export class SqmComparaisonAuditsComponent {
     seuilsBruts: unknown,
     referentielsBruts: unknown,
     messageSelectionRepliee: string | undefined,
+    viaRaccourciPriseEnCharge: boolean,
   ): DonneesComparaisonAudits {
     const seuilsCouverture = ParametresJugementUtils.lireSeuilsCouverture(seuilsBruts);
     const seuilsCouleursViolations =
@@ -615,7 +780,6 @@ export class SqmComparaisonAuditsComponent {
     const dependancesModifications = differentiel.dependances.modifications.map((d) =>
       this.construireLigneDependance(d),
     );
-
     return {
       groupeId: groupe.id,
       nomGroupe: groupe.nom,
@@ -626,6 +790,12 @@ export class SqmComparaisonAuditsComponent {
       dateAvantLabel: this.formaterDateCourte(auditAvant.date),
       dateApresLabel: this.formaterDateCourte(auditApres.date),
       messageSelectionRepliee,
+      priseEnCharge: this.construireInfoPriseEnCharge(projet, options),
+      // RG-059 : « … quand la borne gauche est un audit historique sélectionné via ce raccourci » — c'est bien
+      // `viaRaccourciPriseEnCharge` (l'origine de la sélection courante) qui pilote l'avertissement, jamais une
+      // simple coïncidence de date obtenue par sélection manuelle (cf. commentaire de ce signal).
+      avertissementPriseEnChargeHistorique:
+        viaRaccourciPriseEnCharge && auditAvant.typeAudit === 'historique',
       indicateurs: this.construireLignesIndicateurs(
         differentiel.indicateurs,
         seuilsCouverture,

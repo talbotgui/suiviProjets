@@ -354,8 +354,14 @@ export class BouchonAdministrationUtils {
   /**
    * Enregistre les résultats d'une campagne dans la zone de brouillon (US-009, US-014, RG-019) : refuse tant
    * qu'un brouillon existant n'a pas été intégralement traité, sur le modèle exact du cœur natif.
+   *
+   * `prisesEnCharge` (US-058, RG-058, plan_18 incrément 6) : reportée telle quelle sur le brouillon si non vide,
+   * sur le même principe que `resultatsParProjet` ; absente ou vide, comportement strictement inchangé. Comme le
+   * reste de ce bouchon, aucune entrée de journal n'est produite ici (décision documentée en tête de fichier :
+   * RG-023 jamais alimenté par ce bouchon) — l'application effective de `prisesEnCharge` a lieu à l'intégration
+   * (cf. {@link resoudreBrouillon}).
    * @param parametres - Paramètres reçus (`campagneId`, `date`, `perimetre`, `verdicts`, `resultatsParProjet`,
-   * `donnees`).
+   * `prisesEnCharge`, `donnees`).
    * @returns La racine mise à jour (non encore horodatée).
    */
   private static enregistrerBrouillon(
@@ -376,11 +382,21 @@ export class BouchonAdministrationUtils {
       BouchonAdministrationUtils.estObjet(entree) ? { ...entree, statut: 'enAttente' } : entree,
     );
     const campagnes = BouchonAdministrationUtils.lireListe(donnees, 'campagnes');
+    const prisesEnCharge = BouchonAdministrationUtils.estObjet(parametres['prisesEnCharge'])
+      ? parametres['prisesEnCharge']
+      : undefined;
 
     return {
       ...donnees,
       campagnes: [...campagnes, { id: campagneId, date, perimetre, verdicts }],
-      brouillon: { campagneId, creeLe: date, resultatsParProjet },
+      brouillon: {
+        campagneId,
+        creeLe: date,
+        resultatsParProjet,
+        ...(prisesEnCharge !== undefined && Object.keys(prisesEnCharge).length > 0
+          ? { prisesEnCharge }
+          : {}),
+      },
     };
   }
 
@@ -389,6 +405,13 @@ export class BouchonAdministrationUtils {
    * attente du brouillon courant (US-014). Une entrée intégrée rejoint l'historique des audits du projet
    * concerné ; une entrée rejetée n'y est jamais ajoutée. Le brouillon est effacé (`null`) une fois toutes ses
    * entrées résolues.
+   *
+   * `brouillon.prisesEnCharge` (US-058, RG-058, plan_18 incrément 6) : ciblée par la même `selection` que
+   * `resultatsParProjet`, indépendamment de la présence d'une entrée d'audit pour le même projet. Une intégration
+   * applique chaque entrée ciblée à `Projet.premierCommitInterne` (silencieusement abandonnée si le projet n'existe
+   * plus, sur le modèle du cœur natif) ; un rejet l'abandonne purement et simplement, jamais appliquée (« aucune
+   * application partielle », §5.4 du plan). Aucune entrée de journal n'est produite par ce bouchon (cf. commentaire
+   * d'en-tête de ce fichier).
    * @param parametres - Paramètres reçus (`selection`, `motif`, `donnees`).
    * @param statutCible - Statut à appliquer aux entrées ciblées.
    * @returns La racine mise à jour (non encore horodatée).
@@ -417,9 +440,19 @@ export class BouchonAdministrationUtils {
         .filter((entree) => BouchonAdministrationUtils.lireTexte(entree, 'statut') === 'enAttente')
         .map((entree) => BouchonAdministrationUtils.lireTexte(entree, 'projetId')),
     );
+    const prisesEnChargeExistantes = BouchonAdministrationUtils.estObjet(
+      brouillon['prisesEnCharge'],
+    )
+      ? brouillon['prisesEnCharge']
+      : {};
+    // US-058, plan_18 incrément 6 (corrigé en relecture) : un identifiant de `selection` porté uniquement par
+    // `prisesEnChargeExistantes` (projet dont l'audit a totalement échoué, sans entrée dans `resultatsParProjet`,
+    // mais dont le calcul de prise en charge a réussi) est accepté ici, sur le modèle du cœur natif
+    // (`persistance::audit::entrees_ciblees`) — sinon une sélection projet par projet ne pourrait jamais
+    // atteindre une telle entrée orpheline.
     if (selection !== undefined) {
       for (const projetId of selection) {
-        if (!idsEnAttente.has(projetId)) {
+        if (!idsEnAttente.has(projetId) && !(projetId in prisesEnChargeExistantes)) {
           throw new AnomalieAdministrationBouchon('projetAbsentDuBrouillon');
         }
       }
@@ -450,12 +483,56 @@ export class BouchonAdministrationUtils {
       return { ...entree, statut: 'rejete', ...(motif === undefined ? {} : { motifRejet: motif }) };
     });
 
-    const encoreEnAttente = nouveauxResultats.some(
-      (entree) => BouchonAdministrationUtils.lireTexte(entree, 'statut') === 'enAttente',
+    const idsPriseEnChargeCibles = (selection ?? Object.keys(prisesEnChargeExistantes)).filter(
+      (projetId) => projetId in prisesEnChargeExistantes,
     );
+    if (statutCible === 'integre') {
+      for (const projetId of idsPriseEnChargeCibles) {
+        const premierCommitInterne = prisesEnChargeExistantes[projetId];
+        try {
+          donneesCourantes = BouchonAdministrationUtils.miseAJourProjetParId(
+            donneesCourantes,
+            projetId,
+            (projet) => ({ ...projet, premierCommitInterne }),
+          );
+        } catch {
+          // Projet disparu entre le lancement de la campagne et l'intégration du brouillon : entrée abandonnée
+          // silencieusement, sur le modèle du cœur natif (`persistance::audit::integrer_brouillon`).
+        }
+      }
+    }
+    const prisesEnChargeRestantes = Object.fromEntries(
+      Object.entries(prisesEnChargeExistantes).filter(
+        ([projetId]) => !idsPriseEnChargeCibles.includes(projetId),
+      ),
+    );
+
+    // US-058, plan_18 incrément 6 (corrigé en relecture) : le brouillon reste ouvert tant qu'une prise en charge
+    // en attente subsiste, même si tous les résultats d'audit sont résolus — sur le modèle du cœur natif
+    // (`persistance::audit::purger_brouillon_si_resolu`), pour ne jamais perdre silencieusement une entrée
+    // orpheline de `prisesEnCharge` (projet sans résultat d'audit exploitable).
+    const encoreEnAttente =
+      nouveauxResultats.some(
+        (entree) => BouchonAdministrationUtils.lireTexte(entree, 'statut') === 'enAttente',
+      ) || Object.keys(prisesEnChargeRestantes).length > 0;
+    // `brouillonSansPrisesEnCharge` retire explicitement l'ancienne clé `prisesEnCharge` de `brouillon` avant le
+    // spread ci-dessous : sans ce retrait, le motif usuel « omettre la clé si vide » ne suffirait pas à faire
+    // disparaître une valeur déjà présente sur `brouillon` (la clé omise à droite d'un spread ne retire jamais une
+    // clé déjà posée par le spread lui-même) et une entrée pourtant déjà extraite réapparaîtrait dans le brouillon
+    // renvoyé.
+    const brouillonSansPrisesEnCharge: Record<string, unknown> = { ...brouillon };
+    delete brouillonSansPrisesEnCharge['prisesEnCharge'];
     return {
       ...donneesCourantes,
-      brouillon: encoreEnAttente ? { ...brouillon, resultatsParProjet: nouveauxResultats } : null,
+      brouillon: encoreEnAttente
+        ? {
+            ...brouillonSansPrisesEnCharge,
+            resultatsParProjet: nouveauxResultats,
+            ...(Object.keys(prisesEnChargeRestantes).length > 0
+              ? { prisesEnCharge: prisesEnChargeRestantes }
+              : {}),
+          }
+        : null,
     };
   }
 

@@ -13,9 +13,11 @@ import type {
   Audit,
   Groupe,
   Parametres,
+  PremierCommitInterne,
   Projet,
   Referentiels,
   ResultatBrouillonProjet,
+  ResultatCalculPriseEnCharge,
   ResultatMutationAdministration,
   Source,
   Verdict,
@@ -268,6 +270,7 @@ type MockEnregistrerBrouillon = jest.Mock<
     readonly string[],
     readonly Verdict[],
     readonly ResultatBrouillonProjet[],
+    Readonly<Record<string, PremierCommitInterne>> | undefined,
     string,
   ]
 >;
@@ -278,6 +281,8 @@ describe('OrchestrateurCampagneService', () => {
     groupes: jest.Mock<readonly Groupe[], []>;
     racine: jest.Mock<{ readonly parametres: unknown; readonly referentiels: unknown }, []>;
     enregistrerBrouillon: MockEnregistrerBrouillon;
+    empreinteReferentielInterne: jest.Mock<Promise<string | null>, [string]>;
+    calculerPriseEnChargeProjet: jest.Mock<Promise<ResultatCalculPriseEnCharge>, [string, string]>;
   };
 
   beforeEach(() => {
@@ -294,6 +299,7 @@ describe('OrchestrateurCampagneService', () => {
         readonly string[],
         readonly Verdict[],
         readonly ResultatBrouillonProjet[],
+        Readonly<Record<string, PremierCommitInterne>> | undefined,
         string,
       ]
     >();
@@ -305,6 +311,12 @@ describe('OrchestrateurCampagneService', () => {
         referentiels: REFERENTIELS_DE_TEST,
       })),
       enregistrerBrouillon,
+      empreinteReferentielInterne: jest.fn<Promise<string | null>, [string]>(() =>
+        Promise.resolve('sha256:empreinte-test'),
+      ),
+      calculerPriseEnChargeProjet: jest.fn<Promise<ResultatCalculPriseEnCharge>, [string, string]>(
+        () => Promise.resolve({ type: 'inchange' }),
+      ),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -354,7 +366,7 @@ describe('OrchestrateurCampagneService', () => {
 
       expect(resultat).toEqual({ type: 'succes' });
       expect(donneesApplicationMock.enregistrerBrouillon).toHaveBeenCalledTimes(1);
-      const [, , perimetre, verdicts, resultatsParProjet, motDePasse] =
+      const [, , perimetre, verdicts, resultatsParProjet, , motDePasse] =
         donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
       expect(perimetre).toEqual(['projet-1']);
       expect(motDePasse).toBe('mot-de-passe');
@@ -1072,6 +1084,127 @@ describe('OrchestrateurCampagneService', () => {
         const audit: Audit = resultatsParProjet[0].audit;
         expect(audit.typeAudit).toBe('reguliere');
         expect(audit.dateExecution).toBeUndefined();
+      });
+    });
+
+    describe('option « Calculer la date de prise en charge » (US-058, RG-058, plan_18 incrément 6)', () => {
+      const PREMIER_COMMIT_INTERNE: PremierCommitInterne = {
+        statut: 'determine',
+        date: '2020-01-15',
+        sha: 'abc123',
+        emailAuteur: 'interne@exemple.test',
+        calculeLe: '2026-07-24',
+        empreinteReferentiel: 'sha256:empreinte-test',
+      };
+
+      it("ne doit appeler ni empreinteReferentielInterne ni calculerPriseEnChargeProjet quand l'option n'est pas cochée (comportement inchangé)", async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        expect(donneesApplicationMock.empreinteReferentielInterne).not.toHaveBeenCalled();
+        expect(donneesApplicationMock.calculerPriseEnChargeProjet).not.toHaveBeenCalled();
+        const [, , , , , prisesEnCharge] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(prisesEnCharge).toBeUndefined();
+      });
+
+      it('doit résoudre une seule fois l’empreinte du groupe pour plusieurs projets de ce même groupe', async () => {
+        const projet1 = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        const projet2 = DonneesDeTest.projet('projet-2', [DonneesDeTest.sourceGitlab('source-2')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet1, projet2])]);
+
+        await service.lancerCampagne(['projet-1', 'projet-2'], 'mot-de-passe', undefined, true);
+
+        expect(donneesApplicationMock.empreinteReferentielInterne).toHaveBeenCalledTimes(1);
+        expect(donneesApplicationMock.calculerPriseEnChargeProjet).toHaveBeenCalledTimes(2);
+      });
+
+      it('ne doit pas appeler calculerPriseEnChargeProjet quand le recalcul n’est pas nécessaire (résultat déjà déterminé sur la même empreinte)', async () => {
+        const projet = {
+          ...DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]),
+          premierCommitInterne: PREMIER_COMMIT_INTERNE,
+        };
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        donneesApplicationMock.empreinteReferentielInterne.mockResolvedValue(
+          PREMIER_COMMIT_INTERNE.empreinteReferentiel,
+        );
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe', undefined, true);
+
+        expect(donneesApplicationMock.calculerPriseEnChargeProjet).not.toHaveBeenCalled();
+        const [, , , , , prisesEnCharge] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(prisesEnCharge).toBeUndefined();
+      });
+
+      it("doit reporter dans prisesEnCharge un résultat de type 'change'", async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        donneesApplicationMock.calculerPriseEnChargeProjet.mockResolvedValue({
+          type: 'change',
+          premierCommitInterne: PREMIER_COMMIT_INTERNE,
+        });
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe', undefined, true);
+
+        const [, , , , , prisesEnCharge] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(prisesEnCharge).toEqual({ 'projet-1': PREMIER_COMMIT_INTERNE });
+      });
+
+      it("ne doit rien reporter dans prisesEnCharge quand le résultat est de type 'inchange' (décision 6 du plan)", async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        donneesApplicationMock.calculerPriseEnChargeProjet.mockResolvedValue({ type: 'inchange' });
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe', undefined, true);
+
+        const [, , , , , prisesEnCharge] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(prisesEnCharge).toBeUndefined();
+      });
+
+      it('doit absorber un échec de calcul de prise en charge sans faire échouer le projet, et consigner une anomalie', async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        donneesApplicationMock.calculerPriseEnChargeProjet.mockResolvedValue({
+          type: 'echec',
+          message: 'Instance GitLab injoignable.',
+        });
+
+        const resultat = await service.lancerCampagne(
+          ['projet-1'],
+          'mot-de-passe',
+          undefined,
+          true,
+        );
+
+        expect(resultat).toEqual({ type: 'succes' });
+        const [, , , verdicts, , prisesEnCharge] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(verdicts[0].statut).toBe('succes');
+        expect(verdicts[0].anomalies).toEqual(
+          expect.arrayContaining([expect.objectContaining({ indicateur: 'priseEnCharge.calcul' })]),
+        );
+        expect(prisesEnCharge).toBeUndefined();
+      });
+
+      it('doit absorber un échec de résolution de l’empreinte (null) sans appeler calculerPriseEnChargeProjet, et consigner une anomalie', async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        donneesApplicationMock.empreinteReferentielInterne.mockResolvedValue(null);
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe', undefined, true);
+
+        expect(donneesApplicationMock.calculerPriseEnChargeProjet).not.toHaveBeenCalled();
+        const [, , , verdicts] = donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(verdicts[0].anomalies).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ indicateur: 'priseEnCharge.empreinte' }),
+          ]),
+        );
       });
     });
   });

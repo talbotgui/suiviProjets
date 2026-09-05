@@ -78,6 +78,7 @@ import { DonneesApplicationService } from '../etat/donnees-application.service';
 import type {
   Audit,
   Groupe,
+  PremierCommitInterne,
   Projet,
   Resultat,
   ResultatBrouillonProjet,
@@ -86,6 +87,7 @@ import type {
   Verdict,
 } from '../etat/types-donnees';
 import { TypeSource } from '../etat/types-donnees';
+import { PriseEnChargeUtils } from '../../sansetat/jugement/prise-en-charge.utils';
 import { ConnecteurCroiseUtils } from './connecteur-croise.utils';
 import { AberrationUtils } from './aberration.utils';
 import type { Aberration, ValeursComparablesAberration } from './aberration.utils';
@@ -196,25 +198,43 @@ export class OrchestrateurCampagneService {
    * @param dateCiblee - Date ciblée d'un audit historique (C15-14, US-046, RG-046, format `AAAA-MM-JJ`) ; absente,
    * comportement strictement inchangé (audit régulier à la date du jour). Cf. commentaire d'en-tête de ce fichier
    * pour le détail du périmètre réduit appliqué lorsqu'elle est renseignée.
+   * @param calculerPriseEnCharge - Option « Calculer la date de prise en charge des projets sélectionnés » (US-058,
+   * RG-058, plan_18 incrément 6) ; absente ou `false`, comportement strictement inchangé (aucun appel de calcul de
+   * prise en charge). Cochée, chaque projet du périmètre dont le résultat est absent, non `determine`, ou dont
+   * l'empreinte du référentiel `interne` de son groupe a changé depuis le dernier calcul (`PriseEnChargeUtils.
+   * recalculNecessaire`) est recalculé ; seul un résultat qui diffère de la valeur déjà stockée rejoint le
+   * brouillon (décision 6 du plan : pas d'écriture si inchangé). Une anomalie de calcul (connecteur GitLab,
+   * empreinte introuvable) est absorbée par projet, jamais un échec de campagne (cf. commentaire d'en-tête de ce
+   * fichier pour le même principe déjà appliqué à RG-046/RG-021).
    * @returns Le Résultat typé de l'enregistrement du brouillon (`DonneesApplicationService.enregistrerBrouillon`).
    */
   public async lancerCampagne(
     perimetre: readonly string[],
     motDePasse: string,
     dateCiblee?: string,
+    calculerPriseEnCharge?: boolean,
   ): Promise<ResultatMutationAdministration> {
     this.annulationDemandeeInterne.set(false);
     this.etatSession.demarrerProgressionCampagne(perimetre);
 
     const campagneId = crypto.randomUUID();
     const concurrence = this.extraireConcurrence();
+    const cacheEmpreintes = new Map<string, Promise<string | null>>();
     const resultatsProjets = await firstValueFrom(
       from(perimetre).pipe(
         mergeMap((projetId) => {
           if (this.annulationDemandeeInterne()) {
             return EMPTY;
           }
-          return from(this.auditerProjet(projetId, campagneId, dateCiblee));
+          return from(
+            this.auditerProjet(
+              projetId,
+              campagneId,
+              dateCiblee,
+              calculerPriseEnCharge === true,
+              cacheEmpreintes,
+            ),
+          );
         }, concurrence),
         toArray(),
       ),
@@ -234,6 +254,12 @@ export class OrchestrateurCampagneService {
     const resultatsParProjet: ResultatBrouillonProjet[] = resultatsProjets
       .map((resultat) => resultat.resultatBrouillon)
       .filter((resultat): resultat is ResultatBrouillonProjet => resultat !== undefined);
+    const prisesEnCharge: Record<string, PremierCommitInterne> = {};
+    for (const resultat of resultatsProjets) {
+      if (resultat.priseEnCharge !== undefined) {
+        prisesEnCharge[resultat.projetId] = resultat.priseEnCharge;
+      }
+    }
 
     const date = new Date().toISOString();
     return this.donneesApplication.enregistrerBrouillon(
@@ -242,6 +268,7 @@ export class OrchestrateurCampagneService {
       perimetre,
       verdicts,
       resultatsParProjet,
+      Object.keys(prisesEnCharge).length > 0 ? prisesEnCharge : undefined,
       motDePasse,
     );
   }
@@ -266,16 +293,30 @@ export class OrchestrateurCampagneService {
    * @param dateCiblee - Date ciblée d'un audit historique (C15-14, US-046, RG-046) ; absente, comportement
    * strictement inchangé (audit régulier), cf. commentaire d'en-tête de ce fichier pour le périmètre réduit
    * appliqué lorsqu'elle est renseignée.
-   * @returns Le verdict d'exécution et, en cas de succès, l'entrée de brouillon prête à être proposée.
+   * @param calculerPriseEnCharge - Option de campagne US-058/RG-058 (plan_18 incrément 6) ; `false` par défaut,
+   * comportement strictement inchangé. Cf. commentaire de {@link lancerCampagne}.
+   * @param cacheEmpreintes - Cache des empreintes de référentiel `interne`, partagé par tous les projets de la
+   * campagne (une résolution par groupe, cf. {@link resoudreEmpreinteGroupe}) ; ignoré si `calculerPriseEnCharge`
+   * est `false`.
+   * @returns Le verdict d'exécution, en cas de succès l'entrée de brouillon prête à être proposée, et, si un
+   * calcul de prise en charge a eu lieu et diffère de la valeur stockée, le nouveau résultat à reporter sur le
+   * brouillon (hors du périmètre d'indicateurs d'audit, cf. commentaire d'en-tête de ce fichier : n'alimente
+   * jamais l'`Audit` produit).
    */
   private async auditerProjet(
     projetId: string,
     campagneId: string,
     dateCiblee?: string,
+    calculerPriseEnCharge = false,
+    cacheEmpreintes: Map<string, Promise<string | null>> = new Map<
+      string,
+      Promise<string | null>
+    >(),
   ): Promise<{
     readonly projetId: string;
     readonly verdict: Verdict;
     readonly resultatBrouillon?: ResultatBrouillonProjet;
+    readonly priseEnCharge?: PremierCommitInterne;
   }> {
     const modeHistorique = dateCiblee !== undefined;
     const debut = Date.now();
@@ -659,6 +700,20 @@ export class OrchestrateurCampagneService {
       });
     }
 
+    // Calcul de la date de prise en charge (US-058, RG-058, plan_18 incrément 6), en dehors du périmètre
+    // d'indicateurs d'audit (cf. commentaire d'en-tête de ce fichier) : mené même si l'audit du projet échoue par
+    // ailleurs (indépendant des indicateurs GitLab/Sonar), jamais l'inverse (une anomalie ici n'échoue jamais
+    // l'audit). Placé après la boucle des sources pour ne jamais retarder les indicateurs d'audit eux-mêmes.
+    const priseEnCharge = calculerPriseEnCharge
+      ? await this.calculerPriseEnChargeSiNecessaire(
+          resolution.groupe.id,
+          projetId,
+          resolution.projet.premierCommitInterne,
+          anomalies,
+          cacheEmpreintes,
+        )
+      : undefined;
+
     if (resultats.length === 0) {
       this.etatSession.mettreAJourProgressionProjet(projetId, {
         statut: 'echoue',
@@ -667,7 +722,7 @@ export class OrchestrateurCampagneService {
         indicateurEchec: dernierEchec?.indicateur,
         categorieEchec: dernierEchec?.categorie,
       });
-      return { projetId, verdict: { projetId, statut: 'echec', anomalies } };
+      return { projetId, verdict: { projetId, statut: 'echec', anomalies }, priseEnCharge };
     }
 
     const nouveau: ValeursComparablesAberration = {
@@ -723,7 +778,87 @@ export class OrchestrateurCampagneService {
         statut: 'enAttente',
         aberrations,
       },
+      priseEnCharge,
     };
+  }
+
+  /**
+   * Résout l'empreinte courante (`sha256:…`) du sous-ensemble `interne` des membres connus d'un groupe (US-058,
+   * RG-058, décision 15 du plan_18), avec une seule résolution par groupe pour toute la durée de la campagne
+   * (§5.3 du plan) : les appels concurrents pour un même groupe (plusieurs projets d'un même groupe traités dans
+   * le même lot de concurrence) partagent la même promesse plutôt que de déclencher un appel par projet.
+   * @param groupeId - Identifiant du groupe.
+   * @param cacheEmpreintes - Cache partagé pour la durée de la campagne, tenu par l'appelant ({@link
+   * lancerCampagne}).
+   * @returns L'empreinte, ou `null` en cas d'échec (cf. `DonneesApplicationService.empreinteReferentielInterne`).
+   */
+  private resoudreEmpreinteGroupe(
+    groupeId: string,
+    cacheEmpreintes: Map<string, Promise<string | null>>,
+  ): Promise<string | null> {
+    const empreinteEnCache = cacheEmpreintes.get(groupeId);
+    if (empreinteEnCache !== undefined) {
+      return empreinteEnCache;
+    }
+    const empreinte = this.donneesApplication.empreinteReferentielInterne(groupeId);
+    cacheEmpreintes.set(groupeId, empreinte);
+    return empreinte;
+  }
+
+  /**
+   * Calcule, si nécessaire, la date de prise en charge d'un projet dans le cadre d'une campagne cochant l'option
+   * dédiée (US-058, RG-058, plan_18 incrément 6, décision 2 du plan : pré-filtre `PriseEnChargeUtils.
+   * recalculNecessaire`). Une anomalie de résolution d'empreinte ou de calcul de prise en charge est absorbée par
+   * projet (consignée dans `anomalies`, jamais un échec de campagne ni de l'audit du projet, même principe que
+   * RG-046/RG-021 déjà appliqué ailleurs dans ce fichier).
+   * @param groupeId - Identifiant du groupe de rattachement du projet.
+   * @param projetId - Identifiant du projet dont on calcule la date de prise en charge.
+   * @param existant - Valeur actuellement stockée sur le projet, `undefined` si jamais calculée.
+   * @param anomalies - Tableau local des anomalies du projet (partagé avec le reste de {@link auditerProjet}),
+   * complété en cas d'échec de résolution d'empreinte ou de calcul.
+   * @param cacheEmpreintes - Cache des empreintes de référentiel `interne`, cf. {@link resoudreEmpreinteGroupe}.
+   * @returns Le nouveau résultat si le calcul a eu lieu et diffère de la valeur stockée (décision 6 du plan),
+   * `undefined` sinon (recalcul non nécessaire, échec absorbé, ou résultat inchangé).
+   */
+  private async calculerPriseEnChargeSiNecessaire(
+    groupeId: string,
+    projetId: string,
+    existant: PremierCommitInterne | undefined,
+    anomalies: unknown[],
+    cacheEmpreintes: Map<string, Promise<string | null>>,
+  ): Promise<PremierCommitInterne | undefined> {
+    const empreinteCourante = await this.resoudreEmpreinteGroupe(groupeId, cacheEmpreintes);
+    if (empreinteCourante === null) {
+      anomalies.push({
+        indicateur: 'priseEnCharge.empreinte',
+        sourceId: groupeId,
+        anomalie: {
+          type: 'reponseInattendue',
+          message: "Échec de résolution de l'empreinte du référentiel interne du groupe.",
+        },
+      });
+      return undefined;
+    }
+    if (!PriseEnChargeUtils.recalculNecessaire(existant, empreinteCourante)) {
+      return undefined;
+    }
+    const resultat = await this.donneesApplication.calculerPriseEnChargeProjet(groupeId, projetId);
+    // Switch exhaustif sur le discriminant `type` (norme 09, corrigé en relecture : un `if`/ternaire laissait une
+    // future variante de `ResultatCalculPriseEnCharge` tomber silencieusement dans `undefined`, sans erreur de
+    // compilation, contrairement au switch exhaustif équivalent de `fiche-projet.component.ts`).
+    switch (resultat.type) {
+      case 'echec':
+        anomalies.push({
+          indicateur: 'priseEnCharge.calcul',
+          sourceId: projetId,
+          anomalie: { type: 'reponseInattendue', message: resultat.message },
+        });
+        return undefined;
+      case 'inchange':
+        return undefined;
+      case 'change':
+        return resultat.premierCommitInterne;
+    }
   }
 
   /**

@@ -1144,6 +1144,7 @@ describe('DonneesApplicationService', () => {
         ['projet-1'],
         [VERDICT_SUCCES],
         [RESULTAT_EN_ATTENTE],
+        undefined,
         'mot-de-passe',
       );
 
@@ -1170,10 +1171,65 @@ describe('DonneesApplicationService', () => {
         ['projet-1'],
         [VERDICT_SUCCES],
         [RESULTAT_EN_ATTENTE],
+        undefined,
         'mot-de-passe',
       );
 
       expect(resultat).toEqual({ type: 'echec', anomalie: { type: 'brouillonDejaExistant' } });
+    });
+
+    it('transmet prisesEnCharge à enregistrer_brouillon quand elle contient au moins une entrée', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      invokeSimule.mockResolvedValue(racineAvantAppel);
+      const premierCommitInterne: PremierCommitInterne = {
+        statut: 'determine',
+        date: '2020-01-15',
+        sha: 'abc123',
+        emailAuteur: 'interne@exemple.test',
+        calculeLe: '2026-07-23',
+        empreinteReferentiel: 'sha256:abc',
+      };
+
+      await service.enregistrerBrouillon(
+        'campagne-1',
+        '2026-07-23',
+        ['projet-1'],
+        [VERDICT_SUCCES],
+        [RESULTAT_EN_ATTENTE],
+        { 'projet-1': premierCommitInterne },
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'enregistrer_brouillon',
+        expect.objectContaining({ prisesEnCharge: { 'projet-1': premierCommitInterne } }),
+      );
+    });
+
+    it("n'inclut pas prisesEnCharge dans l'appel quand elle est absente ou vide", async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      invokeSimule.mockResolvedValue(racineAvantAppel);
+
+      await service.enregistrerBrouillon(
+        'campagne-1',
+        '2026-07-23',
+        ['projet-1'],
+        [VERDICT_SUCCES],
+        [RESULTAT_EN_ATTENTE],
+        {},
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith('enregistrer_brouillon', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        campagneId: 'campagne-1',
+        date: '2026-07-23',
+        perimetre: ['projet-1'],
+        verdicts: [VERDICT_SUCCES],
+        resultatsParProjet: [RESULTAT_EN_ATTENTE],
+        motDePasse: 'mot-de-passe',
+      });
     });
 
     it('invoque integrer_brouillon avec la sélection fournie et met à jour la racine', async () => {

@@ -797,6 +797,11 @@ pub(crate) async fn interroger_derniere_analyse(
 /// l'extension déjà pratiquée pour `qualifierMembre` en Phase 4 — cf. `persistance::audit::enregistrer_brouillon`
 /// pour le détail des champs ajoutés.
 ///
+/// `prises_en_charge` (US-058, RG-058, plan_18 incrément 6) : résultats de calcul de la date de prise en charge à
+/// appliquer aux projets correspondants lors d'une future intégration du brouillon (`integrer_brouillon`), déjà
+/// filtrés côté appelant (Orchestrateur de campagne, UI) aux seuls projets dont le résultat diffère de la valeur
+/// stockée (décision 6 du plan) ; absent ou vide, comportement strictement inchangé.
+///
 /// # Erreurs
 ///
 /// Voir [`persistance::audit::enregistrer_brouillon`] pour le détail des anomalies de validation métier (brouillon
@@ -815,6 +820,9 @@ pub(crate) fn enregistrer_brouillon(
     perimetre: Vec<String>,
     verdicts: Vec<Verdict>,
     resultats_par_projet: Vec<ResultatBrouillonProjet>,
+    prises_en_charge: Option<
+        std::collections::HashMap<String, crate::modele::racine::PremierCommitInterne>,
+    >,
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
@@ -830,6 +838,7 @@ pub(crate) fn enregistrer_brouillon(
             perimetre,
             verdicts,
             resultats_par_projet,
+            prises_en_charge,
             horodatage,
         )?;
 
@@ -848,7 +857,8 @@ pub(crate) fn enregistrer_brouillon(
 }
 
 /// Intègre à l'historique des projets concernés tout ou partie des résultats en attente du brouillon courant,
-/// sauvegarde le fichier (US-014).
+/// applique dans la même sauvegarde toute entrée ciblée de `Brouillon.prises_en_charge` (US-058, RG-058, plan_18
+/// incrément 6) en consignant une entrée de journal par entrée appliquée (RG-023), sauvegarde le fichier (US-014).
 ///
 /// Nom de commande non fourni littéralement par `docs/02_documentation/13_conceptionDetaillee.md` (seule
 /// `enregistrerBrouillon` y est nommée) : décision arbitraire documentée dans le compte-rendu de développement de
@@ -871,7 +881,8 @@ pub(crate) fn integrer_brouillon(
     let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
         super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
         let mut donnees = donnees;
-        audit::integrer_brouillon(&mut donnees, selection.as_deref())?;
+        let horodatage = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        audit::integrer_brouillon(&mut donnees, selection.as_deref(), horodatage)?;
 
         let cle = moteur::sauvegarder_fichier(
             Path::new(&chemin),
