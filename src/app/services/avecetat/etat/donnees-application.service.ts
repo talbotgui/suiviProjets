@@ -808,7 +808,8 @@ export class DonneesApplicationService {
    * n'entraîne ni ressaisie de mot de passe, ni sauvegarde, ni entrée de journal).
    * @param groupeId - Identifiant du groupe de rattachement.
    * @param projetId - Identifiant du projet dont on (re)calcule la date de prise en charge.
-   * @returns `inchange`, `change` (avec le nouveau résultat) ou `echec` (avec un message lisible).
+   * @returns `inchange`, `change` (avec le nouveau résultat) ou `echec` (avec un message lisible et la catégorie
+   * d'anomalie d'origine, RG-021, constat R18-Q-02).
    * @throws {Error} Si aucun fichier n'est chargé (erreur de programmation de l'écran appelant).
    */
   public async calculerPriseEnChargeProjet(
@@ -827,7 +828,8 @@ export class DonneesApplicationService {
       }
       return { type: 'change', premierCommitInterne: resultat };
     } catch (erreur: unknown) {
-      return { type: 'echec', message: this.messageErreurConnecteur(erreur) };
+      const categorie = this.resoudreCategorieConnecteur(erreur) ?? 'reponseInattendue';
+      return { type: 'echec', message: this.messageErreurConnecteur(erreur), categorie };
     }
   }
 
@@ -877,8 +879,13 @@ export class DonneesApplicationService {
       id: this.genererId(),
       horodatage: new Date().toISOString(),
       objet: `groupes/${groupeId}/projets/${projetId}/premierCommitInterne`,
-      avant: this.descripteurPriseEnCharge(projet.premierCommitInterne),
-      apres: this.descripteurPriseEnCharge(premierCommitInterne),
+      // `avant`/`apres` portent la valeur JSON brute de `premierCommitInterne`, comme toutes les autres entrées de
+      // journal du cœur natif (`persistance::administration::qualifier_membre` sérialise l'objet complet) et comme la
+      // voie « intégration du brouillon de campagne » (`persistance::audit::integrer_brouillon`) — constat R18-W-01
+      // de `plan_18_relecture.md` : les deux voies de recalcul de la prise en charge consignent désormais le même
+      // format. `null` (et non un descripteur textuel) quand aucun calcul n'existait, comme `qualifier_membre`.
+      avant: projet.premierCommitInterne ?? null,
+      apres: premierCommitInterne,
       origine: ORIGINE_ADMINISTRATION,
     };
     const nouvelleRacine: DonneesRacine = {
@@ -903,23 +910,6 @@ export class DonneesApplicationService {
     } catch (erreur: unknown) {
       return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
     }
-  }
-
-  /**
-   * Descripteur compact et lisible d'un résultat de prise en charge, consigné au journal des modifications
-   * (RG-023) : `AAAA-MM-JJ (determine)` pour un premier commit interne daté, `— (statut)` sinon, `—` si aucun
-   * calcul n'existait.
-   * @param premierCommitInterne - Résultat de prise en charge, ou `undefined` si jamais calculé.
-   * @returns Le descripteur.
-   */
-  private descripteurPriseEnCharge(premierCommitInterne: PremierCommitInterne | undefined): string {
-    if (premierCommitInterne === undefined) {
-      return '—';
-    }
-    if (premierCommitInterne.statut === 'determine') {
-      return `${premierCommitInterne.date} (determine)`;
-    }
-    return `— (${premierCommitInterne.statut})`;
   }
 
   /**

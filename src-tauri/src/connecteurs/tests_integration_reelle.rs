@@ -16,6 +16,10 @@
 //!   documentées par `docs/02_documentation/17_posteDeveloppeur.md`.
 //! - `SQM_TEST_SONAR_PROJET_CLE` : clé d'un projet Sonar réel accessible avec ce jeton (variable introduite par ce
 //!   module, Phase 5, incrément 7).
+//! - `SQM_TEST_GITLAB_DOMAINE_INTERNE` / `SQM_TEST_GITLAB_PROJET_GROS_ID` : **optionnelles**, propres au test
+//!   `rechercher_premier_commit_interne_contre_une_vraie_instance_gitlab` (plan_18, US-058/RG-058) — domaine d'un
+//!   auteur de commit interne du projet testé, et identifiant d'un dépôt de plus de ~10 000 commits pour éprouver
+//!   le repli en parcours avant (en-tête `x-total-pages` omis par l'API).
 //!
 //! `.expect()` est ici le seul endroit du projet où son usage est toléré (`clippy::expect_used` normalement
 //! interdit partout ailleurs, cf.
@@ -24,6 +28,7 @@
 //! immédiatement et lisiblement le test déclenché manuellement, plutôt que de propager une anomalie ambiguë.
 
 use super::commun::client_http_avec_proxy;
+use super::gitlab::{CorrespondanceInterne, ResultatPremierCommitInterne};
 use super::{gitlab, sonar};
 
 /// Client HTTP sans réglage de proxy applicatif, pour ces tests d'intégration hors CI (cf.
@@ -311,4 +316,95 @@ async fn interroger_notes_et_ncloc_en_mode_historique_contre_une_vraie_instance_
          vérification humaine attendue : ces valeurs doivent différer de la valeur de repli (5.0 par note, 0 pour \
          ncloc) si l'instance testée historise bien ces métriques via measures/search_history"
     );
+}
+
+/// Exerce `rechercher_premier_commit_interne` (US-058, RG-058, plan_18) contre une vraie instance GitLab.
+///
+/// Variables d'environnement (en plus de `SQM_TEST_GITLAB_URL` / `SQM_TEST_GITLAB_TOKEN` /
+/// `SQM_TEST_GITLAB_PROJET_ID`), toutes **optionnelles** :
+///
+/// - `SQM_TEST_GITLAB_DOMAINE_INTERNE` : domaine de courriel d'un auteur de commit interne du projet
+///   `SQM_TEST_GITLAB_PROJET_ID` (ex. `exemple.fr`), pour que la recherche ait une chance d'aboutir à `Trouve` ;
+///   sans lui, la recherche parcourt bien la pagination mais se conclut par `AucunCommitInterne`/`TropDeCommits` ;
+/// - `SQM_TEST_GITLAB_PROJET_GROS_ID` : identifiant d'un dépôt de plus de ~10 000 commits, pour lequel l'API omet
+///   l'en-tête `x-total-pages` — la partie du test qui exerce le **repli** en parcours avant est ignorée sans lui.
+///
+/// Vérification principalement **humaine** (`cargo test -- --ignored --nocapture`) : la date, le SHA et le statut
+/// affichés doivent être cohérents avec l'historique réel du dépôt ; la borne par défaut `50` (cf.
+/// `parametres.audit.borneRecherchePremierCommitPages`) est éprouvée à cette occasion. Le test échoue seulement sur
+/// une anomalie de connecteur inattendue.
+#[tokio::test]
+#[ignore = "test d'intégration hors CI : nécessite une vraie instance GitLab, déclenchement manuel uniquement — \
+            éprouve rechercher_premier_commit_interne (US-058/RG-058, plan_18), dont le repli sans x-total-pages"]
+async fn rechercher_premier_commit_interne_contre_une_vraie_instance_gitlab() {
+    let url = variable_env_requise(
+        "SQM_TEST_GITLAB_URL",
+        "SQM_TEST_GITLAB_URL doit être définie pour ce test d'intégration",
+    );
+    let jeton = variable_env_requise(
+        "SQM_TEST_GITLAB_TOKEN",
+        "SQM_TEST_GITLAB_TOKEN doit être définie pour ce test d'intégration",
+    );
+    let projet_id = variable_env_requise(
+        "SQM_TEST_GITLAB_PROJET_ID",
+        "SQM_TEST_GITLAB_PROJET_ID doit être définie pour ce test d'intégration",
+    );
+    let domaines_internes: Vec<String> = std::env::var("SQM_TEST_GITLAB_DOMAINE_INTERNE")
+        .ok()
+        .filter(|valeur| !valeur.trim().is_empty())
+        .into_iter()
+        .collect();
+
+    let correspondance = CorrespondanceInterne::nouvelle(
+        std::iter::empty::<String>(),
+        std::iter::empty::<String>(),
+        domaines_internes,
+    );
+
+    let resultat = gitlab::rechercher_premier_commit_interne(
+        &url,
+        &jeton,
+        &projet_id,
+        None,
+        &correspondance,
+        50,
+        &client_http(),
+    )
+    .await;
+
+    assert!(
+        resultat.is_ok(),
+        "recherche du premier commit interne attendue sans anomalie de connecteur : {resultat:?}"
+    );
+    eprintln!(
+        "rechercher_premier_commit_interne (cas nominal, borne 50) = {resultat:?}\n\
+         vérification humaine attendue : date/sha/statut cohérents avec l'historique réel du dépôt"
+    );
+
+    // Repli « dépôt volumineux » (en-tête x-total-pages absent) : ignoré si aucun gros dépôt n'est configuré.
+    if let Ok(gros_projet_id) = std::env::var("SQM_TEST_GITLAB_PROJET_GROS_ID") {
+        let resultat_gros = gitlab::rechercher_premier_commit_interne(
+            &url,
+            &jeton,
+            &gros_projet_id,
+            None,
+            &correspondance,
+            50,
+            &client_http(),
+        )
+        .await;
+        assert!(
+            resultat_gros.is_ok(),
+            "recherche sur un gros dépôt attendue sans anomalie de connecteur : {resultat_gros:?}"
+        );
+        assert!(
+            !matches!(resultat_gros, Ok(ResultatPremierCommitInterne::DepotVide)),
+            "un gros dépôt n'est pas vide : {resultat_gros:?}"
+        );
+        eprintln!(
+            "rechercher_premier_commit_interne (repli sans x-total-pages, borne 50) = {resultat_gros:?}\n\
+             vérification humaine attendue : `TropDeCommits` si l'auteur interne le plus ancien n'a pas commité \
+             récemment (comportement voulu), `Trouve` sinon"
+        );
+    }
 }

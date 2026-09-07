@@ -236,11 +236,14 @@ export class SaisieMasseMembresUtils {
     if (typeCritere === 'domaineEmail') {
       return 'Une règle de type domaine ne peut pas porter de date de départ (RG-061).';
     }
-    const horodatage = Date.parse(`${partiLe}T00:00:00Z`);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(partiLe) || Number.isNaN(horodatage)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(partiLe) || Number.isNaN(Date.parse(`${partiLe}T00:00:00Z`))) {
       return `Date de départ « ${partiLe} » invalide : format attendu AAAA-MM-JJ.`;
     }
-    if (horodatage > Date.now()) {
+    // Comparaison de chaînes `AAAA-MM-JJ` au jour UTC courant, comme `SqmMembresConnusAdminComponent.validerPartiLe`
+    // et `persistance::administration::valider_parti_le` (jour dérivé de l'horodatage UTC) — constat R18-W-08 de
+    // `plan_18_relecture.md` : les trois étages appliquent la règle « non future » sur la même base de temps.
+    const jourCourantUtc = new Date().toISOString().slice(0, 10);
+    if (partiLe > jourCourantUtc) {
       return `Date de départ « ${partiLe} » invalide : elle ne peut pas être dans le futur.`;
     }
     return null;

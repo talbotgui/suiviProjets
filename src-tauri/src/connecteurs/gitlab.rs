@@ -1343,7 +1343,10 @@ fn tronquer_date_utc(committed_date: &str) -> Result<chrono::NaiveDate, ErreurCo
 /// collections sous environ 10 000 éléments :
 ///
 /// - **cas nominal** (`x-total-pages` présent) : les `borne_pages` dernières pages sont parcourues (les commits les
-///   plus anciens) ; le résultat est marqué tronqué si ces pages ne couvrent pas tout l'historique ;
+///   plus anciens) ; le résultat est marqué tronqué si ces pages ne couvrent pas tout l'historique. La page 1 est
+///   toujours récupérée (elle porte l'en-tête `x-total-pages`) ; hors fenêtre, ses commits sont écartés — choix
+///   assumé (cf. R18-Q-03 de `plan_18_relecture.md` : ne retenir que la fenêtre la plus ancienne, cohérente entre
+///   les deux régimes) ;
 /// - **cas de repli** (`x-total-pages` absent, dépôt volumineux) : les `borne_pages` premières pages (commits les
 ///   plus récents) sont parcourues ; faute d'atteindre les commits les plus anciens, un auteur interne n'est
 ///   retrouvé que s'il a aussi commité récemment, sinon [`ResultatPremierCommitInterne::TropDeCommits`].

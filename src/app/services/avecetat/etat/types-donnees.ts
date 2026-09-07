@@ -35,6 +35,7 @@
 // du Moteur de jugement ni aux nombreux tests qui construisent déjà des valeurs de ces deux types sans
 // identifiant (Phase 6). `VersionDependance.statut` reste une chaîne ouverte, non énumérée en dur (RG-022).
 import type {
+  CategorieErreurConnecteur,
   Instance,
   RegleMarqueurIA,
   ResultatGitlabBranches,
@@ -893,7 +894,16 @@ export type ResultatMutationAdministration =
 export type ResultatCalculPriseEnCharge =
   | { readonly type: 'inchange' }
   | { readonly type: 'change'; readonly premierCommitInterne: PremierCommitInterne }
-  | { readonly type: 'echec'; readonly message: string };
+  | {
+      readonly type: 'echec';
+      readonly message: string;
+      /**
+       * Catégorie d'anomalie d'origine (RG-021 : « une catégorie claire », constat R18-Q-02 de
+       * `plan_18_relecture.md`), `'reponseInattendue'` par défaut si la valeur interceptée n'en porte aucune de
+       * reconnue.
+       */
+      readonly categorie: CategorieErreurConnecteur;
+    };
 
 /**
  * Résultat typé d'un déverrouillage de session (`DonneesApplicationService.deverrouillerSession`, US-026) : à la

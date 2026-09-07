@@ -85,11 +85,12 @@ use std::collections::HashMap;
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
 ///
 /// Passage de `10` à `11` (plan_18 — date de prise en charge, US-058/RG-058 ; date de départ d'un membre connu,
-/// US-061/RG-061) : palier **à transformation nulle**, comme `migration_1_vers_2`. Deux changements de forme
+/// US-061/RG-061) : palier **à transformation nulle**, comme `migration_1_vers_2`. Trois changements de forme
 /// additifs : `Projet.premierCommitInterne` devient une union discriminée sur `statut` ([`PremierCommitInterne`] +
 /// [`StatutPremierCommit`]) dont la variante `determine` sérialise à l'identique de la forme plate antérieure (les
-/// autres statuts n'ont jamais été persistés), et `MembreConnu.partiLe` est un champ optionnel ajouté (absent =
-/// membre actif). Conformément à la convention du projet pour tout changement de forme du schéma, `VERSION_SCHEMA_COURANTE`
+/// autres statuts n'ont jamais été persistés), `MembreConnu.partiLe` est un champ optionnel ajouté (absent =
+/// membre actif) et `Brouillon.prisesEnCharge` est un champ optionnel ajouté à la zone de brouillon transitoire.
+/// Conformément à la convention du projet pour tout changement de forme du schéma, `VERSION_SCHEMA_COURANTE`
 /// est néanmoins incrémentée et `migration_10_vers_11` ajoutée à
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`. La valeur `11` a été retenue en l'absence
 /// d'intégration préalable de `plan_17` chapitre 4 (qui incrémente aussi ce compteur) : le premier des deux plans

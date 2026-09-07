@@ -20,7 +20,8 @@
 //! (US-017 : `MembreGitlab.herite` remplacé par `direct` + `groupesInvites`), [`migration_9_vers_10`] (plan_16,
 //! incrément 2 : uniformisation de la forme du champ `filtres` de chaque `VueEnregistree` en `{ groupeId, projetIds }`,
 //! RG-027 amendée / RG-053) et [`migration_10_vers_11`] (plan_18 : `Projet.premierCommitInterne` en union
-//! discriminée sur `statut`, `MembreConnu.partiLe` optionnel — palier à transformation nulle, RG-058 / RG-061).
+//! discriminée sur `statut`, champs optionnels `MembreConnu.partiLe` et `Brouillon.prisesEnCharge` — palier à
+//! transformation nulle, RG-058 / RG-061).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -181,13 +182,14 @@ fn migration_9_vers_10(valeur: &mut Value) -> Result<(), ErreurPersistance> {
 /// Dixième migration réelle du projet (plan_18 — date de prise en charge, US-058/RG-058 ; date de départ d'un
 /// membre connu, US-061/RG-061), faisant progresser `versionSchema` de `10` à `11`.
 ///
-/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : les deux
-/// changements de forme sont additifs. `Projet.premierCommitInterne` devient une union discriminée sur `statut`
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : les changements
+/// de forme sont tous additifs. `Projet.premierCommitInterne` devient une union discriminée sur `statut`
 /// ([`crate::modele::racine::PremierCommitInterne`]) dont la variante `determine` sérialise à l'identique de la
 /// forme plate historique (`{ statut: "determine", date, sha, emailAuteur, calculeLe, empreinteReferentiel }`) —
-/// seule forme jamais persistée à ce jour, les autres statuts n'ayant jamais existé sur disque —, et
-/// `MembreConnu.partiLe` est un champ optionnel (`#[serde(default, skip_serializing_if = "Option::is_none")]`) dont
-/// l'absence se désérialise directement en `None`. Seule la version de schéma progresse.
+/// seule forme jamais persistée à ce jour, les autres statuts n'ayant jamais existé sur disque —, `MembreConnu.partiLe`
+/// et `Brouillon.prisesEnCharge` sont des champs optionnels (`#[serde(default, skip_serializing_if = "Option::is_none")]`)
+/// dont l'absence se désérialise directement en `None` (un brouillon est de toute façon transitoire). Seule la
+/// version de schéma progresse.
 fn migration_10_vers_11(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     if let Some(objet) = valeur.as_object_mut() {
         objet.insert("versionSchema".to_string(), Value::from(11));

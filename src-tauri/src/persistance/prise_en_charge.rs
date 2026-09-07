@@ -11,12 +11,16 @@
 //! module **n'écrit jamais sur le disque** : il retourne la structure calculée, la persistance conditionnelle
 //! (décision 6 du plan : aucune écriture si le résultat est inchangé) restant à la charge du flux appelant.
 //!
-//! Limite connue de la table de correspondance (à trancher en relecture, cf. rapport de développement) : la
-//! précédence [RG-007](../../../docs/02_documentation/05_reglesGestion.md) est appliquée **au sein d'un même
-//! canal** (un courriel exact ou un domaine également porté par une règle non `interne` de même canal est retiré),
-//! mais le masquage **inter-canaux** (un courriel exact `client` masquant une règle de domaine `interne` qui le
-//! couvrirait) n'est pas reproduit ici : la résolution fine du statut d'affichage reste celle du Moteur de
-//! jugement (interface), non modifiée par ce plan (décision 20).
+//! Portée volontairement plus permissive que la résolution fine du statut d'affichage (écart jugé **acceptable** par
+//! l'utilisateur le 2026-09-07, à la suite de la relecture `plan_18_relecture.md`, constat R18-W-03) :
+//! la précédence [RG-007](../../../docs/02_documentation/05_reglesGestion.md) est appliquée **au sein d'un même
+//! canal** (un courriel exact ou un domaine également porté par une règle non `interne` de même `typeCritere`, à
+//! critère normalisé identique, est retiré — RG-008), mais le masquage **inter-canaux** (un courriel exact `client`
+//! neutralisant une règle de domaine `interne` qui le couvrirait) n'est **pas** reproduit ici. Justification : une
+//! règle de domaine `interne` désigne délibérément ce domaine comme interne pour la datation ; qu'une seule
+//! personne de ce domaine soit par ailleurs qualifiée `client` par courriel exact ne doit pas empêcher de dater le
+//! projet sur les commits des autres auteurs du domaine. La résolution fine du statut d'affichage reste celle du
+//! Moteur de jugement (interface), non modifiée par ce plan (décision 20).
 
 use crate::connecteurs::commun::ErreurConnecteur;
 use crate::connecteurs::gitlab::{CorrespondanceInterne, ResultatPremierCommitInterne};
@@ -42,18 +46,22 @@ pub(crate) type FutureResultatCommit<'a> = Pin<
 ///
 /// Sont projetés, pour chaque règle de statut [`StatutMembre::Interne`], le triplet
 /// `(critere, typeCritere, aliasEmail)` — **jamais `partiLe`** (décision 11 : marquer un interne comme parti ne
-/// périme pas le calcul de prise en charge). Les triplets sont triés puis sérialisés en JSON (tableau de tableaux,
-/// forme stable indépendante de l'ordre des champs d'une structure) avant condensation.
+/// périme pas le calcul de prise en charge). `critere` et `aliasEmail` sont **normalisés** ([`normaliser_critere`],
+/// [`normaliser_alias`] : espaces de bordure retirés, minuscules, `@` de tête d'un domaine retiré), de la même
+/// façon que [`construire_correspondance_interne`] et [`CorrespondanceInterne::correspond`] : une simple retouche
+/// de casse d'une règle (`Corp.FR` → `corp.fr`), sans effet sur la datation, ne périme donc pas non plus le calcul.
+/// Les triplets sont triés puis sérialisés en JSON (tableau de tableaux, forme stable indépendante de l'ordre des
+/// champs d'une structure) avant condensation.
 pub(crate) fn empreinte_referentiel_interne(groupe: &Groupe) -> String {
-    let mut triplets: Vec<(&str, &'static str, &str)> = groupe
+    let mut triplets: Vec<(String, &'static str, String)> = groupe
         .membres_connus
         .iter()
         .filter(|membre| membre.statut == StatutMembre::Interne)
         .map(|membre| {
             (
-                membre.critere.as_str(),
+                normaliser_critere(membre.type_critere, &membre.critere),
                 libelle_type_critere(membre.type_critere),
-                membre.alias_email.as_deref().unwrap_or(""),
+                normaliser_alias(membre.alias_email.as_deref()).unwrap_or_default(),
             )
         })
         .collect();
@@ -78,31 +86,56 @@ fn libelle_type_critere(type_critere: TypeCritere) -> &'static str {
     }
 }
 
+/// Normalise un `critere` de règle pour comparaison et empreinte : espaces de bordure retirés, minuscules ; pour un
+/// [`TypeCritere::DomaineEmail`], le `@` de tête est également retiré. Garantit que courriels et domaines sont
+/// traités de façon **symétrique** par [`empreinte_referentiel_interne`] et [`construire_correspondance_interne`]
+/// (un courriel `client` `Bob@Corp.fr` masque bien une règle `interne` `bob@corp.fr`), et aligné sur la
+/// normalisation interne de [`CorrespondanceInterne::nouvelle`]. Le username n'est jamais comparé à un courriel
+/// d'auteur (absent de l'API des commits) : sa normalisation ne sert qu'à stabiliser l'empreinte.
+fn normaliser_critere(type_critere: TypeCritere, critere: &str) -> String {
+    let base = critere.trim().to_lowercase();
+    match type_critere {
+        TypeCritere::DomaineEmail => base.trim_start_matches('@').to_string(),
+        TypeCritere::Username | TypeCritere::Email => base,
+    }
+}
+
+/// Normalise un alias courriel optionnel (espaces de bordure retirés, minuscules) ; `None` pour un alias absent ou
+/// vide après normalisation (traité comme absent aussi bien dans l'empreinte que dans la table de correspondance).
+fn normaliser_alias(alias: Option<&str>) -> Option<String> {
+    alias
+        .map(|valeur| valeur.trim().to_lowercase())
+        .filter(|valeur| !valeur.is_empty())
+}
+
 /// Construit la table de correspondance des courriels d'auteur de commit à partir des règles `interne` du groupe
 /// (RG-058), **sans filtrer sur `partiLe`** (décision 10 : un interne parti reste pris en compte, ses anciens
 /// commits sont des commits internes légitimes).
 ///
 /// Précédence appliquée : au sein d'un même canal, un `critere` également porté par une règle **non `interne`** du
 /// même `typeCritere` est retiré (RG-008 : un conflit de statut sur le même critère ne date pas la prise en
-/// charge). Les règles de type `username` n'alimentent que par leur éventuel `aliasEmail` (le login n'est pas
-/// exposé par l'API des commits).
+/// charge). La comparaison se fait sur des critères **normalisés** ([`normaliser_critere`]), courriels et domaines
+/// traités de façon symétrique. Les règles de type `username` n'alimentent que par leur éventuel `aliasEmail` (le
+/// login n'est pas exposé par l'API des commits).
 pub(crate) fn construire_correspondance_interne(groupe: &Groupe) -> CorrespondanceInterne {
-    let courriels_non_internes: HashSet<&str> = groupe
-        .membres_connus
-        .iter()
-        .filter(|membre| {
-            membre.statut != StatutMembre::Interne && membre.type_critere == TypeCritere::Email
-        })
-        .map(|membre| membre.critere.as_str())
-        .collect();
-    let domaines_non_internes: HashSet<String> = groupe
+    // Critères (normalisés) portés par une règle non `interne`, par canal comparable à un commit : un critère
+    // `interne` qui y figure aussi est écarté (conflit de statut sur le même critère, RG-008).
+    let criteres_non_internes: HashSet<(&'static str, String)> = groupe
         .membres_connus
         .iter()
         .filter(|membre| {
             membre.statut != StatutMembre::Interne
-                && membre.type_critere == TypeCritere::DomaineEmail
+                && matches!(
+                    membre.type_critere,
+                    TypeCritere::Email | TypeCritere::DomaineEmail
+                )
         })
-        .map(|membre| membre.critere.trim().trim_start_matches('@').to_lowercase())
+        .map(|membre| {
+            (
+                libelle_type_critere(membre.type_critere),
+                normaliser_critere(membre.type_critere, &membre.critere),
+            )
+        })
         .collect();
 
     let mut courriels_exacts: Vec<String> = Vec::new();
@@ -112,22 +145,22 @@ pub(crate) fn construire_correspondance_interne(groupe: &Groupe) -> Correspondan
         if membre.statut != StatutMembre::Interne {
             continue;
         }
+        let critere_normalise = normaliser_critere(membre.type_critere, &membre.critere);
+        let porte_par_regle_non_interne = criteres_non_internes.contains(&(
+            libelle_type_critere(membre.type_critere),
+            critere_normalise.clone(),
+        ));
         match membre.type_critere {
-            TypeCritere::Email => {
-                if !courriels_non_internes.contains(membre.critere.as_str()) {
-                    courriels_exacts.push(membre.critere.clone());
-                }
+            TypeCritere::Email if !porte_par_regle_non_interne => {
+                courriels_exacts.push(critere_normalise);
             }
-            TypeCritere::DomaineEmail => {
-                let normalise = membre.critere.trim().trim_start_matches('@').to_lowercase();
-                if !domaines_non_internes.contains(&normalise) {
-                    domaines.push(membre.critere.clone());
-                }
+            TypeCritere::DomaineEmail if !porte_par_regle_non_interne => {
+                domaines.push(critere_normalise);
             }
-            TypeCritere::Username => {}
+            _ => {}
         }
-        if let Some(alias) = &membre.alias_email {
-            alias_courriels.push(alias.clone());
+        if let Some(alias) = normaliser_alias(membre.alias_email.as_deref()) {
+            alias_courriels.push(alias);
         }
     }
     CorrespondanceInterne::nouvelle(courriels_exacts, alias_courriels, domaines)
@@ -548,5 +581,56 @@ mod tests {
             },
         ]);
         assert!(!construire_correspondance_interne(&groupe).correspond("partage@corp.test"));
+    }
+
+    /// Constat R18-W-02 de `plan_18_relecture.md` : une retouche de casse/espaces d'une règle `interne` ne périme
+    /// pas le calcul de prise en charge (l'empreinte est stable), la datation étant elle-même insensible à la casse.
+    #[test]
+    fn empreinte_insensible_a_la_casse_et_aux_espaces_des_criteres() {
+        let brut = groupe_avec(vec![
+            MembreConnu {
+                alias_email: Some("  Alias@Perso.NET ".to_string()),
+                ..membre_interne(" Corp.FR ", TypeCritere::DomaineEmail)
+            },
+            membre_interne("Marie@Corp.FR", TypeCritere::Email),
+        ]);
+        let normalise = groupe_avec(vec![
+            MembreConnu {
+                alias_email: Some("alias@perso.net".to_string()),
+                ..membre_interne("corp.fr", TypeCritere::DomaineEmail)
+            },
+            membre_interne("marie@corp.fr", TypeCritere::Email),
+        ]);
+        assert_eq!(
+            empreinte_referentiel_interne(&brut),
+            empreinte_referentiel_interne(&normalise)
+        );
+    }
+
+    /// Constat R18-W-03 de `plan_18_relecture.md` : l'exclusion « même canal » compare des critères normalisés,
+    /// courriels et domaines traités symétriquement (auparavant, seuls les domaines étaient normalisés).
+    #[test]
+    fn correspondance_exclut_un_critere_non_interne_de_casse_ou_de_formatage_different() {
+        // Courriel exact : la règle `client` en casse différente masque bien la règle `interne`.
+        let groupe_courriel = groupe_avec(vec![
+            membre_interne("partage@corp.test", TypeCritere::Email),
+            MembreConnu {
+                statut: StatutMembre::Client,
+                ..membre_interne("Partage@Corp.Test", TypeCritere::Email)
+            },
+        ]);
+        assert!(
+            !construire_correspondance_interne(&groupe_courriel).correspond("partage@corp.test")
+        );
+
+        // Domaine : idem, avec `@` de tête et espaces divergents.
+        let groupe_domaine = groupe_avec(vec![
+            membre_interne("corp.test", TypeCritere::DomaineEmail),
+            MembreConnu {
+                statut: StatutMembre::Partenaire,
+                ..membre_interne(" @Corp.TEST ", TypeCritere::DomaineEmail)
+            },
+        ]);
+        assert!(!construire_correspondance_interne(&groupe_domaine).correspond("bob@corp.test"));
     }
 }

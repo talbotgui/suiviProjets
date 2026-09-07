@@ -200,10 +200,12 @@ export class OrchestrateurCampagneService {
    * pour le détail du périmètre réduit appliqué lorsqu'elle est renseignée.
    * @param calculerPriseEnCharge - Option « Calculer la date de prise en charge des projets sélectionnés » (US-058,
    * RG-058, plan_18 incrément 6) ; absente ou `false`, comportement strictement inchangé (aucun appel de calcul de
-   * prise en charge). Cochée, chaque projet du périmètre dont le résultat est absent, non `determine`, ou dont
-   * l'empreinte du référentiel `interne` de son groupe a changé depuis le dernier calcul (`PriseEnChargeUtils.
-   * recalculNecessaire`) est recalculé ; seul un résultat qui diffère de la valeur déjà stockée rejoint le
-   * brouillon (décision 6 du plan : pas d'écriture si inchangé). Une anomalie de calcul (connecteur GitLab,
+   * prise en charge). Cochée, chaque projet du périmètre **dont l'audit a produit au moins un résultat** et dont le
+   * résultat de prise en charge est absent, non `determine`, ou dont l'empreinte du référentiel `interne` de son
+   * groupe a changé depuis le dernier calcul (`PriseEnChargeUtils.recalculNecessaire`) est recalculé ; seul un
+   * résultat qui diffère de la valeur déjà stockée rejoint le brouillon (décision 6 du plan : pas d'écriture si
+   * inchangé). Un projet dont l'audit a **totalement échoué** ne fait l'objet d'aucun calcul (constat R18-W-06 :
+   * il ne pourrait pas être porté au brouillon de toute façon). Une anomalie de calcul (connecteur GitLab,
    * empreinte introuvable) est absorbée par projet, jamais un échec de campagne (cf. commentaire d'en-tête de ce
    * fichier pour le même principe déjà appliqué à RG-046/RG-021).
    * @returns Le Résultat typé de l'enregistrement du brouillon (`DonneesApplicationService.enregistrerBrouillon`).
@@ -298,10 +300,11 @@ export class OrchestrateurCampagneService {
    * @param cacheEmpreintes - Cache des empreintes de référentiel `interne`, partagé par tous les projets de la
    * campagne (une résolution par groupe, cf. {@link resoudreEmpreinteGroupe}) ; ignoré si `calculerPriseEnCharge`
    * est `false`.
-   * @returns Le verdict d'exécution, en cas de succès l'entrée de brouillon prête à être proposée, et, si un
-   * calcul de prise en charge a eu lieu et diffère de la valeur stockée, le nouveau résultat à reporter sur le
-   * brouillon (hors du périmètre d'indicateurs d'audit, cf. commentaire d'en-tête de ce fichier : n'alimente
-   * jamais l'`Audit` produit).
+   * @returns Le verdict d'exécution, en cas de succès l'entrée de brouillon prête à être proposée, et, si l'audit
+   * a produit au moins un résultat et qu'un calcul de prise en charge a eu lieu et diffère de la valeur stockée,
+   * le nouveau résultat à reporter sur le brouillon (hors du périmètre d'indicateurs d'audit, cf. commentaire
+   * d'en-tête de ce fichier : n'alimente jamais l'`Audit` produit). Un projet dont l'audit a totalement échoué ne
+   * porte jamais de résultat de prise en charge (constat R18-W-06 : aucun calcul n'est lancé dans ce cas).
    */
   private async auditerProjet(
     projetId: string,
@@ -700,10 +703,25 @@ export class OrchestrateurCampagneService {
       });
     }
 
-    // Calcul de la date de prise en charge (US-058, RG-058, plan_18 incrément 6), en dehors du périmètre
-    // d'indicateurs d'audit (cf. commentaire d'en-tête de ce fichier) : mené même si l'audit du projet échoue par
-    // ailleurs (indépendant des indicateurs GitLab/Sonar), jamais l'inverse (une anomalie ici n'échoue jamais
-    // l'audit). Placé après la boucle des sources pour ne jamais retarder les indicateurs d'audit eux-mêmes.
+    if (resultats.length === 0) {
+      // Échec total de l'audit du projet : aucun calcul de date de prise en charge n'est lancé (décision
+      // utilisateur du 2026-09-07, constat R18-W-06 de `plan_18_relecture.md`). Justification : une campagne en
+      // échec total ne crée aucun brouillon (`persistance::audit::enregistrer_brouillon`), le résultat serait donc
+      // perdu de toute façon ; éviter l'appel épargne un parcours de pagination GitLab potentiellement coûteux.
+      this.etatSession.mettreAJourProgressionProjet(projetId, {
+        statut: 'echoue',
+        dureeMs: Date.now() - debut,
+        motifEchec: dernierEchec?.motif ?? 'Aucun résultat obtenu',
+        indicateurEchec: dernierEchec?.indicateur,
+        categorieEchec: dernierEchec?.categorie,
+      });
+      return { projetId, verdict: { projetId, statut: 'echec', anomalies } };
+    }
+
+    // Audit du projet réussi (au moins un résultat) : calcul de la date de prise en charge (US-058, RG-058,
+    // plan_18 incrément 6), en dehors du périmètre d'indicateurs d'audit (cf. commentaire d'en-tête de ce
+    // fichier) ; une anomalie ici n'échoue jamais l'audit. Placé après la boucle des sources pour ne jamais
+    // retarder les indicateurs d'audit eux-mêmes.
     const priseEnCharge = calculerPriseEnCharge
       ? await this.calculerPriseEnChargeSiNecessaire(
           resolution.groupe.id,
@@ -713,17 +731,6 @@ export class OrchestrateurCampagneService {
           cacheEmpreintes,
         )
       : undefined;
-
-    if (resultats.length === 0) {
-      this.etatSession.mettreAJourProgressionProjet(projetId, {
-        statut: 'echoue',
-        dureeMs: Date.now() - debut,
-        motifEchec: dernierEchec?.motif ?? 'Aucun résultat obtenu',
-        indicateurEchec: dernierEchec?.indicateur,
-        categorieEchec: dernierEchec?.categorie,
-      });
-      return { projetId, verdict: { projetId, statut: 'echec', anomalies }, priseEnCharge };
-    }
 
     const nouveau: ValeursComparablesAberration = {
       tailleOctets: tailleDepot?.tailleOctets,
@@ -843,15 +850,18 @@ export class OrchestrateurCampagneService {
       return undefined;
     }
     const resultat = await this.donneesApplication.calculerPriseEnChargeProjet(groupeId, projetId);
-    // Switch exhaustif sur le discriminant `type` (norme 09, corrigé en relecture : un `if`/ternaire laissait une
-    // future variante de `ResultatCalculPriseEnCharge` tomber silencieusement dans `undefined`, sans erreur de
-    // compilation, contrairement au switch exhaustif équivalent de `fiche-projet.component.ts`).
+    // Switch exhaustif sur le discriminant `type` (norme 09) : la règle ESLint `switch-exhaustiveness-check`
+    // (`error`) signale toute variante future non couverte de `ResultatCalculPriseEnCharge` ici — protection qu'un
+    // `if`/ternaire ne procurerait pas (il laisserait la nouvelle variante tomber silencieusement dans `undefined`).
     switch (resultat.type) {
       case 'echec':
+        // Catégorie d'anomalie d'origine préservée (RG-021, constat R18-Q-02 de `plan_18_relecture.md`) plutôt
+        // qu'un `reponseInattendue` générique : le rapport d'anomalies du brouillon (F08) distingue ainsi une
+        // authentification refusée d'un délai dépassé ou d'un dépôt vide sur le calcul de prise en charge.
         anomalies.push({
           indicateur: 'priseEnCharge.calcul',
           sourceId: projetId,
-          anomalie: { type: 'reponseInattendue', message: resultat.message },
+          anomalie: { type: resultat.categorie, message: resultat.message },
         });
         return undefined;
       case 'inchange':

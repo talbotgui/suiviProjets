@@ -1166,12 +1166,33 @@ describe('OrchestrateurCampagneService', () => {
         expect(prisesEnCharge).toBeUndefined();
       });
 
+      it("ne doit lancer aucun calcul de prise en charge pour un projet dont l'audit a totalement échoué (constat R18-W-06)", async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        invokeSimule.mockImplementation(() =>
+          Promise.reject(UtilitairesTest.erreurConnecteur('instanceInjoignable')),
+        );
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe', undefined, true);
+
+        expect(donneesApplicationMock.empreinteReferentielInterne).not.toHaveBeenCalled();
+        expect(donneesApplicationMock.calculerPriseEnChargeProjet).not.toHaveBeenCalled();
+        const [, , , verdicts, resultatsParProjet, prisesEnCharge] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(verdicts[0].statut).toBe('echec');
+        expect(resultatsParProjet).toEqual([]);
+        expect(prisesEnCharge).toBeUndefined();
+        // Aucune anomalie propre au calcul de prise en charge n'est consignée (il n'a pas eu lieu).
+        expect(JSON.stringify(verdicts[0].anomalies)).not.toContain('priseEnCharge');
+      });
+
       it('doit absorber un échec de calcul de prise en charge sans faire échouer le projet, et consigner une anomalie', async () => {
         const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceGitlab('source-1')]);
         donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
         donneesApplicationMock.calculerPriseEnChargeProjet.mockResolvedValue({
           type: 'echec',
           message: 'Instance GitLab injoignable.',
+          categorie: 'instanceInjoignable',
         });
 
         const resultat = await service.lancerCampagne(
@@ -1185,8 +1206,16 @@ describe('OrchestrateurCampagneService', () => {
         const [, , , verdicts, , prisesEnCharge] =
           donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
         expect(verdicts[0].statut).toBe('succes');
+        // Constat R18-Q-02 : la catégorie d'origine (`instanceInjoignable`) est préservée dans le rapport
+        // d'anomalies du brouillon, plutôt qu'un `reponseInattendue` figé.
         expect(verdicts[0].anomalies).toEqual(
-          expect.arrayContaining([expect.objectContaining({ indicateur: 'priseEnCharge.calcul' })]),
+          expect.arrayContaining([
+            {
+              indicateur: 'priseEnCharge.calcul',
+              sourceId: 'projet-1',
+              anomalie: { type: 'instanceInjoignable', message: 'Instance GitLab injoignable.' },
+            },
+          ]),
         );
         expect(prisesEnCharge).toBeUndefined();
       });

@@ -711,18 +711,29 @@ export class BouchonAdministrationUtils {
 
   /**
    * Condensé bouchonné du sous-ensemble `interne` des membres connus d'un groupe : triplet trié
-   * `(critere, typeCritere, aliasEmail)`, jamais `partiLe` (décision 11 du plan_18).
+   * `(critere, typeCritere, aliasEmail)`, jamais `partiLe` (décision 11 du plan_18). `critere` et `aliasEmail` sont
+   * normalisés (minuscules, espaces de bordure retirés, `@` de tête d'un domaine retiré), comme le fait le cœur
+   * natif (`persistance::prise_en_charge::normaliser_critere`, constat R18-W-02 de la relecture) : une simple
+   * retouche de casse d'une règle ne périme pas le calcul.
    * @param groupe - Groupe source.
    * @returns Une chaîne `sha256:…`.
    */
   private static empreinteDeGroupe(groupe: Record<string, unknown>): string {
     const triplets = BouchonAdministrationUtils.reglesInternes(groupe)
-      .map(
-        (membre) =>
-          `${BouchonAdministrationUtils.lireTexte(membre, 'critere')}|` +
-          `${BouchonAdministrationUtils.lireTexte(membre, 'typeCritere')}|` +
-          `${BouchonAdministrationUtils.lireTexteOptionnel(membre, 'aliasEmail') ?? ''}`,
-      )
+      .map((membre) => {
+        const typeCritere = BouchonAdministrationUtils.lireTexte(membre, 'typeCritere');
+        const critereBrut = BouchonAdministrationUtils.lireTexte(membre, 'critere')
+          .trim()
+          .toLowerCase();
+        const critere =
+          typeCritere === 'domaineEmail' ? critereBrut.replace(/^@/, '') : critereBrut;
+        const aliasEmail = (
+          BouchonAdministrationUtils.lireTexteOptionnel(membre, 'aliasEmail') ?? ''
+        )
+          .trim()
+          .toLowerCase();
+        return `${critere}|${typeCritere}|${aliasEmail}`;
+      })
       .sort((gauche, droite) => gauche.localeCompare(droite));
     return `sha256:${BouchonAdministrationUtils.hachageStable(triplets.join('\n'))}`;
   }

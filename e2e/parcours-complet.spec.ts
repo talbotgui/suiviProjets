@@ -390,6 +390,11 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page).toHaveURL(/\/audits\/constitution-campagne$/);
 
     await page.locator('#constitution-campagne-case-tout-selectionner').check();
+    // US-058 (plan_18) : carte « Options », case décochée par défaut, cochée pour calculer la date de prise en
+    // charge des projets sélectionnés pendant cette campagne.
+    const casePriseEnCharge = page.locator('#constitution-campagne-case-prise-en-charge');
+    await expect(casePriseEnCharge).not.toBeChecked();
+    await casePriseEnCharge.check();
     await page.locator('#constitution-campagne-bouton-lancer').click();
     await confirmerMotDePasse();
   });
@@ -488,6 +493,18 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     const ligneLangages = page.locator('#fiche-projet-langages-principaux');
     await expect(ligneLangages).toBeAttached();
     expect(await ligneLangages.locator('app-icone-langage').count()).toBeGreaterThan(0);
+
+    // US-058 (plan_18) : métadonnée « Âge chez nous » alimentée par le calcul de prise en charge de l'étape 12
+    // (intégré à l'étape 14), et bouton « Recalculer ». Le bouchon TS est rejouable : l'empreinte du référentiel
+    // `interne` n'ayant pas changé depuis, un recalcul reproduit la valeur stockée et n'entraîne aucune écriture
+    // (décision 6) — la Fiche projet affiche « La date de prise en charge est inchangée. » sans ressaisie du mot
+    // de passe.
+    await expect(page.locator('#fiche-projet-age-chez-nous')).not.toHaveText('non calculée');
+    await page.locator('#fiche-projet-bouton-recalculer-prise-en-charge').click();
+    expect(await attendreNotificationSucces(page)).toContain('inchangée');
+    // Aucune ressaisie du mot de passe : le recalcul reproduit la valeur stockée (décision 6). La notification est
+    // refermée par `avantChangementEcran` au début de l'étape suivante (`fermerNotificationsVisibles`).
+    await expect(page.locator('#confirmation-mot-de-passe-champ')).toBeHidden();
   });
 
   // 17. Liste de travail — qualification d'un membre inconnu depuis une alerte, traitement d'une autre alerte.
@@ -673,11 +690,32 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
   await test.step('20. Comparaison entre deux audits', async () => {
     await avantChangementEcran(page, '20-comparaison-audits');
     await naviguerVersFicheProjet();
+    // « Âge chez nous » contient « (depuis … » uniquement pour un `premierCommitInterne` de statut `determine` :
+    // discriminant fiable pour savoir si le raccourci « Depuis la prise en charge » doit être proposé à l'étape
+    // suivante (les projets du Groupe A portent une règle `interne`, ceux du Groupe B non — US-058/US-059).
+    const priseEnChargeDeterminee = (
+      (await page.locator('#fiche-projet-age-chez-nous').textContent()) ?? ''
+    ).includes('depuis');
     await page.locator('#fiche-projet-lien-comparer').click();
     await expect(page).toHaveURL(/\/comparaison-audits\//);
 
     await page.locator('#comparaison-audits-bouton-raccourci-dernier-precedent').click();
     await expect(page.locator('.comparaison-audits__table').first()).toBeVisible();
+
+    // US-059 (plan_18) : quand `premierCommitInterne` est `determine`, le raccourci « Depuis la prise en charge »
+    // est présent. Aucune campagne historique n'ayant été lancée dans ce parcours, aucun audit ne porte exactement
+    // la date de prise en charge : le raccourci est donc désactivé, accompagné de l'invite à lancer une campagne
+    // historique ciblant cette date.
+    const raccourciPriseEnCharge = page.locator(
+      '#comparaison-audits-bouton-raccourci-prise-en-charge',
+    );
+    if (priseEnChargeDeterminee) {
+      await expect(raccourciPriseEnCharge).toBeVisible();
+      await expect(raccourciPriseEnCharge).toBeDisabled();
+      await expect(page.locator('#comparaison-audits-invite-prise-en-charge')).toBeVisible();
+    } else {
+      await expect(raccourciPriseEnCharge).toHaveCount(0);
+    }
   });
 
   // 21. Paramétrage > Journal des modifications.

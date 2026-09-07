@@ -67,13 +67,16 @@
             <span class="fiche-projet__metadonnee-libelle texte-2xs majuscules texte-tenue"
               >Âge chez nous</span
             >
-            <span class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras">{{
-              donnees.ageChezNousLabel
-            }}</span>
+            <span
+              id="fiche-projet-age-chez-nous"
+              class="fiche-projet__metadonnee-valeur texte-md poids-demi-gras"
+              >{{ donnees.ageChezNousLabel }}</span
+            >
             <div
               class="fiche-projet__hors-capture d-flex direction-colonne ecart-1 exterieur-haut-1"
             >
               <button
+                id="fiche-projet-bouton-recalculer-prise-en-charge"
                 type="button"
                 class="bouton bouton--discret texte-xs"
                 [disabled]="recalculPriseEnChargeEnCours()"

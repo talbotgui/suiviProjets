@@ -172,13 +172,13 @@ La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de
 
 La date de prise en charge d'un projet est la date du premier commit d'un membre interne sur l'un de ses dépôts GitLab : elle indique depuis quand l'organisation travaille réellement sur ce projet. Elle apparaît sur la fiche projet, dans la métadonnée « Âge chez nous ».
 
-Ce calcul n'est jamais fait automatiquement, car il peut être long sur un gros dépôt. On le déclenche de deux façons : en cochant la case « Calculer la date de prise en charge » lors de la constitution d'une campagne (le calcul n'est alors refait que pour les projets dont la date est absente, indéterminée, ou dont la liste des membres internes a changé depuis le dernier calcul), ou avec le bouton « recalculer » à côté de la métadonnée sur la fiche projet (qui refait toujours le calcul pour ce seul projet).
+Ce calcul n'est jamais fait automatiquement, car il peut être long sur un gros dépôt. On le déclenche de deux façons : en cochant la case « Calculer la date de prise en charge » lors de la constitution d'une campagne (le calcul n'est alors refait que pour les projets dont la date est absente, indéterminée, ou dont la liste des membres internes a changé depuis le dernier calcul — et dont l'audit a abouti à au moins un résultat), ou avec le bouton « recalculer » à côté de la métadonnée sur la fiche projet (qui refait toujours le calcul pour ce seul projet).
 
 Pour que le résultat soit utile, il faut d'abord avoir qualifié les membres du groupe : le calcul s'appuie sur les règles de statut `interne` reconnaissant un auteur par son adresse électronique exacte, un alias, ou son domaine (le nom d'utilisateur n'étant pas disponible sur un commit). Sans aucune règle `interne`, la fiche affiche « aucun membre interne qualifié pour ce groupe ». Les autres cas particuliers — aucun commit interne trouvé, dépôt trop volumineux pour être remonté entièrement, projet sans dépôt GitLab, dépôt vide — ont chacun leur libellé explicite.
 
 Un recalcul qui retrouve exactement la même date ne réécrit rien (pas de ressaisie du mot de passe, pas de sauvegarde) : la fiche affiche simplement « date de prise en charge inchangée ». Quand les membres internes du groupe ont changé depuis le dernier calcul, une mention discrète le signale à côté du bouton.
 
-Enfin, si un audit du projet (régulier ou historique) porte exactement cette date, l'écran de comparaison entre deux audits propose un raccourci « Depuis la prise en charge » ; sinon, il vous invite à lancer une campagne historique ciblant cette date.
+Enfin, si un audit du projet porte exactement cette date — en pratique un audit issu d'une campagne historique ciblant ce jour précis —, l'écran de comparaison entre deux audits propose un raccourci « Depuis la prise en charge » ; sinon, il vous invite à lancer une telle campagne historique.
 
 ### Comparaison entre deux audits
 

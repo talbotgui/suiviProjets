@@ -1593,8 +1593,10 @@ describe('DonneesApplicationService', () => {
       expect(racine.journal[0].objet).toBe(
         `groupes/${groupeId}/projets/${projetId}/premierCommitInterne`,
       );
-      expect(racine.journal[0].avant).toBe('2021-03-15 (determine)');
-      expect(racine.journal[0].apres).toBe('2019-02-01 (determine)');
+      // Constat R18-W-01 : `avant`/`apres` portent la valeur JSON brute, comme `qualifier_membre` et la voie
+      // « intégration du brouillon de campagne ».
+      expect(racine.journal[0].avant).toEqual(DETERMINE_STOCKE);
+      expect(racine.journal[0].apres).toEqual(DETERMINE_AUTRE_DATE);
       expect(invokeSimule).toHaveBeenCalledWith(
         'sauvegarder_fichier',
         expect.objectContaining({ chemin: '/tmp/donnees-test.sqm', motDePasse: 'mot-de-passe' }),

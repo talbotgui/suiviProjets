@@ -15,6 +15,12 @@
 //! le brouillon lui-même. `integrer_brouillon` fait exception depuis le plan_18 (incrément 6, US-058, RG-058) pour
 //! la seule application de `Brouillon.prises_en_charge` : chaque entrée appliquée au `Projet` correspondant
 //! consigne une entrée de journal (décision 7 du plan), l'audit intégré lui-même restant hors RG-023 comme avant.
+//!
+//! Le modèle autorise une clé de `Brouillon.prises_en_charge` absente de `resultats_par_projet` (« entrée
+//! orpheline ») et le cycle de vie du brouillon ci-dessous la gère explicitement ; depuis la décision utilisateur
+//! du 2026-09-07 (constat R18-W-06), l'orchestrateur de campagne ne produit toutefois plus jamais cette
+//! combinaison (aucun calcul de prise en charge n'est lancé pour un projet dont l'audit a totalement échoué) — ce
+//! traitement reste donc défensif.
 
 use crate::modele::racine::{
     Brouillon, Campagne, DonneesRacine, EntreeJournal, PremierCommitInterne, Projet,
@@ -115,10 +121,13 @@ pub(crate) fn enregistrer_brouillon(
     // d'une nouvelle campagne derrière un brouillon vide qu'aucune action de l'écran Brouillon ne permet de
     // distinguer d'un brouillon réellement traité (RG-019, constat de relecture).
     if !resultats_par_projet.is_empty() {
-        // Une campagne en échec total ne crée aucun brouillon (cf. commentaire ci-dessus) : les éventuelles entrées
-        // de `prises_en_charge` calculées pour des projets dont l'audit a par ailleurs totalement échoué sont alors
-        // perdues, sur le même principe que les résultats d'audit eux-mêmes dans ce cas — décision arbitraire
-        // documentée dans le rapport de développement de cette phase.
+        // Une campagne en échec total ne crée aucun brouillon (cf. commentaire ci-dessus). Décision utilisateur du
+        // 2026-09-07 (constat R18-W-06 de `plan_18_relecture.md`) : dans ce cas, aucun calcul de date de prise en
+        // charge n'est même lancé côté orchestrateur (`OrchestrateurCampagneService.auditerProjet` court-circuite
+        // le calcul quand l'audit n'a produit aucun résultat), si bien que `prises_en_charge` est déjà vide ici.
+        // Le filtre ci-dessous reste défensif (un appelant pourrait techniquement fournir la map), sur le même
+        // principe que les résultats d'audit eux-mêmes : rien n'est porté au brouillon pour un projet en échec
+        // total.
         let prises_en_charge = match prises_en_charge {
             Some(map) if !map.is_empty() => Some(map),
             _ => None,
