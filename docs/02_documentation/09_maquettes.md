@@ -96,8 +96,9 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | écran | zone | composants / actions |
 |---|---|---|
 | Synthèse graphique | Filtres | [Barre de filtres commune](#barre-de-filtres-commune-synthèse-des-audits-synthèse-graphique-obsolescence-liste-de-travail) (filtre groupe/projet mutualisé + sélecteur de vue), puis sous elle : sélecteur de type d'indicateur |
-| Synthèse graphique | Graphique | Zoom temporel, séries superposables (audits historiques et réguliers d'un projet fondus dans une même courbe continue, RG-046), lignes verticales pour les annotations, les changements de seuils et le repère « Début des audits réguliers » (date du plus ancien audit régulier tous projets confondus), signaux affichés en séries binaires |
-| Synthèse graphique | Export | Export natif du graphique en image PNG |
+| Synthèse graphique | Graphique | Zoom temporel, séries superposables (audits historiques et réguliers d'un projet fondus dans une même courbe continue, RG-046), lignes verticales pour les annotations, les changements de seuils, le repère « Début des audits réguliers » (date du plus ancien audit régulier tous projets confondus) et les montées de version Sonar (repère violet tireté étiqueté « `Sonar <version>` », dédoublonné entre projets d'une même instance, [US-062](./04_casUsage.md#cas-dusage--user-stories)), signaux affichés en séries binaires |
+| Synthèse graphique | Légende | À côté de la légende des séries, panneau de boutons à bascule « Afficher les repères » (un bouton par catégorie de repère vertical présente — annotation, changement de seuil, premier audit régulier, montée de version Sonar —, `aria-pressed`, même idiome que la bascule de séries) permettant de masquer ou réafficher, sans rechargement, les repères d'une seule catégorie ; état de session, non mémorisé |
+| Synthèse graphique | Export | Export natif du graphique en image PNG (les repères masqués au moment de l'export n'y figurent pas) |
 
 ### Obsolescence
 

@@ -89,6 +89,7 @@
 85. [Étape 36 — plan_17 chapitre 3 : langages principaux d'un projet (icônes Sonar) sur la Fiche projet et l'écran Obsolescence (US-057 / RG-057)](#étape-36--plan_17-chapitre-3--langages-principaux-dun-projet-icônes-sonar-sur-la-fiche-projet-et-lécran-obsolescence-us-057--rg-057)
 86. [Étape 37 — Clôture rétroactive des Phases 13, 14 et 15, abandon de l'updater Tauri et des actions H10](#étape-37--clôture-rétroactive-des-phases-13-14-et-15-abandon-de-lupdater-tauri-et-des-actions-h10)
 87. [Étape 38 — plan_18 (date de prise en charge) : relecture isolée et corrections](#étape-38--plan_18-date-de-prise-en-charge--relecture-isolée-et-corrections)
+88. [Étape 39 — plan_17 chapitre 5 (incrément 1) : repères de montée de version Sonar (US-062/RG-062), priorisation sur le chapitre 4 et levée des points ouverts](#étape-39--plan_17-chapitre-5-incrément-1--repères-de-montée-de-version-sonar-us-062rg-062-priorisation-sur-le-chapitre-4-et-levée-des-points-ouverts)
 
 ## Étape 0 — Bootstrap du poste de développement et de l'outillage
 
@@ -4027,3 +4028,25 @@ L'incrément 8 du plan a été achevé et relu le 2026-09-07 :
 ### Vérifications rejouées
 
 `cargo fmt --check` (seuls les 4 écarts pré-existants de `volumetrie.rs`/`vues.rs`, hors périmètre) ; `cargo check --locked --all-targets` ; `cargo clippy --locked --all-targets -- -D warnings` ; `cargo test --lib` (430 tests, 8 `#[ignore]`) ; `npm run typecheck` ; `npm run lint` (« All files pass ») ; `prettier --check` ; `jest` (suite complète, 113 suites / 1723 tests) ; `tsc -p e2e/tsconfig.json`. Test de bout en bout non exécuté dans cette session (nécessite `ng serve`), à lancer localement (`npm run test:e2e`).
+
+## Étape 39 — plan_17 chapitre 5 (incrément 1) : repères de montée de version Sonar (US-062/RG-062), priorisation sur le chapitre 4 et levée des points ouverts
+
+Sur demande explicite de l'utilisateur (2026-09-08), le chapitre 5 de `plan_17_metriquesVolumetrie.md` (repères verticaux de montée de version du serveur Sonar sur le graphique d'évolution, masquage des repères par catégorie) est priorisé sur le chapitre 4 (« Commits des membres », non démarré, identifiants `US-060`/`RG-060`/`RG-061` toujours tenus libres pour lui). Reconfirmé au préalable : les chapitres 1 à 3 de ce même plan et l'intégralité de `plan_18` étant désormais intégrés (jusqu'à `US-061`/`RG-061`), `US-062`/`RG-062` restent le premier couple libre, sans consommation concurrente entre-temps.
+
+### Levée des points restant ouverts (section 12 du chapitre 5)
+
+Tous les arbitrages fonctionnels et d'architecture de la section 12 du chapitre 5 ont été tranchés dans le sens déjà repéré comme « retenu » à la rédaction du 2026-09-01 (détail dans le plan, chapitre 5 section 3, « Compléments actés le 2026-09-08 ») : aucun pseudo-indicateur désactivable dédié ; transport de la carte des montées en argument de `enregistrerBrouillon` avec upsert immédiat, sans palier de migration ; Rustdoc du champ `Annotation.id` amendée pour couvrir les identifiants dérivés stables (non-UUID) des annotations système ; interdiction de suppression manuelle maintenue sans exception ; source secondaire `api/server/version` écartée ; masquage par catégorie en état de session, non mémorisé ; panneau de bascule porté par le composant de graphique. Restent deux points non bloquants, non des arbitrages mais des limites techniques ou de portée transverse, différés : la valeur exacte du filtre `category=SQ_UPGRADE` et la forme d'`event.name`, à vérifier contre une instance Sonar réelle avant une éventuelle release ; la correction des ancres du sommaire du document (chapitres 2 à 5), transverse, à traiter dans un incrément documentaire séparé.
+
+**Décisions arbitraires à valider par un humain** (convention `14_normesDeveloppement.md#règles-de-qualité-de-code`) :
+- Couleur et style du repère `monteeVersionSonar` : `#7c3aed`, tireté `[4, 3]`.
+- Schéma de l'identifiant dérivé stable de l'annotation : `montee-version-sonar-<empreinte de la version>` (minuscules, caractères non alphanumériques remplacés par `-`).
+- Libellé de l'annotation : « Sonar <version> ».
+- Dédoublonnage à l'affichage par `version` seule (et non `(version, jour)`), date la plus ancienne retenue.
+- Absence de pseudo-indicateur désactivable dédié dans `groupe.indicateursDesactives` pour cet appel.
+- Titre et nom de fichier de `plan_17_metriquesVolumetrie.md` conservés en l'état (regroupement de sujets distincts assumé, sur le même principe que `plan_16_navigationFiltrageEtVues.md`).
+
+### Incrément 1 — documents normatifs
+
+Mise à jour, conformément au découpage du plan (§10) : `04_casUsage.md` (nouvelle ligne `US-062`, matrice de couverture), `05_reglesGestion.md` (nouvelle `RG-062` dans « Audits et campagnes », matrice de traçabilité), `08_arborescenceNavigation.md` (matrice écrans × US : Synthèse graphique, Fiche projet, Comparaison d'audits), `09_maquettes.md` (section Synthèse graphique : repère, panneau de bascule, export), `13_conceptionDetaillee.md` (Connecteur Sonar, Moteur de persistance, Façade de commandes, nouveau module `persistance::alertes::synchroniser_annotations_montee_version`, Orchestrateur de campagne, Écrans et navigation, deux lignes de matrice de traçabilité), `15_normesSecurite.md` (rappel de portée), `16_normesTests.md` (tests unitaires Rust/TypeScript, étape de parcours de bout en bout, matrice de traçabilité), `guide-utilisateur.md` (paragraphe Synthèse graphique). `plan_17_metriquesVolumetrie.md` lui-même mis à jour (statut, section 3, section 12).
+
+Conformément à la méthode du projet, aucun code n'est produit à cet incrément : le passage à l'incrément 2 (cœur natif — connecteur Sonar, persistance des repères, extension de `enregistrerBrouillon`) reste conditionné à une validation humaine explicite de ces documents normatifs.

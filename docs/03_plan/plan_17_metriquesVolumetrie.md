@@ -6,11 +6,15 @@
 
 Ce document est structuré en chapitres. Le **chapitre 1** (volumétrie du fichier de données, onglet Métriques de l'écran Administration), le **chapitre 2** (ventilation des dépendances par écosystème sur la Fiche projet et la Comparaison d'audits, rédigé le 2026-08-30), le **chapitre 3** (langages principaux d'un projet, sous forme d'icônes Sonar, sur la Fiche projet et l'écran Obsolescence, rédigé le 2026-09-01), le **chapitre 4** (écran « Commits des membres » : régularité des poussées de code des développeurs d'un groupe, rédigé le 2026-09-01) et le **chapitre 5** (repères de montée de version du serveur Sonar sur les graphiques d'évolution, avec masquage des repères par catégorie, rédigé le 2026-09-01) sont indépendants et traitent des sujets distincts. Le sommaire et la numérotation accueillent les chapitres successifs sans renumérotation des précédents.
 
-Le regroupement de plusieurs sujets sans lien direct dans un même document résulte d'une demande explicite ; le titre et le nom de fichier du document restent à ajuster si besoin (cf. paragraphe suivant).
+Le regroupement de plusieurs sujets sans lien direct dans un même document résulte d'une demande explicite ; décision actée le 2026-09-08 (cf. chapitre 5, section 3) : le titre et le nom de fichier du document sont **conservés en l'état**, sur le même principe que `plan_16_navigationFiltrageEtVues.md`.
 
-Comme `plan_16_navigationFiltrageEtVues.md`, ce fichier est une exception à la règle générale (les évolutions postérieures à la Phase 15 sont normalement tracées sous forme d'entrées « Étape N » du [rapport de développement](../04_rapports/rapportDeDeveloppement.md)) : son emplacement et son nom restent à ajuster si besoin.
+Comme `plan_16_navigationFiltrageEtVues.md`, ce fichier est une exception à la règle générale (les évolutions postérieures à la Phase 15 sont normalement tracées sous forme d'entrées « Étape N » du [rapport de développement](../04_rapports/rapportDeDeveloppement.md)) : son emplacement et son nom sont conservés en l'état.
+
+État d'intégration au 2026-09-08 : chapitres 1, 2 et 3 développés et committés. Chapitre 4 non démarré. **Chapitre 5 priorisé sur le chapitre 4** sur demande explicite de l'utilisateur ; ses points restant ouverts ont été levés (chapitre 5, section 3) et son incrément 1 (documents normatifs) est en cours.
 
 ## Sommaire
+
+Ancres corrigées le 2026-09-08 : recalculées en construisant réellement le site (`mkdocs build`) plutôt que par déduction manuelle de la convention de dédoublonnage, MkDocs (extension `toc` de Python-Markdown) suffixant un titre en collision par `_1`, `_2`, … (**tiret bas**, jamais un tiret), un chiffre par occurrence en collision réelle du texte de titre complet — non par position de chapitre ; deux chapitres peuvent donc partager un même suffixe quand leurs titres numérotés diffèrent (ex. la section « 7. Impacts documentaires » du chapitre 1 et celle du chapitre 3 ne sont pas en collision, portant des numéros de section différents). Cette même convention (`toc`, `slugify: pymdownx.slugs.slugify(case='lower')`) régit aussi tous les autres documents de `docs/`.
 
 - [Chapitre 1 — Onglet « Métriques » de volumétrie du fichier (US-055 / RG-055)](#chapitre-1--onglet--métriques--de-volumétrie-du-fichier-us-055--rg-055)
   1. [Objet et statut](#1-objet-et-statut)
@@ -25,59 +29,59 @@ Comme `plan_16_navigationFiltrageEtVues.md`, ce fichier est une exception à la 
   10. [Vérification de bout en bout](#10-vérification-de-bout-en-bout)
   11. [Points restant ouverts](#11-points-restant-ouverts)
 - [Chapitre 2 — Ventilation des dépendances par écosystème sur la Fiche projet et la Comparaison d'audits (US-056 / RG-056)](#chapitre-2--ventilation-des-dépendances-par-écosystème-sur-la-fiche-projet-et-la-comparaison-daudits-us-056--rg-056)
-  1. [Objet et statut](#1-objet-et-statut-1)
-  2. [Décisions actées](#2-décisions-actées-1)
-  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés-1)
+  1. [Objet et statut](#1-objet-et-statut_1)
+  2. [Décisions actées](#2-décisions-actées_1)
+  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés_1)
   4. [Partie A — Utilitaire de classification d'écosystème](#4-partie-a--utilitaire-de-classification-décosystème)
   5. [Partie B — Fiche projet (F12)](#5-partie-b--fiche-projet-f12)
   6. [Partie C — Comparaison d'audits (F13)](#6-partie-c--comparaison-daudits-f13)
-  7. [Impacts sur le modèle de données et migration](#7-impacts-sur-le-modèle-de-données-et-migration-1)
-  8. [Impacts documentaires](#8-impacts-documentaires-1)
-  9. [Impacts sur les tests](#9-impacts-sur-les-tests-1)
-  10. [Découpage en incréments](#10-découpage-en-incréments-1)
+  7. [Impacts sur le modèle de données et migration](#7-impacts-sur-le-modèle-de-données-et-migration)
+  8. [Impacts documentaires](#8-impacts-documentaires)
+  9. [Impacts sur les tests](#9-impacts-sur-les-tests)
+  10. [Découpage en incréments](#10-découpage-en-incréments)
   11. [Vérification de bout en bout](#11-vérification-de-bout-en-bout)
   12. [Points restant ouverts](#12-points-restant-ouverts)
 - [Chapitre 3 — Langages principaux d'un projet (icônes Sonar) sur la Fiche projet et l'écran Obsolescence (US-057 / RG-057)](#chapitre-3--langages-principaux-dun-projet-icônes-sonar-sur-la-fiche-projet-et-lécran-obsolescence-us-057--rg-057)
-  1. [Objet et statut](#1-objet-et-statut-2)
-  2. [Décisions actées](#2-décisions-actées-2)
-  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés-2)
+  1. [Objet et statut](#1-objet-et-statut_2)
+  2. [Décisions actées](#2-décisions-actées_2)
+  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés_2)
   4. [Partie A — Utilitaire de sélection des langages principaux](#4-partie-a--utilitaire-de-sélection-des-langages-principaux)
   5. [Partie B — Composant d'icône de langage partagé](#5-partie-b--composant-dicône-de-langage-partagé)
-  6. [Partie C — Fiche projet (F12)](#6-partie-c--fiche-projet-f12-1)
+  6. [Partie C — Fiche projet (F12)](#6-partie-c--fiche-projet-f12)
   7. [Partie D — Écran Obsolescence](#7-partie-d--écran-obsolescence)
-  8. [Impacts sur le modèle de données et migration](#8-impacts-sur-le-modèle-de-données-et-migration-2)
-  9. [Impacts documentaires](#9-impacts-documentaires-2)
-  10. [Impacts sur les tests](#10-impacts-sur-les-tests-2)
-  11. [Découpage en incréments](#11-découpage-en-incréments-2)
-  12. [Vérification de bout en bout](#12-vérification-de-bout-en-bout-1)
+  8. [Impacts sur le modèle de données et migration](#8-impacts-sur-le-modèle-de-données-et-migration)
+  9. [Impacts documentaires](#9-impacts-documentaires)
+  10. [Impacts sur les tests](#10-impacts-sur-les-tests)
+  11. [Découpage en incréments](#11-découpage-en-incréments)
+  12. [Vérification de bout en bout](#12-vérification-de-bout-en-bout)
   13. [Points restant ouverts](#13-points-restant-ouverts)
 - [Chapitre 4 — Écran « Commits des membres » : régularité des poussées de code d'un groupe (US-060 / RG-060)](#chapitre-4--écran--commits-des-membres---régularité-des-poussées-de-code-dun-groupe-us-060--rg-060)
-  1. [Objet et statut](#1-objet-et-statut-3)
-  2. [Décisions actées](#2-décisions-actées-3)
-  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés-3)
+  1. [Objet et statut](#1-objet-et-statut_3)
+  2. [Décisions actées](#2-décisions-actées_3)
+  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés_3)
   4. [Partie A — Cœur natif : connecteur GitLab et commandes](#4-partie-a--cœur-natif--connecteur-gitlab-et-commandes)
   5. [Partie B — Façade, Store d'orchestration et Moteur de jugement](#5-partie-b--façade-store-dorchestration-et-moteur-de-jugement)
   6. [Partie C — Écran « Commits des membres »](#6-partie-c--écran--commits-des-membres-)
   7. [Partie D — Seuils paramétrables (Réglages applicatifs)](#7-partie-d--seuils-paramétrables-réglages-applicatifs)
-  8. [Impacts sur le modèle de données et migration](#8-impacts-sur-le-modèle-de-données-et-migration-1)
-  9. [Impacts documentaires](#9-impacts-documentaires-1)
-  10. [Impacts sur les tests](#10-impacts-sur-les-tests-1)
-  11. [Découpage en incréments](#11-découpage-en-incréments-1)
-  12. [Vérification de bout en bout](#12-vérification-de-bout-en-bout-1)
-  13. [Points restant ouverts](#13-points-restant-ouverts-1)
+  8. [Impacts sur le modèle de données et migration](#8-impacts-sur-le-modèle-de-données-et-migration_1)
+  9. [Impacts documentaires](#9-impacts-documentaires_1)
+  10. [Impacts sur les tests](#10-impacts-sur-les-tests_1)
+  11. [Découpage en incréments](#11-découpage-en-incréments_1)
+  12. [Vérification de bout en bout](#12-vérification-de-bout-en-bout_1)
+  13. [Points restant ouverts](#13-points-restant-ouverts_1)
 - [Chapitre 5 — Repères de montée de version Sonar sur les graphiques d'évolution (US-062 / RG-062)](#chapitre-5--repères-de-montée-de-version-sonar-sur-les-graphiques-dévolution-us-062--rg-062)
-  1. [Objet et statut](#1-objet-et-statut-4)
-  2. [Décisions actées](#2-décisions-actées-4)
-  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés-4)
+  1. [Objet et statut](#1-objet-et-statut_4)
+  2. [Décisions actées](#2-décisions-actées_4)
+  3. [Périmètre et identifiants d'exigence proposés](#3-périmètre-et-identifiants-dexigence-proposés_4)
   4. [Partie A — Cœur natif : connecteur Sonar et persistance des repères](#4-partie-a--cœur-natif--connecteur-sonar-et-persistance-des-repères)
   5. [Partie B — Façade, orchestrateur de campagne et intégration du brouillon](#5-partie-b--façade-orchestrateur-de-campagne-et-intégration-du-brouillon)
   6. [Partie C — Graphique d'évolution et Synthèse graphique](#6-partie-c--graphique-dévolution-et-synthèse-graphique)
-  7. [Impacts sur le modèle de données et migration](#7-impacts-sur-le-modèle-de-données-et-migration-4)
-  8. [Impacts documentaires](#8-impacts-documentaires-4)
-  9. [Impacts sur les tests](#9-impacts-sur-les-tests-4)
-  10. [Découpage en incréments](#10-découpage-en-incréments-4)
-  11. [Vérification de bout en bout](#11-vérification-de-bout-en-bout-4)
-  12. [Points restant ouverts](#12-points-restant-ouverts-4)
+  7. [Impacts sur le modèle de données et migration](#7-impacts-sur-le-modèle-de-données-et-migration_1)
+  8. [Impacts documentaires](#8-impacts-documentaires_1)
+  9. [Impacts sur les tests](#9-impacts-sur-les-tests_1)
+  10. [Découpage en incréments](#10-découpage-en-incréments_1)
+  11. [Vérification de bout en bout](#11-vérification-de-bout-en-bout_1)
+  12. [Points restant ouverts](#12-points-restant-ouverts_1)
 
 # Chapitre 1 — Onglet « Métriques » de volumétrie du fichier (US-055 / RG-055)
 
@@ -1145,7 +1149,7 @@ Disponibilité côté API : le point `GET /api/project_analyses/search` renvoie,
 
 État actuel côté modèle : la structure `Annotation` (`src-tauri/src/modele/racine.rs`) porte déjà un champ `systeme: Option<bool>` (« générée automatiquement par le système plutôt que saisie manuellement »), utilisé pour l'annotation système `politiqueIA` (`persistance/administration.rs`) et protégé contre la suppression manuelle (`persistance/alertes.rs`). Les annotations de portée projet (`Projet.annotations`) alimentent déjà les repères de la Synthèse graphique.
 
-Statut : ce chapitre précède la mise à jour des documents normatifs et tout développement, qui restent conditionnés à une validation humaine explicite. La méthode du projet s'applique : arbitrage humain, puis mise à jour des documents normatifs, puis développement, sans passage à l'étape suivante sans validation explicite de la précédente.
+Statut : sur demande explicite de l'utilisateur du 2026-09-08 (priorité donnée à ce chapitre sur le chapitre 4, non démarré), les points restants ouverts de la section 12 ont été levés (cf. section 3) ; l'incrément 1 — mise à jour des documents normatifs — est en cours. La méthode du projet continue de s'appliquer pour la suite : aucun passage à l'incrément 2 (cœur natif) sans validation humaine explicite des documents normatifs mis à jour.
 
 ## 2. Décisions actées
 
@@ -1168,6 +1172,28 @@ Décisions d'architecture :
 ## 3. Périmètre et identifiants d'exigence proposés
 
 Chaîne des identifiants à la date de rédaction : documents normatifs à `US-056` / `RG-056` ; `plan_17` chapitre 3 propose `US-057` / `RG-057` (non intégrés) ; `plan_18` propose `US-058` / `US-059` / `US-061` et `RG-058` / `RG-059` / `RG-060` (non intégrés) ; `plan_17` chapitre 4 propose `US-060` / `RG-061` (non intégrés). `US-060`, `US-061`, `RG-060` et `RG-061` sont donc déjà proposés ailleurs : ce chapitre prend `US-062` / `RG-062`, premier couple libre. Allocation proposée ci-dessous, **à reconfirmer au moment de la qualification effective** ; en cas de consommation concurrente, décaler l'ensemble en bloc sans réintroduire de trou (principe déjà appliqué en Étape 25 de `plan_16`).
+
+**Reconfirmé le 2026-09-08** : les chapitres 1 à 3 de ce plan et l'intégralité de `plan_18` ont depuis été intégrés (`US-055` à `US-059` et `US-061` occupés, `RG-055` à `RG-059` et `RG-061` occupés ; `US-060` / `RG-060` toujours volontairement tenus libres pour le chapitre 4, non développé). `US-062` / `RG-062` restent donc le premier couple libre, sans consommation concurrente entre-temps : l'allocation ci-dessous est actée, non plus seulement proposée.
+
+### Compléments actés le 2026-09-08 (levée des points ouverts de la section 12, priorité donnée à ce chapitre)
+
+Sur arbitrage explicite de l'utilisateur, ce chapitre 5 est traité en priorité sur le chapitre 4 (non démarré) ; les points restant ouverts de la section 12 sont levés dans le sens des options déjà repérées comme « retenu » lors de la rédaction du 2026-09-01, en cohérence avec les précédents déjà actés par ce même document (annotations système, masquage de session, décisions arbitraires de présentation documentées au rapport de développement) :
+
+1. **Pseudo-indicateur désactivable** : non introduit. L'appel `interroger_montees_version_sonar` est systématique pour toute source Sonar auditée, sans entrée dédiée dans `groupe.indicateursDesactives`.
+2. **Transport de la carte des montées** : retenu tel que conçu — argument de `enregistrerBrouillon`, upsert immédiat à la sauvegarde du brouillon, aucun palier de migration. Conséquence assumée : un rejet de brouillon ne retire pas les repères déjà posés ; une fermeture de l'application entre le run et l'enregistrement perd la carte en mémoire, sans conséquence fonctionnelle (la campagne suivante repose les repères par idempotence).
+3. **Identifiant `Annotation.id` non-UUID** : retenu — la Rustdoc du champ `id` (`src-tauri/src/modele/racine.rs`) est amendée à l'incrément 2 pour couvrir, en plus de l'UUID v4 des annotations manuelles, les identifiants dérivés stables des annotations système (`montee-version-sonar-<empreinte de version>`, à l'instar de tout futur identifiant dérivé de ce type).
+4. **Incohérence de date texte / graphe** pour une même version : jugée acceptable, actée sans changement — la Fiche projet affiche la date propre à l'analyse du projet, le repère du graphique affiche la plus ancienne des dates parmi les projets concernés.
+5. **Montée détectée pour un projet hors périmètre de campagne** : actée — aucun repère n'est posé tant que le projet n'a pas été audité au moins une fois après l'introduction de la fonctionnalité.
+6. **Suppression manuelle d'une annotation système erronée** : retenu — l'interdiction générale de suppression d'une annotation système (RG-033) s'applique sans exception à `monteeVersionSonar` ; le masquage par catégorie est le seul levier utilisateur.
+7. **Source secondaire `api/server/version`** : non retenue, hors périmètre confirmé. Seul l'événement `SQ_UPGRADE` de `project_analyses/search` est exploité.
+8. **Persistance du choix de masquage par catégorie** : retenu — état de session uniquement (`WritableSignal`), non mémorisé dans une vue enregistrée.
+9. **Placement du panneau de bascule** : retenu — dans `SqmGraphiqueEvolutionComponent`, à côté de la légende des séries.
+10. **Valeur exacte du filtre `category=SQ_UPGRADE` et forme de `event.name`** : ne peut pas être vérifiée sans accès à une instance Sonar réelle dans le cadre de cette session ; ce n'est pas un arbitrage mais une limite technique documentée (repli sûr déjà prévu : liste vide si la catégorie est absente ou différente). Point à vérifier contre une instance réelle avant une éventuelle release, consigné au rapport de développement comme vérification humaine restant à faire.
+11. **Dédoublonnage inter-projets** : retenu — regroupement par `version` seule, date la plus ancienne conservée.
+12. **Couleur et tirets du repère** : retenu — `#7c3aed` tireté `[4, 3]`, décision arbitraire de présentation à valider par un humain (même statut que les autres couleurs et seuils arbitraires déjà documentés par ce plan et par `plan_18`).
+13. **Priorité `Could have`** de `US-062` : confirmée, cohérente avec les chapitres 1 à 3 de ce même plan (US-055, US-056, US-057), tous `Could have`.
+14. **Ancres du sommaire** : **corrigé le 2026-09-08**. La cause exacte n'était pas la convention de suffixes en elle-même mais son séparateur : MkDocs (extension `toc`, `slugify: pymdownx.slugs.slugify(case='lower')`, seul moteur de rendu réellement publié pour ce document, `mkdocs.yml`) suffixe un titre en collision par `_1`, `_2`, … (**tiret bas**), jamais par un tiret comme le document l'écrivait ; le numérotage du suffixe suit en outre l'ordre des collisions réelles de texte de titre complet (numéro de section inclus), non l'ordre des chapitres. Vérifié en construisant réellement le site (`mkdocs build` dans un environnement local temporaire, jamais commis) et en inspectant les `id` de titre effectivement générés dans le HTML produit, plutôt que par déduction manuelle de la règle de dédoublonnage. Sommaire réécrit en conséquence (ci-dessus) pour les cinq chapitres.
+15. **Titre et nom de fichier de `plan_17`** : **conservés en l'état**, décision alignée sur le précédent déjà appliqué à `plan_16_navigationFiltrageEtVues.md` (cf. paragraphe introductif du Statut du document) : le regroupement de sujets distincts sous un même fichier est assumé, un renommage n'apporterait pas de valeur fonctionnelle et casserait les liens déjà établis depuis les documents normatifs.
 
 | identifiant | intitulé | type |
 |---|---|---|
@@ -1330,18 +1356,6 @@ Inc.2 ─┼─→ Inc.3 ─→ Inc.5 ─→ Inc.6
 
 ## 12. Points restant ouverts
 
-- **Pseudo-indicateur désactivable** `sonar.montees_version` dans `groupe.indicateursDesactives` : non retenu (appel léger et sans effet de bord) ; à confirmer qu'aucun interrupteur n'est souhaité.
-- **Transport de la carte des montées** : argument de `enregistrerBrouillon` avec upsert immédiat à la sauvegarde du brouillon (retenu, aucun palier ; conséquence assumée — un rejet ultérieur du brouillon ne retire pas les repères) vs upsert à `integrerBrouillon` (repères non posés si le brouillon est rejeté, mais aussi non posés tant que l'utilisateur n'a pas intégré) vs champ persisté du brouillon (survivrait à une fermeture entre le run et l'intégration, mais impose un palier de migration). En cas de fermeture de l'application entre le run et l'enregistrement du brouillon avec l'option retenue, la carte en mémoire est perdue ; la campagne suivante repose les repères (idempotence).
-- **Identifiant `Annotation.id` non-UUID** : la Rustdoc du champ (« UUID v4 ») doit être amendée pour couvrir les identifiants dérivés stables des annotations système (retenu), ou le dédoublonnage au stockage doit se porter sur le couple `categorie` + `libelle` en conservant un UUID.
-- **Incohérence de date texte / graphe** pour une même version : chaque `Annotation` de projet conserve sa propre date (analyse post-montée de ce projet), tandis que le repère dédoublonné du graphique prend la date la plus ancienne ; la Fiche projet et la Synthèse graphique peuvent donc afficher la même montée à deux dates légèrement différentes. Jugé acceptable ; à confirmer.
-- **Montée détectée pour un projet hors périmètre de toute campagne** : aucun repère n'est posé tant que le projet n'est pas audité (le fait Sonar est global à l'instance, l'enregistrement reste par projet audité). Acceptable ; à acter.
-- **Suppression manuelle** d'une annotation système `monteeVersionSonar` erronée : conserver l'interdiction générale et se reposer sur le masquage par catégorie (retenu) vs autoriser une exception pour cette seule catégorie.
-- **Source secondaire** `api/server/version` relevée par campagne et comparée d'une campagne à l'autre (couvrirait les instances trop anciennes pour `SQ_UPGRADE` et SonarCloud) : hors périmètre au vu de la décision « se limiter à la montée de version » ; à confirmer qu'on n'en veut pas.
-- **Persistance du choix de masquage par catégorie** : session uniquement (retenu, aligné sur `filtreIndicateur`) vs mémorisation dans une vue enregistrée (US-028, RG-027).
-- **Placement du panneau de bascule** : dans `SqmGraphiqueEvolutionComponent` près de la légende (retenu) vs dans la barre de filtres de la Synthèse graphique.
-- **Valeur exacte du filtre** `category=SQ_UPGRADE` et forme de `event.name` : à vérifier contre une instance réelle (même réserve que l'en-tête du module `sonar.rs`) ; repli si la catégorie est absente = liste vide, pas d'erreur.
-- **Dédoublonnage inter-projets** par `version` seule en gardant la date la plus ancienne (retenu) vs par `(version, jour)` : à confirmer.
-- **Couleur et tirets** du repère `monteeVersionSonar` : `#7c3aed` tireté proposé, à figer avec la maquette de l'incrément 1.
-- **Priorité « Could have »** de US-062 à confirmer par un humain.
-- **Ancres du sommaire** : le document suit une convention de suffixes maison (`-1`, `-2`, `-3`, `-4` par ordre de chapitre) qui ne correspond pas à la slugification réelle de GitHub / MkDocs (titre complet, numéro de section inclus) ; les ancres des chapitres 2 à 5 sont vraisemblablement déjà rompues. Non introduit par ce chapitre, mais à corriger d'un coup, avec un outil de génération, en tenant compte de la cible de publication réelle de `docs/03_plan/`.
-- **Titre et nom de fichier de `plan_17`** : ce chapitre 5 ajoute un sujet distinct supplémentaire au document (point déjà ouvert au Statut du document).
+Tous les points fonctionnels et d'architecture initialement listés ici ont été tranchés le 2026-09-08 (cf. « Compléments actés le 2026-09-08 », section 3) ; ils ne sont pas répétés ici pour éviter toute divergence entre deux emplacements. Le point relatif aux ancres du sommaire, transverse aux chapitres 2 à 5, a également été corrigé le 2026-09-08 (cf. section 3). Ne reste réellement ouvert, non bloquant pour le développement de ce chapitre :
+
+- **Valeur exacte du filtre `category=SQ_UPGRADE` et forme de `event.name`** : limite technique, non un arbitrage — ne peut être vérifiée que contre une instance Sonar réelle. Repli déjà prévu et implémenté (liste vide si absent) ; vérification humaine à faire avant une release, à consigner le cas échéant dans `04_rapports/rapportDeDeveloppement.md`.

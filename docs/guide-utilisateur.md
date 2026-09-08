@@ -192,6 +192,8 @@ On choisit deux dates d'audit, ou un raccourci (« Dernier audit vs précédent 
 
 La synthèse graphique trace l'évolution d'un indicateur dans le temps, projet par projet, avec zoom et superposition. Les annotations de groupe et de projet apparaissent en repères verticaux. Au moins deux audits intégrés sont nécessaires pour tracer une évolution.
 
+Chaque campagne d'audit détecte automatiquement les montées de version du serveur Sonar et les matérialise par un repère vertical violet tireté, étiqueté « `Sonar <version>` » : cette information évite de lire, à tort, une rupture de série due à l'outillage comme une évolution réelle de la qualité. Une même montée de version détectée sur plusieurs projets d'une même instance Sonar n'affiche qu'un seul repère. À côté de la légende des séries, un panneau de boutons permet de masquer ou réafficher, indépendamment, chaque catégorie de repère vertical (annotations, changements de seuil, premier audit régulier, montées de version Sonar) ; ce choix n'est pas mémorisé d'une session à l'autre.
+
 ### Obsolescence
 
 ![Obsolescence](assets/captures/obsolescence.png)
