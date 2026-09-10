@@ -202,6 +202,45 @@ describe('CommitsMembresService', () => {
     expect(service.enCours()).toBe(false);
   });
 
+  it('limite la concurrence de la boucle à parametres.audit.concurrence et fait avancer la progression', async () => {
+    const rosterLarge = {
+      membres: [9001, 9002, 9003, 9004, 9005].map((id) => ({
+        id,
+        username: `dev-${id}`,
+        nom: `Dev ${id}`,
+        courriel: null,
+      })),
+      projets: [{ id: 1, chemin: 'demo/api' }],
+    };
+    let enVol = 0;
+    let maxEnVol = 0;
+    const traitesObserves: number[] = [];
+    invokeSimule.mockImplementation((commande) => {
+      if (commande === 'preparer_analyse_commits_membres') {
+        return Promise.resolve(rosterLarge);
+      }
+      // Chaque appel enregistre l'état de la progression au moment de son lancement (les `concurrence` premiers
+      // voient `traites: 0`, les suivants voient un compteur qui progresse au fil des résolutions).
+      traitesObserves.push(service.progression()?.traites ?? -1);
+      enVol += 1;
+      maxEnVol = Math.max(maxEnVol, enVol);
+      return new Promise<readonly []>((resolve) => {
+        setTimeout(() => {
+          enVol -= 1;
+          resolve([]);
+        }, 5);
+      });
+    });
+
+    await service.analyser('g-1', 'demo/groupe-gitlab');
+
+    // Concurrence bornée : jamais plus de 2 appels en vol simultanément (parametres.audit.concurrence).
+    expect(maxEnVol).toBe(2);
+    // Progression observée : les deux premiers lancements voient 0, puis le compteur avance jusqu'à 4.
+    expect(traitesObserves).toEqual([0, 0, 1, 2, 3]);
+    expect(service.activiteBrute()).toHaveLength(5);
+  });
+
   it('recalcule les lignes sur changement de seuil sans nouvel appel réseau', async () => {
     await service.analyser('g-1', 'demo/groupe-gitlab');
     const appelsAvant = invokeSimule.mock.calls.length;

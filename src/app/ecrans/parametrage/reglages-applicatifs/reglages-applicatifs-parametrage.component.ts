@@ -461,14 +461,15 @@ export class SqmReglagesApplicatifsParametrageComponent {
     const f = this.cadenceCommitsFormulaire;
     const ponderations = [f.ponderationInactivite, f.ponderationEcartCadence, f.ponderationSoiree];
     const invalide =
-      !Number.isFinite(f.fenetreJours) ||
+      !Number.isInteger(f.fenetreJours) ||
       f.fenetreJours < 7 ||
       f.fenetreJours > 90 ||
-      !Number.isFinite(f.seuilJoursOuvresSansPoussee) ||
+      !Number.isInteger(f.seuilJoursOuvresSansPoussee) ||
       f.seuilJoursOuvresSansPoussee < 1 ||
       !Number.isFinite(f.multiplicateurEcartCadence) ||
       f.multiplicateurEcartCadence < 1 ||
       ponderations.some((poids) => !Number.isFinite(poids) || poids < 0 || poids > 1) ||
+      ponderations.reduce((somme, poids) => somme + poids, 0) <= 0 ||
       !Number.isInteger(f.heureDebutSoiree) ||
       f.heureDebutSoiree < 0 ||
       f.heureDebutSoiree > 23 ||
@@ -478,8 +479,8 @@ export class SqmReglagesApplicatifsParametrageComponent {
       !this.fuseauxHorairesDisponibles.includes(f.fuseauHoraire);
     if (invalide) {
       this.messageErreur =
-        'Un des seuils « Commits des membres » est hors bornes (fenêtre 7–90 jours, seuil ≥ 1, ' +
-        'multiplicateur ≥ 1, pondérations entre 0 et 1, heures entre 0 et 23, fuseau à choisir dans la liste).';
+        'Un des seuils « Commits des membres » est hors bornes (fenêtre entière 7–90 jours, seuil entier ≥ 1, ' +
+        'multiplicateur ≥ 1, pondérations entre 0 et 1 de somme non nulle, heures entre 0 et 23, fuseau à choisir dans la liste).';
       return;
     }
     this.messageErreur = null;

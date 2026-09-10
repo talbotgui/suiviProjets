@@ -141,8 +141,6 @@ export class CommitsMembresService {
     if (this.enCoursInterne()) {
       return;
     }
-    this.groupeGitlabSaisiInterne.set(groupeGitlab);
-    this.groupeAnalyseIdInterne.set(groupeApplicatifId);
 
     const groupe = this.donneesApplication
       .groupes()
@@ -150,15 +148,20 @@ export class CommitsMembresService {
     const instancesGitlab = (groupe?.instances ?? []).filter(
       (instance) => instance.type === TypeInstance.Gitlab,
     );
-    this.plusieursInstancesGitlabInterne.set(instancesGitlab.length > 1);
     const instance = instancesGitlab[0];
     if (instance === undefined) {
-      this.premiereInstanceGitlabNomInterne.set(null);
+      // Groupe non analysable : on vide tout résultat précédent plutôt que de laisser le tableau projeter
+      // l'activité de l'ancienne analyse sur les membres connus du nouveau groupe.
+      this.reinitialiser();
       this.notification.erreur(
         'Ce groupe ne déclare aucune instance GitLab : impossible d’analyser les poussées de ses membres.',
       );
       return;
     }
+
+    this.groupeGitlabSaisiInterne.set(groupeGitlab);
+    this.groupeAnalyseIdInterne.set(groupeApplicatifId);
+    this.plusieursInstancesGitlabInterne.set(instancesGitlab.length > 1);
     this.premiereInstanceGitlabNomInterne.set(instance.nom);
 
     this.enCoursInterne.set(true);

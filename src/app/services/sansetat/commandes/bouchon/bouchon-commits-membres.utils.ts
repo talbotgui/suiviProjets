@@ -17,8 +17,11 @@ import type {
   ProjetGroupeGitlab,
 } from '../types-facade';
 
+/** Millisecondes par heure. */
+const MS_PAR_HEURE = 60 * 60 * 1000;
+
 /** Millisecondes par jour, pour le calcul des décalages depuis `Date.now()`. */
-const MS_PAR_JOUR = 24 * 60 * 60 * 1000;
+const MS_PAR_JOUR = 24 * MS_PAR_HEURE;
 
 /**
  * Jeu de démonstration des deux commandes de `FacadeCommitsMembresService` (US-060, RG-060), auxquelles
@@ -95,10 +98,11 @@ export class BouchonCommitsMembresUtils {
   private static horodatage(joursAvant: number, heureUtc: number): string {
     const date = new Date(Date.now() - joursAvant * MS_PAR_JOUR);
     date.setUTCHours(heureUtc, 0, 0, 0);
-    // Imposer une heure précise peut projeter la poussée du jour même dans le futur (appel avant `heureUtc`) :
-    // on la ramène alors à la veille pour rester une poussée réellement passée.
+    // Imposer une heure précise peut projeter la poussée du jour même dans le futur (appel avant `heureUtc`) : on
+    // la ramène alors à la veille **moins une heure**, pour rester une poussée réellement passée sans jamais
+    // coïncider avec la poussée `joursAvant + 1` du même profil (qui reste à `heureUtc:00` la veille).
     if (date.getTime() > Date.now()) {
-      date.setTime(date.getTime() - MS_PAR_JOUR);
+      date.setTime(date.getTime() - MS_PAR_JOUR - MS_PAR_HEURE);
     }
     return date.toISOString();
   }

@@ -380,8 +380,10 @@ export class CadencePousseesUtils {
         : heure >= seuils.heureDebutSoiree || heure < seuils.heureFinSoiree;
 
     const enSoiree = evenements.filter((evenement) => {
-      const heure = Number(formateur.format(new Date(evenement.horodatage))) % 24;
-      return dansLaPlage(heure);
+      const parties = formateur.formatToParts(new Date(evenement.horodatage));
+      const heureTexte = parties.find((partie) => partie.type === 'hour')?.value ?? '0';
+      // `en-GB` avec `hour12: false` peut rendre minuit en `'24'` : normalisé à `0`.
+      return dansLaPlage(Number(heureTexte) % 24);
     }).length;
     return enSoiree / evenements.length;
   }

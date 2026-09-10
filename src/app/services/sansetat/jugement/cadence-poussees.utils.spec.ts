@@ -53,6 +53,29 @@ class Fixtures {
   }
 
   /**
+   * Construit un événement de poussée à `joursAvant` jours et `heureUtc` heures avant un instant de référence
+   * quelconque (variante de {@link poussee} permettant de placer une poussée en été ou en hiver).
+   * @param baseIso - Instant de référence.
+   * @param joursAvant - Ancienneté en jours.
+   * @param heureUtc - Heure UTC imposée (0–23).
+   * @returns L'événement.
+   */
+  public static pousseeDepuis(
+    baseIso: string,
+    joursAvant: number,
+    heureUtc: number,
+  ): EvenementPoussee {
+    const date = new Date(Date.parse(baseIso) - joursAvant * 24 * 60 * 60 * 1000);
+    date.setUTCHours(heureUtc, 0, 0, 0);
+    return {
+      horodatage: date.toISOString(),
+      projetId: 1,
+      refPoussee: 'refs/heads/main',
+      nombreCommits: 1,
+    };
+  }
+
+  /**
    * Enveloppe une liste d'événements dans une entrée d'activité.
    * @param username - Identifiant du développeur.
    * @param evenements - Ses événements.
@@ -197,6 +220,38 @@ describe('CadencePousseesUtils.analyser', () => {
       );
       expect(ligne.partSoiree).toBe(0);
     }
+  });
+
+  it('tient compte de l’heure d’été : une poussée à 17 h UTC est « en soirée » à Paris en juillet, pas en janvier', () => {
+    const enJuillet = CadencePousseesUtils.analyser(
+      [
+        Fixtures.activite('dev', [
+          Fixtures.pousseeDepuis('2026-07-20T12:00:00.000Z', 1, 17),
+          Fixtures.pousseeDepuis('2026-07-20T12:00:00.000Z', 2, 17),
+        ]),
+      ],
+      SEUILS,
+      CHEMINS,
+      SANS_REGLE,
+      '2026-07-20T12:00:00.000Z',
+    )[0];
+    // Paris en juillet (CEST, UTC+2) : 17 h UTC → 19 h locales → dans la plage 19 h – 7 h.
+    expect(enJuillet.partSoiree).toBe(1);
+
+    const enJanvier = CadencePousseesUtils.analyser(
+      [
+        Fixtures.activite('dev', [
+          Fixtures.pousseeDepuis('2026-01-19T12:00:00.000Z', 1, 17),
+          Fixtures.pousseeDepuis('2026-01-19T12:00:00.000Z', 2, 17),
+        ]),
+      ],
+      SEUILS,
+      CHEMINS,
+      SANS_REGLE,
+      '2026-01-19T12:00:00.000Z',
+    )[0];
+    // Paris en janvier (CET, UTC+1) : 17 h UTC → 18 h locales → hors de la plage.
+    expect(enJanvier.partSoiree).toBe(0);
   });
 
   it('bascule sur UTC sans lever quand le fuseau est invalide', () => {

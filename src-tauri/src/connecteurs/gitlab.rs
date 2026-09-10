@@ -7657,7 +7657,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roster_commits_membres_classe_un_delai_depasse_et_une_instance_injoignable() {
+    async fn roster_commits_membres_classe_un_delai_depasse_sur_les_trois_fonctions() {
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(500)))
@@ -7667,10 +7667,38 @@ mod tests {
             lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
             Err(ErreurConnecteur::DelaiDepasse { .. })
         ));
-
+        assert!(matches!(
+            lister_projets_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
         assert!(matches!(
             lister_evenements_poussees(
-                "http://127.0.0.1:1",
+                &serveur.uri(),
+                "j",
+                1,
+                "2026-01-01",
+                &client_test_delai_court()
+            )
+            .await,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn roster_commits_membres_classe_une_instance_injoignable_sur_les_trois_fonctions() {
+        // Aucun serveur n'écoute sur ce port : la connexion échoue avant même le délai de requête.
+        let injoignable = "http://127.0.0.1:1";
+        assert!(matches!(
+            lister_membres_groupe(injoignable, "j", "g", &client_test_delai_court()).await,
+            Err(ErreurConnecteur::InstanceInjoignable { .. })
+        ));
+        assert!(matches!(
+            lister_projets_groupe(injoignable, "j", "g", &client_test_delai_court()).await,
+            Err(ErreurConnecteur::InstanceInjoignable { .. })
+        ));
+        assert!(matches!(
+            lister_evenements_poussees(
+                injoignable,
                 "j",
                 1,
                 "2026-01-01",

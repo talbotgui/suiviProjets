@@ -623,7 +623,8 @@ fn fuseau_horaire_bien_forme(fuseau: &str) -> bool {
 ///
 /// [`ErreurParametrage::ReglageApplicatifInvalide`] si `fenetre_jours` n'est pas dans `7..=90`, si
 /// `seuil_jours_ouvres_sans_poussee` est nul, si `multiplicateur_ecart_cadence` est inférieur à `1` ou non fini, si
-/// une des trois pondérations sort de `[0 ; 1]` ou n'est pas finie, si `heure_debut_soiree` ou `heure_fin_soiree`
+/// une des trois pondérations sort de `[0 ; 1]` ou n'est pas finie, si la **somme** des trois pondérations est nulle
+/// (le score de risque serait alors constant et sans signification), si `heure_debut_soiree` ou `heure_fin_soiree`
 /// dépasse `23`, ou si `fuseau_horaire` n'a pas la forme d'un identifiant IANA (cf. [`fuseau_horaire_bien_forme`]).
 pub(crate) fn definir_parametres_cadence_commits(
     donnees: &mut DonneesRacine,
@@ -642,6 +643,7 @@ pub(crate) fn definir_parametres_cadence_commits(
         || ponderations
             .iter()
             .any(|poids| !poids.is_finite() || !(0.0..=1.0).contains(poids))
+        || ponderations.iter().sum::<f64>() <= 0.0
         || parametres.heure_debut_soiree > 23
         || parametres.heure_fin_soiree > 23
         || !fuseau_horaire_bien_forme(&parametres.fuseau_horaire);
@@ -1421,6 +1423,11 @@ mod tests {
         hors_bornes(|c| c.multiplicateur_ecart_cadence = 0.5);
         hors_bornes(|c| c.ponderation_soiree = 1.5);
         hors_bornes(|c| c.ponderation_inactivite = f64::NAN);
+        hors_bornes(|c| {
+            c.ponderation_inactivite = 0.0;
+            c.ponderation_ecart_cadence = 0.0;
+            c.ponderation_soiree = 0.0;
+        });
         hors_bornes(|c| c.heure_debut_soiree = 24);
         hors_bornes(|c| c.fuseau_horaire = "pas un fuseau".to_string());
         hors_bornes(|c| c.fuseau_horaire = "Paris".to_string());

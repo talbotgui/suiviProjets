@@ -245,8 +245,9 @@ export class SqmCommitsMembresComponent {
   }
 
   /**
-   * Compare deux lignes selon la colonne et le sens de tri courants. Une valeur `null` est toujours reléguée en
-   * fin de liste, quel que soit le sens.
+   * Compare deux lignes selon la colonne et le sens de tri courants. Une valeur `null` (indicateur non calculable)
+   * est **toujours reléguée en fin de liste**, quel que soit le sens de tri : le sens n'est appliqué qu'à la
+   * comparaison des valeurs présentes.
    * @param a - Première ligne.
    * @param b - Seconde ligne.
    * @returns Un entier de comparaison.
@@ -258,49 +259,63 @@ export class SqmCommitsMembresComponent {
         return signe * a.username.localeCompare(b.username);
       case 'statut':
         return signe * a.statut.localeCompare(b.statut);
-      case 'dernierePoussee':
-        return (
-          signe *
-          SqmCommitsMembresComponent.comparerNullable(a.dernierePousseeIso, b.dernierePousseeIso)
-        );
-      case 'joursOuvres':
-        return (
-          signe *
-          SqmCommitsMembresComponent.comparerNombresNullable(
-            a.joursOuvresDepuisDernierePoussee,
-            b.joursOuvresDepuisDernierePoussee,
-          )
-        );
       case 'poussees':
         return signe * (a.nombrePoussees - b.nombrePoussees);
-      case 'cadence':
-        return (
-          signe *
-          SqmCommitsMembresComponent.comparerNombresNullable(
-            a.cadenceMedianeHeures,
-            b.cadenceMedianeHeures,
-          )
-        );
-      case 'ecart':
-        return (
-          signe * SqmCommitsMembresComponent.comparerNombresNullable(a.ecartCadence, b.ecartCadence)
-        );
-      case 'soiree':
-        return (
-          signe * SqmCommitsMembresComponent.comparerNombresNullable(a.partSoiree, b.partSoiree)
-        );
       case 'score':
         return signe * (a.scoreRisque - b.scoreRisque);
+      case 'dernierePoussee':
+        return SqmCommitsMembresComponent.comparerNullable(
+          a.dernierePousseeIso,
+          b.dernierePousseeIso,
+          signe,
+          (x, y) => x.localeCompare(y),
+        );
+      case 'joursOuvres':
+        return SqmCommitsMembresComponent.comparerNullable(
+          a.joursOuvresDepuisDernierePoussee,
+          b.joursOuvresDepuisDernierePoussee,
+          signe,
+          (x, y) => x - y,
+        );
+      case 'cadence':
+        return SqmCommitsMembresComponent.comparerNullable(
+          a.cadenceMedianeHeures,
+          b.cadenceMedianeHeures,
+          signe,
+          (x, y) => x - y,
+        );
+      case 'ecart':
+        return SqmCommitsMembresComponent.comparerNullable(
+          a.ecartCadence,
+          b.ecartCadence,
+          signe,
+          (x, y) => x - y,
+        );
+      case 'soiree':
+        return SqmCommitsMembresComponent.comparerNullable(
+          a.partSoiree,
+          b.partSoiree,
+          signe,
+          (x, y) => x - y,
+        );
     }
   }
 
   /**
-   * Compare deux chaînes nullables, `null` toujours en fin de liste (avant application du sens de tri).
+   * Compare deux valeurs nullables. Un `null` est toujours classé après une valeur présente, **indépendamment**
+   * du sens de tri (`signe`) qui n'est appliqué qu'à la comparaison de deux valeurs présentes.
    * @param a - Première valeur.
    * @param b - Seconde valeur.
+   * @param signe - `-1` pour un tri décroissant, `1` pour un tri croissant.
+   * @param comparer - Comparateur des valeurs présentes (croissant).
    * @returns Un entier de comparaison.
    */
-  private static comparerNullable(a: string | null, b: string | null): number {
+  private static comparerNullable<T>(
+    a: T | null,
+    b: T | null,
+    signe: number,
+    comparer: (x: T, y: T) => number,
+  ): number {
     if (a === null && b === null) {
       return 0;
     }
@@ -310,25 +325,6 @@ export class SqmCommitsMembresComponent {
     if (b === null) {
       return -1;
     }
-    return a.localeCompare(b);
-  }
-
-  /**
-   * Compare deux nombres nullables, `null` toujours en fin de liste (avant application du sens de tri).
-   * @param a - Première valeur.
-   * @param b - Seconde valeur.
-   * @returns Un entier de comparaison.
-   */
-  private static comparerNombresNullable(a: number | null, b: number | null): number {
-    if (a === null && b === null) {
-      return 0;
-    }
-    if (a === null) {
-      return 1;
-    }
-    if (b === null) {
-      return -1;
-    }
-    return a - b;
+    return signe * comparer(a, b);
   }
 }
