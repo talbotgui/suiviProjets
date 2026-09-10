@@ -8,7 +8,7 @@
 // encore `testerConnectivite`) : factorisé ici plutôt que codé en dur dans l'écran Brouillon, pour rester le point
 // d'entrée unique le jour où F24 sera construit. Classe à membres statiques uniquement, sur le modèle du gabarit
 // `ExempleReferenceUtils`.
-import type { CategorieErreurConnecteur } from './types-facade';
+import type { CategorieErreurConnecteur, ErreurConnecteur } from './types-facade';
 
 /**
  * Vocabulaire français (libellé de catégorie et action suggérée) associé à une anomalie de connecteur (RG-021,
@@ -70,5 +70,36 @@ export class ErreurConnecteurUtils {
       case 'depotVide':
         return "Le dépôt ne contient aucun commit : lancer l'audit après une première publication, ou détacher cette source du projet si le dépôt est abandonné.";
     }
+  }
+
+  /**
+   * Vérifie, sans accès non sûr à la valeur reçue, qu'un rejet d'une commande native correspond bien à une anomalie
+   * de connecteur typée (RG-021) plutôt qu'à une valeur inattendue de la frontière IPC. Reconnaît uniquement les
+   * catégories que le cœur natif fait réellement franchir la frontière (les variantes forgées côté interface,
+   * `instanceIntrouvable` notamment, n'y transitent jamais).
+   * @param valeur - Valeur rejetée par `invoke`, de type `unknown` à cette frontière.
+   * @returns `true` si `valeur` correspond à la forme attendue d'une `ErreurConnecteur`.
+   */
+  public static correspondAUneErreurConnecteur(valeur: unknown): valeur is ErreurConnecteur {
+    if (
+      typeof valeur !== 'object' ||
+      valeur === null ||
+      !('type' in valeur) ||
+      !('message' in valeur)
+    ) {
+      return false;
+    }
+    const categorie: unknown = valeur.type;
+    return (
+      typeof valeur.message === 'string' &&
+      (categorie === 'authentificationRefusee' ||
+        categorie === 'refIntrouvable' ||
+        categorie === 'instanceInjoignable' ||
+        categorie === 'delaiDepasse' ||
+        categorie === 'reponseInattendue' ||
+        categorie === 'droitsInsuffisants' ||
+        categorie === 'credentialAbsent' ||
+        categorie === 'depotVide')
+    );
   }
 }

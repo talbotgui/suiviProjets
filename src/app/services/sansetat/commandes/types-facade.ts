@@ -470,6 +470,65 @@ export type ResultatInterrogationMonteesVersionSonar =
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**
+ * Membre `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`), miroir strict de `MembreGroupeGitlab` côté
+ * cœur natif (`camelCase`), pour le roster de l'écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4).
+ * `courriel` n'est renseigné que lorsque l'API le retourne (jeton d'administration).
+ */
+export interface MembreGroupeGitlab {
+  readonly id: number;
+  readonly username: string;
+  readonly nom: string;
+  readonly courriel: string | null;
+}
+
+/**
+ * Dépôt d'un groupe GitLab (`GET /groups/{ref}/projects`), miroir strict de `ProjetGroupeGitlab` côté cœur natif,
+ * pour afficher un nom de dépôt lisible dans le tableau « Commits des membres » (US-060, RG-060).
+ */
+export interface ProjetGroupeGitlab {
+  readonly id: number;
+  readonly chemin: string;
+}
+
+/**
+ * Événement de poussée d'un utilisateur GitLab (`GET /users/{id}/events?action=pushed`), miroir strict de
+ * `EvenementPoussee` côté cœur natif, pour le calcul de régularité de l'écran « Commits des membres » (US-060,
+ * RG-060). L'horodatage est l'heure de poussée (`created_at` de l'événement).
+ */
+export interface EvenementPoussee {
+  readonly horodatage: string;
+  readonly projetId: number;
+  readonly refPoussee: string;
+  readonly nombreCommits: number;
+}
+
+/**
+ * Résultat de la passe de préparation d'une analyse « Commits des membres » (US-060, RG-060) : le roster du groupe
+ * GitLab et ses dépôts. Miroir strict de `PreparationAnalyseCommitsMembres` côté cœur natif ; type possédé par la
+ * Façade (structure de transfert calculée, jamais stockée), importable directement sans généricité.
+ */
+export interface PreparationAnalyseCommitsMembres {
+  readonly membres: readonly MembreGroupeGitlab[];
+  readonly projets: readonly ProjetGroupeGitlab[];
+}
+
+/**
+ * Résultat typé de `FacadeCommitsMembresService.preparerAnalyseCommitsMembres` (US-060, RG-060, plan_17
+ * chapitre 4), sur le modèle de {@link ResultatInterrogationMonteesVersionSonar}.
+ */
+export type ResultatPreparationAnalyseCommitsMembres =
+  | { readonly type: 'succes'; readonly resultat: PreparationAnalyseCommitsMembres }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
+ * Résultat typé de `FacadeCommitsMembresService.listerEvenementsPousseesMembre` (US-060, RG-060), sur le modèle de
+ * {@link ResultatInterrogationMonteesVersionSonar}.
+ */
+export type ResultatListerEvenementsPousseesMembre =
+  | { readonly type: 'succes'; readonly resultat: readonly EvenementPoussee[] }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
  * Type de correspondance d'une règle de détection de marqueur IA (F18), mirroir de `TypeCorrespondanceMarqueur`
  * côté cœur natif : `exact` (égalité stricte du nom) ou `motif` (glob simple, seul `*` étant spécial).
  */
