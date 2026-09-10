@@ -1128,12 +1128,14 @@ Inc.3 ─┘   Inc.5 ─┼─→ Inc.6 ─→ Inc.7
 
 Les points ouverts de la première rédaction ont été tranchés par l'utilisateur les 2026-09-01 et 2026-09-02, puis complétés par sa réponse à la relecture isolée du 2026-09-02 : référence de groupe GitLab non persistée et **obligatoire** ; écran « Commits des membres » juste après Obsolescence ; **première instance GitLab** du groupe applicatif, message si plusieurs ; **trois pondérations du score paramétrables**, deuxième signal = **ratio silence courant / cadence médiane** (coefficient de variation abandonné) ; fuseau horaire unique ; pas de frise ni de sparkline ; jours fériés ignorés ; pas d'avertissement de couverture partielle ; attribution au pousseur ; profondeur d'historique GitLab jugée suffisante ; priorité « Should have » ; **dimension RH assumée, rendue visible par un bandeau permanent et le guide utilisateur** ; nom de fichier `plan_17` conservé. Tous reportés en décisions actées (section 2) et dans le corps du chapitre.
 
-Restent à vérifier au fil du développement, sans blocage de conception :
+Statut à l'intégration (Étape 40 du [rapport de développement](../04_rapports/rapportDeDeveloppement.md)) :
 
-- **Identifiants** : `plan_18` a aligné son `RG` sur `US-061` (→ `RG-061`) ; ce chapitre reprend donc `US-060` / `RG-060` (cf. section 3). À reconfirmer libres à la qualification, plusieurs plans non intégrés consommant des numéros en parallèle.
-- **Valeur du palier de migration** : `plan_17` chapitre 4 **et** `plan_18` incrémentent `VERSION_SCHEMA_COURANTE` ; la valeur exacte et le nom de la fonction (`migration_N_vers_N+1`) sont fixés à l'implémentation selon l'ordre d'intégration, sans trou (cf. section 8).
-- **Sémantique GitLab à confirmer contre l'instance réelle** à l'incrément 2, sans incidence sur l'architecture (fenêtre de quatre semaines) : exclusivité et granularité de jour du paramètre `after` de `/users/:id/events` ; présence effective de `email` dans `/groups/:ref/members/all` sous jeton d'administration ; profondeur d'historique des événements conservée par l'instance Community Edition.
-- **Nom de fichier `plan_17`** conservé sur demande explicite malgré l'ajout de sujets distincts ; le titre du document reste à ajuster si besoin (point déjà ouvert au Statut du document).
+- **Identifiants** : `US-060` / `RG-060` confirmés libres et consommés.
+- **Palier de migration** : `plan_18` intégré en premier a pris `10` → `11` ; ce chapitre a pris `11` → `12` (`migration_11_vers_12`, transformation nulle).
+- **Sémantique GitLab à confirmer contre l'instance réelle**, sans incidence sur l'architecture : exclusivité et granularité de jour du paramètre `after` de `/users/:id/events` ; présence effective de `email` dans `/groups/:ref/members/all` sous jeton d'administration ; profondeur d'historique des événements conservée par l'instance Community Edition. Aucun test d'intégration `#[ignore]` dédié n'a été ajouté à cet effet (à envisager si l'utilisateur souhaite le vérifier à coût nul).
+- **Écart au plan §8** : `parametres.cadenceCommits` **n'est pas** inclus dans l'export de configuration partageable (le module ne porte que `seuils` + `referentiels`) — traité comme un réglage propre au poste, décision à confirmer par un humain.
+- **Nom de fichier `plan_17`** conservé sur demande explicite ; le titre du document reste à ajuster si besoin.
+- **Relecture humaine du code et vérification interactive (`npm start`)** restant dues (session sans relecture isolée par incrément, sur demande de l'utilisateur).
 
 # Chapitre 5 — Repères de montée de version Sonar sur les graphiques d'évolution (US-062 / RG-062)
 

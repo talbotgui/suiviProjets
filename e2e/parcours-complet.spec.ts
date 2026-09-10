@@ -700,6 +700,48 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page).toHaveURL(/\/synthese-audits$/);
   });
 
+  // 19e. Commits des membres — régularité des poussées de code d'un groupe (US-060, RG-060, plan_17 chapitre 4).
+  await test.step('19e. Commits des membres', async () => {
+    await avantChangementEcran(page, '19e-commits-membres');
+    await page.locator('#shell-lien-commits-membres').click();
+    await expect(page).toHaveURL(/\/commits-membres$/);
+
+    // Bandeau permanent de dimension RH, non masquable.
+    await expect(page.locator('.commits-membres__bandeau-rh')).toContainText(
+      'indicateurs nominatifs de rythme de travail',
+    );
+    await expect(page.locator('.commits-membres__bandeau-rh button')).toHaveCount(0);
+
+    // Sélection du groupe applicatif (Alpha porte une instance GitLab) et saisie de la référence de groupe GitLab.
+    await page.locator('select[name="groupeSelectionneId"]').selectOption({ label: GROUPE_A.nom });
+    await page.locator('input[name="referenceGroupeGitlab"]').fill('e2e/groupe-alpha');
+    await page.locator('.commits-membres__commande button[type="submit"]').click();
+
+    // Le jeu de démonstration du bouchon TS expose quatre développeurs synthétiques.
+    const lignes = page.locator('.commits-membres__tableau tbody tr');
+    await expect(lignes).toHaveCount(4);
+    const premieresCellules = page.locator('.commits-membres__tableau tbody tr td:first-child');
+
+    // Tri par défaut (score de risque décroissant) : le développeur « silencieux » apparaît en alerte et devant
+    // le développeur « régulier ». Assertions sur l'ORDRE et la PRÉSENCE uniquement, jamais sur des magnitudes
+    // (les horodatages du bouchon sont relatifs à `Date.now()`).
+    const noms = await premieresCellules.allInnerTexts();
+    const indexSilencieux = noms.findIndex((texte) => texte.includes('sam.silencieux'));
+    const indexRegulier = noms.findIndex((texte) => texte.includes('dana.regulier'));
+    expect(indexSilencieux).toBeGreaterThanOrEqual(0);
+    expect(indexRegulier).toBeGreaterThanOrEqual(0);
+    expect(indexSilencieux).toBeLessThan(indexRegulier);
+    await expect(lignes.nth(indexSilencieux)).toContainText('Inactivité');
+
+    // Le tri d'une autre colonne s'applique côté interface, sans nouvel appel réseau (le nombre de lignes reste 4,
+    // seul l'ordre change). Deux clics sur « Développeur » -> tri alphabétique croissant.
+    const entete = page.locator('.commits-membres__tri', { hasText: 'Développeur' });
+    await entete.click();
+    await entete.click();
+    await expect(lignes).toHaveCount(4);
+    await expect(premieresCellules.first()).toContainText('dana.regulier');
+  });
+
   // 20. Comparaison entre deux audits — comparaison des deux audits intégrés d'un même projet.
   await test.step('20. Comparaison entre deux audits', async () => {
     await avantChangementEcran(page, '20-comparaison-audits');
