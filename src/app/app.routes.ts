@@ -10,6 +10,7 @@ import { SqmComparaisonAuditsComponent } from './ecrans/comparaison-audits/compa
 import { SqmCredentialsComponent } from './ecrans/credentials/credentials.component';
 import { SqmDemarrageComponent } from './ecrans/demarrage/demarrage.component';
 import { SqmFicheProjetComponent } from './ecrans/fiche-projet/fiche-projet.component';
+import { SqmCommitsMembresComponent } from './ecrans/commits-membres/commits-membres.component';
 import { SqmListeTravailComponent } from './ecrans/liste-travail/liste-travail.component';
 import { SqmObsolescenceComponent } from './ecrans/obsolescence/obsolescence.component';
 import { SqmParametrageComponent } from './ecrans/parametrage/parametrage.component';
@@ -39,6 +40,9 @@ import { SqmSyntheseGraphiqueComponent } from './ecrans/synthese-graphique/synth
 //
 // Route `obsolescence` ajoutée en Phase 16 (US-051, `SqmObsolescenceComponent`), sur le même modèle (route enfant
 // sans paramètre, entrée de sidebar après « Synthèse graphique »).
+//
+// Route `commits-membres` ajoutée par plan_17 chapitre 4 (US-060, `SqmCommitsMembresComponent`), sur le même
+// modèle (route enfant sans paramètre, entrée de sidebar juste après « Obsolescence », avant « Liste de travail »).
 //
 // Route `parametrage` ajoutée à la Phase 7, incrément 2 (US-033, `SqmParametrageComponent`), sur le même modèle
 // (route enfant sans paramètre, entrée de sidebar désormais active).
@@ -73,6 +77,7 @@ export const routes: Routes = [
       { path: 'synthese-audits', component: SqmSyntheseAuditsComponent },
       { path: 'synthese-graphique', component: SqmSyntheseGraphiqueComponent },
       { path: 'obsolescence', component: SqmObsolescenceComponent },
+      { path: 'commits-membres', component: SqmCommitsMembresComponent },
       { path: 'liste-travail', component: SqmListeTravailComponent },
       { path: 'credentials', component: SqmCredentialsComponent },
       { path: 'fiche-projet/:projetId', component: SqmFicheProjetComponent },

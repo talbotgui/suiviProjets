@@ -1,0 +1,230 @@
+<section class="commits-membres">
+  <h1 class="texte-lg poids-gras exterieur-bas-2 exterieur-haut-0">Commits des membres</h1>
+
+  <p class="commits-membres__bandeau-rh carte interieur-3 exterieur-bas-3" role="note">
+    Cet écran présente des indicateurs <strong>nominatifs</strong> de rythme de travail. Leur
+    exploitation relève de la responsabilité RH et d'information du personnel de votre organisation.
+  </p>
+
+  <form
+    class="commits-membres__commande carte interieur-4 exterieur-bas-4 d-flex direction-colonne ecart-3"
+    (ngSubmit)="lancerAnalyse()"
+  >
+    <label class="champ">
+      Groupe applicatif
+      <select
+        class="champ__controle"
+        name="groupeSelectionneId"
+        [ngModel]="groupeSelectionneId()"
+        (ngModelChange)="groupeSelectionneId.set($event)"
+        required
+      >
+        <option [ngValue]="null">— Sélectionnez un groupe —</option>
+        @for (groupe of groupesAnalysables(); track groupe.id) {
+          <option [ngValue]="groupe.id">{{ groupe.nom }}</option>
+        }
+      </select>
+      @if (groupesAnalysables().length === 0) {
+        <span class="champ__aide">
+          Aucun groupe ne déclare d'instance GitLab. Ajoutez-en une depuis l'Administration des
+          sources.
+        </span>
+      }
+    </label>
+
+    <label class="champ">
+      Groupe GitLab (chemin ou identifiant)
+      <input
+        type="text"
+        class="champ__controle"
+        name="referenceGroupeGitlab"
+        [ngModel]="referenceGroupeGitlab()"
+        (ngModelChange)="referenceGroupeGitlab.set($event)"
+        required
+        aria-describedby="commits-membres-reference-aide"
+      />
+      <span id="commits-membres-reference-aide" class="champ__aide">
+        Cette référence n'est jamais enregistrée : elle vit uniquement le temps de la session.
+      </span>
+    </label>
+
+    <div class="d-flex aligne-centre retour-ligne ecart-3">
+      <button
+        type="submit"
+        class="bouton bouton--principal"
+        [disabled]="
+          store.enCours() ||
+          groupeSelectionneId() === null ||
+          referenceGroupeGitlab().trim().length === 0
+        "
+      >
+        Analyser
+      </button>
+      @if (store.instantAnalyse(); as instant) {
+        <span class="texte-sm texte-discret">
+          Analyse du {{ formaterHorodatage(instant.toISOString()) }}
+        </span>
+      }
+      <a
+        routerLink="/parametrage"
+        [queryParams]="{ onglet: 'reglages-applicatifs' }"
+        class="texte-sm"
+      >
+        Ajuster les seuils
+      </a>
+    </div>
+
+    <p class="texte-sm texte-discret exterieur-bas-0">
+      Les commits restés locaux, non poussés, ne sont pas visibles. Les jours fériés ne sont pas
+      décomptés.
+    </p>
+    @if (messagePlusieursInstances(); as message) {
+      <p class="texte-sm" role="note">{{ message }}</p>
+    }
+  </form>
+
+  @if (store.enCours()) {
+    <p class="commits-membres__chargement" role="status">
+      Analyse en cours…
+      @if (store.progression(); as progression) {
+        ({{ progression.traites }} / {{ progression.total }} développeurs)
+      }
+    </p>
+  } @else if (store.instantAnalyse() !== null) {
+    <div
+      class="commits-membres__filtres carte interieur-3 exterieur-bas-3 d-flex retour-ligne ecart-3 aligne-centre"
+    >
+      <label class="champ champ--en-ligne">
+        Statut
+        <select
+          class="champ__controle"
+          name="filtreStatut"
+          [ngModel]="filtreStatut()"
+          (ngModelChange)="filtreStatut.set($event)"
+        >
+          <option value="tous">Tous</option>
+          <option value="interne">Internes</option>
+          <option value="client">Clients</option>
+          <option value="partenaire">Partenaires</option>
+          <option value="inconnu">Inconnus</option>
+        </select>
+      </label>
+      <label class="champ champ--en-ligne">
+        Recherche
+        <input
+          type="search"
+          class="champ__controle"
+          name="filtreTexte"
+          [ngModel]="filtreTexte()"
+          (ngModelChange)="filtreTexte.set($event)"
+        />
+      </label>
+      <label class="d-flex aligne-centre ecart-2 texte-sm">
+        <input
+          type="checkbox"
+          name="seulementAlertes"
+          [ngModel]="seulementAlertes()"
+          (ngModelChange)="seulementAlertes.set($event)"
+        />
+        Seulement les lignes en alerte
+      </label>
+      <button type="button" class="bouton" (click)="reinitialiserFiltres()">
+        Réinitialiser les filtres
+      </button>
+      <span class="texte-sm texte-discret">
+        {{ nombreDeveloppeurs() }} développeur(s), {{ nombreEnAlerte() }} en alerte
+      </span>
+    </div>
+
+    <div class="commits-membres__tableau-conteneur deborde-auto">
+      <table class="commits-membres__tableau">
+        <thead>
+          <tr>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('developpeur')">
+                Développeur
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('statut')">
+                Statut
+              </button>
+            </th>
+            <th scope="col">
+              <button
+                type="button"
+                class="commits-membres__tri"
+                (click)="trierPar('dernierePoussee')"
+              >
+                Dernière poussée
+              </button>
+            </th>
+            <th scope="col">Dépôt</th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('joursOuvres')">
+                Jours ouvrés depuis
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('poussees')">
+                Poussées / commits
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('cadence')">
+                Cadence médiane
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('ecart')">
+                Écart à la cadence
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('soiree')">
+                Part en soirée
+              </button>
+            </th>
+            <th scope="col">
+              <button type="button" class="commits-membres__tri" (click)="trierPar('score')">
+                Score de risque
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (ligne of lignesAffichees(); track ligne.username) {
+            <tr [class.commits-membres__ligne--insuffisante]="ligne.donneesInsuffisantes">
+              <td>
+                <span class="poids-gras">{{ ligne.nom }}</span>
+                <span class="texte-sm texte-discret">{{ ligne.username }}</span>
+                @for (alerte of ligne.alertes; track alerte) {
+                  <span class="commits-membres__badge-alerte">{{ libelleAlerte(alerte) }}</span>
+                }
+              </td>
+              <td>{{ libelleStatut(ligne.statut) }}</td>
+              <td>{{ formaterHorodatage(ligne.dernierePousseeIso) }}</td>
+              <td>{{ ligne.depotDernierePoussee ?? '—' }}</td>
+              <td>{{ ligne.joursOuvresDepuisDernierePoussee ?? '—' }}</td>
+              <td>{{ ligne.nombrePoussees }} / {{ ligne.nombreCommits }}</td>
+              <td>{{ formaterHeures(ligne.cadenceMedianeHeures) }}</td>
+              <td>{{ formaterEcart(ligne.ecartCadence) }}</td>
+              <td>{{ formaterPourcentage(ligne.partSoiree) }}</td>
+              <td>{{ formaterPourcentage(ligne.scoreRisque) }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="10" class="texte-discret">
+                Aucun développeur ne correspond aux filtres.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="commits-membres__initial texte-discret">
+      Sélectionnez un groupe, saisissez la référence du groupe GitLab, puis lancez une analyse.
+    </p>
+  }
+</section>

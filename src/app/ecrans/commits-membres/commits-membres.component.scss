@@ -1,0 +1,63 @@
+// Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
+// .claude/rules/01-usage-ia-et-conventions.md.
+//
+// Mise en forme de l'écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4) : tableau à en-têtes
+// collants, débordement horizontal contenu, badges d'alerte. Aucune couleur métier codée ici — la mise en
+// évidence des lignes « données insuffisantes » reste discrète, sans couleur d'alerte.
+
+.commits-membres__bandeau-rh {
+  border-left: 4px solid currentColor;
+}
+
+.commits-membres__tableau-conteneur {
+  max-width: 100%;
+}
+
+.commits-membres__tableau {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875rem;
+
+  th,
+  td {
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: canvas;
+  }
+
+  td span {
+    display: block;
+  }
+}
+
+.commits-membres__tri {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  color: inherit;
+}
+
+.commits-membres__badge-alerte {
+  display: inline-block;
+  margin-top: 0.15rem;
+  margin-right: 0.25rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.commits-membres__ligne--insuffisante td {
+  opacity: 0.7;
+  font-style: italic;
+}
