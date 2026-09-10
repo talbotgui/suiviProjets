@@ -335,4 +335,175 @@
       />
     }
   </section>
+
+  <section class="reglages-applicatifs-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="reglages-applicatifs-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Commits des membres</h3>
+      <button
+        type="button"
+        class="bouton"
+        [disabled]="enCours()"
+        (click)="ouvrirEditionCadenceCommits()"
+      >
+        Modifier
+      </button>
+    </header>
+
+    <p class="texte-sm texte-discret">
+      Seuils de calcul de l'écran « Commits des membres ». Une modification prend effet au prochain
+      calcul de cet écran, sans nouvel appel réseau.
+    </p>
+
+    @if (cadenceCommitsEditVisible()) {
+      <form
+        class="reglages-applicatifs-parametrage__formulaire d-flex direction-colonne ecart-3"
+        (ngSubmit)="demanderEnregistrementCadenceCommits()"
+      >
+        <label class="champ">
+          Fenêtre d'analyse (jours, 7 à 90)
+          <input
+            type="number"
+            min="7"
+            max="90"
+            class="champ__controle"
+            name="cadenceFenetreJours"
+            [(ngModel)]="cadenceCommitsFormulaire.fenetreJours"
+            required
+          />
+        </label>
+        <label class="champ">
+          Seuil de jours ouvrés sans poussée (≥ 1)
+          <input
+            type="number"
+            min="1"
+            class="champ__controle"
+            name="cadenceSeuilJoursOuvres"
+            [(ngModel)]="cadenceCommitsFormulaire.seuilJoursOuvresSansPoussee"
+            required
+          />
+        </label>
+        <label class="champ">
+          Multiplicateur d'écart à la cadence (≥ 1)
+          <input
+            type="number"
+            min="1"
+            step="0.1"
+            class="champ__controle"
+            name="cadenceMultiplicateurEcart"
+            [(ngModel)]="cadenceCommitsFormulaire.multiplicateurEcartCadence"
+            required
+          />
+        </label>
+        <label class="champ">
+          Pondération « inactivité » (0 à 1)
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+            class="champ__controle"
+            name="cadencePonderationInactivite"
+            [(ngModel)]="cadenceCommitsFormulaire.ponderationInactivite"
+            required
+          />
+        </label>
+        <label class="champ">
+          Pondération « écart à la cadence » (0 à 1)
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+            class="champ__controle"
+            name="cadencePonderationEcart"
+            [(ngModel)]="cadenceCommitsFormulaire.ponderationEcartCadence"
+            required
+          />
+        </label>
+        <label class="champ">
+          Pondération « part en soirée » (0 à 1)
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+            class="champ__controle"
+            name="cadencePonderationSoiree"
+            [(ngModel)]="cadenceCommitsFormulaire.ponderationSoiree"
+            required
+          />
+        </label>
+        <label class="champ">
+          Début de la plage de soirée (heure locale, 0 à 23)
+          <input
+            type="number"
+            min="0"
+            max="23"
+            class="champ__controle"
+            name="cadenceHeureDebutSoiree"
+            [(ngModel)]="cadenceCommitsFormulaire.heureDebutSoiree"
+            required
+          />
+        </label>
+        <label class="champ">
+          Fin de la plage de soirée (heure locale, 0 à 23)
+          <input
+            type="number"
+            min="0"
+            max="23"
+            class="champ__controle"
+            name="cadenceHeureFinSoiree"
+            [(ngModel)]="cadenceCommitsFormulaire.heureFinSoiree"
+            required
+          />
+        </label>
+        <label class="champ">
+          Fuseau horaire de référence
+          <select
+            class="champ__controle"
+            name="cadenceFuseauHoraire"
+            [(ngModel)]="cadenceCommitsFormulaire.fuseauHoraire"
+            required
+          >
+            @for (fuseau of fuseauxHorairesDisponibles; track fuseau) {
+              <option [value]="fuseau">{{ fuseau }}</option>
+            }
+          </select>
+        </label>
+        <label class="champ">
+          Comptes exclus (un identifiant de connexion par ligne)
+          <textarea
+            class="champ__controle"
+            rows="3"
+            name="cadenceComptesExclus"
+            [(ngModel)]="cadenceCommitsFormulaire.comptesExclusTexte"
+            aria-describedby="reglages-applicatifs-cadence-comptes-aide"
+          ></textarea>
+          <span id="reglages-applicatifs-cadence-comptes-aide" class="champ__aide">
+            Ex. robots d'intégration continue, comptes de service.
+          </span>
+        </label>
+        <div
+          class="reglages-applicatifs-parametrage__actions-formulaire d-flex justifie-fin ecart-2"
+        >
+          <button type="button" class="bouton" (click)="fermerEditionCadenceCommits()">
+            Annuler
+          </button>
+          <button type="submit" class="bouton bouton--principal" [disabled]="enCours()">
+            Enregistrer
+          </button>
+        </div>
+      </form>
+    }
+
+    @if (reglageEnAttenteMotDePasse() === 'cadenceCommits') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer les seuils « Commits des membres »."
+        (confirmee)="confirmerEnregistrementCadenceCommits($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
 </section>

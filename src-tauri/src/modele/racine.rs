@@ -95,7 +95,15 @@ use std::collections::HashMap;
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`. La valeur `11` a été retenue en l'absence
 /// d'intégration préalable de `plan_17` chapitre 4 (qui incrémente aussi ce compteur) : le premier des deux plans
 /// intégré prend le palier suivant, sans trou.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 11;
+///
+/// Passage de `11` à `12` (plan_17 chapitre 4 — écran « Commits des membres », US-060/RG-060) : palier **à
+/// transformation nulle**, comme `migration_1_vers_2`. Seul changement de forme : ajout du sous-objet
+/// [`CadenceCommits`] à `parametres` (`parametres.cadenceCommits`), dont chaque champ porte son propre
+/// `#[serde(default = "…")]` signifiant — un fichier antérieur récupère les dix valeurs par défaut sans qu'aucune
+/// donnée existante ne soit transformée. Voir `migration_11_vers_12` enregistrée dans
+/// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`. `plan_18` ayant été intégré en premier (palier
+/// `10` → `11`), ce chapitre prend le palier suivant `11` → `12`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 12;
 
 /// Version unique et partagée du schéma de filtres d'une [`VueEnregistree`], depuis le palier `9` → `10`
 /// (plan_16, incrément 2) : la forme de `filtres` (`{ groupeId, projetIds }`) est désormais commune à tous les
@@ -129,6 +137,33 @@ pub(crate) const CONCURRENCE_AUDIT_PAR_DEFAUT: u32 = 4;
 /// taille à laquelle la dérivation de clé (Argon2id, RNF-002) ou le rendu de la synthèse (RNF-001) commenceraient
 /// à se dégrader perceptiblement.
 pub(crate) const SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT: u64 = 10 * 1024 * 1024;
+
+/// Valeurs par défaut des dix seuils de l'écran « Commits des membres » (`parametres.cadenceCommits`, US-060 /
+/// RG-060), portées par [`CadenceCommits`].
+///
+/// **Toutes ces valeurs sont des décisions arbitraires à valider par un humain** (cf. rapport de développement de
+/// cette évolution) : aucun texte normatif ni `docs/01_besoin/exemple-donnees.json` ne les fixe. Fenêtre de quatre
+/// semaines (rythme d'audit usuel) ; seuil d'inactivité de trois jours ouvrés ; silence courant jugé anormal
+/// au-delà de deux fois la cadence médiane personnelle ; pondérations du score de risque privilégiant l'inactivité
+/// absolue (0,5) sur l'écart à la cadence (0,3) puis la part en soirée (0,2) ; plage de soirée 19 h – 7 h (repli
+/// circulaire) ; fuseau « Europe/Paris » ; aucun compte exclu par défaut.
+pub(crate) const CADENCE_FENETRE_JOURS_PAR_DEFAUT: u32 = 28;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_SEUIL_JOURS_OUVRES_SANS_POUSSEE_PAR_DEFAUT: u32 = 3;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_MULTIPLICATEUR_ECART_PAR_DEFAUT: f64 = 2.0;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_PONDERATION_INACTIVITE_PAR_DEFAUT: f64 = 0.5;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_PONDERATION_ECART_PAR_DEFAUT: f64 = 0.3;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_PONDERATION_SOIREE_PAR_DEFAUT: f64 = 0.2;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_HEURE_DEBUT_SOIREE_PAR_DEFAUT: u8 = 19;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_HEURE_FIN_SOIREE_PAR_DEFAUT: u8 = 7;
+/// Cf. [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`].
+pub(crate) const CADENCE_FUSEAU_HORAIRE_PAR_DEFAUT: &str = "Europe/Paris";
 
 /// Motif d'expression régulière de nommage de branche par défaut (RG-030,
 /// `docs/02_documentation/05_reglesGestion.md`), appliqué en l'absence de valeur explicite dans
@@ -1105,6 +1140,104 @@ fn seuil_avertissement_taille_octets_par_defaut() -> u64 {
     SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT
 }
 
+/// Fonctions de repli pour les `#[serde(default = "…")]` par champ de [`CadenceCommits`] : chaque champ récupère sa
+/// valeur signifiante (et non `0` / `""`) même dans un objet `cadenceCommits` partiel édité à la main, sur le même
+/// principe que [`motif_nommage_branches_par_defaut`].
+fn cadence_fenetre_jours_par_defaut() -> u32 {
+    CADENCE_FENETRE_JOURS_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_seuil_jours_ouvres_par_defaut() -> u32 {
+    CADENCE_SEUIL_JOURS_OUVRES_SANS_POUSSEE_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_multiplicateur_ecart_par_defaut() -> f64 {
+    CADENCE_MULTIPLICATEUR_ECART_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_ponderation_inactivite_par_defaut() -> f64 {
+    CADENCE_PONDERATION_INACTIVITE_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_ponderation_ecart_par_defaut() -> f64 {
+    CADENCE_PONDERATION_ECART_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_ponderation_soiree_par_defaut() -> f64 {
+    CADENCE_PONDERATION_SOIREE_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_heure_debut_soiree_par_defaut() -> u8 {
+    CADENCE_HEURE_DEBUT_SOIREE_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_heure_fin_soiree_par_defaut() -> u8 {
+    CADENCE_HEURE_FIN_SOIREE_PAR_DEFAUT
+}
+/// Cf. [`cadence_fenetre_jours_par_defaut`].
+fn cadence_fuseau_horaire_par_defaut() -> String {
+    CADENCE_FUSEAU_HORAIRE_PAR_DEFAUT.to_string()
+}
+
+/// Dix seuils de calcul de l'écran « Commits des membres » (`parametres.cadenceCommits`, US-060 / RG-060), édités
+/// depuis l'onglet « Réglages applicatifs » du Paramétrage et pris en compte au prochain calcul de cet écran.
+///
+/// Chaque champ porte son propre `#[serde(default = "…")]` : un objet `cadenceCommits` partiel (fichier édité à la
+/// main) récupère les valeurs signifiantes plutôt que `0` / `""`. `impl Default` reste fourni pour la cohérence.
+/// Toutes les valeurs par défaut sont des **décisions arbitraires à valider par un humain** (cf.
+/// [`CADENCE_FENETRE_JOURS_PAR_DEFAUT`]).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CadenceCommits {
+    /// Largeur de la fenêtre glissante d'analyse, en jours.
+    #[serde(default = "cadence_fenetre_jours_par_defaut")]
+    pub(crate) fenetre_jours: u32,
+    /// Seuil absolu de jours ouvrés sans poussée déclenchant l'alerte d'inactivité.
+    #[serde(default = "cadence_seuil_jours_ouvres_par_defaut")]
+    pub(crate) seuil_jours_ouvres_sans_poussee: u32,
+    /// Facteur au-delà duquel le silence courant est jugé anormal par rapport à la cadence médiane personnelle.
+    #[serde(default = "cadence_multiplicateur_ecart_par_defaut")]
+    pub(crate) multiplicateur_ecart_cadence: f64,
+    /// Poids du signal d'inactivité dans le score de risque composite.
+    #[serde(default = "cadence_ponderation_inactivite_par_defaut")]
+    pub(crate) ponderation_inactivite: f64,
+    /// Poids du signal « ratio silence courant / cadence médiane ».
+    #[serde(default = "cadence_ponderation_ecart_par_defaut")]
+    pub(crate) ponderation_ecart_cadence: f64,
+    /// Poids du signal de part en soirée.
+    #[serde(default = "cadence_ponderation_soiree_par_defaut")]
+    pub(crate) ponderation_soiree: f64,
+    /// Borne basse de la plage de soirée (heure locale, 0–23).
+    #[serde(default = "cadence_heure_debut_soiree_par_defaut")]
+    pub(crate) heure_debut_soiree: u8,
+    /// Borne haute de la plage de soirée (heure locale, 0–23 ; repli circulaire si inférieure à la borne basse).
+    #[serde(default = "cadence_heure_fin_soiree_par_defaut")]
+    pub(crate) heure_fin_soiree: u8,
+    /// Fuseau IANA de conversion des horodatages pour la plage de soirée et les jours ouvrés.
+    #[serde(default = "cadence_fuseau_horaire_par_defaut")]
+    pub(crate) fuseau_horaire: String,
+    /// Identifiants de connexion exclus de l'analyse (robots, comptes de service).
+    #[serde(default)]
+    pub(crate) comptes_exclus: Vec<String>,
+}
+
+impl Default for CadenceCommits {
+    fn default() -> Self {
+        Self {
+            fenetre_jours: CADENCE_FENETRE_JOURS_PAR_DEFAUT,
+            seuil_jours_ouvres_sans_poussee: CADENCE_SEUIL_JOURS_OUVRES_SANS_POUSSEE_PAR_DEFAUT,
+            multiplicateur_ecart_cadence: CADENCE_MULTIPLICATEUR_ECART_PAR_DEFAUT,
+            ponderation_inactivite: CADENCE_PONDERATION_INACTIVITE_PAR_DEFAUT,
+            ponderation_ecart_cadence: CADENCE_PONDERATION_ECART_PAR_DEFAUT,
+            ponderation_soiree: CADENCE_PONDERATION_SOIREE_PAR_DEFAUT,
+            heure_debut_soiree: CADENCE_HEURE_DEBUT_SOIREE_PAR_DEFAUT,
+            heure_fin_soiree: CADENCE_HEURE_FIN_SOIREE_PAR_DEFAUT,
+            fuseau_horaire: CADENCE_FUSEAU_HORAIRE_PAR_DEFAUT.to_string(),
+            comptes_exclus: Vec::new(),
+        }
+    }
+}
+
 /// Seuils et réglages applicatifs (racine `parametres`).
 ///
 /// Décision de modélisation (cf. commentaire d'en-tête du fichier) : `seuils` reste une valeur JSON générique, le
@@ -1132,6 +1265,9 @@ pub(crate) struct Parametres {
     /// RG-031, RG-032).
     #[serde(default = "seuil_avertissement_taille_octets_par_defaut")]
     pub(crate) seuil_avertissement_taille_octets: u64,
+    /// Dix seuils de calcul de l'écran « Commits des membres » (US-060, RG-060).
+    #[serde(default)]
+    pub(crate) cadence_commits: CadenceCommits,
 }
 
 impl Default for Parametres {
@@ -1143,6 +1279,7 @@ impl Default for Parametres {
             proxy: None,
             sauvegarde: Sauvegarde::default(),
             seuil_avertissement_taille_octets: SEUIL_AVERTISSEMENT_TAILLE_OCTETS_PAR_DEFAUT,
+            cadence_commits: CadenceCommits::default(),
         }
     }
 }

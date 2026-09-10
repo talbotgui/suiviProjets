@@ -4125,3 +4125,23 @@ Mise à jour conformément au découpage du plan (§9) :
 - `lister_projets_groupe` passe `include_subgroups=true` (le roster de poussées peut concerner un dépôt d'un sous-groupe).
 
 Validation : `cargo fmt --check` propre ; `cargo check --locked --lib` propre (aucun dead-code, tout est câblé dès cet incrément) ; `cargo clippy --locked --all-targets -- -D warnings` propre ; `cargo test --locked --lib` — 453 tests passés (+ 9 `#[ignore]`), dont les 10 nouveaux.
+
+### Incrément 3 — `parametres.cadenceCommits` : modèle, migration, commande, Store, Réglages applicatifs
+
+Cœur natif :
+
+- `src-tauri/src/modele/racine.rs` : `VERSION_SCHEMA_COURANTE` `11` → `12` (Rustdoc du palier ajoutée) ; dix constantes `CADENCE_*_PAR_DEFAUT` (décisions arbitraires documentées : fenêtre 28 j, seuil 3 j ouvrés, multiplicateur 2, pondérations 0,5 / 0,3 / 0,2, plage 19 h – 7 h, fuseau « Europe/Paris », comptes exclus `[]`) ; struct `CadenceCommits` (`camelCase`, dix champs, chacun avec son propre `#[serde(default = "…")]` signifiant via dix fonctions `cadence_*_par_defaut`, plus `impl Default`) ; champ `#[serde(default)] cadence_commits: CadenceCommits` ajouté à `Parametres` (+ `Default`).
+- `src-tauri/src/persistance/migration.rs` : `migration_11_vers_12` (transformation nulle, sur le modèle de `migration_1_vers_2`), ajoutée à `ETAPES_MIGRATION_REELLES` et à la doc de module ; test `migration_reelle_11_vers_12_ajoute_cadence_commits_par_defaut_sans_rien_transformer` (fichier `versionSchema: 11` sans `cadenceCommits`, concurrence à 8 → `versionSchema` progresse, `cadenceCommits` prend les dix défauts, concurrence inchangée).
+- `src-tauri/src/persistance/parametrage.rs` : `fuseau_horaire_bien_forme` (contrôle de forme IANA `Region/Ville` ou `UTC`, faute de dépendance embarquant la base tz) ; `definir_parametres_cadence_commits(donnees, parametres, horodatage)` (validation de bornes miroir de l'interface — fenêtre 7–90, seuil ≥ 1, multiplicateur ≥ 1 et fini, pondérations `[0 ; 1]` et finies, heures ≤ 23, fuseau bien formé —, écriture dans `parametres.cadence_commits`, `consigner_modification` sur `parametres.cadenceCommits`) ; trois tests (remplacement + journal, chaque borne rejetée sans journal, `fuseau_horaire_bien_forme`).
+- `src-tauri/src/commandes/parametrage.rs` : commande `definir_parametres_cadence_commits(chemin, donnees, parametres: CadenceCommits, mot_de_passe, etat)` sur le gabarit complet de `definir_concurrence_audit` (`verifier_avant_ecriture` + `sauvegarder_fichier` donc ressaisie du mot de passe RG-002, journalisation technique début/fin). Enregistrée dans `lib.rs`.
+
+Interface :
+
+- `src/app/services/avecetat/etat/types-donnees.ts` : interface `CadenceCommits` (miroir `camelCase`, `readonly`), ajoutée à `Parametres`.
+- `src/app/services/sansetat/commandes/facade-parametrage.service.ts` : interface `ParametresDefinitionCadenceCommits<TDonnees, TCadence>` **générique sur `TCadence`** (la forme des seuils, possédée par `avecetat/etat/`, n'est jamais importée par la frontière `sansetat/commandes/` — `.claude/rules/09`) ; méthode `definirParametresCadenceCommits`.
+- `src/app/services/avecetat/etat/donnees-application.service.ts` : `definirParametresCadenceCommits(parametres: CadenceCommits, motDePasse)` sur le modèle de `definirConcurrenceAudit` (retour `ResultatMutationAdministration`).
+- `src/app/services/sansetat/commandes/bouchon/bouchon-parametrage.utils.ts` : `'definir_parametres_cadence_commits'` ajouté au `Set` (dix-huit commandes) et au `switch` (`definirParametreRacine(parametres, 'cadenceCommits', …)`) ; test dans le spec.
+- `src/app/ecrans/parametrage/reglages-applicatifs/` : sixième bloc « Commits des membres » (dix champs — neuf `input[type=number]`, un `select` de fuseau alimenté par `Intl.supportedValuesOf('timeZone')` avec repli minimal, un `textarea` de comptes exclus converti en liste dédoublonnée), validation cliente miroir de la validation native, texte de portée « au prochain calcul de cet écran », ressaisie du mot de passe ; deux tests (enregistrement, blocage hors bornes sans ressaisie).
+- **35 fixtures de test** (`DonneesDeTest`/`DONNEES_DE_BASE` des composants et services consommateurs de `Parametres`) complétées d'un `cadenceCommits` par défaut — patch mécanique, `parametres` étant un objet requis structurellement typé.
+
+Validation : `cargo fmt --check` / `clippy --locked --lib -D warnings` / `cargo test --locked --lib` (457 passés + 9 `#[ignore]`, dont les 4 nouveaux) ; `npm run typecheck` / `eslint` / `prettier --check` (fichiers du périmètre) propres ; `npx jest` — 113 suites, 1745 tests, tous passés.

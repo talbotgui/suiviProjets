@@ -11,6 +11,18 @@ const DONNEES_DE_BASE = {
     proxy: { url: '', cheminBundleCA: '' },
     sauvegarde: { nombreSauvegardesSecurite: 5 },
     seuilAvertissementTailleOctets: 10_485_760,
+    cadenceCommits: {
+      fenetreJours: 28,
+      seuilJoursOuvresSansPoussee: 3,
+      multiplicateurEcartCadence: 2,
+      ponderationInactivite: 0.5,
+      ponderationEcartCadence: 0.3,
+      ponderationSoiree: 0.2,
+      heureDebutSoiree: 19,
+      heureFinSoiree: 7,
+      fuseauHoraire: 'Europe/Paris',
+      comptesExclus: [],
+    },
   },
   referentiels: {
     reglesDependances: [{ id: 'd1', motif: 'org.exemple:*', versions: [] }],
@@ -231,6 +243,26 @@ describe('BouchonParametrageUtils', () => {
     }>('definir_seuil_avertissement_taille', { donnees: DONNEES_DE_BASE, seuilOctets: 5_000_000 });
 
     expect(resultat.parametres.seuilAvertissementTailleOctets).toBe(5_000_000);
+  });
+
+  it('remplace les seuils « Commits des membres »', async () => {
+    const cadence = {
+      fenetreJours: 14,
+      seuilJoursOuvresSansPoussee: 2,
+      multiplicateurEcartCadence: 3,
+      ponderationInactivite: 0.6,
+      ponderationEcartCadence: 0.2,
+      ponderationSoiree: 0.2,
+      heureDebutSoiree: 20,
+      heureFinSoiree: 6,
+      fuseauHoraire: 'UTC',
+      comptesExclus: ['robot-ci'],
+    };
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly parametres: { readonly cadenceCommits: typeof cadence };
+    }>('definir_parametres_cadence_commits', { donnees: DONNEES_DE_BASE, parametres: cadence });
+
+    expect(resultat.parametres.cadenceCommits).toEqual(cadence);
   });
 
   // Régression du test de bout en bout (Phase 12) : la forme renvoyée par les commandes de prévisualisation de

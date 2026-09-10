@@ -72,6 +72,18 @@ class DonneesDeTest {
         proxy: {},
         sauvegarde: { nombreSauvegardesSecurite: 5 },
         seuilAvertissementTailleOctets: 10_485_760,
+        cadenceCommits: {
+          fenetreJours: 28,
+          seuilJoursOuvresSansPoussee: 3,
+          multiplicateurEcartCadence: 2,
+          ponderationInactivite: 0.5,
+          ponderationEcartCadence: 0.3,
+          ponderationSoiree: 0.2,
+          heureDebutSoiree: 19,
+          heureFinSoiree: 7,
+          fuseauHoraire: 'Europe/Paris',
+          comptesExclus: [],
+        },
       },
       campagnes: [],
       brouillon: null,
@@ -486,6 +498,18 @@ describe('SqmShellComponent', () => {
         parametres: {
           ...DonneesDeTest.racineVide().parametres,
           seuilAvertissementTailleOctets: 10,
+          cadenceCommits: {
+            fenetreJours: 28,
+            seuilJoursOuvresSansPoussee: 3,
+            multiplicateurEcartCadence: 2,
+            ponderationInactivite: 0.5,
+            ponderationEcartCadence: 0.3,
+            ponderationSoiree: 0.2,
+            heureDebutSoiree: 19,
+            heureFinSoiree: 7,
+            fuseauHoraire: 'Europe/Paris',
+            comptesExclus: [],
+          },
         },
       };
       invokeSimule.mockResolvedValue(undefined);
@@ -520,6 +544,18 @@ describe('SqmShellComponent', () => {
         parametres: {
           ...DonneesDeTest.racineVide().parametres,
           seuilAvertissementTailleOctets: 10,
+          cadenceCommits: {
+            fenetreJours: 28,
+            seuilJoursOuvresSansPoussee: 3,
+            multiplicateurEcartCadence: 2,
+            ponderationInactivite: 0.5,
+            ponderationEcartCadence: 0.3,
+            ponderationSoiree: 0.2,
+            heureDebutSoiree: 19,
+            heureFinSoiree: 7,
+            fuseauHoraire: 'Europe/Paris',
+            comptesExclus: [],
+          },
         },
       };
       invokeSimule.mockResolvedValue(undefined);

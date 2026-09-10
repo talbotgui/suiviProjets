@@ -5,7 +5,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { EtatSessionService } from '../../../services/avecetat/etat/etat-session.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
-import type { DonneesRacine, MetriquesVolumetrie } from '../../../services/avecetat/etat/types-donnees';
+import type {
+  DonneesRacine,
+  MetriquesVolumetrie,
+} from '../../../services/avecetat/etat/types-donnees';
 import { StatutMembre, TypeCritereMembre } from '../../../services/avecetat/etat/types-donnees';
 import { SqmMetriquesAdminComponent } from './metriques-admin.component';
 
@@ -62,8 +65,20 @@ class DonneesDeTest {
               sources: [],
               annotations: [],
               audits: [
-                { id: 'a1', date: '2026-01-01', campagneId: 'c1', resultats: [], typeAudit: 'reguliere' },
-                { id: 'a2', date: '2026-02-01', campagneId: 'c2', resultats: [], typeAudit: 'reguliere' },
+                {
+                  id: 'a1',
+                  date: '2026-01-01',
+                  campagneId: 'c1',
+                  resultats: [],
+                  typeAudit: 'reguliere',
+                },
+                {
+                  id: 'a2',
+                  date: '2026-02-01',
+                  campagneId: 'c2',
+                  resultats: [],
+                  typeAudit: 'reguliere',
+                },
               ],
             },
             {
@@ -74,7 +89,13 @@ class DonneesDeTest {
               sources: [],
               annotations: [],
               audits: [
-                { id: 'a3', date: '2026-03-01', campagneId: 'c3', resultats: [], typeAudit: 'reguliere' },
+                {
+                  id: 'a3',
+                  date: '2026-03-01',
+                  campagneId: 'c3',
+                  resultats: [],
+                  typeAudit: 'reguliere',
+                },
               ],
             },
           ],
@@ -109,6 +130,18 @@ class DonneesDeTest {
         proxy: {},
         sauvegarde: { nombreSauvegardesSecurite: 5 },
         seuilAvertissementTailleOctets: 10_485_760,
+        cadenceCommits: {
+          fenetreJours: 28,
+          seuilJoursOuvresSansPoussee: 3,
+          multiplicateurEcartCadence: 2,
+          ponderationInactivite: 0.5,
+          ponderationEcartCadence: 0.3,
+          ponderationSoiree: 0.2,
+          heureDebutSoiree: 19,
+          heureFinSoiree: 7,
+          fuseauHoraire: 'Europe/Paris',
+          comptesExclus: [],
+        },
       },
       campagnes: [],
       brouillon: null,

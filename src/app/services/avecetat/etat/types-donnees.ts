@@ -317,6 +317,35 @@ export interface Sauvegarde {
 }
 
 /**
+ * Dix seuils de calcul de l'écran « Commits des membres » (US-060, RG-060), mirroir de `CadenceCommits` côté cœur
+ * natif (`src-tauri/src/modele/racine.rs`). Édités depuis l'onglet « Réglages applicatifs » du Paramétrage, pris en
+ * compte au prochain calcul de l'écran « Commits des membres » (US-040). Toutes les valeurs par défaut sont des
+ * décisions arbitraires (cf. rapport de développement).
+ */
+export interface CadenceCommits {
+  /** Largeur de la fenêtre glissante d'analyse, en jours (défaut 28, bornes 7–90). */
+  readonly fenetreJours: number;
+  /** Seuil absolu de jours ouvrés sans poussée déclenchant l'alerte d'inactivité (défaut 3, minimum 1). */
+  readonly seuilJoursOuvresSansPoussee: number;
+  /** Facteur au-delà duquel le silence courant est jugé anormal par rapport à la cadence médiane (défaut 2, minimum 1). */
+  readonly multiplicateurEcartCadence: number;
+  /** Poids du signal d'inactivité dans le score de risque composite (défaut 0,5, bornes 0–1). */
+  readonly ponderationInactivite: number;
+  /** Poids du signal « ratio silence courant / cadence médiane » (défaut 0,3, bornes 0–1). */
+  readonly ponderationEcartCadence: number;
+  /** Poids du signal de part en soirée (défaut 0,2, bornes 0–1). */
+  readonly ponderationSoiree: number;
+  /** Borne basse de la plage de soirée (heure locale 0–23, défaut 19). */
+  readonly heureDebutSoiree: number;
+  /** Borne haute de la plage de soirée (heure locale 0–23, défaut 7 ; repli circulaire si inférieure à la borne basse). */
+  readonly heureFinSoiree: number;
+  /** Fuseau IANA de conversion des horodatages (défaut « Europe/Paris »). */
+  readonly fuseauHoraire: string;
+  /** Identifiants de connexion exclus de l'analyse (robots, comptes de service ; défaut vide). */
+  readonly comptesExclus: readonly string[];
+}
+
+/**
  * Seuils et réglages applicatifs (`parametres`), mirroir de `Parametres` côté cœur natif.
  */
 export interface Parametres {
@@ -332,6 +361,8 @@ export interface Parametres {
   readonly sauvegarde: Sauvegarde;
   /** Seuil de taille, en octets, déclenchant l'avertissement contextuel de purge à la sauvegarde (US-035). */
   readonly seuilAvertissementTailleOctets: number;
+  /** Dix seuils de calcul de l'écran « Commits des membres » (US-060, RG-060). */
+  readonly cadenceCommits: CadenceCommits;
 }
 
 /**

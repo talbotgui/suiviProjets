@@ -53,6 +53,7 @@ import { EtatSessionService } from './etat-session.service';
 import { ContexteConsultationService } from './contexte-consultation.service';
 import { HistoriqueNavigationService } from './historique-navigation.service';
 import type {
+  CadenceCommits,
   CategorieErreurAdministration,
   DonneesRacine,
   ErreurAdministration,
@@ -1316,6 +1317,34 @@ export class DonneesApplicationService {
         DonneesRacine,
         DonneesRacine
       >({ chemin, donnees: racine, concurrence, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Remplace les dix seuils de calcul de l'écran « Commits des membres » (`parametres.cadenceCommits`, US-060,
+   * RG-060, plan_17 chapitre 4) : invoque la commande native `definirParametresCadenceCommits`, sur le même modèle
+   * que {@link definirConcurrenceAudit} (écriture disque, ressaisie du mot de passe RG-002).
+   * @param parametres - Les dix seuils, déjà validés côté interface, revalidés côté cœur natif.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async definirParametresCadenceCommits(
+    parametres: CadenceCommits,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.definirParametresCadenceCommits<
+        DonneesRacine,
+        CadenceCommits,
+        DonneesRacine
+      >({ chemin, donnees: racine, parametres, motDePasse });
       this.racineInterne.set(nouvelleRacine);
       return { type: 'succes' };
     } catch (erreur: unknown) {

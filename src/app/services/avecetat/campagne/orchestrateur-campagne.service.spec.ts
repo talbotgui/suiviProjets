@@ -72,6 +72,18 @@ const PARAMETRES_DE_TEST: Parametres = {
   proxy: {},
   sauvegarde: { nombreSauvegardesSecurite: 5 },
   seuilAvertissementTailleOctets: 10_485_760,
+  cadenceCommits: {
+    fenetreJours: 28,
+    seuilJoursOuvresSansPoussee: 3,
+    multiplicateurEcartCadence: 2,
+    ponderationInactivite: 0.5,
+    ponderationEcartCadence: 0.3,
+    ponderationSoiree: 0.2,
+    heureDebutSoiree: 19,
+    heureFinSoiree: 7,
+    fuseauHoraire: 'Europe/Paris',
+    comptesExclus: [],
+  },
 };
 
 /** Référentiels de test, mêmes principes que {@link PARAMETRES_DE_TEST}. */

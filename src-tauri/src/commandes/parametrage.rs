@@ -13,7 +13,7 @@
 
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
-use crate::modele::racine::DonneesRacine;
+use crate::modele::racine::{CadenceCommits, DonneesRacine};
 use crate::persistance::moteur;
 use crate::persistance::parametrage;
 use chrono::{SecondsFormat, Utc};
@@ -439,5 +439,44 @@ pub(crate) fn definir_seuil_avertissement_taille(
         Ok(donnees)
     })();
     crate::journalisation::consigner_fin_commande("definirSeuilAvertissementTaille");
+    resultat
+}
+
+/// Remplace les dix seuils de calcul de l'écran « Commits des membres » (`parametres.cadenceCommits`), sauvegarde
+/// le fichier et consigne la modification au journal (US-060, RG-060, RG-031, plan_17 chapitre 4). Écrit sur le
+/// disque : la ressaisie du mot de passe du fichier est donc imposée (RG-002), sur le gabarit complet de
+/// [`definir_concurrence_audit`].
+///
+/// # Erreurs
+///
+/// [`crate::persistance::parametrage::ErreurParametrage::ReglageApplicatifInvalide`] si un des dix seuils est hors
+/// bornes (cf. [`parametrage::definir_parametres_cadence_commits`]) ; les anomalies de sauvegarde héritées de
+/// [`crate::persistance::erreurs::ErreurPersistance`] sinon.
+#[tauri::command]
+pub(crate) fn definir_parametres_cadence_commits(
+    chemin: String,
+    donnees: DonneesRacine,
+    parametres: CadenceCommits,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    crate::journalisation::consigner_debut_commande("definirParametresCadenceCommits");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::definir_parametres_cadence_commits(&mut donnees, parametres, horodatage)?;
+
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "definirParametresCadenceCommits",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
+
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("definirParametresCadenceCommits");
     resultat
 }

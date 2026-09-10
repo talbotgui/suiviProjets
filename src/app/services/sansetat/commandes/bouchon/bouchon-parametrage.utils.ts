@@ -41,8 +41,9 @@ type ReponseBouchonParametrage =
   | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
 
 /**
- * Bouchon TS des dix-sept commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
- * purges, réglages applicatifs), activé hors contexte Tauri par `InvocationCommandeUtils`.
+ * Bouchon TS des dix-huit commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
+ * purges, réglages applicatifs dont les seuils « Commits des membres »), activé hors contexte Tauri par
+ * `InvocationCommandeUtils`.
  */
 export class BouchonParametrageUtils {
   /**
@@ -65,6 +66,7 @@ export class BouchonParametrageUtils {
     'definir_proxy',
     'definir_nombre_sauvegardes_securite',
     'definir_seuil_avertissement_taille',
+    'definir_parametres_cadence_commits',
     'previsualiser_purge_journal',
     'executer_purge_journal',
   ]);
@@ -159,6 +161,14 @@ export class BouchonParametrageUtils {
             parametres,
             'seuilAvertissementTailleOctets',
             BouchonParametrageUtils.lireNombre(parametres, 'seuilOctets'),
+          ),
+        );
+      case 'definir_parametres_cadence_commits':
+        return BouchonParametrageUtils.horodater(
+          BouchonParametrageUtils.definirParametreRacine(
+            parametres,
+            'cadenceCommits',
+            BouchonParametrageUtils.exigerObjet(parametres['parametres']),
           ),
         );
       default:

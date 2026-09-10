@@ -108,6 +108,7 @@ pub fn run() {
             commandes::parametrage::definir_proxy,
             commandes::parametrage::definir_nombre_sauvegardes_securite,
             commandes::parametrage::definir_seuil_avertissement_taille,
+            commandes::parametrage::definir_parametres_cadence_commits,
             commandes::purge::previsualiser_purge_densite,
             commandes::purge::executer_purge_densite,
             commandes::purge::previsualiser_purge_age,

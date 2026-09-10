@@ -19,7 +19,7 @@
 //! expression régulière syntaxiquement correcte, à l'aide de la dépendance `regex` déjà présente dans
 //! `Cargo.toml` (introduite pour le Connecteur GitLab, aucune nouvelle dépendance requise par cet incrément).
 
-use crate::modele::racine::{DonneesRacine, Proxy};
+use crate::modele::racine::{CadenceCommits, DonneesRacine, Proxy};
 use regex::Regex;
 use serde_json::Value;
 use thiserror::Error;
@@ -587,6 +587,76 @@ pub(crate) fn definir_seuil_avertissement_taille(
         "parametres.seuilAvertissementTailleOctets",
         avant,
         Value::from(seuil_octets),
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Contrôle de forme d'un identifiant de fuseau horaire IANA, faute de dépendance embarquant la base tz : `UTC`, ou
+/// au moins deux segments séparés par `/` (ex. `Europe/Paris`, `America/Argentina/Buenos_Aires`), chaque segment
+/// commençant par une lettre ou un chiffre et ne contenant que lettres, chiffres, `_`, `+`, `-` (RG-060). La
+/// validation fine reste côté interface (choix dans `Intl.supportedValuesOf('timeZone')`) ; en dernier recours, la
+/// fonction pure du Moteur de jugement bascule sur `'UTC'` sans lever.
+fn fuseau_horaire_bien_forme(fuseau: &str) -> bool {
+    if fuseau == "UTC" {
+        return true;
+    }
+    let segments: Vec<&str> = fuseau.split('/').collect();
+    segments.len() >= 2
+        && segments.iter().all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphanumeric())
+                && segment
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '+' | '-'))
+        })
+}
+
+/// Remplace les dix seuils de calcul de l'écran « Commits des membres » (`parametres.cadenceCommits`), puis consigne
+/// la modification au journal (US-060, RG-060, RG-031). Revalidation côté cœur natif d'une saisie déjà validée côté
+/// interface (`docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`).
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::ReglageApplicatifInvalide`] si `fenetre_jours` n'est pas dans `7..=90`, si
+/// `seuil_jours_ouvres_sans_poussee` est nul, si `multiplicateur_ecart_cadence` est inférieur à `1` ou non fini, si
+/// une des trois pondérations sort de `[0 ; 1]` ou n'est pas finie, si `heure_debut_soiree` ou `heure_fin_soiree`
+/// dépasse `23`, ou si `fuseau_horaire` n'a pas la forme d'un identifiant IANA (cf. [`fuseau_horaire_bien_forme`]).
+pub(crate) fn definir_parametres_cadence_commits(
+    donnees: &mut DonneesRacine,
+    parametres: CadenceCommits,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    let ponderations = [
+        parametres.ponderation_inactivite,
+        parametres.ponderation_ecart_cadence,
+        parametres.ponderation_soiree,
+    ];
+    let invalide = !(7..=90).contains(&parametres.fenetre_jours)
+        || parametres.seuil_jours_ouvres_sans_poussee == 0
+        || !parametres.multiplicateur_ecart_cadence.is_finite()
+        || parametres.multiplicateur_ecart_cadence < 1.0
+        || ponderations
+            .iter()
+            .any(|poids| !poids.is_finite() || !(0.0..=1.0).contains(poids))
+        || parametres.heure_debut_soiree > 23
+        || parametres.heure_fin_soiree > 23
+        || !fuseau_horaire_bien_forme(&parametres.fuseau_horaire);
+    if invalide {
+        return Err(ErreurParametrage::ReglageApplicatifInvalide);
+    }
+
+    let avant = serde_json::to_value(&donnees.parametres.cadence_commits).unwrap_or(Value::Null);
+    let apres = serde_json::to_value(&parametres).unwrap_or(Value::Null);
+    donnees.parametres.cadence_commits = parametres;
+    consigner_modification(
+        donnees,
+        "parametres.cadenceCommits",
+        avant,
+        apres,
         horodatage,
     );
     Ok(())
@@ -1306,6 +1376,65 @@ mod tests {
 
         assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
         assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn definir_parametres_cadence_commits_remplace_les_dix_seuils_et_journalise()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        let cadence = CadenceCommits {
+            fenetre_jours: 14,
+            multiplicateur_ecart_cadence: 3.0,
+            fuseau_horaire: "America/Argentina/Buenos_Aires".to_string(),
+            comptes_exclus: vec!["robot-ci".to_string()],
+            ..CadenceCommits::default()
+        };
+
+        definir_parametres_cadence_commits(
+            &mut racine,
+            cadence.clone(),
+            "2026-09-10T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(racine.parametres.cadence_commits, cadence);
+        assert_eq!(racine.journal[0].objet, "parametres.cadenceCommits");
+        Ok(())
+    }
+
+    #[test]
+    fn definir_parametres_cadence_commits_rejette_une_valeur_hors_bornes() {
+        let hors_bornes = |modif: fn(&mut CadenceCommits)| {
+            let mut racine = racine_de_test();
+            let mut cadence = CadenceCommits::default();
+            modif(&mut cadence);
+            let resultat = definir_parametres_cadence_commits(
+                &mut racine,
+                cadence,
+                "2026-09-10T09:00:00Z".to_string(),
+            );
+            assert_eq!(resultat, Err(ErreurParametrage::ReglageApplicatifInvalide));
+            assert!(racine.journal.is_empty());
+        };
+        hors_bornes(|c| c.fenetre_jours = 6);
+        hors_bornes(|c| c.fenetre_jours = 91);
+        hors_bornes(|c| c.seuil_jours_ouvres_sans_poussee = 0);
+        hors_bornes(|c| c.multiplicateur_ecart_cadence = 0.5);
+        hors_bornes(|c| c.ponderation_soiree = 1.5);
+        hors_bornes(|c| c.ponderation_inactivite = f64::NAN);
+        hors_bornes(|c| c.heure_debut_soiree = 24);
+        hors_bornes(|c| c.fuseau_horaire = "pas un fuseau".to_string());
+        hors_bornes(|c| c.fuseau_horaire = "Paris".to_string());
+    }
+
+    #[test]
+    fn fuseau_horaire_bien_forme_accepte_les_identifiants_iana_usuels() {
+        assert!(fuseau_horaire_bien_forme("UTC"));
+        assert!(fuseau_horaire_bien_forme("Europe/Paris"));
+        assert!(fuseau_horaire_bien_forme("America/Argentina/Buenos_Aires"));
+        assert!(fuseau_horaire_bien_forme("Etc/GMT+2"));
+        assert!(!fuseau_horaire_bien_forme("Europe"));
+        assert!(!fuseau_horaire_bien_forme("Europe/Paris/"));
+        assert!(!fuseau_horaire_bien_forme("Europe/Par is"));
     }
 
     #[test]

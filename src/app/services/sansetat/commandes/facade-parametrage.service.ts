@@ -234,6 +234,25 @@ export interface ParametresDefinitionSeuilAvertissementTaille<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `definirParametresCadenceCommits` (US-060, RG-060, RG-031, plan_17
+ * chapitre 4).
+ *
+ * Générique sur `TCadence` (la forme des dix seuils, `CadenceCommits`, possédée par `services/avecetat/etat/`)
+ * plutôt que de l'importer : la frontière `services/sansetat/commandes/` ne dépend jamais de `services/avecetat/`
+ * (`.claude/rules/09-normes-developpement.md#structuration-du-code-et-découpage-en-couches`).
+ */
+export interface ParametresDefinitionCadenceCommits<TDonnees, TCadence> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Les dix seuils de calcul de l'écran « Commits des membres », revalidés côté cœur natif. */
+  readonly parametres: TCadence;
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
  * Paramètres transmis à la commande native `previsualiserPurgeJournal` (US-036, RG-034, Phase 10 incrément 8).
  */
 export interface ParametresPrevisualisationPurgeJournal<TDonnees> {
@@ -450,6 +469,20 @@ export class FacadeParametrageService {
     parametres: ParametresDefinitionSeuilAvertissementTaille<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('definir_seuil_avertissement_taille', {
+      ...parametres,
+    });
+  }
+
+  /**
+   * Remplace les dix seuils de calcul de l'écran « Commits des membres », sauvegarde le fichier et consigne la
+   * modification au journal (US-060, RG-060, RG-031, plan_17 chapitre 4).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionCadenceCommits}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async definirParametresCadenceCommits<TDonnees, TCadence, TReponse>(
+    parametres: ParametresDefinitionCadenceCommits<TDonnees, TCadence>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('definir_parametres_cadence_commits', {
       ...parametres,
     });
   }

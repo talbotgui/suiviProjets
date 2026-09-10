@@ -16,18 +16,46 @@ import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { DonneesApplicationService } from '../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
-import type { ErreurAdministration } from '../../../services/avecetat/etat/types-donnees';
+import type {
+  CadenceCommits,
+  ErreurAdministration,
+} from '../../../services/avecetat/etat/types-donnees';
 
 /**
  * Réglage applicatif actuellement en cours d'édition (RG-002), `null` si aucun.
  */
 type ReglageEnAttente =
-  'verrouillage' | 'concurrenceAudit' | 'proxy' | 'nombreSauvegardes' | 'seuilAvertissement' | null;
+  | 'verrouillage'
+  | 'concurrenceAudit'
+  | 'proxy'
+  | 'nombreSauvegardes'
+  | 'seuilAvertissement'
+  | 'cadenceCommits'
+  | null;
+
+/**
+ * Modèle de formulaire de la zone « Commits des membres » : les neuf seuils scalaires plus la liste de comptes
+ * exclus saisie comme texte libre (une entrée par ligne ou séparée par des virgules), convertie en tableau à
+ * l'enregistrement (US-060, RG-060).
+ */
+interface CadenceCommitsFormulaire {
+  fenetreJours: number;
+  seuilJoursOuvresSansPoussee: number;
+  multiplicateurEcartCadence: number;
+  ponderationInactivite: number;
+  ponderationEcartCadence: number;
+  ponderationSoiree: number;
+  heureDebutSoiree: number;
+  heureFinSoiree: number;
+  fuseauHoraire: string;
+  comptesExclusTexte: string;
+}
 
 /**
  * Zone « Réglages applicatifs » : délai de verrouillage, concurrence d'audit par défaut, proxy HTTP, nombre de
- * sauvegardes de sécurité (US-034, RG-031) et seuil d'avertissement de taille à la sauvegarde (US-035, RG-031,
- * RG-032).
+ * sauvegardes de sécurité (US-034, RG-031), seuil d'avertissement de taille à la sauvegarde (US-035, RG-031,
+ * RG-032) et les dix seuils de calcul de l'écran « Commits des membres » (US-060, RG-060). Chaque bloc est
+ * indépendant et déclenche sa propre ressaisie du mot de passe (RG-002).
  */
 @Component({
   selector: 'app-reglages-applicatifs-parametrage',
@@ -357,6 +385,150 @@ export class SqmReglagesApplicatifsParametrageComponent {
     }
     this.seuilAvertissementEditVisible.set(false);
     this.notification.succes('Le seuil d’avertissement de taille a été enregistré.');
+  }
+
+  // --- Seuils « Commits des membres » (US-060, RG-060) ---
+
+  /** Visibilité du formulaire d'édition des seuils « Commits des membres ». */
+  public readonly cadenceCommitsEditVisible: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Fuseaux horaires IANA proposés dans le sélecteur, issus de `Intl.supportedValuesOf('timeZone')` quand
+   * l'environnement l'expose (revalidés côté cœur natif de toute façon, RG-060) ; repli minimal sinon.
+   */
+  public readonly fuseauxHorairesDisponibles: readonly string[] =
+    SqmReglagesApplicatifsParametrageComponent.listerFuseauxHoraires();
+
+  /**
+   * Liste des fuseaux horaires IANA supportés par l'environnement, ou un repli minimal si l'API `Intl` ne les
+   * expose pas (contextes très anciens). Membre statique pour rester utilisable à l'initialisation du champ.
+   * @returns La liste des identifiants de fuseau proposés dans le sélecteur.
+   */
+  private static listerFuseauxHoraires(): readonly string[] {
+    if ('supportedValuesOf' in Intl && typeof Intl.supportedValuesOf === 'function') {
+      return Intl.supportedValuesOf('timeZone');
+    }
+    return ['UTC', 'Europe/Paris'];
+  }
+
+  /** Modèle de formulaire des seuils « Commits des membres ». */
+  public cadenceCommitsFormulaire: CadenceCommitsFormulaire = {
+    fenetreJours: 28,
+    seuilJoursOuvresSansPoussee: 3,
+    multiplicateurEcartCadence: 2,
+    ponderationInactivite: 0.5,
+    ponderationEcartCadence: 0.3,
+    ponderationSoiree: 0.2,
+    heureDebutSoiree: 19,
+    heureFinSoiree: 7,
+    fuseauHoraire: 'Europe/Paris',
+    comptesExclusTexte: '',
+  };
+
+  /**
+   * Ouvre le formulaire pré-rempli des seuils « Commits des membres » à partir de `parametres.cadenceCommits`.
+   */
+  public ouvrirEditionCadenceCommits(): void {
+    const cadence = this.donneesApplication.racine()?.parametres.cadenceCommits;
+    this.cadenceCommitsFormulaire = {
+      fenetreJours: cadence?.fenetreJours ?? 28,
+      seuilJoursOuvresSansPoussee: cadence?.seuilJoursOuvresSansPoussee ?? 3,
+      multiplicateurEcartCadence: cadence?.multiplicateurEcartCadence ?? 2,
+      ponderationInactivite: cadence?.ponderationInactivite ?? 0.5,
+      ponderationEcartCadence: cadence?.ponderationEcartCadence ?? 0.3,
+      ponderationSoiree: cadence?.ponderationSoiree ?? 0.2,
+      heureDebutSoiree: cadence?.heureDebutSoiree ?? 19,
+      heureFinSoiree: cadence?.heureFinSoiree ?? 7,
+      fuseauHoraire: cadence?.fuseauHoraire ?? 'Europe/Paris',
+      comptesExclusTexte: (cadence?.comptesExclus ?? []).join('\n'),
+    };
+    this.messageErreur = null;
+    this.cadenceCommitsEditVisible.set(true);
+  }
+
+  /**
+   * Referme le formulaire des seuils « Commits des membres » sans enregistrer.
+   */
+  public fermerEditionCadenceCommits(): void {
+    this.cadenceCommitsEditVisible.set(false);
+  }
+
+  /**
+   * Valide le formulaire des seuils « Commits des membres » (bornes miroir de la validation du cœur natif,
+   * RG-060) puis, si valide, ouvre la ressaisie du mot de passe (RG-002).
+   */
+  public demanderEnregistrementCadenceCommits(): void {
+    const f = this.cadenceCommitsFormulaire;
+    const ponderations = [f.ponderationInactivite, f.ponderationEcartCadence, f.ponderationSoiree];
+    const invalide =
+      !Number.isFinite(f.fenetreJours) ||
+      f.fenetreJours < 7 ||
+      f.fenetreJours > 90 ||
+      !Number.isFinite(f.seuilJoursOuvresSansPoussee) ||
+      f.seuilJoursOuvresSansPoussee < 1 ||
+      !Number.isFinite(f.multiplicateurEcartCadence) ||
+      f.multiplicateurEcartCadence < 1 ||
+      ponderations.some((poids) => !Number.isFinite(poids) || poids < 0 || poids > 1) ||
+      !Number.isInteger(f.heureDebutSoiree) ||
+      f.heureDebutSoiree < 0 ||
+      f.heureDebutSoiree > 23 ||
+      !Number.isInteger(f.heureFinSoiree) ||
+      f.heureFinSoiree < 0 ||
+      f.heureFinSoiree > 23 ||
+      !this.fuseauxHorairesDisponibles.includes(f.fuseauHoraire);
+    if (invalide) {
+      this.messageErreur =
+        'Un des seuils « Commits des membres » est hors bornes (fenêtre 7–90 jours, seuil ≥ 1, ' +
+        'multiplicateur ≥ 1, pondérations entre 0 et 1, heures entre 0 et 23, fuseau à choisir dans la liste).';
+      return;
+    }
+    this.messageErreur = null;
+    this.reglageEnAttenteMotDePasse.set('cadenceCommits');
+  }
+
+  /**
+   * Enregistre les seuils « Commits des membres » après confirmation du mot de passe (US-060, RG-002, RG-060,
+   * RG-031). La liste de comptes exclus est déduite du texte saisi (une entrée par ligne ou séparée par des
+   * virgules), dédoublonnée en conservant l'ordre.
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerEnregistrementCadenceCommits(motDePasse: string): Promise<void> {
+    const f = this.cadenceCommitsFormulaire;
+    const comptesExclus = [
+      ...new Set(
+        f.comptesExclusTexte
+          .split(/[\n,]+/)
+          .map((compte) => compte.trim())
+          .filter((compte) => compte.length > 0),
+      ),
+    ];
+    const cadence: CadenceCommits = {
+      fenetreJours: f.fenetreJours,
+      seuilJoursOuvresSansPoussee: f.seuilJoursOuvresSansPoussee,
+      multiplicateurEcartCadence: f.multiplicateurEcartCadence,
+      ponderationInactivite: f.ponderationInactivite,
+      ponderationEcartCadence: f.ponderationEcartCadence,
+      ponderationSoiree: f.ponderationSoiree,
+      heureDebutSoiree: f.heureDebutSoiree,
+      heureFinSoiree: f.heureFinSoiree,
+      fuseauHoraire: f.fuseauHoraire,
+      comptesExclus,
+    };
+
+    this.enCours.set(true);
+    const resultat = await this.donneesApplication.definirParametresCadenceCommits(
+      cadence,
+      motDePasse,
+    );
+    this.enCours.set(false);
+    this.reglageEnAttenteMotDePasse.set(null);
+
+    if (resultat.type === 'echec') {
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
+      return;
+    }
+    this.cadenceCommitsEditVisible.set(false);
+    this.notification.succes('Les seuils « Commits des membres » ont été enregistrés.');
   }
 
   /**

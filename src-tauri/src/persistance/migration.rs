@@ -21,7 +21,8 @@
 //! incrément 2 : uniformisation de la forme du champ `filtres` de chaque `VueEnregistree` en `{ groupeId, projetIds }`,
 //! RG-027 amendée / RG-053) et [`migration_10_vers_11`] (plan_18 : `Projet.premierCommitInterne` en union
 //! discriminée sur `statut`, champs optionnels `MembreConnu.partiLe` et `Brouillon.prisesEnCharge` — palier à
-//! transformation nulle, RG-058 / RG-061).
+//! transformation nulle, RG-058 / RG-061) et [`migration_11_vers_12`] (plan_17 chapitre 4 : ajout de
+//! `parametres.cadenceCommits`, palier à transformation nulle, US-060 / RG-060).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -197,6 +198,22 @@ fn migration_10_vers_11(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Onzième migration réelle du projet (plan_17 chapitre 4 — écran « Commits des membres », US-060 / RG-060),
+/// faisant progresser `versionSchema` de `11` à `12`.
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : le seul
+/// changement de forme est l'ajout du sous-objet `parametres.cadenceCommits`
+/// ([`crate::modele::racine::CadenceCommits`]), dont chaque champ porte un `#[serde(default = "…")]` signifiant.
+/// Son absence sur un document existant se désérialise directement vers les dix valeurs par défaut sans qu'aucune
+/// valeur n'ait à être recalculée ni déplacée ; seule la version de schéma progresse. `plan_18` ayant été intégré
+/// en premier (palier `10` → `11`), ce chapitre prend le palier suivant `11` → `12`.
+fn migration_11_vers_12(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(12));
+    }
+    Ok(())
+}
+
 /// Réécrit le champ `filtres` et le champ `versionFiltres` de chaque entrée de `document.vuesEnregistrees`
 /// (cf. [`migration_9_vers_10`]). Best-effort, comme [`inserer_regle_java_si_absente`].
 fn uniformiser_filtres_vues(document: &mut serde_json::Map<String, Value>) {
@@ -275,7 +292,8 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
 /// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`],
-/// [`migration_7_vers_8`], [`migration_8_vers_9`], [`migration_9_vers_10`] et [`migration_10_vers_11`].
+/// [`migration_7_vers_8`], [`migration_8_vers_9`], [`migration_9_vers_10`], [`migration_10_vers_11`] et
+/// [`migration_11_vers_12`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
@@ -287,6 +305,7 @@ pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (8, migration_8_vers_9),
     (9, migration_9_vers_10),
     (10, migration_10_vers_11),
+    (11, migration_11_vers_12),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -746,6 +765,40 @@ mod tests {
             serde_json::to_value(premier_commit)?,
             premier_commit_plat,
             "la variante Determine doit sérialiser à l'identique de la forme plate historique"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_11_vers_12_ajoute_cadence_commits_par_defaut_sans_rien_transformer()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant plan_17 chapitre 4 : `versionSchema: 11`, `parametres` sans `cadenceCommits`,
+        // avec une valeur non nulle sur un autre réglage applicatif (concurrence). La migration ne doit ni
+        // échouer ni altérer les données : `versionSchema` progresse, `cadenceCommits` prend les dix défauts,
+        // `parametres.audit.concurrence` reste inchangé.
+        let mut valeur = json!({
+            "versionSchema": 11,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "parametres": { "audit": { "concurrence": 8 } },
+            "groupes": []
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        assert_eq!(racine.parametres.audit.concurrence, 8);
+        assert_eq!(
+            racine.parametres.cadence_commits,
+            crate::modele::racine::CadenceCommits::default()
         );
         Ok(())
     }

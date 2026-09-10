@@ -112,6 +112,18 @@ const PARAMETRES_BOUCHON: Readonly<Record<string, unknown>> = {
   proxy: { url: 'http://proxy.entreprise.fr:3128', cheminBundleCa: 'C:/certs/ca-entreprise.pem' },
   sauvegarde: { nombreSauvegardesSecurite: 5 },
   seuilAvertissementTailleOctets: 10_485_760,
+  cadenceCommits: {
+    fenetreJours: 28,
+    seuilJoursOuvresSansPoussee: 3,
+    multiplicateurEcartCadence: 2,
+    ponderationInactivite: 0.5,
+    ponderationEcartCadence: 0.3,
+    ponderationSoiree: 0.2,
+    heureDebutSoiree: 19,
+    heureFinSoiree: 7,
+    fuseauHoraire: 'Europe/Paris',
+    comptesExclus: [],
+  },
 };
 
 /**

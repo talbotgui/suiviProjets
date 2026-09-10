@@ -58,6 +58,18 @@ class DonneesDeTest {
         proxy: { url: 'http://proxy.exemple.local:3128' },
         sauvegarde: { nombreSauvegardesSecurite: 5 },
         seuilAvertissementTailleOctets: 10_485_760,
+        cadenceCommits: {
+          fenetreJours: 28,
+          seuilJoursOuvresSansPoussee: 3,
+          multiplicateurEcartCadence: 2,
+          ponderationInactivite: 0.5,
+          ponderationEcartCadence: 0.3,
+          ponderationSoiree: 0.2,
+          heureDebutSoiree: 19,
+          heureFinSoiree: 7,
+          fuseauHoraire: 'Europe/Paris',
+          comptesExclus: [],
+        },
       },
       campagnes: [],
       brouillon: null,
@@ -228,6 +240,58 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
         message: 'Le seuil d’avertissement de taille a été enregistré.',
       }),
     ]);
+  });
+
+  it('enregistre les seuils « Commits des membres » après confirmation du mot de passe (US-060, RG-060)', async () => {
+    const composant = TestBed.createComponent(
+      SqmReglagesApplicatifsParametrageComponent,
+    ).componentInstance;
+    invokeSimule.mockResolvedValue(DonneesDeTest.racine());
+    composant.ouvrirEditionCadenceCommits();
+    composant.cadenceCommitsFormulaire.fenetreJours = 14;
+    composant.cadenceCommitsFormulaire.fuseauHoraire = 'UTC';
+    composant.cadenceCommitsFormulaire.comptesExclusTexte = 'robot-ci\nrobot-ci\nrelease-bot';
+
+    composant.demanderEnregistrementCadenceCommits();
+    await composant.confirmerEnregistrementCadenceCommits('mot-de-passe');
+
+    expect(invokeSimule).toHaveBeenCalledWith(
+      'definir_parametres_cadence_commits',
+      expect.objectContaining({
+        motDePasse: 'mot-de-passe',
+        parametres: {
+          fenetreJours: 14,
+          seuilJoursOuvresSansPoussee: 3,
+          multiplicateurEcartCadence: 2,
+          ponderationInactivite: 0.5,
+          ponderationEcartCadence: 0.3,
+          ponderationSoiree: 0.2,
+          heureDebutSoiree: 19,
+          heureFinSoiree: 7,
+          fuseauHoraire: 'UTC',
+          comptesExclus: ['robot-ci', 'release-bot'],
+        },
+      }),
+    );
+    expect(TestBed.inject(NotificationService).liste()).toEqual([
+      expect.objectContaining({
+        type: 'succes',
+        message: 'Les seuils « Commits des membres » ont été enregistrés.',
+      }),
+    ]);
+  });
+
+  it('bloque les seuils « Commits des membres » hors bornes sans ressaisie du mot de passe', () => {
+    const composant = TestBed.createComponent(
+      SqmReglagesApplicatifsParametrageComponent,
+    ).componentInstance;
+    composant.ouvrirEditionCadenceCommits();
+    composant.cadenceCommitsFormulaire.fenetreJours = 3;
+
+    composant.demanderEnregistrementCadenceCommits();
+
+    expect(composant.reglageEnAttenteMotDePasse()).toBeNull();
+    expect(composant.messageErreur).not.toBeNull();
   });
 
   it('convertit un rejet typé « reglageApplicatifInvalide » en message explicite', async () => {
