@@ -458,4 +458,43 @@ describe('FacadeCommandesService', () => {
       });
     });
   });
+
+  describe('interrogerMonteesVersionSonar (US-062, RG-062, plan_17 chapitre 5)', () => {
+    it('doit invoquer interroger_montees_version_sonar avec l’instance et l’identifiant externe', async () => {
+      invokeSimule.mockResolvedValue([{ version: '10.4', date: '2026-01-01' }]);
+
+      const resultat = await service.interrogerMonteesVersionSonar(INSTANCE_SONAR, 'proj-key');
+
+      expect(invokeSimule).toHaveBeenCalledWith('interroger_montees_version_sonar', {
+        instance: INSTANCE_SONAR,
+        idExterne: 'proj-key',
+      });
+      expect(resultat).toEqual({
+        type: 'succes',
+        resultat: [{ version: '10.4', date: '2026-01-01' }],
+      });
+    });
+
+    it('doit remonter une liste vide pour un projet sans aucune montée détectée', async () => {
+      invokeSimule.mockResolvedValue([]);
+
+      const resultat = await service.interrogerMonteesVersionSonar(INSTANCE_SONAR, 'proj-key');
+
+      expect(resultat).toEqual({ type: 'succes', resultat: [] });
+    });
+
+    it('doit convertir un rejet typé « instanceInjoignable » en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({
+        type: 'instanceInjoignable',
+        message: 'Connexion refusée',
+      });
+
+      const resultat = await service.interrogerMonteesVersionSonar(INSTANCE_SONAR, 'proj-key');
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'instanceInjoignable', message: 'Connexion refusée' },
+      });
+    });
+  });
 });

@@ -37,6 +37,7 @@
 import type {
   Branche,
   Dependance,
+  MonteeVersionSonar,
   ResultatGitlabBranches,
   ResultatGitlabContributeurs,
   ResultatGitlabDependances,
@@ -92,6 +93,7 @@ const COMMANDES_INTERROGATION_AUDIT: ReadonlySet<string> = new Set([
   'interroger_couverture',
   'interroger_notes',
   'interroger_ncloc',
+  'interroger_montees_version_sonar',
 ]);
 
 /**
@@ -119,7 +121,8 @@ type ReponseBouchon =
   | ResultatSonarCouverture
   | ResultatSonarNotes
   | ResultatSonarNcloc
-  | readonly SourceDisponible[];
+  | readonly SourceDisponible[]
+  | readonly MonteeVersionSonar[];
 
 /**
  * Correspondance `Source.idExterne` (dépôt GitLab) -> `Source.id`, nécessaire à `interrogerBranches` (US-008,
@@ -143,6 +146,22 @@ const SOURCE_ID_PAR_ID_EXTERNE_SONAR: ReadonlyMap<string, string> = new Map([
   ['entreprise:batch-comptable', 'f0000000-0000-4000-8000-000000000004'],
   ['nova:front-portail', 'f0000000-0000-4000-8000-000000000007'],
   ['nova:api-portail', 'f0000000-0000-4000-8000-000000000009'],
+]);
+
+/**
+ * Montées de version Sonar bouchonnées (US-062, RG-062, plan_17 chapitre 5), par `idExterne` de projet Sonar.
+ * `entreprise:api-facturation` et `entreprise:batch-comptable` partagent la même instance Sonar (`sonar-core`,
+ * cf. `donnees-racine-bouchon.ts`) et la même version détectée (`10.4`), à des dates distinctes, pour exercer le
+ * dédoublonnage inter-projets à l'affichage (date la plus ancienne retenue). Les autres projets Sonar du jeu de
+ * démonstration, absents de cette table, n'ont subi aucune montée détectée (`[]`). `e2e:projet-alpha-1` et
+ * `e2e:projet-alpha-2` (créés par le test de bout en bout Playwright, `e2e/donnees-test.ts`, groupe unique
+ * `sonar-e2e-alpha`) reçoivent la même paire, pour exercer ce même dédoublonnage dans ce test.
+ */
+const MONTEES_VERSION_SONAR_BOUCHON: ReadonlyMap<string, readonly MonteeVersionSonar[]> = new Map([
+  ['entreprise:api-facturation', [{ version: '10.4', date: '2025-11-03' }]],
+  ['entreprise:batch-comptable', [{ version: '10.4', date: '2025-11-10' }]],
+  ['e2e:projet-alpha-1', [{ version: '10.4', date: '2025-11-03' }]],
+  ['e2e:projet-alpha-2', [{ version: '10.4', date: '2025-11-10' }]],
 ]);
 
 /**
@@ -230,6 +249,8 @@ export class BouchonCommandesUtils {
         return BouchonCommandesUtils.constatNcloc(parametres);
       case 'interroger_derniere_analyse':
         return BouchonCommandesUtils.derniereAnalyse(parametres);
+      case 'interroger_montees_version_sonar':
+        return BouchonCommandesUtils.monteesVersionSonar(parametres);
       case 'consigner_erreur_ui':
       case 'consigner_resume_source':
         return undefined;
@@ -576,6 +597,23 @@ export class BouchonCommandesUtils {
       return CONSTAT_SONAR_REPLI.derniereAnalyseLe;
     }
     return (CONSTATS_SONAR_BOUCHON.get(sourceId) ?? CONSTAT_SONAR_REPLI).derniereAnalyseLe;
+  }
+
+  /**
+   * Résout la commande `interroger_montees_version_sonar` (US-062, RG-062, plan_17 chapitre 5) : ne reçoit pas
+   * `sourceId`, sur le même modèle que {@link derniereAnalyse}.
+   * @param parametres - Paramètres de la commande, portant `idExterne`.
+   * @returns Les montées de version bouchonnées associées à `idExterne`, liste vide si absentes de
+   * {@link MONTEES_VERSION_SONAR_BOUCHON} (aucune montée détectée pour ce projet).
+   */
+  private static monteesVersionSonar(
+    parametres: Readonly<Record<string, unknown>>,
+  ): readonly MonteeVersionSonar[] {
+    const idExterne = parametres['idExterne'];
+    if (typeof idExterne !== 'string') {
+      return [];
+    }
+    return MONTEES_VERSION_SONAR_BOUCHON.get(idExterne) ?? [];
   }
 
   /**

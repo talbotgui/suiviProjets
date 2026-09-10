@@ -102,10 +102,36 @@ export interface SerieGraphiqueEvolution {
 /**
  * Catégorie d'une ligne verticale étiquetée du graphique d'évolution : une annotation (US-019, Phase 8, créée
  * ailleurs — `SqmFicheProjetComponent` — et seulement lue et affichée ici, en lecture seule), un changement de
- * seuil (RG-023, `ChangementSeuilUtils`), ou le repère du premier audit régulier tous projets confondus (C15-14,
- * US-046, RG-046) : à gauche de ce repère, tout point de toute série provient d'un audit historique.
+ * seuil (RG-023, `ChangementSeuilUtils`), le repère du premier audit régulier tous projets confondus (C15-14,
+ * US-046, RG-046) : à gauche de ce repère, tout point de toute série provient d'un audit historique — ou une
+ * montée de version du serveur Sonar (US-062, RG-062, plan_17 chapitre 5), également une annotation système créée
+ * ailleurs (matérialisée à l'enregistrement du brouillon) et seulement lue et affichée ici.
  */
-export type CategorieLigneVerticale = 'annotation' | 'changementSeuil' | 'premierAuditRegulier';
+export type CategorieLigneVerticale =
+  'annotation' | 'changementSeuil' | 'premierAuditRegulier' | 'monteeVersionSonar';
+
+/**
+ * Ordre d'affichage stable des catégories de ligne verticale dans le panneau de bascule (cf.
+ * {@link SqmGraphiqueEvolutionComponent.categoriesLignesPresentes}), indépendant de l'ordre d'apparition des
+ * lignes elles-mêmes dans {@link SqmGraphiqueEvolutionComponent.lignesVerticales}.
+ */
+const ORDRE_CATEGORIES_LIGNE_VERTICALE: readonly CategorieLigneVerticale[] = [
+  'annotation',
+  'changementSeuil',
+  'premierAuditRegulier',
+  'monteeVersionSonar',
+];
+
+/**
+ * Libellé du panneau de bascule par catégorie de ligne verticale (US-062, RG-062, plan_17 chapitre 5 : bascule
+ * étendue à toutes les catégories déjà existantes, pas seulement à la nouvelle).
+ */
+const LIBELLE_CATEGORIE_LIGNE_VERTICALE: Readonly<Record<CategorieLigneVerticale, string>> = {
+  annotation: 'Annotations',
+  changementSeuil: 'Changements de seuil',
+  premierAuditRegulier: 'Premier audit régulier',
+  monteeVersionSonar: 'Montées de version Sonar',
+};
 
 /**
  * Ligne verticale étiquetée du graphique d'évolution (charte d'ergonomie).
@@ -134,6 +160,10 @@ const STYLE_LIGNE_VERTICALE: Readonly<
   annotation: { couleur: '#6b7280', tirets: [] },
   changementSeuil: { couleur: '#d97706', tirets: [6, 4] },
   premierAuditRegulier: { couleur: '#1a56db', tirets: [2, 3] },
+  // US-062, RG-062 (plan_17 chapitre 5) : violet tireté, décision arbitraire d'ergonomie à valider par un humain,
+  // cohérente avec l'absence des couleurs sémantiques vert/orange/rouge du Moteur de jugement (RG-022, cf.
+  // commentaire de STYLE_LIGNE_VERTICALE ci-dessus).
+  monteeVersionSonar: { couleur: '#7c3aed', tirets: [4, 3] },
 };
 
 /**
@@ -232,6 +262,27 @@ export class SqmGraphiqueEvolutionComponent {
   private readonly seriesMasquees: WritableSignal<ReadonlySet<string>> = signal(new Set<string>());
 
   /**
+   * Catégories de ligne verticale actuellement masquées par l'utilisateur (US-062, RG-062, plan_17 chapitre 5 :
+   * panneau de bascule étendu à toutes les catégories déjà existantes), sur le même modèle que
+   * {@link seriesMasquees}. Une catégorie absente de cet ensemble est active (comportement par défaut : toutes les
+   * catégories visibles). État de session, non mémorisé.
+   */
+  private readonly categoriesLignesMasquees: WritableSignal<ReadonlySet<CategorieLigneVerticale>> =
+    signal(new Set<CategorieLigneVerticale>());
+
+  /**
+   * Catégories de ligne verticale effectivement présentes dans {@link lignesVerticales}, dans l'ordre stable de
+   * {@link ORDRE_CATEGORIES_LIGNE_VERTICALE} : n'affiche un bouton de bascule que pour une catégorie réellement
+   * fournie par le composant appelant.
+   */
+  public readonly categoriesLignesPresentes: Signal<readonly CategorieLigneVerticale[]> = computed(
+    () => {
+      const presentes = new Set(this.lignesVerticales().map((ligne) => ligne.categorie));
+      return ORDRE_CATEGORIES_LIGNE_VERTICALE.filter((categorie) => presentes.has(categorie));
+    },
+  );
+
+  /**
    * Instance `chart.js` actuellement construite, `undefined` tant qu'aucune série ne porte de donnée ou avant la
    * première initialisation de la vue.
    */
@@ -283,6 +334,52 @@ export class SqmGraphiqueEvolutionComponent {
       ensemble.add(serieId);
     }
     this.seriesMasquees.set(ensemble);
+  }
+
+  /**
+   * Indique si une catégorie de ligne verticale est actuellement active (visible), pilote l'état du bouton de
+   * bascule associé (`aria-pressed`, US-062, RG-062, plan_17 chapitre 5), sur le même modèle que
+   * {@link serieActive}.
+   * @param categorie - Catégorie de ligne verticale concernée.
+   * @returns `true` si la catégorie est active.
+   */
+  public categorieLigneActive(categorie: CategorieLigneVerticale): boolean {
+    return !this.categoriesLignesMasquees().has(categorie);
+  }
+
+  /**
+   * Bascule l'activation d'une catégorie de ligne verticale (US-062, RG-062, plan_17 chapitre 5), sur le même
+   * modèle que {@link basculerSerie}.
+   * @param categorie - Catégorie de ligne verticale à basculer.
+   */
+  public basculerCategorieLigne(categorie: CategorieLigneVerticale): void {
+    const ensemble = new Set(this.categoriesLignesMasquees());
+    if (ensemble.has(categorie)) {
+      ensemble.delete(categorie);
+    } else {
+      ensemble.add(categorie);
+    }
+    this.categoriesLignesMasquees.set(ensemble);
+  }
+
+  /**
+   * Libellé affiché pour une catégorie de ligne verticale dans le panneau de bascule (US-062, RG-062, plan_17
+   * chapitre 5).
+   * @param categorie - Catégorie de ligne verticale concernée.
+   * @returns Le libellé correspondant.
+   */
+  public libelleCategorieLigne(categorie: CategorieLigneVerticale): string {
+    return LIBELLE_CATEGORIE_LIGNE_VERTICALE[categorie];
+  }
+
+  /**
+   * Couleur associée à une catégorie de ligne verticale (US-062, RG-062, plan_17 chapitre 5), pour la puce du
+   * panneau de bascule, sur le même modèle que la puce de couleur de série (cf. gabarit).
+   * @param categorie - Catégorie de ligne verticale concernée.
+   * @returns La couleur CSS de cette catégorie.
+   */
+  public couleurCategorieLigne(categorie: CategorieLigneVerticale): string {
+    return STYLE_LIGNE_VERTICALE[categorie].couleur;
   }
 
   /**
@@ -358,9 +455,10 @@ export class SqmGraphiqueEvolutionComponent {
       pointRadius: 3,
     }));
 
-    const annotations: AnnotationOptions[] = this.lignesVerticales().map((ligne) =>
-      this.construireAnnotation(ligne),
-    );
+    const categoriesLignesMasquees = this.categoriesLignesMasquees();
+    const annotations: AnnotationOptions[] = this.lignesVerticales()
+      .filter((ligne) => !categoriesLignesMasquees.has(ligne.categorie))
+      .map((ligne) => this.construireAnnotation(ligne));
 
     return {
       type: 'line',

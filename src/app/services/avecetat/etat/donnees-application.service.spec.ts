@@ -1145,6 +1145,7 @@ describe('DonneesApplicationService', () => {
         [VERDICT_SUCCES],
         [RESULTAT_EN_ATTENTE],
         undefined,
+        [],
         'mot-de-passe',
       );
 
@@ -1156,6 +1157,7 @@ describe('DonneesApplicationService', () => {
         perimetre: ['projet-1'],
         verdicts: [VERDICT_SUCCES],
         resultatsParProjet: [RESULTAT_EN_ATTENTE],
+        monteesVersionSonarParProjet: [],
         motDePasse: 'mot-de-passe',
       });
       expect(resultat).toEqual({ type: 'succes' });
@@ -1172,6 +1174,7 @@ describe('DonneesApplicationService', () => {
         [VERDICT_SUCCES],
         [RESULTAT_EN_ATTENTE],
         undefined,
+        [],
         'mot-de-passe',
       );
 
@@ -1197,6 +1200,7 @@ describe('DonneesApplicationService', () => {
         [VERDICT_SUCCES],
         [RESULTAT_EN_ATTENTE],
         { 'projet-1': premierCommitInterne },
+        [],
         'mot-de-passe',
       );
 
@@ -1217,6 +1221,7 @@ describe('DonneesApplicationService', () => {
         [VERDICT_SUCCES],
         [RESULTAT_EN_ATTENTE],
         {},
+        [],
         'mot-de-passe',
       );
 
@@ -1228,8 +1233,33 @@ describe('DonneesApplicationService', () => {
         perimetre: ['projet-1'],
         verdicts: [VERDICT_SUCCES],
         resultatsParProjet: [RESULTAT_EN_ATTENTE],
+        monteesVersionSonarParProjet: [],
         motDePasse: 'mot-de-passe',
       });
+    });
+
+    it('transmet monteesVersionSonarParProjet à enregistrer_brouillon (US-062, RG-062)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      invokeSimule.mockResolvedValue(racineAvantAppel);
+      const monteesVersionSonarParProjet = [
+        { projetId: 'projet-1', montees: [{ version: '10.4', date: '2026-01-01' }] },
+      ];
+
+      await service.enregistrerBrouillon(
+        'campagne-1',
+        '2026-07-23',
+        ['projet-1'],
+        [VERDICT_SUCCES],
+        [RESULTAT_EN_ATTENTE],
+        undefined,
+        monteesVersionSonarParProjet,
+        'mot-de-passe',
+      );
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'enregistrer_brouillon',
+        expect.objectContaining({ monteesVersionSonarParProjet }),
+      );
     });
 
     it('invoque integrer_brouillon avec la sélection fournie et met à jour la racine', async () => {

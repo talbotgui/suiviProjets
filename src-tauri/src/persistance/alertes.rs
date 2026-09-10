@@ -10,13 +10,114 @@
 //! uniquement sur une [`DonneesRacine`] déjà chargée en mémoire ; la sauvegarde effective reste de la responsabilité
 //! des commandes de la Façade qui l'invoquent (`commandes::alertes`).
 
+use crate::connecteurs::sonar::MonteeVersionSonar;
 use crate::modele::racine::{
     Annotation, DonneesRacine, EntreeJournal, StatutTraitementAlerte, TraitementAlerte,
 };
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Origine consignée au journal des modifications (RG-023) pour la création d'une annotation.
 const ORIGINE_ANNOTATION: &str = "Annotation";
+
+/// Origine consignée au journal des modifications (RG-023) pour la création automatique d'une annotation système
+/// de montée de version Sonar (US-062, RG-062, plan_17 chapitre 5), distincte de [`ORIGINE_ANNOTATION`] (création
+/// manuelle depuis un écran) pour rester traçable dans le journal comme une origine automatique de campagne.
+const ORIGINE_ANNOTATION_MONTEE_VERSION_SONAR: &str = "MonteeVersionSonar";
+
+/// Catégorie de l'annotation système matérialisant une montée de version du serveur Sonar (US-062, RG-062,
+/// plan_17 chapitre 5).
+const CATEGORIE_ANNOTATION_MONTEE_VERSION_SONAR: &str = "monteeVersionSonar";
+
+/// Les montées de version Sonar détectées pour un projet donné lors d'une campagne (US-062, RG-062, plan_17
+/// chapitre 5) : structure de transfert, argument de [`synchroniser_annotations_montee_version`] et paramètre
+/// additionnel de `commandes::audit::enregistrer_brouillon`, miroir strict du type TypeScript homonyme.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MonteeVersionSonarProjet {
+    pub(crate) projet_id: String,
+    pub(crate) montees: Vec<MonteeVersionSonar>,
+}
+
+/// Dérive un identifiant stable et non-UUID pour l'annotation système d'une montée de version Sonar donnée
+/// (US-062, RG-062) : minuscules, tout caractère non alphanumérique remplacé par `-`. Une collision théorique entre
+/// deux numéros de version distincts après cette normalisation (ex. `10.4` et `10-4`) est jugée sans risque pour un
+/// numéro de version Sonar réel — décision arbitraire documentée dans `plan_17_metriquesVolumetrie.md`, chapitre 5.
+fn empreinte_version(version: &str) -> String {
+    version
+        .to_lowercase()
+        .chars()
+        .map(|caractere| {
+            if caractere.is_ascii_alphanumeric() {
+                caractere
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
+
+/// Synchronise, pour chaque projet concerné, les annotations système matérialisant les montées de version du
+/// serveur Sonar détectées lors d'une campagne (US-062, RG-062, plan_17 chapitre 5) : appelée par
+/// `commandes::audit::enregistrer_brouillon` avant sauvegarde, jamais par `creerAnnotation`.
+///
+/// Idempotente par construction : l'identifiant dérivé ([`empreinte_version`]) étant stable d'un appel à l'autre,
+/// une annotation déjà présente pour une version donnée du projet n'est jamais recréée, et aucune entrée de journal
+/// n'est alors ajoutée. Un projet de `montees_par_projet` ne désignant aucun projet des données courantes est
+/// silencieusement ignoré (situation théorique, la liste provenant de projets déjà résolus par l'appelant).
+///
+/// Retourne les identifiants des annotations effectivement créées (compte-rendu de campagne).
+pub(crate) fn synchroniser_annotations_montee_version(
+    donnees: &mut DonneesRacine,
+    montees_par_projet: &[MonteeVersionSonarProjet],
+    horodatage: &str,
+) -> Vec<String> {
+    let mut identifiants_crees = Vec::new();
+    for groupe in &mut donnees.groupes {
+        let groupe_id = groupe.id.clone();
+        for projet in &mut groupe.projets {
+            let Some(entree) = montees_par_projet
+                .iter()
+                .find(|entree| entree.projet_id == projet.id)
+            else {
+                continue;
+            };
+            for montee in &entree.montees {
+                let id = format!(
+                    "montee-version-sonar-{}",
+                    empreinte_version(&montee.version)
+                );
+                if projet
+                    .annotations
+                    .iter()
+                    .any(|annotation| annotation.id == id)
+                {
+                    continue;
+                }
+                let annotation = Annotation {
+                    id: id.clone(),
+                    date: montee.date.clone(),
+                    libelle: format!("Sonar {}", montee.version),
+                    categorie: CATEGORIE_ANNOTATION_MONTEE_VERSION_SONAR.to_string(),
+                    description: None,
+                    systeme: Some(true),
+                };
+                projet.annotations.push(annotation.clone());
+                donnees.journal.push(EntreeJournal {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    horodatage: horodatage.to_string(),
+                    objet: format!("groupes/{groupe_id}/projets/{}/annotations/{id}", projet.id),
+                    avant: serde_json::Value::Null,
+                    apres: serde_json::to_value(&annotation).unwrap_or(serde_json::Value::Null),
+                    origine: ORIGINE_ANNOTATION_MONTEE_VERSION_SONAR.to_string(),
+                    detail_origine: None,
+                });
+                identifiants_crees.push(id);
+            }
+        }
+    }
+    identifiants_crees
+}
 
 /// Anomalie de validation métier levée avant toute tentative de sauvegarde, lorsque les identifiants fournis ne
 /// désignent rien dans les données courantes.
@@ -485,6 +586,187 @@ mod tests {
         );
 
         assert_eq!(resultat, Err(ErreurAlertes::AnnotationIntrouvable));
+    }
+
+    #[test]
+    fn synchroniser_annotations_montee_version_cree_lannotation_au_premier_passage() {
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        let mut racine = racine_avec_groupe(groupe);
+
+        let identifiants_crees = synchroniser_annotations_montee_version(
+            &mut racine,
+            &[MonteeVersionSonarProjet {
+                projet_id: "p1".to_string(),
+                montees: vec![MonteeVersionSonar {
+                    version: "10.4".to_string(),
+                    date: "2026-03-01T10:00:00+0000".to_string(),
+                }],
+            }],
+            "2026-09-08T10:00:00Z",
+        );
+
+        assert_eq!(identifiants_crees.len(), 1);
+        let annotations = &racine.groupes[0].projets[0].annotations;
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].id, "montee-version-sonar-10-4");
+        assert_eq!(annotations[0].categorie, "monteeVersionSonar");
+        assert_eq!(annotations[0].libelle, "Sonar 10.4");
+        assert_eq!(annotations[0].date, "2026-03-01T10:00:00+0000");
+        assert_eq!(annotations[0].systeme, Some(true));
+        assert_eq!(racine.journal.len(), 1);
+        assert_eq!(
+            racine.journal[0].origine,
+            ORIGINE_ANNOTATION_MONTEE_VERSION_SONAR
+        );
+        assert_eq!(
+            racine.journal[0].objet,
+            "groupes/g1/projets/p1/annotations/montee-version-sonar-10-4"
+        );
+    }
+
+    #[test]
+    fn synchroniser_annotations_montee_version_est_idempotente_au_second_passage() {
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        let mut racine = racine_avec_groupe(groupe);
+        let entrees = vec![MonteeVersionSonarProjet {
+            projet_id: "p1".to_string(),
+            montees: vec![MonteeVersionSonar {
+                version: "10.4".to_string(),
+                date: "2026-03-01T10:00:00+0000".to_string(),
+            }],
+        }];
+
+        synchroniser_annotations_montee_version(&mut racine, &entrees, "2026-09-08T10:00:00Z");
+        let identifiants_second_passage =
+            synchroniser_annotations_montee_version(&mut racine, &entrees, "2026-09-08T11:00:00Z");
+
+        assert!(identifiants_second_passage.is_empty());
+        assert_eq!(racine.groupes[0].projets[0].annotations.len(), 1);
+        assert_eq!(racine.journal.len(), 1);
+    }
+
+    #[test]
+    fn synchroniser_annotations_montee_version_ajoute_une_seule_annotation_pour_une_nouvelle_version()
+     {
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        let mut racine = racine_avec_groupe(groupe);
+        synchroniser_annotations_montee_version(
+            &mut racine,
+            &[MonteeVersionSonarProjet {
+                projet_id: "p1".to_string(),
+                montees: vec![MonteeVersionSonar {
+                    version: "10.4".to_string(),
+                    date: "2026-03-01T10:00:00+0000".to_string(),
+                }],
+            }],
+            "2026-09-08T10:00:00Z",
+        );
+
+        let identifiants_crees = synchroniser_annotations_montee_version(
+            &mut racine,
+            &[MonteeVersionSonarProjet {
+                projet_id: "p1".to_string(),
+                montees: vec![
+                    MonteeVersionSonar {
+                        version: "10.4".to_string(),
+                        date: "2026-03-01T10:00:00+0000".to_string(),
+                    },
+                    MonteeVersionSonar {
+                        version: "10.5".to_string(),
+                        date: "2026-06-01T10:00:00+0000".to_string(),
+                    },
+                ],
+            }],
+            "2026-09-08T11:00:00Z",
+        );
+
+        assert_eq!(
+            identifiants_crees,
+            vec!["montee-version-sonar-10-5".to_string()]
+        );
+        assert_eq!(racine.groupes[0].projets[0].annotations.len(), 2);
+        assert_eq!(racine.journal.len(), 2);
+    }
+
+    #[test]
+    fn synchroniser_annotations_montee_version_reste_strictement_par_projet() {
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        groupe.projets.push(projet_vide("p2"));
+        let mut racine = racine_avec_groupe(groupe);
+
+        synchroniser_annotations_montee_version(
+            &mut racine,
+            &[MonteeVersionSonarProjet {
+                projet_id: "p1".to_string(),
+                montees: vec![MonteeVersionSonar {
+                    version: "10.4".to_string(),
+                    date: "2026-03-01T10:00:00+0000".to_string(),
+                }],
+            }],
+            "2026-09-08T10:00:00Z",
+        );
+
+        assert_eq!(racine.groupes[0].projets[0].annotations.len(), 1);
+        assert!(racine.groupes[0].projets[1].annotations.is_empty());
+    }
+
+    #[test]
+    fn synchroniser_annotations_montee_version_ignore_un_projet_inconnu() {
+        let mut racine = racine_avec_groupe(groupe_vide("g1"));
+
+        let identifiants_crees = synchroniser_annotations_montee_version(
+            &mut racine,
+            &[MonteeVersionSonarProjet {
+                projet_id: "projet-inconnu".to_string(),
+                montees: vec![MonteeVersionSonar {
+                    version: "10.4".to_string(),
+                    date: "2026-03-01T10:00:00+0000".to_string(),
+                }],
+            }],
+            "2026-09-08T10:00:00Z",
+        );
+
+        assert!(identifiants_crees.is_empty());
+        assert!(racine.journal.is_empty());
+    }
+
+    #[test]
+    fn annotation_montee_version_sonar_nest_jamais_supprimable() {
+        // Non-régression : une annotation système créée par `synchroniser_annotations_montee_version` porte
+        // `systeme: Some(true)` et reste donc rejetée par `supprimer_annotation` (RG-033), comme toute annotation
+        // système.
+        let mut groupe = groupe_vide("g1");
+        groupe.projets.push(projet_vide("p1"));
+        let mut racine = racine_avec_groupe(groupe);
+        synchroniser_annotations_montee_version(
+            &mut racine,
+            &[MonteeVersionSonarProjet {
+                projet_id: "p1".to_string(),
+                montees: vec![MonteeVersionSonar {
+                    version: "10.4".to_string(),
+                    date: "2026-03-01T10:00:00+0000".to_string(),
+                }],
+            }],
+            "2026-09-08T10:00:00Z",
+        );
+
+        let resultat = supprimer_annotation(
+            &mut racine,
+            "g1",
+            Some("p1"),
+            "montee-version-sonar-10-4",
+            "2026-09-08T11:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurAlertes::AnnotationSystemeNonSupprimable)
+        );
+        assert_eq!(racine.groupes[0].projets[0].annotations.len(), 1);
     }
 
     #[test]

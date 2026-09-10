@@ -199,7 +199,10 @@ mod tests {
 
     #[test]
     fn linvariant_de_somme_tient_aussi_sur_une_racine_vide() {
-        let metriques = calculer_metriques(&DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z"), None);
+        let metriques = calculer_metriques(
+            &DonneesRacine::nouvelle("Test", "2026-07-27T08:00:00Z"),
+            None,
+        );
         let v = &metriques.ventilation;
 
         assert_eq!(
@@ -242,7 +245,9 @@ mod tests {
             .audits_octets;
 
         let mut racine = racine_peuplee();
-        racine.groupes[0].projets[0].audits.push(audit_de_test("a3"));
+        racine.groupes[0].projets[0]
+            .audits
+            .push(audit_de_test("a3"));
         let avec = calculer_metriques(&racine, None).ventilation.audits_octets;
 
         assert!(avec > sans);
@@ -269,7 +274,8 @@ mod tests {
 
     #[test]
     fn taille_disque_est_renseignee_pour_un_fichier_reel() -> Result<(), std::io::Error> {
-        let chemin = std::env::temp_dir().join(format!("volumetrie-test-{}.bin", uuid::Uuid::new_v4()));
+        let chemin =
+            std::env::temp_dir().join(format!("volumetrie-test-{}.bin", uuid::Uuid::new_v4()));
         std::fs::write(&chemin, b"contenu chiffre simule")?;
         let fichier = FichierTemporaire {
             chemin: chemin.clone(),

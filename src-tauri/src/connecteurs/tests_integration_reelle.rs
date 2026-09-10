@@ -408,3 +408,46 @@ async fn rechercher_premier_commit_interne_contre_une_vraie_instance_gitlab() {
         );
     }
 }
+
+/// Exerce `interroger_montees_version` (US-062, RG-062, plan_17 chapitre 5) contre une vraie instance Sonar.
+///
+/// Point non vérifié contre une instance réelle au moment de ce développement (cf. Rustdoc de
+/// `sonar::interroger_montees_version`) : la valeur exacte du filtre `category=SQ_UPGRADE` de
+/// `project_analyses/search`, et la forme du champ `name` d'un événement de cette catégorie (numéro de version
+/// serveur brut, supposé d'après la documentation de l'API Sonar). Le test réussit même sans aucune montée détectée
+/// (`Ok(vec![])` n'est pas une anomalie) : la vérification utile est **humaine**
+/// (`cargo test -- --ignored --nocapture`), à mener sur une instance ayant réellement subi au moins une montée de
+/// version depuis sa mise en service, en confirmant que la liste affichée ci-dessous porte bien un numéro de version
+/// plausible (ex. `10.4`) et non une chaîne vide ou un artefact d'un autre type d'événement.
+#[tokio::test]
+#[ignore = "test d'intégration hors CI : nécessite une vraie instance Sonar, déclenchement manuel uniquement — \
+            confirme la forme réelle des événements SQ_UPGRADE (US-062/RG-062, plan_17 chapitre 5)"]
+async fn interroger_montees_version_contre_une_vraie_instance_sonar() {
+    let url = variable_env_requise(
+        "SQM_TEST_SONAR_URL",
+        "SQM_TEST_SONAR_URL doit être définie pour ce test d'intégration",
+    );
+    let jeton = variable_env_requise(
+        "SQM_TEST_SONAR_TOKEN",
+        "SQM_TEST_SONAR_TOKEN doit être définie pour ce test d'intégration",
+    );
+    let projet_cle = variable_env_requise(
+        "SQM_TEST_SONAR_PROJET_CLE",
+        "SQM_TEST_SONAR_PROJET_CLE doit être définie pour ce test d'intégration",
+    );
+
+    let resultat =
+        sonar::interroger_montees_version(&url, &jeton, &projet_cle, &client_http()).await;
+
+    assert!(
+        resultat.is_ok(),
+        "interrogation des montées de version Sonar attendue sans anomalie de connecteur : {resultat:?}"
+    );
+    eprintln!(
+        "interroger_montees_version = {resultat:?}\n\
+         vérification humaine attendue : si non vide, chaque `version` doit être un numéro de version Sonar \
+         plausible (ex. « 10.4 »), jamais une chaîne vide ni le nom d'un événement d'une autre catégorie \
+         (QUALITY_PROFILE, QUALITY_GATE, VERSION) ; une liste vide est normale si l'instance n'a subi aucune montée \
+         de version depuis sa mise en service ou ne produit pas cet événement (SonarCloud notamment)"
+    );
+}

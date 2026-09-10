@@ -334,6 +334,107 @@ describe('SqmGraphiqueEvolutionComponent', () => {
     },
   );
 
+  it(
+    'attribue à la catégorie "monteeVersionSonar" son style violet tireté propre ' +
+      '(US-062, RG-062, plan_17 chapitre 5)',
+    () => {
+      const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+      const series: readonly SerieGraphiqueEvolution[] = [
+        {
+          id: 'projet-1',
+          libelle: 'Projet 1',
+          couleur: '#1a56db',
+          points: [{ date: '2026-06-05T00:00:00Z', valeur: 61.2 }],
+        },
+      ];
+      const lignesVerticales: readonly LigneVerticaleGraphique[] = [
+        {
+          id: 'montee-10-4',
+          date: '2026-03-01',
+          libelle: 'Sonar 10.4',
+          categorie: 'monteeVersionSonar',
+        },
+      ];
+      fixture.componentRef.setInput('series', series);
+      fixture.componentRef.setInput('lignesVerticales', lignesVerticales);
+      fixture.detectChanges();
+
+      const instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
+      const annotations = instance?.options.plugins?.annotation?.annotations;
+      if (!Array.isArray(annotations)) {
+        throw new Error('Annotations attendues sous forme de tableau.');
+      }
+      const [repere] = annotations;
+      if (repere?.type !== 'line') {
+        throw new Error('Repère de type ligne attendu.');
+      }
+      expect(repere.borderColor).toBe('#7c3aed');
+      expect(repere.borderDash).toEqual([4, 3]);
+    },
+  );
+
+  it('categoriesLignesPresentes() ne liste que les catégories réellement fournies, dans un ordre stable', () => {
+    const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+    const lignesVerticales: readonly LigneVerticaleGraphique[] = [
+      {
+        id: 'montee-10-4',
+        date: '2026-03-01',
+        libelle: 'Sonar 10.4',
+        categorie: 'monteeVersionSonar',
+      },
+      { id: 'a1', date: '2026-03-10', libelle: 'Migration', categorie: 'annotation' },
+    ];
+    fixture.componentRef.setInput('series', []);
+    fixture.componentRef.setInput('lignesVerticales', lignesVerticales);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.categoriesLignesPresentes()).toEqual([
+      'annotation',
+      'monteeVersionSonar',
+    ]);
+  });
+
+  it('basculerCategorieLigne masque puis réaffiche les repères de la seule catégorie concernée', () => {
+    const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
+    const series: readonly SerieGraphiqueEvolution[] = [
+      {
+        id: 'projet-1',
+        libelle: 'Projet 1',
+        couleur: '#1a56db',
+        points: [{ date: '2026-06-05T00:00:00Z', valeur: 61.2 }],
+      },
+    ];
+    const lignesVerticales: readonly LigneVerticaleGraphique[] = [
+      { id: 'a1', date: '2026-03-10', libelle: 'Migration', categorie: 'annotation' },
+      {
+        id: 'montee-10-4',
+        date: '2026-03-01',
+        libelle: 'Sonar 10.4',
+        categorie: 'monteeVersionSonar',
+      },
+    ];
+    fixture.componentRef.setInput('series', series);
+    fixture.componentRef.setInput('lignesVerticales', lignesVerticales);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.categorieLigneActive('monteeVersionSonar')).toBe(true);
+    fixture.componentInstance.basculerCategorieLigne('monteeVersionSonar');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.categorieLigneActive('monteeVersionSonar')).toBe(false);
+    let instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
+    let annotations = instance?.options.plugins?.annotation?.annotations;
+    expect(Array.isArray(annotations) ? annotations.length : -1).toBe(1);
+
+    fixture.componentInstance.basculerCategorieLigne('monteeVersionSonar');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.categorieLigneActive('monteeVersionSonar')).toBe(true);
+    instance = trouverInstanceChart(DomTestUtils.obtenirElementNatif(fixture));
+    annotations = instance?.options.plugins?.annotation?.annotations;
+    expect(Array.isArray(annotations) ? annotations.length : -1).toBe(2);
+  });
+
   it('masque la totalité des points d’une série au clic sur son bouton de bascule', () => {
     const fixture = TestBed.createComponent(SqmGraphiqueEvolutionComponent);
     const series: readonly SerieGraphiqueEvolution[] = [

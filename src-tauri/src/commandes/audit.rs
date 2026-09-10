@@ -788,6 +788,56 @@ pub(crate) async fn interroger_derniere_analyse(
     resultat
 }
 
+/// Interroge les montées de version du serveur Sonar déjà détectées pour un projet (US-062, RG-062, plan_17
+/// chapitre 5), sur le patron exact de [`interroger_derniere_analyse`] : renvoie `Result<Vec<MonteeVersionSonar>,
+/// ErreurConnecteur>` **brut** (le cœur natif ne construit pas de variante succès/échec, c'est la façade
+/// TypeScript qui enveloppe en `{ type: 'succes' | 'echec' }`).
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::CredentialAbsent`] si aucun credential n'a été saisi pour cette instance ; les autres
+/// catégories de [`ErreurConnecteur`] en cas d'échec de l'appel réseau. Un projet sans aucune montée détectée n'est
+/// pas une erreur : `Ok(vec![])`.
+#[tauri::command]
+pub(crate) async fn interroger_montees_version_sonar(
+    instance: Instance,
+    id_externe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<Vec<sonar::MonteeVersionSonar>, ErreurConnecteur> {
+    crate::journalisation::consigner_debut_commande("interrogerMonteesVersionSonar");
+    let resultat = async {
+        let credential = credential_instance(&instance, &etat)?;
+        crate::journalisation::consigner_appel_connecteur(
+            "interrogerMonteesVersionSonar",
+            &instance.nom,
+            &id_externe,
+        );
+        let resultat = match instance.type_instance {
+            TypeInstance::Sonar => {
+                sonar::interroger_montees_version(
+                    &instance.url_base,
+                    &credential,
+                    &id_externe,
+                    &etat.client_http(),
+                )
+                .await
+            }
+            TypeInstance::Gitlab => Err(ErreurConnecteur::ReponseInattendue {
+                message: "Type de source incompatible avec cette opération".to_string(),
+            }),
+        };
+        crate::journalisation::consigner_resultat_connecteur(
+            "interrogerMonteesVersionSonar",
+            &instance.nom,
+            &id_externe,
+            resultat,
+        )
+    }
+    .await;
+    crate::journalisation::consigner_fin_commande("interrogerMonteesVersionSonar");
+    resultat
+}
+
 /// Enregistre les résultats d'une campagne dans la zone de brouillon, sauvegarde le fichier (US-009, US-014,
 /// RG-019).
 ///
@@ -801,6 +851,13 @@ pub(crate) async fn interroger_derniere_analyse(
 /// appliquer aux projets correspondants lors d'une future intégration du brouillon (`integrer_brouillon`), déjà
 /// filtrés côté appelant (Orchestrateur de campagne, UI) aux seuls projets dont le résultat diffère de la valeur
 /// stockée (décision 6 du plan) ; absent ou vide, comportement strictement inchangé.
+///
+/// `montees_version_sonar_par_projet` (US-062, RG-062, plan_17 chapitre 5) : à la différence de `prises_en_charge`
+/// ci-dessus, matérialisée **immédiatement** en annotations système
+/// ([`crate::persistance::alertes::synchroniser_annotations_montee_version`]), avant même la sauvegarde de ce
+/// brouillon — conséquence assumée (décision actée, cf. plan) : un rejet ultérieur du brouillon
+/// (`rejeter_brouillon`) ne retire pas ces repères, une montée de version étant un fait réel indépendant de la
+/// campagne qui l'a détectée. Une carte vide (aucune source Sonar dans le périmètre) est un cas neutre.
 ///
 /// # Erreurs
 ///
@@ -823,6 +880,7 @@ pub(crate) fn enregistrer_brouillon(
     prises_en_charge: Option<
         std::collections::HashMap<String, crate::modele::racine::PremierCommitInterne>,
     >,
+    montees_version_sonar_par_projet: Vec<crate::persistance::alertes::MonteeVersionSonarProjet>,
     mot_de_passe: String,
     etat: State<'_, EtatSession>,
 ) -> Result<DonneesRacine, ErreurFacade> {
@@ -839,8 +897,13 @@ pub(crate) fn enregistrer_brouillon(
             verdicts,
             resultats_par_projet,
             prises_en_charge,
-            horodatage,
+            horodatage.clone(),
         )?;
+        crate::persistance::alertes::synchroniser_annotations_montee_version(
+            &mut donnees,
+            &montees_version_sonar_par_projet,
+            &horodatage,
+        );
 
         let cle = moteur::sauvegarder_fichier(
             Path::new(&chemin),

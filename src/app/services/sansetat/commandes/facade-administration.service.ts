@@ -29,6 +29,7 @@
 // mutation, aucun mot de passe) alimentant l'onglet « Métriques » de l'écran Administration.
 import { Injectable } from '@angular/core';
 import { InvocationCommandeUtils } from './invocation-commande.utils';
+import type { MonteeVersionSonarProjet } from './types-facade';
 
 /**
  * Paramètres transmis à la commande native `qualifierMembre` (US-022, US-023), génériques sur le type concret de
@@ -180,6 +181,16 @@ export interface ParametresEnregistrementBrouillon<
    * dont le résultat diffère de la valeur stockée (décision 6 du plan).
    */
   readonly prisesEnCharge?: Readonly<Record<string, TPremierCommitInterne>>;
+  /**
+   * Montées de version du serveur Sonar détectées lors de cette campagne, par projet (US-062, RG-062, plan_17
+   * chapitre 5), agrégées par `OrchestrateurCampagneService.lancerCampagne` à partir des retours de
+   * `auditerProjet`. Type possédé par la Façade (`MonteeVersionSonarProjet`, `types-facade.ts`), importé
+   * directement plutôt que générique : à la différence de `TPremierCommitInterne` ci-dessus, cette structure de
+   * transfert n'est jamais stockée dans `DonneesRacine` (elle est matérialisée en annotations système avant même
+   * cette commande), la règle de frontière unique ne s'applique donc pas ici. Une liste vide (aucune source Sonar
+   * dans le périmètre) est un cas neutre.
+   */
+  readonly monteesVersionSonarParProjet: readonly MonteeVersionSonarProjet[];
   /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
   readonly motDePasse: string;
 }

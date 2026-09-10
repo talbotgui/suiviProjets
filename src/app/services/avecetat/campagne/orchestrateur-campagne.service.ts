@@ -63,6 +63,8 @@ import type {
   CategorieErreurConnecteur,
   ErreurConnecteur,
   Instance,
+  MonteeVersionSonar,
+  MonteeVersionSonarProjet,
   RegleMarqueurIA,
   ResultatGitlabContributeurs,
   ResultatGitlabMarqueursIa,
@@ -192,6 +194,9 @@ export class OrchestrateurCampagneService {
    * Lance une campagne d'audit sur le périmètre donné (US-009) : interroge chaque projet avec une concurrence
    * limitée et paramétrable (RG-017), puis alimente le brouillon existant (`DonneesApplicationService.
    * enregistrerBrouillon`) une fois le périmètre intégralement traité ou l'annulation prise en compte (RG-018).
+   * Agrège aussi les montées de version Sonar détectées par chaque projet (US-062, RG-062, plan_17 chapitre 5,
+   * systématique, sans option dédiée) en `MonteeVersionSonarProjet[]` (projets sans montée omis), matérialisées
+   * en annotations système par `enregistrerBrouillon` lui-même, indépendamment du sort ultérieur du brouillon.
    * @param perimetre - Identifiants des projets du périmètre de la campagne.
    * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour la sauvegarde du brouillon
    * (RG-002).
@@ -262,6 +267,15 @@ export class OrchestrateurCampagneService {
         prisesEnCharge[resultat.projetId] = resultat.priseEnCharge;
       }
     }
+    const monteesVersionSonarParProjet: MonteeVersionSonarProjet[] = [];
+    for (const resultat of resultatsProjets) {
+      if (resultat.montees !== undefined && resultat.montees.length > 0) {
+        monteesVersionSonarParProjet.push({
+          projetId: resultat.projetId,
+          montees: resultat.montees,
+        });
+      }
+    }
 
     const date = new Date().toISOString();
     return this.donneesApplication.enregistrerBrouillon(
@@ -271,6 +285,7 @@ export class OrchestrateurCampagneService {
       verdicts,
       resultatsParProjet,
       Object.keys(prisesEnCharge).length > 0 ? prisesEnCharge : undefined,
+      monteesVersionSonarParProjet,
       motDePasse,
     );
   }
@@ -305,6 +320,9 @@ export class OrchestrateurCampagneService {
    * le nouveau résultat à reporter sur le brouillon (hors du périmètre d'indicateurs d'audit, cf. commentaire
    * d'en-tête de ce fichier : n'alimente jamais l'`Audit` produit). Un projet dont l'audit a totalement échoué ne
    * porte jamais de résultat de prise en charge (constat R18-W-06 : aucun calcul n'est lancé dans ce cas).
+   * `montees` (US-062, RG-062, plan_17 chapitre 5) : montées de version Sonar détectées, fusionnées entre les
+   * sources Sonar du projet ([`dedupliquerMonteesVersion`]), `undefined` si aucune ou si l'audit a totalement
+   * échoué (même garde que `priseEnCharge`).
    */
   private async auditerProjet(
     projetId: string,
@@ -320,6 +338,7 @@ export class OrchestrateurCampagneService {
     readonly verdict: Verdict;
     readonly resultatBrouillon?: ResultatBrouillonProjet;
     readonly priseEnCharge?: PremierCommitInterne;
+    readonly montees?: readonly MonteeVersionSonar[];
   }> {
     const modeHistorique = dateCiblee !== undefined;
     const debut = Date.now();
@@ -345,6 +364,7 @@ export class OrchestrateurCampagneService {
     let ncloc: ResultatSonarNcloc | undefined;
     let derniereAnalyse: string | null | undefined;
     let marqueursIa: ResultatGitlabMarqueursIa | undefined;
+    const montees: MonteeVersionSonar[] = [];
 
     for (const source of resolution.projet.sources) {
       const instance = resolution.groupe.instances.find(
@@ -645,6 +665,24 @@ export class OrchestrateurCampagneService {
           }
         }
 
+        // Montées de version Sonar (US-062, RG-062, plan_17 chapitre 5) : appel systématique, sans pseudo-indicateur
+        // désactivable dédié (décision actée du plan), à côté de `interrogerDerniereAnalyse`. Une anomalie ici
+        // n'échoue jamais l'audit du projet ni la campagne (dégradation par source, même principe que
+        // `croise.fraicheur_sonar` ci-dessus).
+        const reponseMontees = await this.facadeCommandes.interrogerMonteesVersionSonar(
+          instance,
+          source.idExterne,
+        );
+        if (reponseMontees.type === 'succes') {
+          montees.push(...reponseMontees.resultat);
+        } else {
+          anomalies.push({
+            indicateur: 'sonar.montees_version',
+            sourceId: source.id,
+            anomalie: reponseMontees.anomalie,
+          });
+        }
+
         // Diagnostic de R15-06 (cf. commentaire symétrique de la branche GitLab ci-dessus) : résumé de fin
         // d'analyse de cette seule source Sonar.
         await this.facadeCommandes.consignerResumeSource(source.id, source.idExterne, {
@@ -786,7 +824,28 @@ export class OrchestrateurCampagneService {
         aberrations,
       },
       priseEnCharge,
+      montees: montees.length > 0 ? this.dedupliquerMonteesVersion(montees) : undefined,
     };
+  }
+
+  /**
+   * Fusionne les montées de version Sonar obtenues des différentes sources d'un même projet (US-062, RG-062,
+   * plan_17 chapitre 5) : dédoublonnage sur `version`, la date la plus ancienne étant conservée en cas de
+   * doublon entre sources (situation théorique, un projet ne portant habituellement qu'une seule source Sonar).
+   * @param montees - Montées collectées, toutes sources Sonar du projet confondues, dans l'ordre d'obtention.
+   * @returns Les montées dédoublonnées par version.
+   */
+  private dedupliquerMonteesVersion(
+    montees: readonly MonteeVersionSonar[],
+  ): readonly MonteeVersionSonar[] {
+    const parVersion = new Map<string, MonteeVersionSonar>();
+    for (const montee of montees) {
+      const existante = parVersion.get(montee.version);
+      if (existante === undefined || montee.date < existante.date) {
+        parVersion.set(montee.version, montee);
+      }
+    }
+    return [...parVersion.values()];
   }
 
   /**

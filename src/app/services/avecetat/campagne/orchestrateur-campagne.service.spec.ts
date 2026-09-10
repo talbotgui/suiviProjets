@@ -4,8 +4,9 @@
 // direct de `DonneesApplicationService` (cf. `docs/02_documentation/16_normesTests.md#tests-unitaires`).
 import { TestBed } from '@angular/core/testing';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import type { InvokeArgs } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../sansetat/commandes/types-facade';
-import type { Instance } from '../../sansetat/commandes/types-facade';
+import type { Instance, MonteeVersionSonarProjet } from '../../sansetat/commandes/types-facade';
 import { DonneesApplicationService } from '../etat/donnees-application.service';
 import { EtatSessionService } from '../etat/etat-session.service';
 import { TypeSource } from '../etat/types-donnees';
@@ -260,6 +261,9 @@ const REPONSES_PAR_DEFAUT: Readonly<Record<string, unknown>> = {
   },
   interroger_ncloc: { sourceId: 'src', ncloc: 10_000, parLangage: {} },
   interroger_derniere_analyse: '2026-07-19',
+  // US-062, RG-062 (plan_17 chapitre 5) : aucune montée détectée par défaut, pour ne pas affecter les tests
+  // préexistants ; le comportement de remontée/agrégation est couvert par des tests dédiés ci-dessous.
+  interroger_montees_version_sonar: [],
 };
 
 type MockEnregistrerBrouillon = jest.Mock<
@@ -271,6 +275,7 @@ type MockEnregistrerBrouillon = jest.Mock<
     readonly Verdict[],
     readonly ResultatBrouillonProjet[],
     Readonly<Record<string, PremierCommitInterne>> | undefined,
+    readonly MonteeVersionSonarProjet[],
     string,
   ]
 >;
@@ -300,6 +305,7 @@ describe('OrchestrateurCampagneService', () => {
         readonly Verdict[],
         readonly ResultatBrouillonProjet[],
         Readonly<Record<string, PremierCommitInterne>> | undefined,
+        readonly MonteeVersionSonarProjet[],
         string,
       ]
     >();
@@ -366,7 +372,7 @@ describe('OrchestrateurCampagneService', () => {
 
       expect(resultat).toEqual({ type: 'succes' });
       expect(donneesApplicationMock.enregistrerBrouillon).toHaveBeenCalledTimes(1);
-      const [, , perimetre, verdicts, resultatsParProjet, , motDePasse] =
+      const [, , perimetre, verdicts, resultatsParProjet, , , motDePasse] =
         donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
       expect(perimetre).toEqual(['projet-1']);
       expect(motDePasse).toBe('mot-de-passe');
@@ -1234,6 +1240,85 @@ describe('OrchestrateurCampagneService', () => {
             expect.objectContaining({ indicateur: 'priseEnCharge.empreinte' }),
           ]),
         );
+      });
+    });
+
+    describe('montées de version Sonar (US-062, RG-062, plan_17 chapitre 5)', () => {
+      it('doit remonter les montées de version Sonar interrogées jusque dans le brouillon enregistré', async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceSonar('source-2')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        invokeSimule.mockImplementation((commande: string) => {
+          if (commande === 'interroger_montees_version_sonar') {
+            return Promise.resolve([{ version: '10.4', date: '2026-01-01' }]);
+          }
+          return Promise.resolve(REPONSES_PAR_DEFAUT[commande]);
+        });
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        const [, , , , , , monteesVersionSonarParProjet] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(monteesVersionSonarParProjet).toEqual([
+          { projetId: 'projet-1', montees: [{ version: '10.4', date: '2026-01-01' }] },
+        ]);
+      });
+
+      it("doit fusionner et dédoublonner les montées de plusieurs sources Sonar d'un même projet, en conservant la date la plus ancienne", async () => {
+        const projet = DonneesDeTest.projet('projet-1', [
+          DonneesDeTest.sourceSonar('source-a'),
+          DonneesDeTest.sourceSonar('source-b'),
+        ]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        invokeSimule.mockImplementation((commande: string, parametres?: InvokeArgs) => {
+          if (
+            commande === 'interroger_montees_version_sonar' &&
+            parametres !== undefined &&
+            !Array.isArray(parametres) &&
+            !(parametres instanceof ArrayBuffer) &&
+            !(parametres instanceof Uint8Array)
+          ) {
+            const idExterne = parametres['idExterne'];
+            if (idExterne === 'source-a-externe') {
+              return Promise.resolve([{ version: '10.4', date: '2026-02-01' }]);
+            }
+            if (idExterne === 'source-b-externe') {
+              return Promise.resolve([{ version: '10.4', date: '2026-01-01' }]);
+            }
+          }
+          return Promise.resolve(REPONSES_PAR_DEFAUT[commande]);
+        });
+
+        await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        const [, , , , , , monteesVersionSonarParProjet] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(monteesVersionSonarParProjet).toEqual([
+          { projetId: 'projet-1', montees: [{ version: '10.4', date: '2026-01-01' }] },
+        ]);
+      });
+
+      it("doit absorber une anomalie sur l'interrogation des montées de version sans faire échouer le projet ni la campagne", async () => {
+        const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.sourceSonar('source-2')]);
+        donneesApplicationMock.groupes.mockReturnValue([DonneesDeTest.groupe([projet])]);
+        invokeSimule.mockImplementation((commande: string) => {
+          if (commande === 'interroger_montees_version_sonar') {
+            return Promise.reject(UtilitairesTest.erreurConnecteur('instanceInjoignable'));
+          }
+          return Promise.resolve(REPONSES_PAR_DEFAUT[commande]);
+        });
+
+        const resultat = await service.lancerCampagne(['projet-1'], 'mot-de-passe');
+
+        expect(resultat).toEqual({ type: 'succes' });
+        const [, , , verdicts, , , monteesVersionSonarParProjet] =
+          donneesApplicationMock.enregistrerBrouillon.mock.calls[0];
+        expect(verdicts[0].statut).toBe('succes');
+        expect(verdicts[0].anomalies).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ indicateur: 'sonar.montees_version' }),
+          ]),
+        );
+        expect(monteesVersionSonarParProjet).toEqual([]);
       });
     });
   });

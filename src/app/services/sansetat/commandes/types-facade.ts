@@ -440,6 +440,36 @@ export type ResultatInterrogationDerniereAnalyse =
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**
+ * Une montée de version du serveur Sonar détectée via `project_analyses/search` (US-062, RG-062, plan_17
+ * chapitre 5), miroir strict de la structure Rust homonyme (`camelCase`). `version` provient du champ `name` d'un
+ * événement `SQ_UPGRADE`, `date` de la `date` de l'analyse Sonar ayant suivi cette montée.
+ */
+export interface MonteeVersionSonar {
+  readonly version: string;
+  readonly date: string;
+}
+
+/**
+ * Les montées de version Sonar détectées pour un projet donné lors d'une campagne (US-062, RG-062, plan_17
+ * chapitre 5) : argument additionnel de `FacadeAdministrationService.enregistrerBrouillon`, agrégé par
+ * `OrchestrateurCampagneService.lancerCampagne` à partir des retours de `auditerProjet`. Type possédé par la
+ * Façade (structure de transfert calculée, jamais stockée dans `DonneesRacine`), importable directement sans
+ * généricité — à la différence de `PremierCommitInterne`, propriété persistée d'un `Projet`.
+ */
+export interface MonteeVersionSonarProjet {
+  readonly projetId: string;
+  readonly montees: readonly MonteeVersionSonar[];
+}
+
+/**
+ * Résultat typé de `FacadeCommandesService.interrogerMonteesVersionSonar` (US-062, RG-062, plan_17 chapitre 5),
+ * sur le modèle de {@link ResultatInterrogationDerniereAnalyse}.
+ */
+export type ResultatInterrogationMonteesVersionSonar =
+  | { readonly type: 'succes'; readonly resultat: readonly MonteeVersionSonar[] }
+  | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
+
+/**
  * Type de correspondance d'une règle de détection de marqueur IA (F18), mirroir de `TypeCorrespondanceMarqueur`
  * côté cœur natif : `exact` (égalité stricte du nom) ou `motif` (glob simple, seul `*` étant spécial).
  */

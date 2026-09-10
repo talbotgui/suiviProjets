@@ -22,6 +22,12 @@
   gap: 0.4rem;
 }
 
+.graphique-evolution__legende-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .graphique-evolution__serie {
   display: inline-flex;
   align-items: center;

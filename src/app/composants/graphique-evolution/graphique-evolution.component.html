@@ -36,6 +36,30 @@
       }
     </div>
 
+    @if (categoriesLignesPresentes().length > 0) {
+      <!-- Panneau de masquage des repères verticaux par catégorie (US-062, RG-062, plan_17 chapitre 5), même
+           idiome d'accessibilité que la bascule de séries ci-dessus (aria-pressed, jamais une case à cocher). -->
+      <div
+        class="graphique-evolution__legende-categories"
+        role="group"
+        aria-label="Afficher les repères"
+      >
+        @for (categorie of categoriesLignesPresentes(); track categorie) {
+          <button
+            type="button"
+            class="graphique-evolution__bouton-serie"
+            [class.graphique-evolution__bouton-serie--inactive]="!categorieLigneActive(categorie)"
+            [style.--couleur-serie]="couleurCategorieLigne(categorie)"
+            [attr.aria-pressed]="categorieLigneActive(categorie)"
+            (click)="basculerCategorieLigne(categorie)"
+          >
+            <span class="graphique-evolution__pastille" aria-hidden="true"></span>
+            {{ libelleCategorieLigne(categorie) }}
+          </button>
+        }
+      </div>
+    }
+
     <div class="graphique-evolution__zoom" role="group" aria-label="Zoom temporel">
       <button type="button" (click)="zoomerAvant()">Zoom avant</button>
       <button type="button" (click)="zoomerArriere()">Zoom arrière</button>

@@ -369,6 +369,92 @@ describe('SqmSyntheseGraphiqueComponent', () => {
     },
   );
 
+  it(
+    'détourne les annotations « monteeVersionSonar » vers un regroupement par version, dédoublonné entre ' +
+      "projets d'une même instance à la date la plus ancienne (US-062, RG-062, plan_17 chapitre 5)",
+    () => {
+      const annotationMonteeA: Annotation = {
+        id: 'montee-version-sonar-10-4',
+        date: '2026-02-01',
+        libelle: 'Sonar 10.4',
+        categorie: 'monteeVersionSonar',
+        systeme: true,
+      };
+      const annotationMonteeB: Annotation = {
+        id: 'montee-version-sonar-10-4',
+        date: '2026-01-01',
+        libelle: 'Sonar 10.4',
+        categorie: 'monteeVersionSonar',
+        systeme: true,
+      };
+      const projetA = DonneesDeTest.projet('projet-a', 'Projet A', [], [annotationMonteeA]);
+      const projetB = DonneesDeTest.projet('projet-b', 'Projet B', [], [annotationMonteeB]);
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe 1',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projetA, projetB],
+      };
+      const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+
+      const lignes = fixture.componentInstance
+        .lignesVerticales()
+        .filter((ligne) => ligne.categorie === 'monteeVersionSonar');
+      expect(lignes).toHaveLength(1);
+      expect(lignes[0]?.date).toBe('2026-01-01');
+      expect(lignes[0]?.libelle).toBe('Sonar 10.4');
+    },
+  );
+
+  it(
+    'conserve une annotation manuelle en catégorie « annotation », indépendamment du regroupement des montées ' +
+      'de version Sonar',
+    () => {
+      const annotationManuelle: Annotation = {
+        id: 'annotation-manuelle-1',
+        date: '2026-03-10',
+        libelle: 'Migration majeure',
+        categorie: 'technique',
+      };
+      const annotationMontee: Annotation = {
+        id: 'montee-version-sonar-10-4',
+        date: '2026-02-01',
+        libelle: 'Sonar 10.4',
+        categorie: 'monteeVersionSonar',
+        systeme: true,
+      };
+      const projet = DonneesDeTest.projet(
+        'projet-a',
+        'Projet A',
+        [],
+        [annotationManuelle, annotationMontee],
+      );
+      const groupe: Groupe = {
+        id: 'groupe-1',
+        nom: 'Groupe 1',
+        description: '',
+        instances: [],
+        membresConnus: [],
+        annotations: [],
+        indicateursDesactives: [],
+        projets: [projet],
+      };
+      const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+
+      const lignes = fixture.componentInstance.lignesVerticales();
+      expect(lignes.find((ligne) => ligne.id === 'annotation-manuelle-1')).toEqual(
+        expect.objectContaining({ categorie: 'annotation', libelle: 'Migration majeure' }),
+      );
+      expect(lignes.find((ligne) => ligne.categorie === 'monteeVersionSonar')).toEqual(
+        expect.objectContaining({ libelle: 'Sonar 10.4' }),
+      );
+    },
+  );
+
   it('convertit la taille du dépôt en mégaoctets pour l’indicateur « Taille du dépôt »', () => {
     const projet = DonneesDeTest.projet('projet-a', 'Projet A', [
       DonneesDeTest.audit('2026-06-05', { tailleOctets: 48_234_567 }),

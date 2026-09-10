@@ -23,6 +23,7 @@ import { InvocationCommandeUtils } from './invocation-commande.utils';
 import type {
   ErreurConnecteur,
   Instance,
+  MonteeVersionSonar,
   RegleMarqueurIA,
   ResultatGitlabBranches,
   ResultatGitlabContributeurs,
@@ -42,6 +43,7 @@ import type {
   ResultatInterrogationMarqueursIa,
   ResultatInterrogationMembres,
   ResultatInterrogationMergeRequests,
+  ResultatInterrogationMonteesVersionSonar,
   ResultatInterrogationNcloc,
   ResultatInterrogationNotes,
   ResultatInterrogationTailleDepot,
@@ -607,6 +609,39 @@ export class FacadeCommandesService {
           idExterne,
           dateCiblee,
         },
+      );
+      return { type: 'succes', resultat };
+    } catch (erreur: unknown) {
+      if (this.estErreurConnecteur(erreur)) {
+        return { type: 'echec', anomalie: erreur };
+      }
+      return {
+        type: 'echec',
+        anomalie: {
+          type: 'reponseInattendue',
+          message: 'Réponse inattendue de la frontière IPC (forme non reconnue)',
+        },
+      };
+    }
+  }
+
+  /**
+   * Interroge les montées de version du serveur Sonar déjà détectées pour un projet (US-062, RG-062, plan_17
+   * chapitre 5), sur le modèle exact de {@link interrogerDerniereAnalyse} : ne reçoit pas `sourceId`, cette
+   * donnée n'appartenant à aucune variante du catalogue figé des résultats d'audit (elle est matérialisée en
+   * annotations système, jamais en résultat d'indicateur).
+   * @param instance - Instance Sonar hébergeant le projet.
+   * @param idExterne - Clé du projet Sonar côté instance (`Source.idExterne`).
+   * @returns La liste des montées détectées (vide si aucune) en cas de succès, ou l'anomalie typée en cas d'échec.
+   */
+  public async interrogerMonteesVersionSonar(
+    instance: Instance,
+    idExterne: string,
+  ): Promise<ResultatInterrogationMonteesVersionSonar> {
+    try {
+      const resultat = await InvocationCommandeUtils.invoquer<readonly MonteeVersionSonar[]>(
+        'interroger_montees_version_sonar',
+        { instance, idExterne },
       );
       return { type: 'succes', resultat };
     } catch (erreur: unknown) {

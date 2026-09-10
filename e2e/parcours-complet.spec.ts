@@ -605,6 +605,20 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     // légende (une entrée par projet) est visible plutôt que l'état « aucune donnée ».
     await expect(page.locator('app-graphique-evolution')).toBeVisible();
     await expect(page.locator('.graphique-evolution__legende')).toBeVisible();
+
+    // US-062, RG-062 (plan_17 chapitre 5) : les deux projets du groupe Alpha (même instance Sonar unique,
+    // `e2e/donnees-test.ts`) partagent une montée de version Sonar bouchonnée (`10.4`), dédoublonnée en un seul
+    // repère sur ce graphique — d'où un seul bouton « Montées de version Sonar » dans le panneau de bascule
+    // (jamais deux), quel que soit le nombre de projets concernés. Désactivation puis réactivation du bouton.
+    const boutonMonteeVersion = page.locator('.graphique-evolution__legende-categories button', {
+      hasText: 'Montées de version Sonar',
+    });
+    await expect(boutonMonteeVersion).toHaveCount(1);
+    await expect(boutonMonteeVersion).toHaveAttribute('aria-pressed', 'true');
+    await boutonMonteeVersion.click();
+    await expect(boutonMonteeVersion).toHaveAttribute('aria-pressed', 'false');
+    await boutonMonteeVersion.click();
+    await expect(boutonMonteeVersion).toHaveAttribute('aria-pressed', 'true');
   });
 
   // 19b. Obsolescence — grille de tuiles et modale de détail du dernier audit d'un projet (US-051).

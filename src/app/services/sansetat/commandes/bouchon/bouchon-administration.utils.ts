@@ -360,17 +360,26 @@ export class BouchonAdministrationUtils {
    * reste de ce bouchon, aucune entrée de journal n'est produite ici (décision documentée en tête de fichier :
    * RG-023 jamais alimenté par ce bouchon) — l'application effective de `prisesEnCharge` a lieu à l'intégration
    * (cf. {@link resoudreBrouillon}).
+   *
+   * `monteesVersionSonarParProjet` (US-062, RG-062, plan_17 chapitre 5) : à la différence de `prisesEnCharge`
+   * ci-dessus, appliquée **immédiatement** ({@link synchroniserMonteesVersionSonar}), avant même la construction
+   * du brouillon, sur le modèle exact du cœur natif (`persistance::alertes::synchroniser_annotations_montee_version`
+   * appelée par `enregistrer_brouillon` avant sauvegarde).
    * @param parametres - Paramètres reçus (`campagneId`, `date`, `perimetre`, `verdicts`, `resultatsParProjet`,
-   * `prisesEnCharge`, `donnees`).
+   * `prisesEnCharge`, `monteesVersionSonarParProjet`, `donnees`).
    * @returns La racine mise à jour (non encore horodatée).
    */
   private static enregistrerBrouillon(
     parametres: Readonly<Record<string, unknown>>,
   ): Record<string, unknown> {
-    const donnees = BouchonAdministrationUtils.exigerObjet(parametres['donnees']);
-    if (donnees['brouillon'] !== null && donnees['brouillon'] !== undefined) {
+    const donneesRecues = BouchonAdministrationUtils.exigerObjet(parametres['donnees']);
+    if (donneesRecues['brouillon'] !== null && donneesRecues['brouillon'] !== undefined) {
       throw new AnomalieAdministrationBouchon('brouillonDejaExistant');
     }
+    const donnees = BouchonAdministrationUtils.synchroniserMonteesVersionSonar(
+      donneesRecues,
+      parametres['monteesVersionSonarParProjet'],
+    );
     const campagneId = BouchonAdministrationUtils.lireTexte(parametres, 'campagneId');
     const date = BouchonAdministrationUtils.lireTexte(parametres, 'date');
     const perimetre = Array.isArray(parametres['perimetre']) ? parametres['perimetre'] : [];
@@ -398,6 +407,80 @@ export class BouchonAdministrationUtils {
           : {}),
       },
     };
+  }
+
+  /**
+   * Matérialise, pour chaque projet concerné, les annotations système des montées de version Sonar détectées
+   * (US-062, RG-062, plan_17 chapitre 5), sur le modèle simplifié de
+   * `persistance::alertes::synchroniser_annotations_montee_version` : identifiant dérivé stable
+   * ({@link empreinteVersion}), idempotent (une annotation déjà présente pour une version donnée n'est jamais
+   * recréée), `systeme: true`, `categorie: 'monteeVersionSonar'`, libellé « Sonar <version> ». Aucune entrée de
+   * journal n'est produite (cf. commentaire d'en-tête de ce fichier).
+   * @param donnees - Racine courante (déjà vérifiée comme objet par l'appelant).
+   * @param monteesVersionSonarParProjet - Paramètre brut reçu, non nécessairement un tableau à cette frontière non
+   * typée ; absent ou vide, `donnees` est retournée inchangée.
+   * @returns La racine mise à jour.
+   */
+  private static synchroniserMonteesVersionSonar(
+    donnees: Record<string, unknown>,
+    monteesVersionSonarParProjet: unknown,
+  ): Record<string, unknown> {
+    if (!Array.isArray(monteesVersionSonarParProjet) || monteesVersionSonarParProjet.length === 0) {
+      return donnees;
+    }
+    const entrees = monteesVersionSonarParProjet.filter(
+      (entree): entree is Record<string, unknown> => BouchonAdministrationUtils.estObjet(entree),
+    );
+    const groupes = BouchonAdministrationUtils.lireListe(donnees, 'groupes').map((groupe) => ({
+      ...groupe,
+      projets: BouchonAdministrationUtils.lireListe(groupe, 'projets').map((projet) => {
+        const projetId = BouchonAdministrationUtils.lireTexte(projet, 'id');
+        const entree = entrees.find(
+          (candidate) => BouchonAdministrationUtils.lireTexte(candidate, 'projetId') === projetId,
+        );
+        if (entree === undefined) {
+          return projet;
+        }
+        const annotationsExistantes = BouchonAdministrationUtils.lireListe(projet, 'annotations');
+        const idsExistants = new Set(
+          annotationsExistantes.map((annotation) =>
+            BouchonAdministrationUtils.lireTexte(annotation, 'id'),
+          ),
+        );
+        const nouvellesAnnotations: Record<string, unknown>[] = [];
+        for (const montee of BouchonAdministrationUtils.lireListe(entree, 'montees')) {
+          const version = BouchonAdministrationUtils.lireTexte(montee, 'version');
+          const id = `montee-version-sonar-${BouchonAdministrationUtils.empreinteVersion(version)}`;
+          if (idsExistants.has(id)) {
+            continue;
+          }
+          idsExistants.add(id);
+          nouvellesAnnotations.push({
+            id,
+            date: BouchonAdministrationUtils.lireTexte(montee, 'date'),
+            libelle: `Sonar ${version}`,
+            categorie: 'monteeVersionSonar',
+            systeme: true,
+          });
+        }
+        if (nouvellesAnnotations.length === 0) {
+          return projet;
+        }
+        return { ...projet, annotations: [...annotationsExistantes, ...nouvellesAnnotations] };
+      }),
+    }));
+    return { ...donnees, groupes };
+  }
+
+  /**
+   * Dérive un identifiant stable et non-UUID pour l'annotation système d'une montée de version Sonar donnée
+   * (US-062, RG-062), sur le modèle exact de `empreinte_version` côté cœur natif (`persistance::alertes`) :
+   * minuscules, tout caractère non alphanumérique remplacé par `-`.
+   * @param version - Numéro de version Sonar.
+   * @returns L'identifiant dérivé, sans le préfixe `montee-version-sonar-`.
+   */
+  private static empreinteVersion(version: string): string {
+    return version.toLowerCase().replace(/[^a-z0-9]/g, '-');
   }
 
   /**

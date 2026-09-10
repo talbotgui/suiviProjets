@@ -401,7 +401,11 @@ pub(crate) struct MembreConnu {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Annotation {
-    /// Identifiant UUID v4 de l'annotation.
+    /// Identifiant de l'annotation : UUID v4 pour une annotation manuelle ([`persistance::alertes::creer_annotation`]),
+    /// ou identifiant dérivé stable, non-UUID, pour une annotation système générée automatiquement à partir d'un
+    /// fait externe idempotent (ex. `montee-version-sonar-<empreinte de version>`, US-062, RG-062, plan_17
+    /// chapitre 5) — ce dernier cas garantit qu'un ré-audit ne recrée jamais la même annotation. Traité comme une
+    /// chaîne opaque partout ailleurs (aucun code, cœur natif ou interface, ne valide le format de ce champ).
     pub(crate) id: String,
     /// Date de l'événement.
     pub(crate) date: String,

@@ -40,8 +40,9 @@ use crate::modele::racine::{
     ParSeverite, ResultatSonarCouverture, ResultatSonarDette, ResultatSonarNcloc,
     ResultatSonarNotes, ResultatSonarViolations,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Réponse du point d'API `authentication/validate` de Sonar.
 #[derive(Debug, Deserialize)]
@@ -868,6 +869,140 @@ pub(crate) async fn interroger_derniere_analyse(
         .into_iter()
         .next()
         .map(|analyse| analyse.date))
+}
+
+/// Une montée de version du serveur Sonar détectée via `project_analyses/search` (US-062, RG-062, plan_17
+/// chapitre 5) : `version` provient du champ `name` d'un événement `SQ_UPGRADE`, `date` de la `date` de l'analyse
+/// Sonar ayant suivi cette montée. Structure de transfert calculée, jamais persistée telle quelle — matérialisée en
+/// annotation système par `persistance::alertes::synchroniser_annotations_montee_version`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MonteeVersionSonar {
+    pub(crate) version: String,
+    pub(crate) date: String,
+}
+
+/// Catégorie d'événement Sonar correspondant à une montée de version du serveur (`project_analyses/search`) :
+/// périmètre strictement limité à cette catégorie (RG-062, décision actée) — les changements de profil qualité
+/// (`QUALITY_PROFILE`), de portail qualité (`QUALITY_GATE`) et de version de projet (`VERSION`) ne sont jamais
+/// remontés, bien que le même appel les exposerait au même coût.
+const CATEGORIE_EVENEMENT_MONTEE_VERSION: &str = "SQ_UPGRADE";
+
+/// Un événement associé à une analyse Sonar (`project_analyses/search`), réduit aux champs exploités par
+/// [`interroger_montees_version`].
+#[derive(Debug, Deserialize)]
+struct EvenementAnalyse {
+    category: String,
+    name: String,
+}
+
+/// Une analyse Sonar avec ses événements (`project_analyses/search`), réduite aux champs exploités par
+/// [`interroger_montees_version`].
+#[derive(Debug, Deserialize)]
+struct AnalyseAvecEvenements {
+    date: String,
+    #[serde(default)]
+    events: Vec<EvenementAnalyse>,
+}
+
+/// Réponse du point d'API `project_analyses/search` de Sonar, réduite aux analyses avec leurs événements (à la
+/// différence de [`ReponseAnalyses`], qui ne porte que la `date`).
+#[derive(Debug, Deserialize)]
+struct ReponseAnalysesEvenements {
+    #[serde(default)]
+    analyses: Vec<AnalyseAvecEvenements>,
+}
+
+/// Interroge les montées de version du serveur Sonar déjà détectées pour un projet (US-062, RG-062, plan_17
+/// chapitre 5), via les événements [`CATEGORIE_EVENEMENT_MONTEE_VERSION`] de `project_analyses/search`, filtré
+/// côté serveur par `category` et revérifié côté client par défense en profondeur. Paginé (`ps`/`p`) jusqu'à
+/// épuisement ou [`MAX_PAGES_ANALYSES_HISTORIQUE`], sur le même patron que [`interroger_derniere_analyse`].
+///
+/// Résultat trié par date croissante puis dédoublonné sur `version` (première occurrence rencontrée conservée,
+/// donc la date la plus ancienne). Un projet sans aucun événement de cette catégorie — ou jamais analysé — renvoie
+/// `Ok(vec![])`, ce n'est jamais une anomalie.
+///
+/// Réserve documentée, non vérifiée contre une instance Sonar réelle au moment de ce développement (cf. test
+/// d'intégration `#[ignore]` `interroger_montees_version_contre_une_vraie_instance_sonar`,
+/// `connecteurs::tests_integration_reelle`, à exécuter avant toute release) : la valeur exacte du filtre de
+/// catégorie et la forme du champ `name` d'un événement `SQ_UPGRADE` (numéro de version serveur brut), déduites de
+/// la documentation de l'API Sonar. Une instance ne produisant pas cet événement (version de Sonar antérieure à
+/// son introduction, ou SonarCloud, sans notion de version serveur) renvoie simplement une liste vide, jamais une
+/// anomalie.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::AuthentificationRefusee`] (401), [`ErreurConnecteur::DroitsInsuffisants`] (403),
+/// [`ErreurConnecteur::ReponseInattendue`] pour tout autre statut (dont un projet introuvable, 404, fondu comme
+/// pour [`interroger_derniere_analyse`], le module Sonar n'ayant pas de variante `RefIntrouvable`) ;
+/// délai/injoignabilité selon [`erreur_depuis_reqwest`].
+pub(crate) async fn interroger_montees_version(
+    url_base: &str,
+    credential: &str,
+    id_externe: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<MonteeVersionSonar>, ErreurConnecteur> {
+    let mut montees: Vec<MonteeVersionSonar> = Vec::new();
+    for page in 1..=MAX_PAGES_ANALYSES_HISTORIQUE {
+        let url = format!(
+            "{}/api/project_analyses/search",
+            url_base.trim_end_matches('/')
+        );
+        let reponse = client
+            .get(url)
+            .bearer_auth(credential)
+            .query(&[
+                ("project", id_externe),
+                ("category", CATEGORIE_EVENEMENT_MONTEE_VERSION),
+                ("ps", TAILLE_PAGE_ANALYSES_HISTORIQUE),
+                ("p", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+
+        let statut = reponse.status();
+        if statut.as_u16() == 401 {
+            return Err(ErreurConnecteur::AuthentificationRefusee {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if statut.as_u16() == 403 {
+            return Err(ErreurConnecteur::DroitsInsuffisants {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+        if !statut.is_success() {
+            return Err(ErreurConnecteur::ReponseInattendue {
+                message: format!("Statut HTTP {} reçu", statut.as_u16()),
+            });
+        }
+
+        let page_reponse = reponse
+            .json::<ReponseAnalysesEvenements>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_reponse.analyses.is_empty() {
+            break;
+        }
+        for analyse in page_reponse.analyses {
+            for evenement in analyse.events {
+                if evenement.category == CATEGORIE_EVENEMENT_MONTEE_VERSION {
+                    montees.push(MonteeVersionSonar {
+                        version: evenement.name,
+                        date: analyse.date.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    montees.sort_by(|a, b| a.date.cmp(&b.date));
+    let mut versions_vues: HashSet<String> = HashSet::new();
+    montees.retain(|montee| versions_vues.insert(montee.version.clone()));
+    Ok(montees)
 }
 
 /// Nombre maximal de pages parcourues lors du listing des projets Sonar accessibles avec le credential courant
@@ -2322,6 +2457,268 @@ mod tests {
         assert!(matches!(
             resultat,
             Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_reussit_sur_plusieurs_pages_et_trie_par_date_croissante()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .and(query_param("category", "SQ_UPGRADE"))
+            .and(query_param("p", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "analyses": [
+                    {
+                        "date": "2026-03-01T10:00:00+0000",
+                        "events": [{ "category": "SQ_UPGRADE", "name": "10.4" }]
+                    },
+                    {
+                        "date": "2026-01-01T10:00:00+0000",
+                        "events": [{ "category": "SQ_UPGRADE", "name": "10.2" }]
+                    }
+                ]
+            })))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .and(query_param("category", "SQ_UPGRADE"))
+            .and(query_param("p", "2"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "analyses": [] })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton-valide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            vec![
+                MonteeVersionSonar {
+                    version: "10.2".to_string(),
+                    date: "2026-01-01T10:00:00+0000".to_string(),
+                },
+                MonteeVersionSonar {
+                    version: "10.4".to_string(),
+                    date: "2026-03-01T10:00:00+0000".to_string(),
+                },
+            ]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_ignore_les_evenements_dune_autre_categorie()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "analyses": [{
+                    "date": "2026-01-01T10:00:00+0000",
+                    "events": [
+                        { "category": "QUALITY_PROFILE", "name": "Sonar way" },
+                        { "category": "QUALITY_GATE", "name": "Passed" },
+                        { "category": "VERSION", "name": "1.2.3" }
+                    ]
+                }]
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton-valide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert!(resultat.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_dedoublonne_sur_la_version_en_conservant_la_date_la_plus_ancienne()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "analyses": [
+                    {
+                        "date": "2026-01-01T10:00:00+0000",
+                        "events": [{ "category": "SQ_UPGRADE", "name": "10.4" }]
+                    },
+                    {
+                        "date": "2026-02-01T10:00:00+0000",
+                        "events": [{ "category": "SQ_UPGRADE", "name": "10.4" }]
+                    }
+                ]
+            })))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton-valide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            resultat,
+            vec![MonteeVersionSonar {
+                version: "10.4".to_string(),
+                date: "2026-01-01T10:00:00+0000".to_string(),
+            }]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_retourne_une_liste_vide_sans_aucune_montee()
+    -> Result<(), ErreurConnecteur> {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({ "analyses": [] })),
+            )
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton-valide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert!(resultat.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_signale_authentification_refusee() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton-invalide",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::AuthentificationRefusee { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_signale_des_droits_insuffisants() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton-limite",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DroitsInsuffisants { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_signale_une_instance_injoignable() {
+        let resultat = interroger_montees_version(
+            "http://127.0.0.1:1",
+            "jeton",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::InstanceInjoignable { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_signale_un_delai_depasse() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(500)))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn interroger_montees_version_signale_une_reponse_inattendue_sur_un_statut_non_gere() {
+        // Couvre aussi un éventuel 404 « projet introuvable » (RG-021), le module Sonar n'ayant pas de variante
+        // `RefIntrouvable` dédiée, comme pour `interroger_derniere_analyse`.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/project_analyses/search"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&serveur)
+            .await;
+
+        let resultat = interroger_montees_version(
+            &serveur.uri(),
+            "jeton",
+            "proj-key",
+            &client_test_delai_court(),
+        )
+        .await;
+
+        assert!(matches!(
+            resultat,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
         ));
     }
 

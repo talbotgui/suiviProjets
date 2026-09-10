@@ -335,12 +335,36 @@ mod tests {
     fn definir_vue_par_defaut_consigne_le_retrait_du_statut_des_autres_vues_de_lecran()
     -> Result<(), ErreurVues> {
         let mut racine = DonneesRacine::nouvelle("Test", "2026-07-28T08:00:00Z");
-        definir(&mut racine, None, "Ancienne défaut", "obsolescence", 1, true, json!({}))?;
+        definir(
+            &mut racine,
+            None,
+            "Ancienne défaut",
+            "obsolescence",
+            1,
+            true,
+            json!({}),
+        )?;
         // Une vue d'un autre écran, également par défaut : elle ne doit pas être touchée ni journalisée.
-        definir(&mut racine, None, "Défaut listeTravail", "listeTravail", 1, true, json!({}))?;
+        definir(
+            &mut racine,
+            None,
+            "Défaut listeTravail",
+            "listeTravail",
+            1,
+            true,
+            json!({}),
+        )?;
         racine.journal.clear();
 
-        definir(&mut racine, None, "Nouvelle défaut", "obsolescence", 1, true, json!({}))?;
+        definir(
+            &mut racine,
+            None,
+            "Nouvelle défaut",
+            "obsolescence",
+            1,
+            true,
+            json!({}),
+        )?;
 
         // Deux entrées : la nouvelle vue par défaut, et le retrait du statut de « Ancienne défaut ».
         assert_eq!(racine.journal.len(), 2);

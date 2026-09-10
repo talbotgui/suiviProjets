@@ -179,6 +179,45 @@ describe('BouchonCommandesUtils', () => {
     expect(resultat).toBeNull();
   });
 
+  describe('interroger_montees_version_sonar (US-062, RG-062, plan_17 chapitre 5)', () => {
+    it('doit résoudre la montée bouchonnée pour un projet Sonar connu', async () => {
+      const resultat = await BouchonCommandesUtils.invoquer<
+        readonly { readonly version: string; readonly date: string }[]
+      >('interroger_montees_version_sonar', { idExterne: ID_EXTERNE_SONAR_CONNU });
+
+      expect(resultat).toEqual([{ version: '10.4', date: '2025-11-03' }]);
+    });
+
+    it("doit partager la même version entre deux projets d'une même instance Sonar, à des dates distinctes (dédoublonnage inter-projets)", async () => {
+      const monteesApiFacturation = await BouchonCommandesUtils.invoquer<
+        readonly { readonly version: string; readonly date: string }[]
+      >('interroger_montees_version_sonar', { idExterne: 'entreprise:api-facturation' });
+      const monteesBatchComptable = await BouchonCommandesUtils.invoquer<
+        readonly { readonly version: string; readonly date: string }[]
+      >('interroger_montees_version_sonar', { idExterne: 'entreprise:batch-comptable' });
+
+      expect(monteesApiFacturation[0]?.version).toBe('10.4');
+      expect(monteesBatchComptable[0]?.version).toBe('10.4');
+      expect(monteesApiFacturation[0]?.date).not.toBe(monteesBatchComptable[0]?.date);
+    });
+
+    it('doit résoudre une liste vide pour un projet Sonar sans montée détectée', async () => {
+      const resultat = await BouchonCommandesUtils.invoquer<
+        readonly { readonly version: string; readonly date: string }[]
+      >('interroger_montees_version_sonar', { idExterne: 'nova:front-portail' });
+
+      expect(resultat).toEqual([]);
+    });
+
+    it('doit résoudre une liste vide pour un projet Sonar inconnu', async () => {
+      const resultat = await BouchonCommandesUtils.invoquer<
+        readonly { readonly version: string; readonly date: string }[]
+      >('interroger_montees_version_sonar', { idExterne: 'sonar:inconnu' });
+
+      expect(resultat).toEqual([]);
+    });
+  });
+
   it('doit rejeter une commande non bouchonnée', async () => {
     await expect(BouchonCommandesUtils.invoquer('commande_inexistante', {})).rejects.toThrow(
       'commande_inexistante',

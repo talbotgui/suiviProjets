@@ -472,7 +472,12 @@ export interface MembreConnu {
  * sur les graphiques d'évolution (hors périmètre de restitution de l'Administration, Phase 6).
  */
 export interface Annotation {
-  /** Identifiant UUID v4 de l'annotation. */
+  /**
+   * Identifiant de l'annotation : UUID v4 pour une annotation manuelle, ou identifiant dérivé stable non-UUID pour
+   * une annotation système générée automatiquement à partir d'un fait externe idempotent (ex.
+   * `montee-version-sonar-<empreinte de version>`, US-062, RG-062, plan_17 chapitre 5). Traité comme une chaîne
+   * opaque, aucun code ne valide son format.
+   */
   readonly id: string;
   /** Date de l'événement. */
   readonly date: string;

@@ -42,7 +42,11 @@ import { FacadeFichierService } from '../../sansetat/commandes/facade-fichier.se
 import { FacadeParametrageService } from '../../sansetat/commandes/facade-parametrage.service';
 import { FacadeVuesService } from '../../sansetat/commandes/facade-vues.service';
 import { ErreurConnecteurUtils } from '../../sansetat/commandes/erreur-connecteur.utils';
-import type { CategorieErreurConnecteur, Instance } from '../../sansetat/commandes/types-facade';
+import type {
+  CategorieErreurConnecteur,
+  Instance,
+  MonteeVersionSonarProjet,
+} from '../../sansetat/commandes/types-facade';
 import { PriseEnChargeUtils } from '../../sansetat/jugement/prise-en-charge.utils';
 import { TriAlphabetiqueUtils } from '../../sansetat/jugement/tri-alphabetique.utils';
 import { EtatSessionService } from './etat-session.service';
@@ -1774,6 +1778,9 @@ export class DonneesApplicationService {
    * @param prisesEnCharge - Résultats de calcul de la date de prise en charge à appliquer aux projets
    * correspondants lors d'une future intégration du brouillon (US-058, RG-058, plan_18 incrément 6), par
    * identifiant de projet ; absent ou vide, comportement strictement inchangé.
+   * @param monteesVersionSonarParProjet - Montées de version du serveur Sonar détectées lors de cette campagne,
+   * par projet (US-062, RG-062, plan_17 chapitre 5) ; liste vide (aucune source Sonar dans le périmètre), cas
+   * neutre.
    * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
    * @returns Le Résultat typé de l'opération.
    * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
@@ -1785,6 +1792,7 @@ export class DonneesApplicationService {
     verdicts: readonly Verdict[],
     resultatsParProjet: readonly ResultatBrouillonProjet[],
     prisesEnCharge: Readonly<Record<string, PremierCommitInterne>> | undefined,
+    monteesVersionSonarParProjet: readonly MonteeVersionSonarProjet[],
     motDePasse: string,
   ): Promise<ResultatMutationAdministration> {
     const racine = this.racineActuelle();
@@ -1807,6 +1815,7 @@ export class DonneesApplicationService {
         ...(prisesEnCharge !== undefined && Object.keys(prisesEnCharge).length > 0
           ? { prisesEnCharge }
           : {}),
+        monteesVersionSonarParProjet,
         motDePasse,
       });
       this.racineInterne.set(nouvelleRacine);

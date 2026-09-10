@@ -333,10 +333,16 @@ export class SqmSyntheseGraphiqueComponent {
    * Lignes verticales étiquetées du graphique : changements de seuil pertinents pour l'indicateur sélectionné
    * (RG-023, journal complet, non limité aux projets retenus — un seuil est un réglage global), annotations des
    * projets actuellement retenus (US-019, Phase 8, créées ailleurs — `SqmFicheProjetComponent` — et seulement lues
-   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran), et le repère du premier audit
+   * et affichées ici, en lecture seule, jamais créées ni modifiées par cet écran), le repère du premier audit
    * régulier tous projets confondus (C15-14, US-046, RG-046, cf. {@link datePremierAuditRegulier}) : à gauche de ce
    * repère, tout point de toute série provient d'un audit historique, les valeurs des audits historiques et
-   * régulières étant désormais fondues dans une même courbe continue (cf. {@link construireSerie}).
+   * régulières étant désormais fondues dans une même courbe continue (cf. {@link construireSerie}) — et les
+   * montées de version du serveur Sonar (US-062, RG-062, plan_17 chapitre 5), également des annotations système des
+   * projets retenus, mais dédoublonnées séparément par libellé de version plutôt que par identifiant d'annotation :
+   * une même montée détectée sur plusieurs projets d'une même instance Sonar ne produit ainsi qu'un seul repère, à
+   * la date la plus ancienne parmi les projets concernés (leur `id` dérivé étant de toute façon identique d'un
+   * projet à l'autre pour une même version, cf. `persistance::alertes::empreinte_version`, le libellé reste le
+   * critère de dédoublonnage documenté par le plan).
    */
   public readonly lignesVerticales: Signal<readonly LigneVerticaleGraphique[]> = computed(() => {
     const racine = this.donneesApplication.racine();
@@ -356,8 +362,21 @@ export class SqmSyntheseGraphiqueComponent {
     }));
 
     const annotationsParId = new Map<string, LigneVerticaleGraphique>();
+    const monteesVersionSonarParLibelle = new Map<string, LigneVerticaleGraphique>();
     for (const projet of this.projetsRetenus()) {
       for (const annotation of projet.annotations) {
+        if (annotation.categorie === 'monteeVersionSonar') {
+          const existante = monteesVersionSonarParLibelle.get(annotation.libelle);
+          if (existante === undefined || annotation.date < existante.date) {
+            monteesVersionSonarParLibelle.set(annotation.libelle, {
+              id: annotation.id,
+              date: annotation.date,
+              libelle: annotation.libelle,
+              categorie: 'monteeVersionSonar',
+            });
+          }
+          continue;
+        }
         annotationsParId.set(annotation.id, {
           id: annotation.id,
           date: annotation.date,
@@ -380,7 +399,12 @@ export class SqmSyntheseGraphiqueComponent {
             },
           ];
 
-    return [...lignesSeuil, ...annotationsParId.values(), ...lignePremierAuditRegulier];
+    return [
+      ...lignesSeuil,
+      ...annotationsParId.values(),
+      ...lignePremierAuditRegulier,
+      ...monteesVersionSonarParLibelle.values(),
+    ];
   });
 
   /**

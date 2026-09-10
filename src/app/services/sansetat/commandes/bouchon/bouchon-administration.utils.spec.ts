@@ -518,6 +518,101 @@ describe('BouchonAdministrationUtils', () => {
     });
   });
 
+  describe('enregistrer_brouillon — montées de version Sonar (US-062, RG-062, plan_17 chapitre 5)', () => {
+    it('doit matérialiser une annotation système pour chaque montée de version reçue', async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'enregistrer_brouillon',
+        {
+          donnees: RACINE_VIDE,
+          campagneId: 'campagne-1',
+          date: '2026-07-28',
+          perimetre: ['projet-1'],
+          verdicts: [{ projetId: 'projet-1', statut: 'succes' }],
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'brouillon' },
+          ],
+          monteesVersionSonarParProjet: [
+            { projetId: 'projet-1', montees: [{ version: '10.4', date: '2026-01-01' }] },
+          ],
+        },
+      );
+
+      expect(donnees.groupes[0]?.projets[0]?.['annotations']).toEqual([
+        {
+          id: 'montee-version-sonar-10-4',
+          date: '2026-01-01',
+          libelle: 'Sonar 10.4',
+          categorie: 'monteeVersionSonar',
+          systeme: true,
+        },
+      ]);
+    });
+
+    it('ne doit pas recréer une annotation déjà présente pour la même version (idempotence)', async () => {
+      const racineAvecAnnotation = {
+        ...RACINE_VIDE,
+        groupes: [
+          {
+            ...GROUPE_VIDE,
+            projets: [
+              {
+                id: 'projet-1',
+                iaAutorisee: false,
+                audits: [],
+                annotations: [
+                  {
+                    id: 'montee-version-sonar-10-4',
+                    date: '2026-01-01',
+                    libelle: 'Sonar 10.4',
+                    categorie: 'monteeVersionSonar',
+                    systeme: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'enregistrer_brouillon',
+        {
+          donnees: racineAvecAnnotation,
+          campagneId: 'campagne-1',
+          date: '2026-07-28',
+          perimetre: ['projet-1'],
+          verdicts: [{ projetId: 'projet-1', statut: 'succes' }],
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'brouillon' },
+          ],
+          monteesVersionSonarParProjet: [
+            { projetId: 'projet-1', montees: [{ version: '10.4', date: '2026-01-01' }] },
+          ],
+        },
+      );
+
+      expect(donnees.groupes[0]?.projets[0]?.['annotations']).toHaveLength(1);
+    });
+
+    it('ne doit rien modifier quand monteesVersionSonarParProjet est absent ou vide', async () => {
+      const donnees = await BouchonAdministrationUtils.invoquer<DonneesTest>(
+        'enregistrer_brouillon',
+        {
+          donnees: RACINE_VIDE,
+          campagneId: 'campagne-1',
+          date: '2026-07-28',
+          perimetre: ['projet-1'],
+          verdicts: [{ projetId: 'projet-1', statut: 'succes' }],
+          resultatsParProjet: [
+            { projetId: 'projet-1', audit: { id: 'audit-1' }, statut: 'brouillon' },
+          ],
+        },
+      );
+
+      expect(donnees.groupes[0]?.projets[0]?.['annotations']).toEqual([]);
+    });
+  });
+
   describe('integrer_brouillon / rejeter_brouillon', () => {
     const racineAvecBrouillon = {
       ...RACINE_VIDE,
