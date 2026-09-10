@@ -21,7 +21,7 @@ use crate::modele::racine::Instance;
 ///
 /// [`ErreurConnecteur::CredentialAbsent`] si aucun credential n'a été saisi pour cette instance dans la session
 /// courante.
-pub(crate) fn credential_instance(
+pub(super) fn credential_instance(
     instance: &Instance,
     etat: &EtatSession,
 ) -> Result<String, ErreurConnecteur> {

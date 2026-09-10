@@ -1947,6 +1947,32 @@ async fn recuperer_usernames_membres_groupe(
 /// l'indicateur « dernière poussée » et la cadence récente restent exacts.
 const MAX_PAGES_EVENEMENTS_POUSSEE: u32 = 10;
 
+/// États de membre GitLab explicitement non actifs, exclus du roster de l'écran « Commits des membres » (US-060 /
+/// RG-060). Repli défensif : un membre dont le `state` est absent ou d'une valeur inconnue est **conservé** plutôt
+/// que d'exposer un roster vide (lu comme une inactivité universelle) si l'API cessait un jour de renvoyer ce
+/// champ.
+const ETATS_MEMBRE_NON_ACTIFS: &[&str] = &[
+    "blocked",
+    "blocked_pending_approval",
+    "banned",
+    "deactivated",
+    "ldap_blocked",
+    "awaiting",
+];
+
+/// Contrôle de forme d'une référence de groupe GitLab (saisie libre obligatoire de l'écran « Commits des membres »,
+/// US-060) avant tout appel réseau : non vide, sans `..`, et composée uniquement de lettres, chiffres, `_`, `-`,
+/// `.` et `/` — ce qui rejette une espace, un caractère de contrôle, un `%` (double-décodage) ou une tentative de
+/// remontée de chemin. Revalidation côté cœur natif d'une saisie déjà contrainte côté interface
+/// (`docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`).
+fn reference_groupe_valide(reference: &str) -> bool {
+    !reference.is_empty()
+        && !reference.contains("..")
+        && reference
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/'))
+}
+
 /// Membre `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`), pour le roster de l'écran
 /// « Commits des membres » (US-060 / RG-060). Miroir strict, en `camelCase`, de la structure TypeScript.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -2071,23 +2097,30 @@ fn statut_reponse_ok(reponse: &reqwest::Response) -> Result<(), ErreurConnecteur
     }
 }
 
-/// Liste les membres `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`, paginé jusqu'à épuisement ou
+/// Liste les membres actifs d'un groupe GitLab (`GET /groups/{ref}/members/all`, paginé jusqu'à épuisement ou
 /// [`MAX_PAGES_CONTRIBUTEURS`]), pour le roster de l'écran « Commits des membres » (US-060 / RG-060), sur le modèle
-/// de [`recuperer_usernames_membres_groupe`]. `groupe_ref` (chemin ou identifiant numérique) est percent-encodé
-/// comme un unique segment de chemin. `courriel` n'est renseigné que lorsque l'API le retourne (jeton
-/// d'administration) ; à défaut, seules les règles de membre connu de type `username` pourront être résolues côté
-/// interface.
+/// de [`recuperer_usernames_membres_groupe`]. `groupe_ref` (chemin ou identifiant numérique) est contrôlé en forme
+/// (cf. [`reference_groupe_valide`]) puis percent-encodé comme un unique segment de chemin. Les membres au `state`
+/// explicitement non actif ([`ETATS_MEMBRE_NON_ACTIFS`]) sont écartés ; un `state` absent ou inconnu est conservé.
+/// `courriel` n'est renseigné que lorsque l'API le retourne (jeton d'administration) ; à défaut, seules les règles
+/// de membre connu de type `username` pourront être résolues côté interface.
 ///
 /// # Erreurs
 ///
-/// [`ErreurConnecteur`] typée selon RG-021 (cf. [`statut_reponse_ok`]) ; erreur réseau mappée par
-/// [`erreur_depuis_reqwest`] ; corps non désérialisable → [`ErreurConnecteur::ReponseInattendue`].
+/// [`ErreurConnecteur::RefIntrouvable`] si `groupe_ref` n'a pas une forme valide ; [`ErreurConnecteur`] typée selon
+/// RG-021 (cf. [`statut_reponse_ok`]) ; erreur réseau mappée par [`erreur_depuis_reqwest`] ; corps non
+/// désérialisable → [`ErreurConnecteur::ReponseInattendue`].
 pub(crate) async fn lister_membres_groupe(
     url_base: &str,
     credential: &str,
     groupe_ref: &str,
     client: &reqwest::Client,
 ) -> Result<Vec<MembreGroupeGitlab>, ErreurConnecteur> {
+    if !reference_groupe_valide(groupe_ref) {
+        return Err(ErreurConnecteur::RefIntrouvable {
+            message: "Référence de groupe GitLab de forme invalide".to_string(),
+        });
+    }
     let url = url_api(url_base, &["groups", groupe_ref, "members", "all"])?;
     let mut membres = Vec::new();
     for page in 1..=MAX_PAGES_CONTRIBUTEURS {
@@ -2114,7 +2147,7 @@ pub(crate) async fn lister_membres_groupe(
         membres.extend(
             page_membres
                 .into_iter()
-                .filter(|membre| membre.state == "active")
+                .filter(|membre| !ETATS_MEMBRE_NON_ACTIFS.contains(&membre.state.as_str()))
                 .map(|membre| MembreGroupeGitlab {
                     id: membre.id,
                     username: membre.username,
@@ -2140,6 +2173,11 @@ pub(crate) async fn lister_projets_groupe(
     groupe_ref: &str,
     client: &reqwest::Client,
 ) -> Result<Vec<ProjetGroupeGitlab>, ErreurConnecteur> {
+    if !reference_groupe_valide(groupe_ref) {
+        return Err(ErreurConnecteur::RefIntrouvable {
+            message: "Référence de groupe GitLab de forme invalide".to_string(),
+        });
+    }
     let url = url_api(url_base, &["groups", groupe_ref, "projects"])?;
     let mut projets = Vec::new();
     for page in 1..=MAX_PAGES_PROJETS {
@@ -7376,7 +7414,7 @@ mod tests {
     // `lister_evenements_poussees`. Client HTTP simulé, jamais d'appel réseau réel (cf. `16_normesTests.md`).
 
     #[tokio::test]
-    async fn lister_membres_groupe_agrege_les_pages_et_ne_retient_que_les_membres_actifs()
+    async fn lister_membres_groupe_agrege_les_pages_et_ecarte_les_etats_non_actifs()
     -> Result<(), ErreurConnecteur> {
         use wiremock::matchers::query_param;
         let serveur = MockServer::start().await;
@@ -7386,7 +7424,8 @@ mod tests {
             .and(query_param("page", "1"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
                 { "id": 1, "username": "alice", "name": "Alice", "access_level": 40, "state": "active", "email": "alice@example.com" },
-                { "id": 2, "username": "ex-bob", "name": "Bob", "access_level": 30, "state": "blocked", "email": "bob@example.com" }
+                { "id": 2, "username": "ex-bob", "name": "Bob", "access_level": 30, "state": "blocked", "email": "bob@example.com" },
+                { "id": 4, "username": "diane", "name": "Diane", "access_level": 40, "state": "awaiting" }
             ])))
             .mount(&serveur)
             .await;
@@ -7394,7 +7433,8 @@ mod tests {
             .and(path("/api/v4/groups/equipe-plateforme/members/all"))
             .and(query_param("page", "2"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                { "id": 3, "username": "carole", "name": "Carole", "access_level": 40, "state": "active" }
+                // Repli défensif : `state` absent → membre conservé (l'API le renvoie toujours en pratique).
+                { "id": 3, "username": "carole", "name": "Carole", "access_level": 40 }
             ])))
             .mount(&serveur)
             .await;
@@ -7431,6 +7471,46 @@ mod tests {
             ]
         );
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn roster_commits_membres_rejette_une_reference_de_groupe_malformee_sans_appel_reseau() {
+        // Aucun serveur monté : si un appel réseau partait, il échouerait en `InstanceInjoignable`, pas en
+        // `RefIntrouvable` — le test prouve donc que la validation de forme court-circuite avant tout appel.
+        for reference in [
+            "",
+            "equipe/../secret",
+            "equipe%2Fx",
+            "equipe ",
+            "equipe\ntech",
+        ] {
+            assert!(
+                matches!(
+                    lister_membres_groupe(
+                        "http://127.0.0.1:1",
+                        "j",
+                        reference,
+                        &client_test_delai_court()
+                    )
+                    .await,
+                    Err(ErreurConnecteur::RefIntrouvable { .. })
+                ),
+                "membres, référence {reference:?}"
+            );
+            assert!(
+                matches!(
+                    lister_projets_groupe(
+                        "http://127.0.0.1:1",
+                        "j",
+                        reference,
+                        &client_test_delai_court()
+                    )
+                    .await,
+                    Err(ErreurConnecteur::RefIntrouvable { .. })
+                ),
+                "projets, référence {reference:?}"
+            );
+        }
     }
 
     #[tokio::test]

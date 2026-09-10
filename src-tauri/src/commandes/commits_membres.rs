@@ -26,7 +26,7 @@ use tauri::State;
 
 /// Résultat de la passe de préparation d'une analyse « Commits des membres » : le roster du groupe GitLab et ses
 /// dépôts (pour afficher un nom de dépôt lisible). Structure de transfert calculée, jamais persistée.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PreparationAnalyseCommitsMembres {
     /// Membres `active` du groupe GitLab désigné.
