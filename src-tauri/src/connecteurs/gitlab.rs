@@ -37,7 +37,7 @@ use crate::modele::racine::{
     ResultatGitlabTailleDepot, ResultatGitlabVitalite,
 };
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Portée minimale en lecture seule recommandée par l'assistant de création de token
@@ -1655,11 +1655,22 @@ pub(crate) async fn interroger_merge_requests(
 }
 
 /// Réponse d'un membre de l'API GitLab (`/members` ou `/members/all`), réduite aux champs exploités ici.
+///
+/// Les champs `id`, `state` et `email` portent `#[serde(default)]` : ils ne sont exploités que par
+/// [`lister_membres_groupe`] (US-060) et absents des réponses simulées des tests plus anciens de
+/// [`interroger_membres`] / [`recuperer_usernames_membres_groupe`], qui ne s'appuient que sur les trois premiers.
+/// `email` n'est renseigné par `GET /groups/{ref}/members/all` que pour un jeton d'administration.
 #[derive(Debug, Deserialize)]
 struct ReponseMembre {
     username: String,
     name: String,
     access_level: u32,
+    #[serde(default)]
+    id: u64,
+    #[serde(default)]
+    state: String,
+    #[serde(default)]
+    email: Option<String>,
 }
 
 /// Interroge les membres d'un dépôt GitLab (US-009, `gitlab.membres`) : un premier appel liste les membres
@@ -1927,6 +1938,296 @@ async fn recuperer_usernames_membres_groupe(
         usernames.extend(page_membres.into_iter().map(|membre| membre.username));
     }
     Ok(usernames)
+}
+
+/// Nombre maximal de pages parcourues lors de la récupération des événements de poussée d'un membre
+/// (`lister_evenements_poussees`, US-060 / RG-060) : borne de sécurité arbitraire (cf. rapport de développement de
+/// cette évolution), sur le même principe que [`MAX_PAGES_CONTRIBUTEURS`]. Combinée à `sort=desc`, elle garantit
+/// qu'un membre très actif voit ses poussées **les plus anciennes** tronquées, jamais les plus récentes —
+/// l'indicateur « dernière poussée » et la cadence récente restent exacts.
+const MAX_PAGES_EVENEMENTS_POUSSEE: u32 = 10;
+
+/// Membre `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`), pour le roster de l'écran
+/// « Commits des membres » (US-060 / RG-060). Miroir strict, en `camelCase`, de la structure TypeScript.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MembreGroupeGitlab {
+    /// Identifiant numérique GitLab de l'utilisateur.
+    pub(crate) id: u64,
+    /// Nom d'utilisateur (`username`).
+    pub(crate) username: String,
+    /// Nom affiché.
+    pub(crate) nom: String,
+    /// Adresse électronique, renseignée uniquement quand l'API la retourne (jeton d'administration).
+    pub(crate) courriel: Option<String>,
+}
+
+/// Dépôt d'un groupe GitLab (`GET /groups/{ref}/projects`), pour afficher un nom de dépôt lisible dans le tableau
+/// « Commits des membres » (US-060 / RG-060).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjetGroupeGitlab {
+    /// Identifiant numérique GitLab du projet.
+    pub(crate) id: u64,
+    /// Chemin complet (`path_with_namespace`).
+    pub(crate) chemin: String,
+}
+
+/// Événement de poussée d'un utilisateur GitLab (`GET /users/{id}/events?action=pushed`), pour le calcul de
+/// régularité de l'écran « Commits des membres » (US-060 / RG-060). L'horodatage retenu est l'heure de poussée
+/// (`created_at`), non l'`authored_date` d'un commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EvenementPoussee {
+    /// Horodatage de la poussée (`created_at` de l'événement).
+    pub(crate) horodatage: String,
+    /// Identifiant numérique du dépôt poussé (`project_id`).
+    pub(crate) projet_id: u64,
+    /// Référence poussée (`push_data.ref`), branche ou tag.
+    pub(crate) ref_poussee: String,
+    /// Nombre de commits transportés par la poussée (`push_data.commit_count`).
+    pub(crate) nombre_commits: u32,
+}
+
+/// Réponse d'un dépôt de `GET /groups/{ref}/projects`, réduite aux champs exploités par [`lister_projets_groupe`].
+#[derive(Debug, Deserialize)]
+struct ReponseProjetGroupe {
+    id: u64,
+    path_with_namespace: String,
+}
+
+/// Bloc `push_data` d'un événement `GET /users/{id}/events`, réduit aux champs exploités par
+/// [`lister_evenements_poussees`].
+#[derive(Debug, Deserialize)]
+struct ReponsePushData {
+    #[serde(default)]
+    action: String,
+    #[serde(rename = "ref", default)]
+    ref_poussee: Option<String>,
+    #[serde(default)]
+    commit_count: u32,
+}
+
+/// Réponse d'un événement de `GET /users/{id}/events`, réduite aux champs exploités par
+/// [`lister_evenements_poussees`]. Un événement sans `push_data` (autre `action` que `pushed`, malgré le filtre
+/// `action=pushed`) est ignoré.
+#[derive(Debug, Deserialize)]
+struct ReponseEvenement {
+    created_at: String,
+    #[serde(default)]
+    project_id: u64,
+    #[serde(default)]
+    push_data: Option<ReponsePushData>,
+}
+
+/// Construit une URL d'API GitLab (`{base}/api/v4/{segment}/…`) en poussant chaque segment via le crate `url`, ce
+/// qui percent-encode un `/` interne — une référence de groupe imbriqué `parent/enfant` devient `parent%2Fenfant`
+/// et reste un unique segment de chemin, sur le même principe que [`url_commit_ref`].
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur::ReponseInattendue`] si `url_base` n'est pas une URL absolue segmentable.
+fn url_api(url_base: &str, segments: &[&str]) -> Result<url::Url, ErreurConnecteur> {
+    let mut url = url::Url::parse(&format!("{}/api/v4", url_base.trim_end_matches('/'))).map_err(
+        |erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        },
+    )?;
+    {
+        let mut chemin =
+            url.path_segments_mut()
+                .map_err(|_| ErreurConnecteur::ReponseInattendue {
+                    message: "URL de base non segmentable (schéma opaque)".to_string(),
+                })?;
+        for segment in segments {
+            chemin.push(segment);
+        }
+    }
+    Ok(url)
+}
+
+/// Traduit le statut HTTP d'une réponse GitLab en [`ErreurConnecteur`] typée selon RG-021 : 401 → authentification
+/// refusée, 403 → droits insuffisants, tout autre statut non 2xx → réponse inattendue ; `Ok(())` pour un 2xx.
+/// Factorisé pour les trois fonctions du roster « Commits des membres » (US-060) ; les fonctions plus anciennes de
+/// ce module inlinent ce même contrôle.
+fn statut_reponse_ok(reponse: &reqwest::Response) -> Result<(), ErreurConnecteur> {
+    let statut = reponse.status();
+    match statut.as_u16() {
+        401 => Err(ErreurConnecteur::AuthentificationRefusee {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        }),
+        403 => Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        }),
+        _ if !statut.is_success() => Err(ErreurConnecteur::ReponseInattendue {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        }),
+        _ => Ok(()),
+    }
+}
+
+/// Liste les membres `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`, paginé jusqu'à épuisement ou
+/// [`MAX_PAGES_CONTRIBUTEURS`]), pour le roster de l'écran « Commits des membres » (US-060 / RG-060), sur le modèle
+/// de [`recuperer_usernames_membres_groupe`]. `groupe_ref` (chemin ou identifiant numérique) est percent-encodé
+/// comme un unique segment de chemin. `courriel` n'est renseigné que lorsque l'API le retourne (jeton
+/// d'administration) ; à défaut, seules les règles de membre connu de type `username` pourront être résolues côté
+/// interface.
+///
+/// # Erreurs
+///
+/// [`ErreurConnecteur`] typée selon RG-021 (cf. [`statut_reponse_ok`]) ; erreur réseau mappée par
+/// [`erreur_depuis_reqwest`] ; corps non désérialisable → [`ErreurConnecteur::ReponseInattendue`].
+pub(crate) async fn lister_membres_groupe(
+    url_base: &str,
+    credential: &str,
+    groupe_ref: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<MembreGroupeGitlab>, ErreurConnecteur> {
+    let url = url_api(url_base, &["groups", groupe_ref, "members", "all"])?;
+    let mut membres = Vec::new();
+    for page in 1..=MAX_PAGES_CONTRIBUTEURS {
+        let reponse = client
+            .get(url.clone())
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        statut_reponse_ok(&reponse)?;
+        let page_membres = reponse
+            .json::<Vec<ReponseMembre>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_membres.is_empty() {
+            break;
+        }
+        membres.extend(
+            page_membres
+                .into_iter()
+                .filter(|membre| membre.state == "active")
+                .map(|membre| MembreGroupeGitlab {
+                    id: membre.id,
+                    username: membre.username,
+                    nom: membre.name,
+                    courriel: membre.email,
+                }),
+        );
+    }
+    Ok(membres)
+}
+
+/// Liste les dépôts d'un groupe GitLab, sous-groupes compris (`GET /groups/{ref}/projects?simple=true&include_subgroups=true`,
+/// paginé jusqu'à épuisement ou [`MAX_PAGES_PROJETS`]), pour afficher un nom de dépôt lisible dans le tableau
+/// « Commits des membres » (US-060 / RG-060). Un identifiant de dépôt hors du périmètre du groupe (poussée sur un
+/// projet externe) reste affiché tel quel côté interface.
+///
+/// # Erreurs
+///
+/// Voir [`lister_membres_groupe`].
+pub(crate) async fn lister_projets_groupe(
+    url_base: &str,
+    credential: &str,
+    groupe_ref: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<ProjetGroupeGitlab>, ErreurConnecteur> {
+    let url = url_api(url_base, &["groups", groupe_ref, "projects"])?;
+    let mut projets = Vec::new();
+    for page in 1..=MAX_PAGES_PROJETS {
+        let reponse = client
+            .get(url.clone())
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("simple", "true"),
+                ("include_subgroups", "true"),
+                ("per_page", TAILLE_PAGE_PROJETS),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        statut_reponse_ok(&reponse)?;
+        let page_projets = reponse
+            .json::<Vec<ReponseProjetGroupe>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_projets.is_empty() {
+            break;
+        }
+        projets.extend(page_projets.into_iter().map(|projet| ProjetGroupeGitlab {
+            id: projet.id,
+            chemin: projet.path_with_namespace,
+        }));
+    }
+    Ok(projets)
+}
+
+/// Liste les événements de poussée d'un utilisateur GitLab
+/// (`GET /users/{id}/events?action=pushed&after={date}&sort=desc`, paginé du plus récent au plus ancien jusqu'à
+/// épuisement ou [`MAX_PAGES_EVENEMENTS_POUSSEE`]), pour le calcul de régularité de l'écran « Commits des membres »
+/// (US-060 / RG-060). `apres_date` est au format `AAAA-MM-JJ` (le paramètre `after` de GitLab est exclusif et à
+/// granularité de jour ; le filtrage fin sur l'instant exact de début de fenêtre est fait côté interface). Les
+/// événements de suppression de branche (`push_data.action == "removed"`) et ceux sans commit
+/// (`push_data.commit_count == 0`) sont ignorés.
+///
+/// # Erreurs
+///
+/// Voir [`lister_membres_groupe`].
+pub(crate) async fn lister_evenements_poussees(
+    url_base: &str,
+    credential: &str,
+    utilisateur_id: u64,
+    apres_date: &str,
+    client: &reqwest::Client,
+) -> Result<Vec<EvenementPoussee>, ErreurConnecteur> {
+    let url = url_api(url_base, &["users", &utilisateur_id.to_string(), "events"])?;
+    let mut evenements = Vec::new();
+    for page in 1..=MAX_PAGES_EVENEMENTS_POUSSEE {
+        let reponse = client
+            .get(url.clone())
+            .header("PRIVATE-TOKEN", credential)
+            .query(&[
+                ("action", "pushed"),
+                ("after", apres_date),
+                ("sort", "desc"),
+                ("per_page", TAILLE_PAGE_AUDIT),
+                ("page", page.to_string().as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+        statut_reponse_ok(&reponse)?;
+        let page_evenements = reponse
+            .json::<Vec<ReponseEvenement>>()
+            .await
+            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+                message: erreur.to_string(),
+            })?;
+        if page_evenements.is_empty() {
+            break;
+        }
+        for evenement in page_evenements {
+            let Some(push_data) = evenement.push_data else {
+                continue;
+            };
+            if push_data.action == "removed" || push_data.commit_count == 0 {
+                continue;
+            }
+            evenements.push(EvenementPoussee {
+                horodatage: evenement.created_at,
+                projet_id: evenement.project_id,
+                ref_poussee: push_data.ref_poussee.unwrap_or_default(),
+                nombre_commits: push_data.commit_count,
+            });
+        }
+    }
+    Ok(evenements)
 }
 
 /// Nombre maximal de pages parcourues lors de la liste complète des branches ou des demandes de fusion ouvertes
@@ -7064,5 +7365,319 @@ mod tests {
     #[test]
     fn parser_build_gradle_sans_declaration_reconnue_retourne_une_liste_vide() {
         assert!(parser_build_gradle("// rien à voir ici\n", "build.gradle").is_empty());
+    }
+
+    // --- Roster « Commits des membres » (US-060 / RG-060) : `lister_membres_groupe`, `lister_projets_groupe`,
+    // `lister_evenements_poussees`. Client HTTP simulé, jamais d'appel réseau réel (cf. `16_normesTests.md`).
+
+    #[tokio::test]
+    async fn lister_membres_groupe_agrege_les_pages_et_ne_retient_que_les_membres_actifs()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/equipe-plateforme/members/all"))
+            .and(header("PRIVATE-TOKEN", "jeton-admin"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 1, "username": "alice", "name": "Alice", "access_level": 40, "state": "active", "email": "alice@example.com" },
+                { "id": 2, "username": "ex-bob", "name": "Bob", "access_level": 30, "state": "blocked", "email": "bob@example.com" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/equipe-plateforme/members/all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 3, "username": "carole", "name": "Carole", "access_level": 40, "state": "active" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/equipe-plateforme/members/all"))
+            .and(query_param("page", "3"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let membres = lister_membres_groupe(
+            &serveur.uri(),
+            "jeton-admin",
+            "equipe-plateforme",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            membres,
+            vec![
+                MembreGroupeGitlab {
+                    id: 1,
+                    username: "alice".to_string(),
+                    nom: "Alice".to_string(),
+                    courriel: Some("alice@example.com".to_string()),
+                },
+                MembreGroupeGitlab {
+                    id: 3,
+                    username: "carole".to_string(),
+                    nom: "Carole".to_string(),
+                    courriel: None,
+                },
+            ]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_membres_groupe_percent_encode_une_reference_de_groupe_imbrique()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+        let serveur = MockServer::start().await;
+        // Le `/` de `dir-tech/plateforme` doit rester un unique segment (`%2F`), sans introduire de sous-chemin :
+        // seul un mock monté sur le chemin percent-encodé répond, tout autre chemin renvoyant 404 par défaut.
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/dir-tech%2Fplateforme/members/all"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 1, "username": "alice", "name": "Alice", "access_level": 40, "state": "active" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/dir-tech%2Fplateforme/members/all"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let membres = lister_membres_groupe(
+            &serveur.uri(),
+            "jeton",
+            "dir-tech/plateforme",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(membres.len(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_projets_groupe_agrege_les_pages() -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/equipe/projects"))
+            .and(query_param("include_subgroups", "true"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": 10, "path_with_namespace": "equipe/api" }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/groups/equipe/projects"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let projets = lister_projets_groupe(
+            &serveur.uri(),
+            "jeton",
+            "equipe",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            projets,
+            vec![ProjetGroupeGitlab {
+                id: 10,
+                chemin: "equipe/api".to_string(),
+            }]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_evenements_poussees_pagine_exclut_les_suppressions_de_branche_et_les_poussees_vides()
+    -> Result<(), ErreurConnecteur> {
+        use wiremock::matchers::query_param;
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/users/42/events"))
+            .and(query_param("action", "pushed"))
+            .and(query_param("sort", "desc"))
+            .and(query_param("after", "2026-01-31"))
+            .and(query_param("page", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "created_at": "2026-02-10T09:00:00.000Z", "project_id": 10, "push_data": { "action": "pushed", "ref": "main", "commit_count": 3 } },
+                { "created_at": "2026-02-09T18:00:00.000Z", "project_id": 10, "push_data": { "action": "removed", "ref": "vieille-branche", "commit_count": 0 } },
+                { "created_at": "2026-02-08T08:00:00.000Z", "project_id": 11, "push_data": { "action": "pushed", "ref": "feature/x", "commit_count": 0 } },
+                { "created_at": "2026-02-07T08:00:00.000Z", "project_id": 11 }
+            ])))
+            .mount(&serveur)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/users/42/events"))
+            .and(query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&serveur)
+            .await;
+
+        let evenements = lister_evenements_poussees(
+            &serveur.uri(),
+            "jeton",
+            42,
+            "2026-01-31",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(
+            evenements,
+            vec![EvenementPoussee {
+                horodatage: "2026-02-10T09:00:00.000Z".to_string(),
+                projet_id: 10,
+                ref_poussee: "main".to_string(),
+                nombre_commits: 3,
+            }]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lister_evenements_poussees_s_arrete_a_la_borne_de_pages()
+    -> Result<(), ErreurConnecteur> {
+        // Chaque page est pleine (aucune page vide) : seule `MAX_PAGES_EVENEMENTS_POUSSEE` arrête le parcours.
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v4/users/7/events"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "created_at": "2026-02-10T09:00:00.000Z", "project_id": 1, "push_data": { "action": "pushed", "ref": "main", "commit_count": 1 } }
+            ])))
+            .mount(&serveur)
+            .await;
+
+        let evenements = lister_evenements_poussees(
+            &serveur.uri(),
+            "jeton",
+            7,
+            "2026-01-01",
+            &client_test_delai_court(),
+        )
+        .await?;
+
+        assert_eq!(evenements.len(), MAX_PAGES_EVENEMENTS_POUSSEE as usize);
+        Ok(())
+    }
+
+    /// `true` si `resultat` est l'anomalie [`ErreurConnecteur`] attendue pour le statut HTTP simulé : 401 →
+    /// authentification refusée, 403 → droits insuffisants, tout autre statut non 2xx → réponse inattendue.
+    fn anomalie_rg021_attendue<T>(resultat: &Result<T, ErreurConnecteur>, statut: u16) -> bool {
+        match statut {
+            401 => matches!(
+                resultat,
+                Err(ErreurConnecteur::AuthentificationRefusee { .. })
+            ),
+            403 => matches!(resultat, Err(ErreurConnecteur::DroitsInsuffisants { .. })),
+            _ => matches!(resultat, Err(ErreurConnecteur::ReponseInattendue { .. })),
+        }
+    }
+
+    #[tokio::test]
+    async fn roster_commits_membres_classe_chaque_categorie_danomalie_rg021() {
+        for statut in [401_u16, 403, 500, 404] {
+            let serveur = MockServer::start().await;
+            Mock::given(method("GET"))
+                .respond_with(ResponseTemplate::new(statut))
+                .mount(&serveur)
+                .await;
+            assert!(
+                anomalie_rg021_attendue(
+                    &lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court())
+                        .await,
+                    statut
+                ),
+                "membres, statut {statut}"
+            );
+            assert!(
+                anomalie_rg021_attendue(
+                    &lister_projets_groupe(&serveur.uri(), "j", "g", &client_test_delai_court())
+                        .await,
+                    statut
+                ),
+                "projets, statut {statut}"
+            );
+            assert!(
+                anomalie_rg021_attendue(
+                    &lister_evenements_poussees(
+                        &serveur.uri(),
+                        "j",
+                        1,
+                        "2026-01-01",
+                        &client_test_delai_court()
+                    )
+                    .await,
+                    statut
+                ),
+                "événements, statut {statut}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn roster_commits_membres_classe_un_corps_non_desserialisable_en_reponse_inattendue() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("pas du JSON"))
+            .mount(&serveur)
+            .await;
+
+        assert!(matches!(
+            lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+        assert!(matches!(
+            lister_projets_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+        assert!(matches!(
+            lister_evenements_poussees(
+                &serveur.uri(),
+                "j",
+                1,
+                "2026-01-01",
+                &client_test_delai_court()
+            )
+            .await,
+            Err(ErreurConnecteur::ReponseInattendue { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn roster_commits_membres_classe_un_delai_depasse_et_une_instance_injoignable() {
+        let serveur = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(500)))
+            .mount(&serveur)
+            .await;
+        assert!(matches!(
+            lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
+            Err(ErreurConnecteur::DelaiDepasse { .. })
+        ));
+
+        assert!(matches!(
+            lister_evenements_poussees(
+                "http://127.0.0.1:1",
+                "j",
+                1,
+                "2026-01-01",
+                &client_test_delai_court()
+            )
+            .await,
+            Err(ErreurConnecteur::InstanceInjoignable { .. })
+        ));
     }
 }

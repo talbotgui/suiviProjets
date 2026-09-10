@@ -39,6 +39,7 @@
 //! catalogue figé des résultats d'audit et donc jamais persistée seule — signature allégée sans `sourceId` par
 //! rapport aux dix commandes d'interrogation de l'incrément 1.
 
+use super::commun::credential_instance;
 use super::etat_session::EtatSession;
 use super::fichier::ErreurFacade;
 use crate::connecteurs::commun::ErreurConnecteur;
@@ -55,18 +56,6 @@ use crate::persistance::audit;
 use crate::persistance::moteur;
 use std::path::{Path, PathBuf};
 use tauri::State;
-
-/// Résout le credential mémorisé pour l'instance demandée, ou [`ErreurConnecteur::CredentialAbsent`] à défaut
-/// (US-003), factorisé pour les dix commandes de ce module.
-fn credential_instance(
-    instance: &Instance,
-    etat: &EtatSession,
-) -> Result<String, ErreurConnecteur> {
-    etat.credential(&instance.id)
-        .ok_or_else(|| ErreurConnecteur::CredentialAbsent {
-            message: "Aucun credential en mémoire pour cette instance".to_string(),
-        })
-}
 
 /// Interroge la vitalité d'un dépôt GitLab, c'est-à-dire la date du dernier commit sur la ref auditée (US-009,
 /// `gitlab.vitalite`).

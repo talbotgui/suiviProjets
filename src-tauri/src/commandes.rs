@@ -24,6 +24,8 @@
 pub(crate) mod administration;
 pub(crate) mod alertes;
 pub(crate) mod audit;
+pub(crate) mod commits_membres;
+pub(crate) mod commun;
 pub(crate) mod configuration_partageable;
 pub(crate) mod connectivite;
 pub(crate) mod diagnostic;
