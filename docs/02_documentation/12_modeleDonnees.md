@@ -100,7 +100,7 @@ Avant tout écrasement du fichier de données, une sauvegarde de sécurité horo
 | `cleAlerte` respecte le motif `type_alerte|projetId|discriminant` | TraitementAlerte |
 | `versionFiltres` est un entier positif correspondant à un schéma de filtres connu ; depuis le palier `9` → `10`, la valeur attendue est la constante partagée unique `1`, la forme de `filtres` étant commune à tous les écrans (`{ groupeId, projetIds }`) | VueEnregistrée |
 | L'export en clair ne contient que `parametres.seuils` et `referentiels` | Contrôle transverse à l'export de configuration |
-| `cadenceCommits` : `fenetreJours` entre 7 et 90, `seuilJoursOuvresSansPoussee` ≥ 1, `multiplicateurEcartCadence` ≥ 1, chaque pondération dans `[0 ; 1]`, `heureDebutSoiree` / `heureFinSoiree` entre 0 et 23, `fuseauHoraire` identifiant IANA reconnu ; validé côté interface et revalidé côté cœur natif ([RG-060](./05_reglesGestion.md#membres-et-sécurité-des-accès)) | Paramètres |
+| `cadenceCommits` : `fenetreJours` entre 7 et 90, `seuilJoursOuvresSansPoussee` ≥ 1, `multiplicateurEcartCadence` ≥ 1, chaque pondération dans `[0 ; 1]` et somme des trois pondérations non nulle, `heureDebutSoiree` / `heureFinSoiree` entre 0 et 23 et **distinctes** (une plage vide serait incohérente), `fuseauHoraire` identifiant IANA reconnu ; validé côté interface et revalidé côté cœur natif ([RG-060](./05_reglesGestion.md#membres-et-sécurité-des-accès)) | Paramètres |
 | `referentiels.motifNommageBranches` est une expression régulière syntaxiquement valide, jamais vide (valeur par défaut Gitflow appliquée à la création du fichier) | Référentiels |
 
 ## Matrice de traçabilité

@@ -2047,9 +2047,11 @@ fn url_api(url_base: &str, segments: &[&str]) -> Result<url::Url, ErreurConnecte
 }
 
 /// Traduit le statut HTTP d'une réponse GitLab en [`ErreurConnecteur`] typée selon RG-021 : 401 → authentification
-/// refusée, 403 → droits insuffisants, tout autre statut non 2xx → réponse inattendue ; `Ok(())` pour un 2xx.
-/// Factorisé pour les trois fonctions du roster « Commits des membres » (US-060) ; les fonctions plus anciennes de
-/// ce module inlinent ce même contrôle.
+/// refusée, 403 → droits insuffisants, 404 → ref introuvable (la référence de groupe / l'identifiant d'utilisateur
+/// n'existe pas — c'est l'erreur de saisie la plus probable sur la référence de groupe obligatoire de l'écran
+/// « Commits des membres »), tout autre statut non 2xx → réponse inattendue ; `Ok(())` pour un 2xx. Factorisé pour
+/// les trois fonctions du roster « Commits des membres » (US-060) ; les fonctions plus anciennes de ce module
+/// inlinent un contrôle équivalent.
 fn statut_reponse_ok(reponse: &reqwest::Response) -> Result<(), ErreurConnecteur> {
     let statut = reponse.status();
     match statut.as_u16() {
@@ -2057,6 +2059,9 @@ fn statut_reponse_ok(reponse: &reqwest::Response) -> Result<(), ErreurConnecteur
             message: format!("Statut HTTP {} reçu", statut.as_u16()),
         }),
         403 => Err(ErreurConnecteur::DroitsInsuffisants {
+            message: format!("Statut HTTP {} reçu", statut.as_u16()),
+        }),
+        404 => Err(ErreurConnecteur::RefIntrouvable {
             message: format!("Statut HTTP {} reçu", statut.as_u16()),
         }),
         _ if !statut.is_success() => Err(ErreurConnecteur::ReponseInattendue {
@@ -7574,7 +7579,8 @@ mod tests {
     }
 
     /// `true` si `resultat` est l'anomalie [`ErreurConnecteur`] attendue pour le statut HTTP simulé : 401 →
-    /// authentification refusée, 403 → droits insuffisants, tout autre statut non 2xx → réponse inattendue.
+    /// authentification refusée, 403 → droits insuffisants, 404 → ref introuvable, tout autre statut non 2xx →
+    /// réponse inattendue.
     fn anomalie_rg021_attendue<T>(resultat: &Result<T, ErreurConnecteur>, statut: u16) -> bool {
         match statut {
             401 => matches!(
@@ -7582,13 +7588,14 @@ mod tests {
                 Err(ErreurConnecteur::AuthentificationRefusee { .. })
             ),
             403 => matches!(resultat, Err(ErreurConnecteur::DroitsInsuffisants { .. })),
+            404 => matches!(resultat, Err(ErreurConnecteur::RefIntrouvable { .. })),
             _ => matches!(resultat, Err(ErreurConnecteur::ReponseInattendue { .. })),
         }
     }
 
     #[tokio::test]
     async fn roster_commits_membres_classe_chaque_categorie_danomalie_rg021() {
-        for statut in [401_u16, 403, 500, 404] {
+        for statut in [401_u16, 403, 404, 500, 503] {
             let serveur = MockServer::start().await;
             Mock::given(method("GET"))
                 .respond_with(ResponseTemplate::new(statut))

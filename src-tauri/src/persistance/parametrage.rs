@@ -625,7 +625,9 @@ fn fuseau_horaire_bien_forme(fuseau: &str) -> bool {
 /// `seuil_jours_ouvres_sans_poussee` est nul, si `multiplicateur_ecart_cadence` est inférieur à `1` ou non fini, si
 /// une des trois pondérations sort de `[0 ; 1]` ou n'est pas finie, si la **somme** des trois pondérations est nulle
 /// (le score de risque serait alors constant et sans signification), si `heure_debut_soiree` ou `heure_fin_soiree`
-/// dépasse `23`, ou si `fuseau_horaire` n'a pas la forme d'un identifiant IANA (cf. [`fuseau_horaire_bien_forme`]).
+/// dépasse `23`, si `heure_debut_soiree == heure_fin_soiree` (plage de soirée vide et donc incohérente — une plage
+/// couvrant toute la journée se saisit avec des bornes distinctes, ex. `0`–`23`), ou si `fuseau_horaire` n'a pas la
+/// forme d'un identifiant IANA (cf. [`fuseau_horaire_bien_forme`]).
 pub(crate) fn definir_parametres_cadence_commits(
     donnees: &mut DonneesRacine,
     parametres: CadenceCommits,
@@ -646,6 +648,7 @@ pub(crate) fn definir_parametres_cadence_commits(
         || ponderations.iter().sum::<f64>() <= 0.0
         || parametres.heure_debut_soiree > 23
         || parametres.heure_fin_soiree > 23
+        || parametres.heure_debut_soiree == parametres.heure_fin_soiree
         || !fuseau_horaire_bien_forme(&parametres.fuseau_horaire);
     if invalide {
         return Err(ErreurParametrage::ReglageApplicatifInvalide);
@@ -1429,6 +1432,10 @@ mod tests {
             c.ponderation_soiree = 0.0;
         });
         hors_bornes(|c| c.heure_debut_soiree = 24);
+        hors_bornes(|c| {
+            c.heure_debut_soiree = 21;
+            c.heure_fin_soiree = 21;
+        });
         hors_bornes(|c| c.fuseau_horaire = "pas un fuseau".to_string());
         hors_bornes(|c| c.fuseau_horaire = "Paris".to_string());
     }

@@ -96,10 +96,10 @@ describe('CadencePousseesUtils.analyser', () => {
     expect(CadencePousseesUtils.analyser([], SEUILS, CHEMINS, SANS_REGLE, MAINTENANT)).toEqual([]);
   });
 
-  it('retire une ligne dont le compte figure dans comptesExclus', () => {
+  it('retire une ligne dont le compte figure dans comptesExclus, casse ignorée', () => {
     const lignes = CadencePousseesUtils.analyser(
       [
-        Fixtures.activite('robot-ci', [Fixtures.poussee(1, 10)]),
+        Fixtures.activite('Robot-CI', [Fixtures.poussee(1, 10)]),
         Fixtures.activite('dev', [Fixtures.poussee(1, 10)]),
       ],
       { ...SEUILS, comptesExclus: ['robot-ci'] },

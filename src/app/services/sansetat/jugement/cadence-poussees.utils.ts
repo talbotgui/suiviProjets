@@ -112,10 +112,12 @@ export class CadencePousseesUtils {
   ): readonly LigneCadencePoussees[] {
     const maintenant = Date.parse(maintenantIso);
     const debutFenetre = maintenant - seuils.fenetreJours * MS_PAR_JOUR;
-    const comptesExclus = new Set(seuils.comptesExclus);
+    // Comparaison insensible à la casse : un identifiant de connexion GitLab a une forme canonique, mais l'exclure
+    // ne doit pas dépendre de la casse exacte saisie dans les réglages (RG-060).
+    const comptesExclus = new Set(seuils.comptesExclus.map((compte) => compte.toLowerCase()));
 
     const lignes = activite
-      .filter((entree) => !comptesExclus.has(entree.membre.username))
+      .filter((entree) => !comptesExclus.has(entree.membre.username.toLowerCase()))
       .map((entree) =>
         CadencePousseesUtils.construireLigne(
           entree,

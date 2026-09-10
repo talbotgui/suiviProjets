@@ -476,11 +476,13 @@ export class SqmReglagesApplicatifsParametrageComponent {
       !Number.isInteger(f.heureFinSoiree) ||
       f.heureFinSoiree < 0 ||
       f.heureFinSoiree > 23 ||
+      f.heureDebutSoiree === f.heureFinSoiree ||
       !this.fuseauxHorairesDisponibles.includes(f.fuseauHoraire);
     if (invalide) {
       this.messageErreur =
         'Un des seuils « Commits des membres » est hors bornes (fenêtre entière 7–90 jours, seuil entier ≥ 1, ' +
-        'multiplicateur ≥ 1, pondérations entre 0 et 1 de somme non nulle, heures entre 0 et 23, fuseau à choisir dans la liste).';
+        'multiplicateur ≥ 1, pondérations entre 0 et 1 de somme non nulle, heures entre 0 et 23 et distinctes, ' +
+        'fuseau à choisir dans la liste).';
       return;
     }
     this.messageErreur = null;
@@ -490,19 +492,22 @@ export class SqmReglagesApplicatifsParametrageComponent {
   /**
    * Enregistre les seuils « Commits des membres » après confirmation du mot de passe (US-060, RG-002, RG-060,
    * RG-031). La liste de comptes exclus est déduite du texte saisi (une entrée par ligne ou séparée par des
-   * virgules), dédoublonnée en conservant l'ordre.
+   * virgules), dédoublonnée sans tenir compte de la casse (première occurrence conservée), en gardant l'ordre.
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
    */
   public async confirmerEnregistrementCadenceCommits(motDePasse: string): Promise<void> {
     const f = this.cadenceCommitsFormulaire;
-    const comptesExclus = [
-      ...new Set(
-        f.comptesExclusTexte
-          .split(/[\n,]+/)
-          .map((compte) => compte.trim())
-          .filter((compte) => compte.length > 0),
-      ),
-    ];
+    const comptesExclusVus = new Set<string>();
+    const comptesExclus = f.comptesExclusTexte
+      .split(/[\n,]+/)
+      .map((compte) => compte.trim())
+      .filter((compte) => {
+        if (compte.length === 0 || comptesExclusVus.has(compte.toLowerCase())) {
+          return false;
+        }
+        comptesExclusVus.add(compte.toLowerCase());
+        return true;
+      });
     const cadence: CadenceCommits = {
       fenetreJours: f.fenetreJours,
       seuilJoursOuvresSansPoussee: f.seuilJoursOuvresSansPoussee,

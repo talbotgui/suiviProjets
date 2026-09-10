@@ -294,6 +294,57 @@ describe('SqmReglagesApplicatifsParametrageComponent', () => {
     expect(composant.messageErreur).not.toBeNull();
   });
 
+  it('bloque une plage de soirée aux bornes identiques et des pondérations toutes nulles', () => {
+    const composant = TestBed.createComponent(
+      SqmReglagesApplicatifsParametrageComponent,
+    ).componentInstance;
+
+    composant.ouvrirEditionCadenceCommits();
+    composant.cadenceCommitsFormulaire.heureDebutSoiree = 21;
+    composant.cadenceCommitsFormulaire.heureFinSoiree = 21;
+    composant.demanderEnregistrementCadenceCommits();
+    expect(composant.reglageEnAttenteMotDePasse()).toBeNull();
+    expect(composant.messageErreur).not.toBeNull();
+
+    composant.ouvrirEditionCadenceCommits();
+    composant.cadenceCommitsFormulaire.ponderationInactivite = 0;
+    composant.cadenceCommitsFormulaire.ponderationEcartCadence = 0;
+    composant.cadenceCommitsFormulaire.ponderationSoiree = 0;
+    composant.demanderEnregistrementCadenceCommits();
+    expect(composant.reglageEnAttenteMotDePasse()).toBeNull();
+    expect(composant.messageErreur).not.toBeNull();
+  });
+
+  it('dédoublonne les comptes exclus sans tenir compte de la casse (première occurrence conservée)', async () => {
+    const composant = TestBed.createComponent(
+      SqmReglagesApplicatifsParametrageComponent,
+    ).componentInstance;
+    invokeSimule.mockResolvedValue(DonneesDeTest.racine());
+    composant.ouvrirEditionCadenceCommits();
+    composant.cadenceCommitsFormulaire.comptesExclusTexte = 'Robot-CI\nrobot-ci, bot';
+
+    composant.demanderEnregistrementCadenceCommits();
+    await composant.confirmerEnregistrementCadenceCommits('mot-de-passe');
+
+    expect(invokeSimule).toHaveBeenCalledWith(
+      'definir_parametres_cadence_commits',
+      expect.objectContaining({
+        parametres: {
+          fenetreJours: 28,
+          seuilJoursOuvresSansPoussee: 3,
+          multiplicateurEcartCadence: 2,
+          ponderationInactivite: 0.5,
+          ponderationEcartCadence: 0.3,
+          ponderationSoiree: 0.2,
+          heureDebutSoiree: 19,
+          heureFinSoiree: 7,
+          fuseauHoraire: 'Europe/Paris',
+          comptesExclus: ['Robot-CI', 'bot'],
+        },
+      }),
+    );
+  });
+
   it('convertit un rejet typé « reglageApplicatifInvalide » en message explicite', async () => {
     const composant = TestBed.createComponent(
       SqmReglagesApplicatifsParametrageComponent,
