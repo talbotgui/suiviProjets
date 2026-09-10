@@ -13,9 +13,10 @@ Les captures d'écran proviennent de l'application réelle, alimentée par un je
 5. [Adapter l'outil à son contexte : le paramétrage](#adapter-loutil-à-son-contexte--le-paramétrage)
 6. [Lancer un audit : la campagne](#lancer-un-audit--la-campagne)
 7. [Exploiter les résultats](#exploiter-les-résultats)
-8. [Traiter les alertes : la liste de travail](#traiter-les-alertes--la-liste-de-travail)
-9. [Au quotidien : recherche, sauvegarde, verrouillage](#au-quotidien--recherche-sauvegarde-verrouillage)
-10. [Questions fréquentes](#questions-fréquentes)
+8. [Suivre la régularité des poussées : les commits des membres](#suivre-la-régularité-des-poussées--les-commits-des-membres)
+9. [Traiter les alertes : la liste de travail](#traiter-les-alertes--la-liste-de-travail)
+10. [Au quotidien : recherche, sauvegarde, verrouillage](#au-quotidien--recherche-sauvegarde-verrouillage)
+11. [Questions fréquentes](#questions-fréquentes)
 
 ## Principes à connaître avant de commencer
 
@@ -199,6 +200,20 @@ Chaque campagne d'audit détecte automatiquement les montées de version du serv
 ![Obsolescence](assets/captures/obsolescence.png)
 
 L'écran d'obsolescence présente une grille de tuiles, une par projet, indiquant le retard maximal en versions majeures pour chaque catégorie de dépendance au dernier audit retenu (`0` signifie « à jour »). Chaque tuile affiche aussi, en fin de la ligne du nom du projet, une à deux petites icônes de ses langages principaux (mêmes langages que la fiche projet). Les filtres min/max par catégorie et la date de référence permettent de cibler l'analyse ; un clic sur une tuile ouvre le détail du dernier audit du projet, l'infobulle de la tuile rappelant par ailleurs ces langages.
+
+## Suivre la régularité des poussées : les commits des membres
+
+L'écran « Commits des membres », dans la barre latérale juste après Obsolescence, aide à vérifier que les développeurs d'un groupe poussent leur code régulièrement sur GitLab, et à repérer une inactivité prolongée qui annoncerait un risque de perte de travail non partagé en cas d'absence.
+
+Cet écran présente des indicateurs **nominatifs** de rythme de travail individuel. Un bandeau permanent le rappelle : leur exploitation relève de la responsabilité RH et d'information du personnel de votre organisation. Aucune donnée d'activité n'est enregistrée dans le fichier de données : le résultat d'une analyse vit uniquement le temps de la session.
+
+Pour lancer une analyse, sélectionnez un groupe applicatif, saisissez la référence (chemin ou identifiant) du groupe GitLab correspondant — obligatoire, jamais mémorisée — puis cliquez sur « Analyser ». L'analyse interroge la première instance GitLab déclarée par le groupe (un message le signale si le groupe en déclare plusieurs) et récupère, pour chaque membre du groupe GitLab, ses événements de poussée sur une fenêtre glissante (quatre semaines par défaut).
+
+Le tableau donne, par développeur : la dernière poussée (date, heure et dépôt), le nombre de jours ouvrés écoulés depuis, le nombre de poussées et de commits sur la fenêtre, sa cadence médiane de poussée, l'écart entre son silence courant et cette cadence, la part de ses poussées faites en soirée, et un score de risque composite. Le tri (clic sur un en-tête) et les filtres (statut, recherche, « seulement les lignes en alerte ») s'appliquent sans nouvel appel réseau.
+
+Limites à garder en tête : les commits restés locaux, non poussés, sont invisibles ; les jours fériés ne sont pas décomptés ; aucun avertissement de couverture partielle n'est émis — sur une instance Community Edition avec des dépôts privés, une vue complète suppose un jeton d'**administration** (ou membre de tous les projets concernés), une portée de jeton insuffisante se lisant alors comme une inactivité.
+
+Les dix seuils du calcul (fenêtre, seuil de jours ouvrés sans poussée, multiplicateur d'écart à la cadence, trois pondérations du score, bornes de la plage de soirée, fuseau horaire de référence, liste de comptes exclus comme les robots) se règlent depuis l'onglet « Réglages applicatifs » du Paramétrage, accessible aussi par le lien « Ajuster les seuils » de l'écran ; ils prennent effet au prochain calcul.
 
 ## Traiter les alertes : la liste de travail
 

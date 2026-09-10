@@ -113,6 +113,19 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | Obsolescence | Détail d'un projet | Au clic sur une tuile, modale résumant le dernier audit retenu du projet : date de l'audit, tableau des dépendances (référence, catégorie, version, retard calculé), ligne Java mise en évidence ; ouverture et fermeture pilotées par un paramètre de requête de la route `/obsolescence` (l'écran reste monté sous la modale, l'ouverture est une étape d'historique, cf. [RG-052](./05_reglesGestion.md#navigation-transverse-et-filtrage-mutualisé)) ; fermeture par bouton, touche Échap ou bouton Reculer, un lien « Ouvrir la fiche projet » dans le pied de la modale |
 | Obsolescence | Export | Export de la grille (bandeau inclus) en image PNG |
 
+### Commits des membres
+
+Écran de pilotage (US-060, RG-060), sans maquette haute-fidélité de référence : même fond et mêmes panneaux à filets fins que l'Obsolescence, aucun effet décoratif. Tableau de tri unique, aucune frise ni sparkline par ligne.
+
+| écran | zone | composants / actions |
+|---|---|---|
+| Commits des membres | Bandeau de dimension RH | Bandeau permanent non masquable en tête d'écran : « Cet écran présente des indicateurs nominatifs de rythme de travail. Leur exploitation relève de la responsabilité RH et d'information du personnel de votre organisation. » |
+| Commits des membres | Bandeau de commande | Sélecteur de groupe applicatif (groupes possédant au moins une instance GitLab), champ texte « Groupe GitLab (chemin ou identifiant) » **obligatoire**, bouton « Analyser » (désactivé tant que groupe ou référence manquent), horodatage « Analyse du … » de la dernière analyse, rappel « Les commits non poussés ne sont pas visibles », message « Le groupe déclare plusieurs instances GitLab ; seule la première (`<nom>`) est interrogée » le cas échéant, lien « Ajuster les seuils » vers Paramétrage › Réglages applicatifs |
+| Commits des membres | Analyse en cours | Indicateur de chargement avec progression « traités / total » |
+| Commits des membres | Barre de filtres | Filtre de statut (par défaut « tous »), recherche texte, case « seulement les lignes en alerte » |
+| Commits des membres | Tableau trié | Colonnes Développeur, Statut, Dernière poussée (date et heure locales), Dépôt, Jours ouvrés depuis, Poussées / commits (fenêtre), Cadence médiane, Écart à la cadence, Part en soirée, Score de risque ; en-têtes cliquables (tri, tri par défaut sur le score décroissant) ; cellules colorées par rapport aux seuils via les classes de statut existantes (aucune couleur codée en dur), badge d'alerte par ligne ; ligne « données insuffisantes » quand le développeur a moins de deux poussées sur la fenêtre |
+| Commits des membres | État initial | Avant toute analyse : « Sélectionnez un groupe, saisissez la référence du groupe GitLab, puis lancez une analyse. » |
+
 ### Fiche projet
 
 | écran | zone | composants / actions |
@@ -153,7 +166,7 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 |---|---|---|
 | Paramétrage | Seuils de couleur | Seuils de chaque indicateur de la synthèse et seuils spécifiques (vitalité, bornes de taille, fraîcheur Sonar, activité sans qualité, matérialité du brouillon, fraîcheur d'audit) |
 | Paramétrage | Référentiels | Référentiel des dépendances (motif, versions, statut), référentiel des marqueurs IA, et motif de nommage des branches (expression régulière unique, initialisée à la convention Gitflow) |
-| Paramétrage | Réglages applicatifs | Délai de verrouillage, concurrence d'audit, proxy optionnel, nombre de sauvegardes de sécurité |
+| Paramétrage | Réglages applicatifs | Délai de verrouillage, concurrence d'audit, proxy optionnel, nombre de sauvegardes de sécurité ; zone « Commits des membres » (US-060) regroupant les dix seuils de l'écran homonyme — fenêtre d'analyse, seuil de jours ouvrés sans poussée, multiplicateur d'écart à la cadence, trois pondérations du score de risque, bornes de la plage de soirée, fuseau horaire (choisi dans une liste), liste de comptes exclus — avec un texte de portée « s'applique au prochain calcul de l'écran Commits des membres », chaque enregistrement redemandant le mot de passe du fichier |
 | Paramétrage | Accès complémentaires | Journal des modifications, purge des audits, export/import de configuration, vues enregistrées |
 | Paramétrage | Vues enregistrées | Onglet listant toutes les vues enregistrées regroupées par écran (libellé d'écran lisible) ; par ligne : nom, actions Renommer (nom seul), Dupliquer (« … (copie) »), Supprimer, et bascule « Vue par défaut » (exclusive par écran), plus un lien « Ouvrir l'écran concerné » ; chaque mutation redemande le mot de passe du fichier ([RG-002](./05_reglesGestion.md#stockage-et-confidentialité-des-données)) et est journalisée ([RG-054](./05_reglesGestion.md#vues-alertes-export-et-import)) |
 
@@ -177,6 +190,9 @@ Composant mutualisé unique décrit ici une fois, référencé par les quatre é
 | Obsolescence | Aucun projet ne correspond aux filtres : message explicite plutôt qu'une grille vide silencieuse |
 | Obsolescence | Projet sans audit retenu : indicateurs absents (jamais `0`), modale mentionnant « jamais audité » |
 | Obsolescence | Catégorie sans dépendance concernée pour un projet : seul le sigle est affiché sur la tuile, sans barre ni valeur, pour repérer les catégories manquantes (distinct de la valeur `0`, « à jour », qui conserve sa barre) |
+| Commits des membres | Groupe sans instance GitLab : le groupe n'apparaît pas dans le sélecteur ; si aucun groupe n'en a, message renvoyant vers l'Administration des sources |
+| Commits des membres | Membre du roster sans aucun événement de poussée visible : ligne présente, sans activité, sans avertissement (à interpréter par l'utilisateur, cf. RG-060) |
+| Commits des membres | Erreur d'un membre pendant l'analyse : consignée en notification, la boucle continue ; une erreur de préparation (roster) interrompt l'analyse |
 | Fiche projet | Dernière campagne en échec : encart d'anomalie technique affiché en tête, indicateurs de la campagne précédente conservés |
 | Fiche projet | Date de prise en charge non calculée ou non déterminée : la métadonnée « Âge chez nous » affiche le libellé du statut concerné (« non calculée » ; pour `aucune_regle_interne`, « aucun membre interne qualifié pour ce groupe » ou, si des règles `interne` existent sans canal courriel, le libellé actionnable « N membres internes qualifiés, mais uniquement par identifiant de connexion… » ; « non déterminé (dépôt trop volumineux) » ; « — (aucune source GitLab) » ; « — (dépôt vide) »), jamais une valeur d'âge trompeuse ; le bouton « recalculer » reste disponible |
 | Fiche projet | SONAR_KO actif : bloc Indicateurs Sonar grisé avec légende explicative de l'écart |

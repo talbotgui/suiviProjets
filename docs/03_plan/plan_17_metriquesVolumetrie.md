@@ -10,7 +10,7 @@ Le regroupement de plusieurs sujets sans lien direct dans un même document rés
 
 Comme `plan_16_navigationFiltrageEtVues.md`, ce fichier est une exception à la règle générale (les évolutions postérieures à la Phase 15 sont normalement tracées sous forme d'entrées « Étape N » du [rapport de développement](../04_rapports/rapportDeDeveloppement.md)) : son emplacement et son nom sont conservés en l'état.
 
-État d'intégration au 2026-09-08 : chapitres 1, 2 et 3 développés et committés. Chapitre 4 non démarré. **Chapitre 5 priorisé sur le chapitre 4** sur demande explicite de l'utilisateur ; ses points restant ouverts ont été levés (chapitre 5, section 3) et son incrément 1 (documents normatifs) est en cours.
+État d'intégration : chapitres 1, 2 et 3 développés et committés ; chapitre 5 intégralement réalisé (rapport, Étape 39). Chapitre 4 réalisé à l'Étape 40 du [rapport de développement](../04_rapports/rapportDeDeveloppement.md) — en une seule session, tous incréments enchaînés sans validation humaine intermédiaire, sur demande explicite de l'utilisateur (écart assumé à la méthode) ; relecture humaine du code restant due.
 
 ## Sommaire
 
@@ -1066,7 +1066,7 @@ Validation du fuseau horaire — deux niveaux (norme de sécurité « validé c�
 
 Ajout du sous-objet `parametres.cadenceCommits` (défauts par champ + `impl Default`) : un fichier antérieur récupère les valeurs par défaut, aucune transformation de donnée nécessaire. Conformément à la convention du projet (cf. `migration_4_vers_5`, qui a introduit un palier de transformation nulle pour un simple ajout de champs), **`VERSION_SCHEMA_COURANTE` est incrémentée** et un nouveau palier de migration à transformation nulle est ajouté à `ETAPES_MIGRATION_REELLES`, nommé d'après la valeur atteinte (`migration_N_vers_N+1`). La **valeur exacte n'est pas fixée par ce plan** : elle dépend des paliers déjà consommés au moment de l'implémentation par les autres évolutions intégrées entre-temps. `plan_18` incrémente lui aussi `VERSION_SCHEMA_COURANTE` (cf. son §9) : à l'intégration, celui qui passe en second prend le palier suivant, sans trou ni valeur codée d'avance dans l'un ou l'autre plan.
 
-Le résultat d'une analyse n'est jamais persisté (`ActivitePousseesDeveloppeur`, `LigneCadencePoussees` : vues calculées en mémoire). `CadenceCommits` est la seule structure persistée ajoutée ; elle est exportée en clair avec le reste de `parametres` par l'export de configuration partageable (aucune donnée nominative : uniquement des seuils et une liste de comptes exclus).
+Le résultat d'une analyse n'est jamais persisté (`ActivitePousseesDeveloppeur`, `LigneCadencePoussees` : vues calculées en mémoire). `CadenceCommits` est la seule structure persistée ajoutée. **Correction apportée à l'intégration (Étape 40 du rapport)** : contrairement à ce qu'annonçait la rédaction initiale de ce paragraphe, l'export de configuration partageable (`persistance::configuration_partageable`) ne porte que `parametres.seuils` + `referentiels`, et la Partie D ne le modifie pas ; `CadenceCommits` est donc un réglage propre au poste (comme `verrouillage`, `audit`, `proxy`), **non inclus dans l'export**.
 
 ## 9. Impacts documentaires
 
