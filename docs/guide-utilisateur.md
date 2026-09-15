@@ -113,6 +113,10 @@ Le journal recense en lecture seule toutes les modifications de configuration (s
 
 Deux purges sont proposées, jamais automatiques et toujours précédées d'une prévisualisation du volume libéré : par densité (audits trop rapprochés) et par âge (au-delà de six mois, au choix par suppression ou par agrégation mensuelle).
 
+#### Supprimer des audits ciblés
+
+À côté de ces deux purges automatiques, une section « Suppression ciblée » liste, tous projets et groupes confondus, chaque audit avec son groupe, son projet, son type (régulier ou historique), sa date ciblée, sa date de réalisation / création et sa campagne d'origine. On la filtre par plage de date de réalisation / création (utile notamment pour retrouver les audits produits par une ancienne version de l'application), par plage de date ciblée, par groupe, par projet ou par type, puis on coche les lignes à retirer — ou « tout cocher le résultat filtré ». Une prévisualisation indique le volume libéré et, le cas échéant, les projets qui se retrouveraient sans aucun audit : contrairement à la purge automatique, cette suppression ne protège ni le premier ni le dernier audit d'un projet. La confirmation redemande le mot de passe du fichier.
+
 ### Export / Import de configuration
 
 ![Paramétrage — Export / Import](assets/captures/parametrage-export-import.png)

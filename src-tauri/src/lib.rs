@@ -115,6 +115,8 @@ pub fn run() {
             commandes::purge::executer_purge_age,
             commandes::purge::previsualiser_purge_journal,
             commandes::purge::executer_purge_journal,
+            commandes::suppression_audits::previsualiser_suppression_audits,
+            commandes::suppression_audits::supprimer_audits,
             commandes::alertes::creer_annotation,
             commandes::alertes::supprimer_annotation,
             commandes::alertes::qualifier_alerte,

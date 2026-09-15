@@ -354,6 +354,49 @@ mod tests {
         Ok(())
     }
 
+    /// Non-régression plan_20 Partie C : une règle `interne` de type `username` sans `aliasEmail` n'alimente aucun
+    /// canal comparable au courriel d'auteur d'un commit (le login n'est pas exposé par l'API des commits, RG-058)
+    /// et produit donc `AucuneRegleInterne`, exactement comme l'absence totale de règle `interne` — recouvrement
+    /// des deux cas que la Fiche projet désambiguïse à l'affichage (`construireAgeChezNousLabel`), sans changement
+    /// du cœur natif.
+    #[tokio::test]
+    async fn aucune_regle_interne_quand_seule_une_regle_username_sans_alias_existe()
+    -> Result<(), ErreurConnecteur> {
+        let groupe = groupe_avec(vec![membre_interne("jdupont", TypeCritere::Username)]);
+        let projet = projet_avec(vec![source_gitlab("s1")]);
+        let connecteur = |_source: Source,
+                          _c: CorrespondanceInterne|
+         -> FutureResultatCommit<'static> {
+            Box::pin(async {
+                panic!(
+                    "aucun appel réseau attendu : la règle username sans alias n'alimente aucun canal"
+                )
+            })
+        };
+
+        let resultat =
+            calculer_prise_en_charge(&groupe, &projet, "2026-09-15".to_string(), connecteur)
+                .await?;
+
+        assert_eq!(resultat.statut, StatutPremierCommit::AucuneRegleInterne);
+        Ok(())
+    }
+
+    /// Symétrique du test précédent : une règle `username` porteuse d'un `aliasEmail` alimente bien le canal alias
+    /// (RG-058), donc `CorrespondanceInterne` n'est plus vide et le calcul appelle réellement le connecteur.
+    #[tokio::test]
+    async fn regle_username_avec_alias_email_alimente_le_canal_alias()
+    -> Result<(), ErreurConnecteur> {
+        let groupe = groupe_avec(vec![MembreConnu {
+            alias_email: Some("j.dupont@entreprise.fr".to_string()),
+            ..membre_interne("jdupont", TypeCritere::Username)
+        }]);
+        let correspondance = construire_correspondance_interne(&groupe);
+
+        assert!(!correspondance.est_vide());
+        Ok(())
+    }
+
     #[tokio::test]
     async fn non_applicable_sans_source_gitlab() -> Result<(), ErreurConnecteur> {
         let groupe = groupe_avec(vec![membre_interne("corp.test", TypeCritere::DomaineEmail)]);

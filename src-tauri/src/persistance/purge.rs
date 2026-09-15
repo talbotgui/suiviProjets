@@ -73,8 +73,10 @@ pub(crate) struct PrevisualisationPurge {
 
 /// Taille compressée (zstd, niveau par défaut) de la sérialisation JSON de `donnees`, identique à l'étape de
 /// compression effectuée avant chiffrement par `persistance::moteur::sauvegarder_fichier`. `0` si la sérialisation
-/// ou la compression échouent, cas non atteignable en pratique pour une `DonneesRacine` valide.
-fn taille_compressee(donnees: &DonneesRacine) -> u64 {
+/// ou la compression échouent, cas non atteignable en pratique pour une `DonneesRacine` valide. `pub(crate)` :
+/// réutilisée par `persistance::suppression_audits` (plan_20 Partie D) pour un aperçu de volume cohérent avec la
+/// purge automatique.
+pub(crate) fn taille_compressee(donnees: &DonneesRacine) -> u64 {
     serde_json::to_vec(donnees)
         .ok()
         .and_then(|json| zstd::stream::encode_all(json.as_slice(), 0).ok())
@@ -199,8 +201,10 @@ fn identifiants_a_supprimer_age(
 
 /// Applique une purge (densité ou âge) à `racine`, en place, en retirant de chaque projet les audits désignés par
 /// `selectionner`, puis renvoie le résumé de l'opération (nombre d'audits/projets concernés, taille compressée
-/// avant/après).
-fn purger(
+/// avant/après). `pub(crate)` : réutilisée par `persistance::suppression_audits` (plan_20 Partie D), `selectionner`
+/// y filtrant chaque tranche d'audits d'un projet contre un ensemble global d'identifiants plutôt que contre une
+/// règle de densité/âge.
+pub(crate) fn purger(
     racine: &mut DonneesRacine,
     selectionner: impl Fn(&[Audit]) -> HashSet<String>,
 ) -> PrevisualisationPurge {
@@ -238,8 +242,9 @@ pub(crate) fn previsualiser_purge_densite(racine: &DonneesRacine) -> Previsualis
 
 /// Consigne une entrée récapitulative au journal des modifications (RG-023, R10-17) pour une exécution effective de
 /// purge ayant réellement supprimé au moins un audit ; sans effet si `resume.nb_audits_supprimes` est nul (cohérent
-/// avec RG-023 : une entrée de journal représente une modification réelle, jamais un no-op).
-fn consigner_purge(
+/// avec RG-023 : une entrée de journal représente une modification réelle, jamais un no-op). `pub(crate)` :
+/// réutilisée par `persistance::suppression_audits` (plan_20 Partie D, `mode = "suppression ciblée"`).
+pub(crate) fn consigner_purge(
     donnees: &mut DonneesRacine,
     resume: &PrevisualisationPurge,
     mode: &str,

@@ -311,4 +311,101 @@ describe('BouchonParametrageUtils', () => {
       BouchonParametrageUtils.invoquer('definir_seuil', { cle: 'x', valeur: 1 }),
     ).rejects.toThrow('donnees');
   });
+
+  describe('suppression ciblée d’audits (US-063, RG-063, plan_20 Partie D)', () => {
+    const DONNEES_AVEC_AUDITS = {
+      ...DONNEES_DE_BASE,
+      groupes: [
+        {
+          id: 'groupe-1',
+          nom: 'Groupe',
+          projets: [
+            {
+              id: 'projet-1',
+              nom: 'Projet un',
+              audits: [{ id: 'a1' }, { id: 'a2' }],
+            },
+            {
+              id: 'projet-2',
+              nom: 'Projet deux',
+              audits: [{ id: 'a3' }],
+            },
+          ],
+        },
+      ],
+    };
+
+    it('previsualiser_suppression_audits : compte les audits et projets concernés sans muter la racine', async () => {
+      const resultat = await BouchonParametrageUtils.invoquer<{
+        readonly nbAudits: number;
+        readonly nbProjetsConcernes: number;
+        readonly projetsVides: readonly { readonly projetId: string; readonly nomProjet: string }[];
+      }>('previsualiser_suppression_audits', {
+        donnees: DONNEES_AVEC_AUDITS,
+        auditIds: ['a1', 'a3'],
+      });
+
+      expect(resultat.nbAudits).toBe(2);
+      expect(resultat.nbProjetsConcernes).toBe(2);
+      expect(resultat.projetsVides).toEqual([{ projetId: 'projet-2', nomProjet: 'Projet deux' }]);
+      expect(DONNEES_AVEC_AUDITS.groupes[0]?.projets[0]?.audits).toHaveLength(2);
+    });
+
+    it('supprimer_audits : retire les audits ciblés, quel que soit leur projet, et horodate la racine', async () => {
+      const resultat = await BouchonParametrageUtils.invoquer<{
+        readonly groupes: readonly {
+          readonly projets: readonly { readonly audits: readonly { readonly id: string }[] }[];
+        }[];
+        readonly meta: { readonly modifieLe: string };
+      }>('supprimer_audits', {
+        donnees: DONNEES_AVEC_AUDITS,
+        auditIds: ['a1', 'a3'],
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(resultat.groupes[0]?.projets[0]?.audits.map((audit) => audit.id)).toEqual(['a2']);
+      expect(resultat.groupes[0]?.projets[1]?.audits).toEqual([]);
+      expect(resultat.meta.modifieLe).toBeDefined();
+    });
+
+    it('supprimer_audits : consigne une unique entrée de journal récapitulative (RG-023)', async () => {
+      const resultat = await BouchonParametrageUtils.invoquer<{
+        readonly journal: readonly {
+          readonly objet: string;
+          readonly origine: string;
+          readonly detailOrigine?: string;
+          readonly apres: {
+            readonly nbAuditsSupprimes: number;
+            readonly nbProjetsConcernes: number;
+          };
+        }[];
+      }>('supprimer_audits', {
+        donnees: DONNEES_AVEC_AUDITS,
+        auditIds: ['a1', 'a3'],
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(resultat.journal).toHaveLength(1);
+      expect(resultat.journal[0]).toEqual(
+        expect.objectContaining({
+          objet: 'audits',
+          origine: 'Purge',
+          detailOrigine: 'suppression ciblée',
+          apres: { nbAuditsSupprimes: 2, nbProjetsConcernes: 2 },
+        }),
+      );
+    });
+
+    it("supprimer_audits : ne consigne aucune entrée de journal si aucun audit n'a réellement été supprimé", async () => {
+      const resultat = await BouchonParametrageUtils.invoquer<{
+        readonly journal: readonly unknown[];
+      }>('supprimer_audits', {
+        donnees: DONNEES_AVEC_AUDITS,
+        auditIds: ['id-inexistant'],
+        motDePasse: 'mot-de-passe',
+      });
+
+      expect(resultat.journal).toEqual([]);
+    });
+  });
 });

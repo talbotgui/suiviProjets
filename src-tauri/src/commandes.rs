@@ -34,4 +34,5 @@ pub(crate) mod fichier;
 pub(crate) mod parametrage;
 pub(crate) mod prise_en_charge;
 pub(crate) mod purge;
+pub(crate) mod suppression_audits;
 pub(crate) mod vues;

@@ -30,10 +30,10 @@ import {
   input,
 } from '@angular/core';
 import type { InputSignal, Signal, WritableSignal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SqmConfirmationMotDePasseComponent } from '../../../../composants/confirmation-mot-de-passe/confirmation-mot-de-passe.component';
 import { SqmConfirmationSuppressionComponent } from '../../../../composants/confirmation-suppression/confirmation-suppression.component';
+import { DateCalendaireUtils } from '../../../../services/sansetat/jugement/date-calendaire.utils';
 import type { DonneesMembreConnu } from '../../../../services/avecetat/etat/donnees-application.service';
 import { DonneesApplicationService } from '../../../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../../../services/avecetat/etat/notification.service';
@@ -58,12 +58,7 @@ const ORIGINE_ADMINISTRATION = 'Administration';
  */
 @Component({
   selector: 'app-membres-connus-admin',
-  imports: [
-    DatePipe,
-    FormsModule,
-    SqmConfirmationSuppressionComponent,
-    SqmConfirmationMotDePasseComponent,
-  ],
+  imports: [FormsModule, SqmConfirmationSuppressionComponent, SqmConfirmationMotDePasseComponent],
   templateUrl: './membres-connus-admin.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './membres-connus-admin.component.scss',
@@ -121,7 +116,11 @@ export class SqmMembresConnusAdminComponent {
       this.selectionnerGroupe(groupeCible);
       const typeCritereCible = this.analyserTypeCritere(this.typeCritereInitial());
       const critereCible = this.critereInitial();
-      if (typeCritereCible === undefined || critereCible === undefined || critereCible.length === 0) {
+      if (
+        typeCritereCible === undefined ||
+        critereCible === undefined ||
+        critereCible.length === 0
+      ) {
         return;
       }
       const regleExistante = this.membresConnus().find(
@@ -283,13 +282,48 @@ export class SqmMembresConnusAdminComponent {
   }
 
   /**
-   * Règles de membres connus du groupe actuellement sélectionné, tableau vide si aucun groupe n'est sélectionné.
-   * @returns Le tableau des règles du groupe sélectionné.
+   * Règles de membres connus du groupe actuellement sélectionné, triées alphabétiquement (US-023, plan_20 Partie A),
+   * tableau vide si aucun groupe n'est sélectionné. Tri d'affichage uniquement : l'ordre stocké dans le fichier de
+   * données n'est jamais modifié.
+   * @returns Le tableau trié des règles du groupe sélectionné.
    */
   public membresConnus(): readonly MembreConnu[] {
-    return (
-      this.groupes().find((groupe) => groupe.id === this.groupeSelectionneId)?.membresConnus ?? []
-    );
+    const membres =
+      this.groupes().find((groupe) => groupe.id === this.groupeSelectionneId)?.membresConnus ?? [];
+    return [...membres].sort((a, b) => this.comparerRegles(a, b));
+  }
+
+  /**
+   * Compare deux règles de membre connu pour un tri alphabétique insensible à la casse et aux accents (US-023) :
+   * clé primaire `libelle` si renseigné et non vide, sinon `critere` ; à égalité, départage par `critere` puis par
+   * `id` pour un ordre totalement déterministe.
+   * @param a - Première règle à comparer.
+   * @param b - Seconde règle à comparer.
+   * @returns Un nombre négatif, nul ou positif selon l'ordre relatif de {@link a} et {@link b}.
+   */
+  private comparerRegles(a: MembreConnu, b: MembreConnu): number {
+    const cleA = a.libelle?.trim() ? a.libelle.trim() : a.critere;
+    const cleB = b.libelle?.trim() ? b.libelle.trim() : b.critere;
+    const comparaisonCle = cleA.localeCompare(cleB, 'fr', { sensitivity: 'base' });
+    if (comparaisonCle !== 0) {
+      return comparaisonCle;
+    }
+    const comparaisonCritere = a.critere.localeCompare(b.critere, 'fr', { sensitivity: 'base' });
+    if (comparaisonCritere !== 0) {
+      return comparaisonCritere;
+    }
+    return a.id.localeCompare(b.id);
+  }
+
+  /**
+   * Met en forme la date de départ (`partiLe`, RG-061) d'une règle sans aucune interprétation de fuseau horaire
+   * (date calendaire, plan_20 Partie B) : remplace l'ancien recours à `DatePipe`, à l'origine d'un décalage d'un
+   * jour selon le fuseau du poste (cf. `docs/03_plan/plan_18_relecture.md#r18-w-09`).
+   * @param dateIso - Date de départ au format `AAAA-MM-JJ`.
+   * @returns Le libellé `JJ/MM/AAAA` correspondant.
+   */
+  public formaterPartiLe(dateIso: string): string {
+    return DateCalendaireUtils.formaterFr(dateIso);
   }
 
   /**
@@ -560,6 +594,7 @@ export class SqmMembresConnusAdminComponent {
       case 'annotationIntrouvable':
       case 'annotationSystemeNonSupprimable':
       case 'nouveauMotDePasseInvalide':
+      case 'auditIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

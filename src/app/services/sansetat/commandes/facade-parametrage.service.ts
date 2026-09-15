@@ -5,7 +5,9 @@
 // modification d'un seuil de couleur (`definirSeuil`) et ajout/modification/remplacement d'une entrée de
 // référentiel (`definirReferentiel`) ; étendu à l'incrément 4 (US-025 ; RG-024, RG-025) : prévisualisation et
 // exécution d'une purge d'audits anciens par densité (`previsualiserPurgeDensite`/`executerPurgeDensite`) ou par
-// âge (`previsualiserPurgeAge`/`executerPurgeAge`). Troisième client de la Façade, classé comme
+// âge (`previsualiserPurgeAge`/`executerPurgeAge`) ; complétée par plan_20 Partie D (US-063, RG-063) de la
+// suppression ciblée d'audits, transverse à tous les projets (`previsualiserSuppressionAudits`/`supprimerAudits`).
+// Troisième client de la Façade, classé comme
 // `FacadeParametrageService` sous `services/sansetat/commandes/` (aucun état interne conservé entre deux appels),
 // qui reprend le même rôle de frontière unique vers `invoke` que `FacadeAdministrationService`, dont il suit
 // exactement le même patron : chaque commande qu'il porte échange la racine complète du fichier de données
@@ -273,6 +275,32 @@ export interface ParametresExecutionPurgeJournal<TDonnees> {
 }
 
 /**
+ * Paramètres transmis à la commande native `previsualiserSuppressionAudits` (US-063, RG-063, plan_20 Partie D),
+ * générique sur le type concret de la racine échangée (`TDonnees`).
+ */
+export interface ParametresPrevisualisationSuppressionAudits<TDonnees> {
+  /** Racine des données courante. */
+  readonly donnees: TDonnees;
+  /** Identifiants des audits sélectionnés (tous projets et groupes confondus). */
+  readonly auditIds: readonly string[];
+}
+
+/**
+ * Paramètres transmis à la commande native `supprimerAudits` (US-063, RG-063, plan_20 Partie D), génériques sur le
+ * type concret de la racine échangée (`TDonnees`) pour ne jamais importer ce type depuis `services/avecetat/etat/`.
+ */
+export interface ParametresSuppressionAudits<TDonnees> {
+  /** Chemin du fichier de données ouvert, nécessaire à la sauvegarde effective déclenchée par cette commande. */
+  readonly chemin: string;
+  /** Racine des données courante, réécrite intégralement par la sauvegarde. */
+  readonly donnees: TDonnees;
+  /** Identifiants des audits à supprimer (tous projets et groupes confondus). */
+  readonly auditIds: readonly string[];
+  /** Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002). */
+  readonly motDePasse: string;
+}
+
+/**
  * Client typé de la Façade de commandes pour le paramétrage des seuils et référentiels (US-033) et la purge des
  * audits anciens (US-025, Phase 7, incrément 4). Cf. commentaire d'en-tête de ce fichier pour la justification de
  * son existence distincte de `FacadeCommandesService`/`FacadeAdministrationService`. Étendu à la Phase 10,
@@ -511,5 +539,30 @@ export class FacadeParametrageService {
     parametres: ParametresExecutionPurgeJournal<TDonnees>,
   ): Promise<TReponse> {
     return InvocationCommandeUtils.invoquer<TReponse>('executer_purge_journal', { ...parametres });
+  }
+
+  /**
+   * Prévisualise une suppression ciblée d'audits (US-063, RG-063, plan_20 Partie D), sans aucune modification ni
+   * sauvegarde.
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresPrevisualisationSuppressionAudits}.
+   * @returns Le résumé de la suppression qui serait effectuée, typé par l'appelant via `TReponse`.
+   */
+  public async previsualiserSuppressionAudits<TDonnees, TReponse>(
+    parametres: ParametresPrevisualisationSuppressionAudits<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('previsualiser_suppression_audits', {
+      ...parametres,
+    });
+  }
+
+  /**
+   * Exécute une suppression ciblée d'audits, sauvegarde le fichier (US-063, RG-063, plan_20 Partie D).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresSuppressionAudits}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async supprimerAudits<TDonnees, TReponse>(
+    parametres: ParametresSuppressionAudits<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_audits', { ...parametres });
   }
 }

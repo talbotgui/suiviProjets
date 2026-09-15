@@ -873,6 +873,7 @@ export type CategorieErreurAdministration =
   | 'sessionVerrouillee'
   | 'motDePasseSessionDivergent'
   | 'nouveauMotDePasseInvalide'
+  | 'auditIntrouvable'
   | 'erreurInterne';
 
 /**
@@ -983,6 +984,42 @@ export type ResultatPrevisualisationPurge =
  * Mode de purge par âge (RG-025), transmis tel quel à `previsualiserPurgeAge`/`executerPurgeAge`.
  */
 export type ModePurgeAge = 'suppression' | 'agregationMensuelle';
+
+/**
+ * Projet qui se retrouverait sans aucun audit si la suppression ciblée demandée était appliquée (US-063, RG-063,
+ * plan_20 Partie D), mirroir de `ProjetVide` côté cœur natif.
+ */
+export interface ProjetVide {
+  /** Identifiant du projet concerné. */
+  readonly projetId: string;
+  /** Nom du projet concerné, pour l'affichage du récapitulatif de confirmation. */
+  readonly nomProjet: string;
+}
+
+/**
+ * Résumé d'une prévisualisation ou d'une exécution de suppression ciblée d'audits (US-063, RG-063, plan_20
+ * Partie D), mirroir de `PrevisualisationSuppressionAudits` côté cœur natif.
+ */
+export interface PrevisualisationSuppressionAudits {
+  /** Nombre d'audits concernés par la suppression, tous projets confondus. */
+  readonly nbAudits: number;
+  /** Nombre de projets comportant au moins un audit concerné. */
+  readonly nbProjetsConcernes: number;
+  /** Taille compressée estimée du fichier de données avant la suppression (octets). */
+  readonly octetsAvant: number;
+  /** Taille compressée estimée du fichier de données après la suppression (octets). */
+  readonly octetsApres: number;
+  /** Projets qui se retrouveraient sans aucun audit si la suppression était appliquée. */
+  readonly projetsVides: readonly ProjetVide[];
+}
+
+/**
+ * Résultat typé d'une prévisualisation ou d'une exécution de suppression ciblée d'audits
+ * (`previsualiserSuppressionAudits`/`supprimerAudits`), sur le modèle de {@link ResultatPrevisualisationPurge}.
+ */
+export type ResultatPrevisualisationSuppressionAudits =
+  | { readonly type: 'succes'; readonly previsualisation: PrevisualisationSuppressionAudits }
+  | { readonly type: 'echec'; readonly anomalie: ErreurAdministration };
 
 /**
  * Résumé d'une prévisualisation ou d'une exécution de purge du journal des modifications lui-même (US-036,

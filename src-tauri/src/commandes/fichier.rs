@@ -130,6 +130,11 @@ pub(crate) enum ErreurFacade {
     /// Le nouveau mot de passe soumis à `changerMotDePasseFichier` est vide (Phase 15, C15-03, US-040, RG-038) :
     /// revalidation côté cœur natif de la validation déjà effectuée côté interface.
     NouveauMotDePasseInvalide,
+    /// Au moins un des identifiants d'audit soumis à `previsualiserSuppressionAudits`/`supprimerAudits` ne
+    /// correspond à aucun audit existant de la racine courante (plan_20 Partie D, US-063, RG-063) : revalidation
+    /// côté cœur natif d'une sélection d'audits reçue via une commande, jamais suivie sans contrôle pour une
+    /// opération destructrice ([norme sécurité](../../../docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties)).
+    AuditIntrouvable,
     /// Anomalie interne non destinée à être détaillée à l'utilisateur.
     ErreurInterne,
 }
@@ -245,6 +250,15 @@ impl From<crate::persistance::purge::ErreurPurge> for ErreurFacade {
         use crate::persistance::purge::ErreurPurge;
         match erreur {
             ErreurPurge::ModePurgeAgeInconnu => Self::ModePurgeAgeInconnu,
+        }
+    }
+}
+
+impl From<crate::persistance::suppression_audits::ErreurSuppressionAudits> for ErreurFacade {
+    fn from(erreur: crate::persistance::suppression_audits::ErreurSuppressionAudits) -> Self {
+        use crate::persistance::suppression_audits::ErreurSuppressionAudits;
+        match erreur {
+            ErreurSuppressionAudits::AuditIntrouvable(_) => Self::AuditIntrouvable,
         }
     }
 }

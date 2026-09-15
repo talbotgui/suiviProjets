@@ -10,13 +10,26 @@
 // (`src-tauri/src/commandes/parametrage.rs`, `src-tauri/src/persistance/purge.rs`, hors périmètre de lecture de
 // cette tâche), sur le modèle déjà retenu par `BouchonAdministrationUtils` : mutations structurelles correctes,
 // mais sans certaines finesses des règles de gestion, chacune signalée ci-dessous comme décision arbitraire :
-// - RG-023 (journal des modifications) : jamais alimenté par ce bouchon, comme déjà pour `BouchonAdministrationUtils` ;
+// - RG-023 (journal des modifications) : jamais alimenté par ce bouchon pour les purges par densité/âge/journal
+//   ci-dessous, comme déjà pour `BouchonAdministrationUtils` — mais bien alimenté pour `supprimer_audits`
+//   (suppression ciblée), cf. plus bas, sur le modèle déjà retenu par `BouchonVuesUtils` pour les mutations de vue ;
 // - RG-024/RG-025 (purge par densité/par âge) : la prévisualisation renvoie toujours un résumé vide (aucune
 //   suppression proposée), l'exécution renvoie la racine inchangée — cette logique de sélection des audits à
 //   purger équivaut à une portion du Moteur de jugement, hors périmètre d'un bouchon ; suffisant pour vérifier
 //   que l'écran affiche un résultat sans erreur, pas pour vérifier une sélection réelle ;
-// - RG-034 (purge du journal des modifications) : même simplification que ci-dessus, le journal n'étant de toute
-//   façon jamais alimenté par ce bouchon.
+// - RG-034 (purge du journal des modifications) : même simplification que ci-dessus, le journal n'étant jamais
+//   alimenté par cette commande précise du bouchon.
+//
+// La suppression ciblée d'audits (US-063, RG-063, plan_20 Partie D) fait exception à cette simplification : la
+// sélection des audits à retirer est déjà entièrement calculée côté interface (l'écran transmet directement les
+// `auditIds` cochés, pas un critère de densité/âge à réinterpréter) ; `previsualiser_suppression_audits` et
+// `supprimer_audits` reproduisent donc fidèlement le comptage (nombre d'audits, de projets concernés, projets
+// vidés détectés), la suppression effective des audits ciblés de la racine bouchonnée, et l'entrée de journal
+// récapitulative unique qui en résulte (RG-023, sur le modèle exact de `persistance::purge::consigner_purge` côté
+// cœur natif), sans délai artificiel (aucune des commandes de ce bouchon n'en porte). Simplification assumée sur
+// un seul point, alignée sur la purge automatique ci-dessus : `octetsAvant`/`octetsApres` restent fixés à `0` (pas
+// de recalcul de taille compressée côté bouchon, coût disproportionné pour un simple retour visuel de « N Mo →
+// M Mo »).
 //
 // Volontairement non typé sur `DonneesRacine`/`Groupe`/`Projet`/… (`services/avecetat/etat/types-donnees.ts`),
 // interdits en dépendance depuis `services/sansetat/` (cf. commentaire d'en-tête de `donnees-racine-bouchon.ts`) :
@@ -38,7 +51,14 @@ type ReponseBouchonParametrage =
       readonly octetsApres: number;
     }
   | { readonly nbEntreesSupprimees: number }
-  | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] };
+  | { readonly donnees: Record<string, unknown>; readonly reussites: readonly boolean[] }
+  | {
+      readonly nbAudits: number;
+      readonly nbProjetsConcernes: number;
+      readonly octetsAvant: number;
+      readonly octetsApres: number;
+      readonly projetsVides: readonly { readonly projetId: string; readonly nomProjet: string }[];
+    };
 
 /**
  * Bouchon TS des dix-huit commandes de la Façade portées par `FacadeParametrageService` (seuils, référentiels,
@@ -69,6 +89,8 @@ export class BouchonParametrageUtils {
     'definir_parametres_cadence_commits',
     'previsualiser_purge_journal',
     'executer_purge_journal',
+    'previsualiser_suppression_audits',
+    'supprimer_audits',
   ]);
 
   /**
@@ -170,6 +192,12 @@ export class BouchonParametrageUtils {
             'cadenceCommits',
             BouchonParametrageUtils.exigerObjet(parametres['parametres']),
           ),
+        );
+      case 'previsualiser_suppression_audits':
+        return BouchonParametrageUtils.previsualiserSuppressionAudits(parametres);
+      case 'supprimer_audits':
+        return BouchonParametrageUtils.horodater(
+          BouchonParametrageUtils.supprimerAudits(parametres),
         );
       default:
         throw new Error(`BouchonParametrageUtils : commande « ${commande} » non bouchonnée.`);
@@ -478,5 +506,112 @@ export class BouchonParametrageUtils {
   private static lireNombre(objet: Readonly<Record<string, unknown>>, cle: string): number {
     const valeur = objet[cle];
     return typeof valeur === 'number' ? valeur : 0;
+  }
+
+  /**
+   * Lit un tableau de chaînes à une clé donnée, liste vide si absent, mal typé, ou si ses éléments ne sont pas
+   * eux-mêmes des chaînes.
+   * @param objet - Objet source.
+   * @param cle - Clé à lire.
+   * @returns Le tableau de chaînes, jamais `undefined`.
+   */
+  private static lireListeTextes(
+    objet: Readonly<Record<string, unknown>>,
+    cle: string,
+  ): readonly string[] {
+    const valeur = objet[cle];
+    if (!Array.isArray(valeur)) {
+      return [];
+    }
+    return valeur.filter((entree): entree is string => typeof entree === 'string');
+  }
+
+  /**
+   * Résout `previsualiser_suppression_audits` (US-063, RG-063, plan_20 Partie D) : calcule, sur la racine
+   * bouchonnée transmise sans la modifier, le nombre d'audits et de projets concernés par `auditIds`, ainsi que la
+   * liste des projets qui se retrouveraient sans aucun audit.
+   * @param parametres - Paramètres reçus (`donnees`, `auditIds`).
+   * @returns Le résumé de la suppression qui serait effectuée.
+   */
+  private static previsualiserSuppressionAudits(parametres: Readonly<Record<string, unknown>>): {
+    nbAudits: number;
+    nbProjetsConcernes: number;
+    octetsAvant: number;
+    octetsApres: number;
+    projetsVides: readonly { projetId: string; nomProjet: string }[];
+  } {
+    const donnees = BouchonParametrageUtils.exigerObjet(parametres['donnees']);
+    const auditIds = new Set(BouchonParametrageUtils.lireListeTextes(parametres, 'auditIds'));
+    let nbAudits = 0;
+    let nbProjetsConcernes = 0;
+    const projetsVides: { projetId: string; nomProjet: string }[] = [];
+    for (const groupe of BouchonParametrageUtils.lireListe(donnees, 'groupes')) {
+      for (const projet of BouchonParametrageUtils.lireListe(groupe, 'projets')) {
+        const audits = BouchonParametrageUtils.lireListe(projet, 'audits');
+        const auditsASupprimer = audits.filter((audit) =>
+          auditIds.has(BouchonParametrageUtils.lireTexte(audit, 'id')),
+        );
+        if (auditsASupprimer.length === 0) {
+          continue;
+        }
+        nbAudits += auditsASupprimer.length;
+        nbProjetsConcernes += 1;
+        if (auditsASupprimer.length === audits.length) {
+          projetsVides.push({
+            projetId: BouchonParametrageUtils.lireTexte(projet, 'id'),
+            nomProjet: BouchonParametrageUtils.lireTexte(projet, 'nom'),
+          });
+        }
+      }
+    }
+    return { nbAudits, nbProjetsConcernes, octetsAvant: 0, octetsApres: 0, projetsVides };
+  }
+
+  /**
+   * Résout `supprimer_audits` (US-063, RG-063, plan_20 Partie D) : retire de la racine bouchonnée les audits dont
+   * l'`id` figure dans `auditIds`, quel que soit leur projet de rattachement.
+   * @param parametres - Paramètres reçus (`donnees`, `auditIds`).
+   * @returns La racine mise à jour (horodatée par l'appelant, cf. {@link horodater}).
+   */
+  private static supprimerAudits(
+    parametres: Readonly<Record<string, unknown>>,
+  ): Record<string, unknown> {
+    const donnees = BouchonParametrageUtils.exigerObjet(parametres['donnees']);
+    const auditIds = new Set(BouchonParametrageUtils.lireListeTextes(parametres, 'auditIds'));
+    let nbAuditsSupprimes = 0;
+    let nbProjetsConcernes = 0;
+    const groupes = BouchonParametrageUtils.lireListe(donnees, 'groupes').map((groupe) => ({
+      ...groupe,
+      projets: BouchonParametrageUtils.lireListe(groupe, 'projets').map((projet) => {
+        const audits = BouchonParametrageUtils.lireListe(projet, 'audits');
+        const auditsRestants = audits.filter(
+          (audit) => !auditIds.has(BouchonParametrageUtils.lireTexte(audit, 'id')),
+        );
+        if (auditsRestants.length < audits.length) {
+          nbAuditsSupprimes += audits.length - auditsRestants.length;
+          nbProjetsConcernes += 1;
+        }
+        return { ...projet, audits: auditsRestants };
+      }),
+    }));
+    // Entrée de journal récapitulative unique (RG-023), sur le modèle exact de `persistance::purge::consigner_purge`
+    // côté cœur natif (`objet: "audits"`, `origine: "Purge"`, `detailOrigine` portant le mode) : sans effet si
+    // aucun audit n'a réellement été supprimé, cohérent avec ce même comportement réel.
+    const journal =
+      nbAuditsSupprimes === 0
+        ? BouchonParametrageUtils.lireListe(donnees, 'journal')
+        : [
+            ...BouchonParametrageUtils.lireListe(donnees, 'journal'),
+            {
+              id: crypto.randomUUID(),
+              horodatage: new Date().toISOString(),
+              objet: 'audits',
+              avant: null,
+              apres: { nbAuditsSupprimes, nbProjetsConcernes },
+              origine: 'Purge',
+              detailOrigine: 'suppression ciblée',
+            },
+          ];
+    return { ...donnees, groupes, journal };
   }
 }

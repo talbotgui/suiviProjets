@@ -65,6 +65,7 @@ import type {
   PremierCommitInterne,
   PrevisualisationPurge,
   PrevisualisationPurgeJournal,
+  PrevisualisationSuppressionAudits,
   Projet,
   ReponseDefinitionReferentiels,
   ReponseQualificationMembre,
@@ -78,6 +79,7 @@ import type {
   ResultatPrevisualisationImportConfiguration,
   ResultatPrevisualisationPurge,
   ResultatPrevisualisationPurgeJournal,
+  ResultatPrevisualisationSuppressionAudits,
   ResultatQualificationMembre,
   ResultatQualificationMembresMasse,
   Source,
@@ -1481,6 +1483,55 @@ export class DonneesApplicationService {
   }
 
   /**
+   * Prévisualise une suppression ciblée d'audits (US-063, RG-063, plan_20 Partie D) : invoque la commande native
+   * `previsualiserSuppressionAudits` sur la racine actuellement chargée, sans aucune modification ni sauvegarde.
+   * @param auditIds - Identifiants des audits sélectionnés (tous projets et groupes confondus).
+   * @returns Le Résultat typé de l'opération, portant le résumé de la suppression qui serait effectuée.
+   * @throws {Error} Si aucun fichier n'est chargé.
+   */
+  public async previsualiserSuppressionAudits(
+    auditIds: readonly string[],
+  ): Promise<ResultatPrevisualisationSuppressionAudits> {
+    const racine = this.racineActuelle();
+    try {
+      const previsualisation = await this.facadeParametrage.previsualiserSuppressionAudits<
+        DonneesRacine,
+        PrevisualisationSuppressionAudits
+      >({ donnees: racine, auditIds });
+      return { type: 'succes', previsualisation };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Exécute une suppression ciblée d'audits (US-063, RG-063, plan_20 Partie D) : invoque la commande native
+   * `supprimerAudits`, qui sauvegarde effectivement le fichier (RG-002) avant de renvoyer la racine mise à jour,
+   * substituée à l'état courant de ce Store.
+   * @param auditIds - Identifiants des audits à supprimer (tous projets et groupes confondus).
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerAudits(
+    auditIds: readonly string[],
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.supprimerAudits<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, auditIds, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
    * Crée une annotation de portée groupe ou projet (US-019) : invoque la commande native `creerAnnotation`, qui
    * ajoute l'annotation, consigne la création au journal et sauvegarde effectivement le fichier (RG-002, RG-023)
    * avant de renvoyer la racine mise à jour, substituée à l'état courant de ce Store.
@@ -1967,6 +2018,7 @@ export class DonneesApplicationService {
       'credentialInvalide',
       'sessionVerrouillee',
       'motDePasseSessionDivergent',
+      'auditIntrouvable',
       'erreurInterne',
     ];
     if (typeof valeur === 'object' && valeur !== null && 'type' in valeur) {

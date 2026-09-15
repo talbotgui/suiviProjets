@@ -830,6 +830,87 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#purge-parametrage-age-resultat-vide')).toBeVisible();
   });
 
+  // 22b. Paramétrage > Suppression ciblée d'audits (US-063, RG-063, plan_20 Partie D) — liste transverse, filtres,
+  // tout cocher, prévisualisation, rejet puis confirmation du mot de passe, disparition dans la Synthèse des
+  // audits et le Journal. Cible les deux projets du groupe Beta (jamais revisités par les étapes suivantes, à la
+  // différence du groupe Alpha dont le premier projet est réutilisé jusqu'à l'étape 25) : leur suppression
+  // intégrale exerce à la fois la protection absente du premier/dernier audit (décision 12 du plan) et l'état
+  // « jamais audité » qui en résulte, sans risquer les étapes ultérieures du parcours. La Comparaison d'audits
+  // (également mentionnée par le plan) n'est pas revérifiée ici : elle n'a été ouverte, à l'étape 20, que sur un
+  // projet du groupe Alpha, non concerné par cette suppression.
+  await test.step('22b. Paramétrage > Suppression ciblée d’audits', async () => {
+    await avantChangementEcran(page, '22b-parametrage-suppression-ciblee');
+
+    // Filtre de date de réalisation / création sur demain : aucun des huit audits déjà intégrés (deux campagnes
+    // désormais terminées, quatre projets) n'a de date de réalisation future — état particulier « aucun résultat »
+    // couvert par le filtre principal du plan (date de réalisation / création), avant de le réinitialiser.
+    const demain = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await page.locator('#purge-parametrage-ciblee-filtre-realisation-min').fill(demain);
+    await expect(page.locator('#purge-parametrage-ciblee-aucun-resultat')).toBeVisible();
+    await page.locator('#purge-parametrage-ciblee-filtre-realisation-min').fill('');
+    await expect(page.locator('#purge-parametrage-ciblee-tableau')).toBeVisible();
+
+    // Filtre par groupe (Beta) : quatre audits (deux campagnes × deux projets), aucun du groupe Alpha visible.
+    await page
+      .locator('#purge-parametrage-ciblee-filtre-groupe')
+      .selectOption({ label: GROUPE_B.nom });
+    const lignesBeta = page.locator('#purge-parametrage-ciblee-tableau tbody tr');
+    await expect(lignesBeta).toHaveCount(4);
+    await expect(page.locator('#purge-parametrage-ciblee-tableau')).not.toContainText(GROUPE_A.nom);
+
+    // « Tout cocher le résultat filtré » puis prévisualisation : les deux projets Beta se retrouveraient sans
+    // aucun audit (décision 12 du plan : aucune protection du premier/dernier audit, à la différence de la purge
+    // par densité).
+    const sectionCiblee = page.locator('#purge-parametrage-suppression-ciblee');
+    await sectionCiblee.getByRole('button', { name: 'Tout cocher le résultat filtré' }).click();
+    await expect(page.locator('#purge-parametrage-ciblee-compteur-selection')).toContainText(
+      '4 audit(s) sélectionné(s) sur 2 projet(s)',
+    );
+    await page.locator('#purge-parametrage-ciblee-bouton-previsualiser').click();
+    await expect(sectionCiblee).toContainText('4 audit(s) sur 2 projet(s)');
+    await expect(page.locator('#purge-parametrage-ciblee-projets-vides')).toContainText(
+      PROJET_B1.nom,
+    );
+    await expect(page.locator('#purge-parametrage-ciblee-projets-vides')).toContainText(
+      PROJET_B2.nom,
+    );
+
+    // Rejet de la ressaisie du mot de passe (décision 12 : aucune écriture, sélection et prévisualisation
+    // inchangées) avant la confirmation effective.
+    await page.locator('#purge-parametrage-ciblee-bouton-supprimer').click();
+    await expect(page.locator('#confirmation-mot-de-passe-champ')).toBeVisible();
+    await page.locator('#confirmation-mot-de-passe-bouton-annuler').click();
+    await expect(page.locator('#confirmation-mot-de-passe-champ')).toBeHidden();
+    await expect(lignesBeta).toHaveCount(4);
+
+    // Confirmation effective : notification de succès, section repassée sans résultat pour le filtre Beta toujours
+    // actif (état particulier « aucun audit ne correspond aux filtres »).
+    await page.locator('#purge-parametrage-ciblee-bouton-supprimer').click();
+    await confirmerMotDePasse();
+    expect(await attendreNotificationSucces(page)).toContain('suppression ciblée');
+    await expect(page.locator('#purge-parametrage-ciblee-aucun-resultat')).toBeVisible();
+
+    // Filtres réinitialisés : seuls les quatre audits restants du groupe Alpha apparaissent.
+    await page.locator('#purge-parametrage-ciblee-filtre-groupe').selectOption('');
+    await expect(page.locator('#purge-parametrage-ciblee-tableau tbody tr')).toHaveCount(4);
+    await expect(page.locator('#purge-parametrage-ciblee-tableau')).not.toContainText(GROUPE_B.nom);
+
+    // Synthèse des audits : les deux projets Beta sont désormais « jamais audité ».
+    await page.locator('#shell-lien-synthese-audits').click();
+    await expect(page).toHaveURL(/\/synthese-audits$/);
+    await expect(page.locator('.tableau-dense__ligne', { hasText: PROJET_B1.nom })).toContainText(
+      'jamais audité',
+    );
+    await expect(page.locator('.tableau-dense__ligne', { hasText: PROJET_B2.nom })).toContainText(
+      'jamais audité',
+    );
+
+    // Journal des modifications : une entrée récapitulative unique (RG-023), sur le modèle de la purge existante.
+    await page.locator('#shell-lien-parametrage').click();
+    await page.locator('#parametrage-onglet-journal').click();
+    await expect(page.locator('#journal-parametrage-tableau')).toContainText('suppression ciblée');
+  });
+
   // 23. Recherche transversale — recherche d'un des projets créés.
   await test.step('23. Recherche transversale', async () => {
     await avantChangementEcran(page, '23-recherche-transversale');

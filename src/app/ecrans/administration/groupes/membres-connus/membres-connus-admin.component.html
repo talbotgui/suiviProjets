@@ -217,7 +217,7 @@
           }}</span>
           @if (regle.partiLe) {
             <span class="membres-connus-admin__parti-le texte-discret texte-sm">
-              · parti le {{ regle.partiLe | date: 'dd/MM/yyyy' : 'UTC' }}
+              · parti le {{ formaterPartiLe(regle.partiLe) }}
             </span>
           }
           @if (estEnConflit(regle.id)) {

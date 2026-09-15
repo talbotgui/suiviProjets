@@ -713,8 +713,9 @@ export class BouchonAdministrationUtils {
     const calculeLe = new Date().toISOString().slice(0, 10);
     const base = { calculeLe, empreinteReferentiel };
 
-    const reglesInternes = BouchonAdministrationUtils.reglesInternes(groupe);
-    if (reglesInternes.length === 0) {
+    const reglesInternesExploitables =
+      BouchonAdministrationUtils.reglesInternesExploitables(groupe);
+    if (reglesInternesExploitables.length === 0) {
       return { ...base, statut: 'aucune_regle_interne' };
     }
     const sourcesGitlab = BouchonAdministrationUtils.lireListe(projet, 'sources').filter(
@@ -744,7 +745,7 @@ export class BouchonAdministrationUtils {
         emailAuteur: BouchonAdministrationUtils.lireTexte(existantDetermine, 'emailAuteur'),
       };
     }
-    const premiereRegle = reglesInternes[0];
+    const premiereRegle = reglesInternesExploitables[0];
     const emailAuteur =
       BouchonAdministrationUtils.lireTexteOptionnel(premiereRegle, 'aliasEmail') ??
       BouchonAdministrationUtils.lireTexte(premiereRegle, 'critere');
@@ -790,6 +791,28 @@ export class BouchonAdministrationUtils {
     return BouchonAdministrationUtils.lireListe(groupe, 'membresConnus').filter(
       (membre) => BouchonAdministrationUtils.lireTexte(membre, 'statut') === 'interne',
     );
+  }
+
+  /**
+   * Règles `interne` d'un groupe portant un canal réellement comparable au courriel d'auteur d'un commit —
+   * courriel exact, domaine de courriel, ou alias courriel d'une règle `username` (plan_20 Partie C, décision 9) :
+   * reproduit `construire_correspondance_interne` côté cœur natif, sans quoi le bouchon renverrait `determine` là
+   * où le cœur natif renvoie `aucune_regle_interne` pour une règle `username` sans `aliasEmail` (le login n'étant
+   * pas exposé par l'API des commits).
+   * @param groupe - Groupe source.
+   * @returns Le sous-ensemble exploitable des règles `interne`.
+   */
+  private static reglesInternesExploitables(
+    groupe: Record<string, unknown>,
+  ): readonly Record<string, unknown>[] {
+    return BouchonAdministrationUtils.reglesInternes(groupe).filter((membre) => {
+      const typeCritere = BouchonAdministrationUtils.lireTexte(membre, 'typeCritere');
+      if (typeCritere === 'email' || typeCritere === 'domaineEmail') {
+        return true;
+      }
+      const aliasEmail = BouchonAdministrationUtils.lireTexteOptionnel(membre, 'aliasEmail');
+      return (aliasEmail?.trim().length ?? 0) > 0;
+    });
   }
 
   /**

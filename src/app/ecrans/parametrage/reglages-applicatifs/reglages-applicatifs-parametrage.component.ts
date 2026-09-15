@@ -591,6 +591,7 @@ export class SqmReglagesApplicatifsParametrageComponent {
       case 'annotationIntrouvable':
       case 'annotationSystemeNonSupprimable':
       case 'nouveauMotDePasseInvalide':
+      case 'auditIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

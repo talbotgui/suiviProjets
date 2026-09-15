@@ -216,6 +216,19 @@ describe('SqmPurgeParametrageComponent', () => {
     expect(composant.previsualisationAge()).toBeNull();
   });
 
+  it("n'attribue pas le message « audit introuvable » à une anomalie sans rapport (non-régression : le cas auditIntrouvable avait été inséré au milieu du groupe de retombée générique, l'interrompant prématurément)", async () => {
+    invokeSimule.mockRejectedValue({ type: 'groupeIntrouvable' });
+    const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+
+    await composant.previsualiserAge();
+
+    const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
+    expect(derniereNotification?.message).toBe(
+      "Une erreur inattendue est survenue lors de l'opération.",
+    );
+    expect(derniereNotification?.message).not.toContain('audit');
+  });
+
   it("affiche un message explicite quand l'exécution de la purge par densité échoue", async () => {
     invokeSimule.mockResolvedValueOnce({
       nbAuditsSupprimes: 1,
@@ -301,5 +314,303 @@ describe('SqmPurgeParametrageComponent', () => {
     composant.annulerMotDePasse();
 
     expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+  });
+
+  describe('suppression ciblée (US-063, RG-063, plan_20 Partie D)', () => {
+    /**
+     * Construit une racine portant deux groupes, trois projets et cinq audits (réguliers et historiques), pour
+     * exercer la liste transverse, ses filtres et le repère « prise en charge » perdu.
+     * @returns Une racine de test.
+     */
+    function racineAvecAudits(): DonneesRacine {
+      const base = DonneesDeTest.racineVide();
+      return {
+        ...base,
+        campagnes: [
+          { id: 'campagne-1', date: '2026-06-01T10:00:00Z', perimetre: [], verdicts: [] },
+        ],
+        groupes: [
+          {
+            id: 'groupe-1',
+            nom: 'Socle Comptable',
+            description: '',
+            instances: [],
+            membresConnus: [],
+            annotations: [],
+            indicateursDesactives: [],
+            projets: [
+              {
+                id: 'projet-1',
+                nom: 'API Facturation',
+                description: '',
+                iaAutorisee: false,
+                sources: [],
+                annotations: [],
+                premierCommitInterne: {
+                  statut: 'determine',
+                  date: '2025-01-10',
+                  sha: 'abc',
+                  emailAuteur: 'x@entreprise.fr',
+                  calculeLe: '2026-01-01',
+                  empreinteReferentiel: 'sha256:test',
+                },
+                audits: [
+                  {
+                    id: 'audit-1',
+                    date: '2026-06-01T10:00:00Z',
+                    campagneId: 'campagne-1',
+                    typeAudit: 'reguliere',
+                    resultats: [],
+                  },
+                  {
+                    id: 'audit-repere',
+                    date: '2025-01-10',
+                    dateExecution: '2026-07-01T10:00:00Z',
+                    campagneId: 'campagne-inconnue',
+                    typeAudit: 'historique',
+                    resultats: [],
+                  },
+                ],
+              },
+              {
+                id: 'projet-2',
+                nom: 'Batch Nocturne',
+                description: '',
+                iaAutorisee: false,
+                sources: [],
+                annotations: [],
+                audits: [
+                  {
+                    id: 'audit-seul',
+                    date: '2026-05-01T10:00:00Z',
+                    campagneId: 'campagne-inconnue',
+                    typeAudit: 'reguliere',
+                    resultats: [],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: 'groupe-2',
+            nom: 'Portail Nova',
+            description: '',
+            instances: [],
+            membresConnus: [],
+            annotations: [],
+            indicateursDesactives: [],
+            projets: [
+              {
+                id: 'projet-3',
+                nom: 'Front Nova',
+                description: '',
+                iaAutorisee: false,
+                sources: [],
+                annotations: [],
+                audits: [
+                  {
+                    id: 'audit-nova',
+                    date: '2026-04-01T10:00:00Z',
+                    campagneId: 'campagne-inconnue',
+                    typeAudit: 'reguliere',
+                    resultats: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    it('construit la liste transverse triée par date de réalisation décroissante', () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+
+      const ids = composant.lignesTransverses().map((ligne) => ligne.auditId);
+
+      expect(ids).toEqual(['audit-repere', 'audit-1', 'audit-seul', 'audit-nova']);
+    });
+
+    it('filtre par groupe, projet, type et plage de date', () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+
+      composant.changerFiltreGroupe('groupe-1');
+      expect(
+        composant
+          .lignesFiltrees()
+          .map((l) => l.auditId)
+          .sort(),
+      ).toEqual(['audit-1', 'audit-repere', 'audit-seul'].sort());
+
+      composant.filtreProjetId.set('projet-1');
+      expect(
+        composant
+          .lignesFiltrees()
+          .map((l) => l.auditId)
+          .sort(),
+      ).toEqual(['audit-1', 'audit-repere'].sort());
+
+      composant.filtreType.set('historique');
+      expect(composant.lignesFiltrees().map((l) => l.auditId)).toEqual(['audit-repere']);
+
+      composant.filtreType.set('');
+      composant.filtreDateRealisationMin.set('2026-06-15');
+      expect(composant.lignesFiltrees().map((l) => l.auditId)).toEqual(['audit-repere']);
+    });
+
+    it('réinitialise le filtre de projet quand le groupe change', () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.filtreProjetId.set('projet-1');
+
+      composant.changerFiltreGroupe('groupe-2');
+
+      expect(composant.filtreProjetId()).toBe('');
+    });
+
+    it('« tout cocher le résultat filtré » ajoute à la sélection existante, « tout décocher » la vide entièrement', () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.bascule('audit-nova');
+      composant.changerFiltreGroupe('groupe-1');
+
+      composant.toutCocherResultatFiltre();
+
+      expect(composant.resumeSelection()).toEqual({ nbAudits: 4, nbProjets: 3 });
+
+      composant.toutDecocher();
+
+      expect(composant.resumeSelection()).toEqual({ nbAudits: 0, nbProjets: 0 });
+    });
+
+    it('invalide la prévisualisation dès que la sélection change', async () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.bascule('audit-seul');
+      invokeSimule.mockResolvedValueOnce({
+        nbAudits: 1,
+        nbProjetsConcernes: 1,
+        octetsAvant: 100,
+        octetsApres: 90,
+        projetsVides: [],
+      });
+      await composant.previsualiserSuppressionCiblee();
+      expect(composant.previsualisationCiblee()).not.toBeNull();
+
+      composant.bascule('audit-nova');
+
+      expect(composant.previsualisationCiblee()).toBeNull();
+    });
+
+    it('signale les projets qui se retrouveraient sans aucun audit et le repère « prise en charge » perdu', async () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.bascule('audit-seul');
+      composant.bascule('audit-repere');
+      invokeSimule.mockResolvedValueOnce({
+        nbAudits: 2,
+        nbProjetsConcernes: 2,
+        octetsAvant: 200,
+        octetsApres: 100,
+        projetsVides: [{ projetId: 'projet-2', nomProjet: 'Batch Nocturne' }],
+      });
+
+      await composant.previsualiserSuppressionCiblee();
+
+      expect(composant.previsualisationCiblee()?.projetsVides).toEqual([
+        { projetId: 'projet-2', nomProjet: 'Batch Nocturne' },
+      ]);
+      expect(composant.projetsPerdantRepere()).toEqual([
+        { projetId: 'projet-1', nomProjet: 'API Facturation' },
+      ]);
+    });
+
+    it("n'ouvre pas la ressaisie du mot de passe sans prévisualisation concernant au moins un audit", () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+
+      composant.demanderExecutionCiblee();
+
+      expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+    });
+
+    it('exécute la suppression ciblée après confirmation du mot de passe, réinitialise sélection et prévisualisation', async () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.bascule('audit-seul');
+      invokeSimule.mockResolvedValueOnce({
+        nbAudits: 1,
+        nbProjetsConcernes: 1,
+        octetsAvant: 100,
+        octetsApres: 90,
+        projetsVides: [],
+      });
+      await composant.previsualiserSuppressionCiblee();
+      composant.demanderExecutionCiblee();
+      expect(composant.actionEnAttenteMotDePasse()).toBe('ciblee');
+
+      invokeSimule.mockResolvedValueOnce(racineAvecAudits());
+      await composant.confirmerExecutionCiblee('mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'supprimer_audits',
+        expect.objectContaining({
+          chemin: '/tmp/donnees-test.sqm',
+          auditIds: ['audit-seul'],
+          motDePasse: 'mot-de-passe',
+        }),
+      );
+      expect(composant.resumeSelection()).toEqual({ nbAudits: 0, nbProjets: 0 });
+      expect(composant.previsualisationCiblee()).toBeNull();
+      expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+      const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
+      expect(derniereNotification?.type).toBe('succes');
+      expect(derniereNotification?.message).toContain('suppression ciblée');
+    });
+
+    it('annule une ressaisie du mot de passe déjà ouverte si la sélection change entre-temps (non-régression : ne jamais confirmer une suppression sur une sélection différente de celle prévisualisée)', async () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.bascule('audit-seul');
+      invokeSimule.mockResolvedValueOnce({
+        nbAudits: 1,
+        nbProjetsConcernes: 1,
+        octetsAvant: 100,
+        octetsApres: 90,
+        projetsVides: [],
+      });
+      await composant.previsualiserSuppressionCiblee();
+      composant.demanderExecutionCiblee();
+      expect(composant.actionEnAttenteMotDePasse()).toBe('ciblee');
+
+      composant.bascule('audit-nova');
+
+      expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+      expect(composant.previsualisationCiblee()).toBeNull();
+    });
+
+    it("affiche un message explicite quand un audit sélectionné n'existe plus (données modifiées entre-temps)", async () => {
+      donneesApplication.chargerRacine(racineAvecAudits());
+      const composant = TestBed.createComponent(SqmPurgeParametrageComponent).componentInstance;
+      composant.bascule('audit-seul');
+      invokeSimule.mockResolvedValueOnce({
+        nbAudits: 1,
+        nbProjetsConcernes: 1,
+        octetsAvant: 100,
+        octetsApres: 90,
+        projetsVides: [],
+      });
+      await composant.previsualiserSuppressionCiblee();
+      composant.demanderExecutionCiblee();
+
+      invokeSimule.mockRejectedValueOnce({ type: 'auditIntrouvable' });
+      await composant.confirmerExecutionCiblee('mot-de-passe');
+
+      const derniereNotification = TestBed.inject(NotificationService).liste().at(-1);
+      expect(derniereNotification?.type).toBe('erreur');
+      expect(derniereNotification?.message).toContain("n'existe plus");
+    });
   });
 });

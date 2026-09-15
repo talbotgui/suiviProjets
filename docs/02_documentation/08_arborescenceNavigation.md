@@ -37,7 +37,7 @@ Shell applicatif (après ouverture d'un fichier — sidebar persistante + barre 
 ├── Paramétrage
 │   ├── Seuils et référentiels (dépendances, marqueurs IA, nommage des branches)
 │   ├── Journal des modifications
-│   ├── Purge des audits
+│   ├── Purge des audits (purge automatique par densité / âge, et section « Suppression ciblée » transverse à tous les projets, [US-063](./04_casUsage.md#cas-dusage--user-stories))
 │   ├── Export / Import de configuration
 │   └── Vues enregistrées (administration centralisée : renommer, dupliquer, supprimer, définir par défaut)
 ├── Gestion des credentials (accessible depuis la barre supérieure et depuis Constitution de campagne ; inclut le test de connectivité globale comme zone du même écran, non un écran distinct)
@@ -84,7 +84,7 @@ Composant transversal
 | Comparaison entre deux audits | [US-018](./04_casUsage.md#cas-dusage--user-stories), [US-032](./04_casUsage.md#cas-dusage--user-stories), [US-056](./04_casUsage.md#cas-dusage--user-stories), [US-059](./04_casUsage.md#cas-dusage--user-stories), [US-062](./04_casUsage.md#cas-dusage--user-stories) |
 | Liste de travail | [US-020](./04_casUsage.md#cas-dusage--user-stories), [US-028](./04_casUsage.md#cas-dusage--user-stories), [US-053](./04_casUsage.md#cas-dusage--user-stories) |
 | Recherche transversale | [US-021](./04_casUsage.md#cas-dusage--user-stories) |
-| Paramétrage | [US-025](./04_casUsage.md#cas-dusage--user-stories), [US-027](./04_casUsage.md#cas-dusage--user-stories), [US-028](./04_casUsage.md#cas-dusage--user-stories), [US-029](./04_casUsage.md#cas-dusage--user-stories), [US-030](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories), [US-034](./04_casUsage.md#cas-dusage--user-stories), [US-035](./04_casUsage.md#cas-dusage--user-stories), [US-036](./04_casUsage.md#cas-dusage--user-stories), [US-048](./04_casUsage.md#cas-dusage--user-stories), [US-049](./04_casUsage.md#cas-dusage--user-stories), [US-054](./04_casUsage.md#cas-dusage--user-stories) |
+| Paramétrage | [US-025](./04_casUsage.md#cas-dusage--user-stories), [US-027](./04_casUsage.md#cas-dusage--user-stories), [US-028](./04_casUsage.md#cas-dusage--user-stories), [US-029](./04_casUsage.md#cas-dusage--user-stories), [US-030](./04_casUsage.md#cas-dusage--user-stories), [US-033](./04_casUsage.md#cas-dusage--user-stories), [US-034](./04_casUsage.md#cas-dusage--user-stories), [US-035](./04_casUsage.md#cas-dusage--user-stories), [US-036](./04_casUsage.md#cas-dusage--user-stories), [US-048](./04_casUsage.md#cas-dusage--user-stories), [US-049](./04_casUsage.md#cas-dusage--user-stories), [US-054](./04_casUsage.md#cas-dusage--user-stories), [US-063](./04_casUsage.md#cas-dusage--user-stories) |
 | Verrouillage | [US-026](./04_casUsage.md#cas-dusage--user-stories) |
 
 [US-037](./04_casUsage.md#cas-dusage--user-stories) (adaptation de chaque écran à la largeur de fenêtre, cf. [RNF-030, RNF-031](./07_exigencesNonFonctionnelles.md#accessibilité)) n'apparaît volontairement dans aucune ligne ci-dessus : ce besoin est transversal à l'ensemble des vingt écrans du shell applicatif, et non propre à un écran particulier ; Paramétrage n'en a été que l'écran pilote lors de sa mise en œuvre (cf. [rapport de développement, Phase 10 incrément 10](../04_rapports/rapportDeDeveloppement.md#étape-10-incrément-10--rattrapage--bugs--c10-06-écran-paramétrage)).

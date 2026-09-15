@@ -2184,7 +2184,6 @@ describe('SqmFicheProjetComponent', () => {
     }
 
     it.each<[StatutPremierCommitNonDetermine, string]>([
-      ['aucune_regle_interne', 'aucun membre interne qualifié pour ce groupe'],
       ['aucun_membre_interne', 'aucun commit interne trouvé'],
       ['indetermine_trop_de_commits', 'non déterminé (dépôt trop volumineux)'],
       ['non_applicable', '— (aucune source GitLab)'],
@@ -2202,6 +2201,55 @@ describe('SqmFicheProjetComponent', () => {
       const element = DomTestUtils.obtenirElementNatif(fixture);
 
       expect(metadonneeAge(element)?.textContent).toContain(libelleAttendu);
+    });
+
+    describe('statut « aucune_regle_interne » (libellé désambiguïsé, RG-058, plan_20 Partie C)', () => {
+      const premierCommitInterne: PremierCommitInterne = {
+        statut: 'aucune_regle_interne',
+        calculeLe: '2026-01-01',
+        empreinteReferentiel: 'sha256:test',
+      };
+
+      it('affiche le libellé actionnable quand des règles interne existent mais sont toutes de type username sans aliasEmail', () => {
+        // Racine construite explicitement avec une seule règle `interne` (plutôt que de s'appuyer implicitement
+        // sur le nombre de règles de la racine de test par défaut) : le test reste valide même si ce nombre
+        // change un jour dans `DonneesDeTest.racine` (constat de relecture, plan_20).
+        const racineDeBase = DonneesDeTest.racine(projetAvecPriseEnCharge(premierCommitInterne));
+        const racine: DonneesRacine = {
+          ...racineDeBase,
+          groupes: racineDeBase.groupes.map((groupe) => ({
+            ...groupe,
+            membresConnus: [
+              {
+                id: 'membre-connu-1',
+                critere: 'jdupont',
+                typeCritere: TypeCritereMembre.Username,
+                statut: StatutMembre.Interne,
+              },
+            ],
+          })),
+        };
+        const fixture = creerFixture('projet-1', racine);
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        expect(metadonneeAge(element)?.textContent).toContain(
+          '1 membres internes qualifiés, mais uniquement par identifiant de connexion',
+        );
+      });
+
+      it('affiche « aucun membre interne qualifié pour ce groupe » quand le groupe ne porte aucune règle interne', () => {
+        const racine = DonneesDeTest.racine(projetAvecPriseEnCharge(premierCommitInterne));
+        const racineSansRegleInterne: DonneesRacine = {
+          ...racine,
+          groupes: racine.groupes.map((groupe) => ({ ...groupe, membresConnus: [] })),
+        };
+        const fixture = creerFixture('projet-1', racineSansRegleInterne);
+        const element = DomTestUtils.obtenirElementNatif(fixture);
+
+        expect(metadonneeAge(element)?.textContent).toContain(
+          'aucun membre interne qualifié pour ce groupe',
+        );
+      });
     });
 
     it('affiche « non calculée » quand aucun calcul n’a jamais eu lieu', () => {

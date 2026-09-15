@@ -29,6 +29,7 @@ import {
 import type { AfterViewInit, OutputEmitterRef, WritableSignal } from '@angular/core';
 import { Router } from '@angular/router';
 import { IndexRechercheTransversaleService } from '../../services/avecetat/recherche/index-recherche-transversale.service';
+import { DateCalendaireUtils } from '../../services/sansetat/jugement/date-calendaire.utils';
 import type {
   EntiteIndexee,
   OccurrenceDependanceIndexee,
@@ -154,12 +155,16 @@ export class SqmRechercheTransversaleComponent implements AfterViewInit {
   }
 
   /**
-   * Met en forme un horodatage ISO 8601 en une date courte `JJ/MM/AAAA`, affichée en regard de chaque occurrence
-   * historique.
-   * @param dateIso - Horodatage ISO 8601 à mettre en forme.
+   * Met en forme une date courte `JJ/MM/AAAA`, affichée en regard de chaque occurrence historique. `dateIso` peut
+   * porter soit une date calendaire (audit historique), mise en forme sans passer par `Date` (plan_20 Partie B),
+   * soit un horodatage complet (audit régulier), dont seul le jour civil local est extrait.
+   * @param dateIso - Horodatage ISO 8601, ou date calendaire `AAAA-MM-JJ`, à mettre en forme.
    * @returns La date courte correspondante.
    */
   public formaterDate(dateIso: string): string {
+    if (DateCalendaireUtils.estDateCalendaire(dateIso)) {
+      return DateCalendaireUtils.formaterFr(dateIso);
+    }
     const date = new Date(dateIso);
     const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
     return `${deuxChiffres(date.getDate())}/${deuxChiffres(date.getMonth() + 1)}/${date.getFullYear()}`;

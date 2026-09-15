@@ -335,6 +335,7 @@ export class SqmAnnotationsGroupeAdminComponent {
       case 'vueIntrouvable':
       case 'reglageApplicatifInvalide':
       case 'nouveauMotDePasseInvalide':
+      case 'auditIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'enregistrement.";
     }

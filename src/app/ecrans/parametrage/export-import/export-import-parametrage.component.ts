@@ -338,6 +338,7 @@ export class SqmExportImportParametrageComponent {
       case 'annotationIntrouvable':
       case 'annotationSystemeNonSupprimable':
       case 'nouveauMotDePasseInvalide':
+      case 'auditIntrouvable':
       case 'erreurInterne':
         return "Une erreur inattendue est survenue lors de l'opération.";
     }

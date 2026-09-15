@@ -163,6 +163,7 @@ export class SqmSecuriteParametrageComponent {
       case 'vueIntrouvable':
       case 'annotationIntrouvable':
       case 'annotationSystemeNonSupprimable':
+      case 'auditIntrouvable':
       case 'erreurInterne':
         return 'Une erreur inattendue est survenue lors du changement de mot de passe.';
     }

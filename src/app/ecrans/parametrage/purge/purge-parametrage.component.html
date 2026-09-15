@@ -122,4 +122,218 @@
       />
     }
   </section>
+
+  <section
+    id="purge-parametrage-suppression-ciblee"
+    class="purge-parametrage__bloc carte interieur-4 exterieur-haut-5"
+  >
+    <h3 class="texte-md poids-gras exterieur-bas-2 exterieur-haut-0">Suppression ciblée</h3>
+    <p class="texte-sm texte-discret">
+      Liste, tous groupes et projets confondus, les audits filtrables par date de réalisation /
+      création, date ciblée, groupe, projet ou type ; contrairement aux purges automatiques
+      ci-dessus, aucun audit n'est protégé — utile notamment pour retirer les audits produits par
+      une version antérieure de l'application.
+    </p>
+
+    <fieldset class="d-flex retour-ligne ecart-3 exterieur-haut-2">
+      <legend class="d-block poids-gras texte-sm exterieur-bas-1">Filtres</legend>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        Date de réalisation / création — du
+        <input
+          id="purge-parametrage-ciblee-filtre-realisation-min"
+          type="date"
+          [ngModel]="filtreDateRealisationMin()"
+          (ngModelChange)="filtreDateRealisationMin.set($event)"
+        />
+      </label>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        au
+        <input
+          id="purge-parametrage-ciblee-filtre-realisation-max"
+          type="date"
+          [ngModel]="filtreDateRealisationMax()"
+          (ngModelChange)="filtreDateRealisationMax.set($event)"
+        />
+      </label>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        Date ciblée — du
+        <input
+          id="purge-parametrage-ciblee-filtre-ciblee-min"
+          type="date"
+          [ngModel]="filtreDateCibleeMin()"
+          (ngModelChange)="filtreDateCibleeMin.set($event)"
+        />
+      </label>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        au
+        <input
+          id="purge-parametrage-ciblee-filtre-ciblee-max"
+          type="date"
+          [ngModel]="filtreDateCibleeMax()"
+          (ngModelChange)="filtreDateCibleeMax.set($event)"
+        />
+      </label>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        Groupe
+        <select
+          id="purge-parametrage-ciblee-filtre-groupe"
+          [ngModel]="filtreGroupeId()"
+          (ngModelChange)="changerFiltreGroupe($event)"
+        >
+          <option value="">Tous</option>
+          @for (groupe of groupesFiltrables(); track groupe.id) {
+            <option [value]="groupe.id">{{ groupe.nom }}</option>
+          }
+        </select>
+      </label>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        Projet
+        <select
+          id="purge-parametrage-ciblee-filtre-projet"
+          [ngModel]="filtreProjetId()"
+          (ngModelChange)="filtreProjetId.set($event)"
+        >
+          <option value="">Tous</option>
+          @for (projet of projetsFiltrables(); track projet.id) {
+            <option [value]="projet.id">{{ projet.nom }}</option>
+          }
+        </select>
+      </label>
+      <label class="d-flex direction-colonne ecart-1 texte-sm">
+        Type
+        <select
+          id="purge-parametrage-ciblee-filtre-type"
+          [ngModel]="filtreType()"
+          (ngModelChange)="filtreType.set($event)"
+        >
+          <option value="">Tous</option>
+          <option value="reguliere">Régulier</option>
+          <option value="historique">Historique</option>
+        </select>
+      </label>
+    </fieldset>
+
+    @if (lignesFiltrees().length === 0) {
+      <p id="purge-parametrage-ciblee-aucun-resultat" class="exterieur-haut-2">
+        Aucun audit ne correspond aux filtres.
+      </p>
+    } @else {
+      <div class="d-flex aligne-centre ecart-2 exterieur-haut-2">
+        <button
+          type="button"
+          class="bouton"
+          [disabled]="enCours()"
+          (click)="toutCocherResultatFiltre()"
+        >
+          Tout cocher le résultat filtré
+        </button>
+        <button type="button" class="bouton" [disabled]="enCours()" (click)="toutDecocher()">
+          Tout décocher
+        </button>
+        <span id="purge-parametrage-ciblee-compteur-selection" class="texte-sm texte-discret">
+          {{ resumeSelection().nbAudits }} audit(s) sélectionné(s) sur
+          {{ resumeSelection().nbProjets }}
+          projet(s)
+        </span>
+      </div>
+
+      <div class="deborde-auto exterieur-haut-2">
+        <table id="purge-parametrage-ciblee-tableau" class="tableau">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">Groupe</th>
+              <th scope="col">Projet</th>
+              <th scope="col">Type</th>
+              <th scope="col">Date ciblée</th>
+              <th scope="col">Date de réalisation</th>
+              <th scope="col">Campagne</th>
+              <th scope="col">Indicateurs</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ligne of lignesFiltrees(); track ligne.auditId) {
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    [attr.aria-label]="'Sélectionner l’audit du ' + ligne.dateRealisationLabel"
+                    [checked]="estSelectionne(ligne.auditId)"
+                    (change)="bascule(ligne.auditId)"
+                  />
+                </td>
+                <td>{{ ligne.groupeLabel }}</td>
+                <td>{{ ligne.projetLabel }}</td>
+                <td>{{ ligne.typeLabel }}</td>
+                <td>{{ ligne.dateCibleeLabel }}</td>
+                <td>{{ ligne.dateRealisationLabel }}</td>
+                <td>{{ ligne.campagneLabel }}</td>
+                <td>{{ ligne.nombreIndicateurs }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <button
+      id="purge-parametrage-ciblee-bouton-previsualiser"
+      type="button"
+      class="bouton exterieur-haut-2"
+      [disabled]="enCours() || resumeSelection().nbAudits === 0"
+      (click)="previsualiserSuppressionCiblee()"
+    >
+      Prévisualiser
+    </button>
+
+    @if (previsualisationCiblee(); as previsualisationCibleeValeur) {
+      @if (previsualisationCibleeValeur.nbAudits === 0) {
+        <p class="exterieur-haut-2">Aucun audit sélectionné ne serait supprimé.</p>
+      } @else {
+        <p class="exterieur-haut-2">
+          {{ previsualisationCibleeValeur.nbAudits }} audit(s) sur
+          {{ previsualisationCibleeValeur.nbProjetsConcernes }} projet(s),
+          {{ formaterOctets(previsualisationCibleeValeur.octetsAvant) }} →
+          {{ formaterOctets(previsualisationCibleeValeur.octetsApres) }}.
+        </p>
+        @if (previsualisationCibleeValeur.projetsVides.length > 0) {
+          <p id="purge-parametrage-ciblee-projets-vides" class="texte-orange">
+            Les projets suivants se retrouveraient sans aucun audit :
+            @for (
+              projetVide of previsualisationCibleeValeur.projetsVides;
+              track projetVide.projetId;
+              let derniere = $last
+            ) {
+              {{ projetVide.nomProjet }}{{ derniere ? '.' : ', ' }}
+            }
+          </p>
+        }
+        @if (projetsPerdantRepere().length > 0) {
+          <p id="purge-parametrage-ciblee-repere-perdu" class="texte-orange">
+            Les projets suivants perdraient leur repère « prise en charge » :
+            @for (projet of projetsPerdantRepere(); track projet.projetId; let derniere = $last) {
+              {{ projet.nomProjet }}{{ derniere ? '.' : ', ' }}
+            }
+          </p>
+        }
+        <button
+          id="purge-parametrage-ciblee-bouton-supprimer"
+          type="button"
+          class="bouton bouton--danger"
+          [disabled]="enCours()"
+          (click)="demanderExecutionCiblee()"
+        >
+          Supprimer la sélection
+        </button>
+      }
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'ciblee') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer les audits sélectionnés."
+        (confirmee)="confirmerExecutionCiblee($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+  </section>
 </section>

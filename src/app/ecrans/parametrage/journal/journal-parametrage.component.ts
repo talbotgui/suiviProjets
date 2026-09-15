@@ -168,6 +168,7 @@ export class SqmJournalParametrageComponent {
       case 'annotationIntrouvable':
       case 'annotationSystemeNonSupprimable':
       case 'nouveauMotDePasseInvalide':
+      case 'auditIntrouvable':
       case 'erreurInterne':
         return 'Une erreur inattendue est survenue lors de la purge.';
     }

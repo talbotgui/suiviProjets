@@ -67,6 +67,7 @@ import type {
   EntreeJournal,
   EntreeReglesDependances,
   Groupe,
+  MembreConnu,
   PremierCommitInterne,
   Projet,
   Resultat,
@@ -85,6 +86,7 @@ import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugemen
 import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
+import { DateCalendaireUtils } from '../../services/sansetat/jugement/date-calendaire.utils';
 import { DerniereCampagneUtils } from '../../services/sansetat/jugement/derniere-campagne.utils';
 import { EcosystemeDependanceUtils } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import type { EcosystemeDependance } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
@@ -291,7 +293,8 @@ interface LigneMembre {
    * décision 10 du plan `plan_18`, §8.5). `undefined` pour tout autre statut, une résolution par domaine (une règle
    * `domaineEmail` ne peut jamais porter `partiLe`), ou un membre déjà marqué parti.
    */
-  readonly critereMarquerParti: { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
+  readonly critereMarquerParti:
+    { readonly type: TypeCritereMembre; readonly valeur: string } | undefined;
   /** `true` si le membre est nominativement membre direct du dépôt (US-017, première section). */
   readonly direct: boolean;
   /**
@@ -1136,7 +1139,11 @@ export class SqmFicheProjetComponent {
       statutIa: this.construireEtiquetteStatutIa(projet.iaAutorisee, themes.marqueursIa),
       sonarKo,
       membreInconnuDetecte: membres.some((membre) => membre.inconnu),
-      ageChezNousLabel: this.construireAgeChezNousLabel(projet.premierCommitInterne, maintenant),
+      ageChezNousLabel: this.construireAgeChezNousLabel(
+        projet.premierCommitInterne,
+        maintenant,
+        groupe.membresConnus,
+      ),
       empreinteReferentielPriseEnCharge: projet.premierCommitInterne?.empreinteReferentiel,
       dernierAuditLabel:
         dernierAudit === undefined ? 'jamais audité' : this.formaterDateCourte(dernierAudit.date),
@@ -1251,23 +1258,36 @@ export class SqmFicheProjetComponent {
   }
 
   /**
-   * Calcule le nombre de jours pleins écoulés depuis une date ISO 8601, jamais négatif.
-   * @param dateIso - Date ISO 8601 de référence.
+   * Calcule le nombre de jours pleins écoulés depuis une date, jamais négatif. `dateIso` peut porter soit une
+   * date calendaire (`premierCommitInterne.date`, RG-058), comparée sans passer par `Date` (plan_20 Partie B —
+   * une soustraction d'instants locaux décalerait le résultat d'un jour selon le fuseau du poste), soit un
+   * horodatage complet (`mr.creeLe`, date de création d'une merge request), dont l'écart en instants est mesuré
+   * normalement.
+   * @param dateIso - Date calendaire (`AAAA-MM-JJ`) ou horodatage ISO 8601 complet de référence.
    * @param maintenant - Date courante.
    * @returns Le nombre de jours écoulés.
    */
   private joursDepuis(dateIso: string, maintenant: Date): number {
+    if (DateCalendaireUtils.estDateCalendaire(dateIso)) {
+      return DateCalendaireUtils.joursEcoules(dateIso, maintenant);
+    }
     const diffMs = maintenant.getTime() - new Date(dateIso).getTime();
     return Math.max(0, Math.floor(diffMs / MILLISECONDES_PAR_JOUR));
   }
 
   /**
    * Met en forme une date ISO 8601 en libellé court `AAAA-MM-JJ` (sur le modèle de `SqmSyntheseAuditsComponent.
-   * formaterDate`, cohérence visuelle entre écrans).
-   * @param dateIso - Date ISO 8601 à mettre en forme.
+   * formaterDate`, cohérence visuelle entre écrans). `dateIso` peut porter soit une date calendaire (audit
+   * historique, `premierCommitInterne.date`), restituée telle quelle sans passer par `Date` (plan_20 Partie B —
+   * une conversion locale/UTC décalerait le jour affiché selon le fuseau du poste), soit un horodatage complet
+   * (audit régulier), dont seul le jour civil local est extrait.
+   * @param dateIso - Date ISO 8601, ou date calendaire `AAAA-MM-JJ`, à mettre en forme.
    * @returns Le libellé court correspondant.
    */
   private formaterDateCourte(dateIso: string): string {
+    if (DateCalendaireUtils.estDateCalendaire(dateIso)) {
+      return dateIso;
+    }
     const date = new Date(dateIso);
     const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
     return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;
@@ -1299,11 +1319,14 @@ export class SqmFicheProjetComponent {
    * Construit le libellé de l'âge du projet chez nous (`Projet.premierCommitInterne`).
    * @param premierCommitInterne - Date du premier commit interne, absente si non encore calculée.
    * @param maintenant - Date de référence pour le calcul d'ancienneté.
+   * @param membresConnus - Règles de membres connus du groupe de rattachement, pour désambiguïser le statut
+   * `aucune_regle_interne` à l'affichage (RG-058, plan_20 Partie C).
    * @returns Le libellé calculé, libellé de repli explicite si non calculable.
    */
   private construireAgeChezNousLabel(
     premierCommitInterne: Projet['premierCommitInterne'],
     maintenant: Date,
+    membresConnus: readonly MembreConnu[],
   ): string {
     // Les six libellés de statut (RG-058, plan_18) : seule la variante `determine` produit un libellé
     // d'ancienneté, chaque autre statut un libellé explicite distinct (`aucune_regle_interne` invite à qualifier,
@@ -1318,8 +1341,25 @@ export class SqmFicheProjetComponent {
         const ancienneteLabel = annees > 0 ? `${annees} an${annees > 1 ? 's' : ''}` : `${jours} j`;
         return `${ancienneteLabel} (depuis ${this.formaterDateCourte(premierCommitInterne.date)})`;
       }
-      case 'aucune_regle_interne':
-        return 'aucun membre interne qualifié pour ce groupe';
+      case 'aucune_regle_interne': {
+        // `aucune_regle_interne` recouvre à la fois l'absence totale de règle `interne` et la présence de règles
+        // `interne` toutes inexploitables pour la datation (type `username` sans `aliasEmail` : le username n'est
+        // pas exposé par l'API des commits, cf. `construire_correspondance_interne` côté cœur natif) — RG-058,
+        // plan_20 Partie C. La Fiche projet lève l'ambiguïté à l'affichage, à partir des règles déjà chargées : si
+        // au moins une règle `interne` existe, le cœur natif n'a pu renvoyer ce statut que parce qu'aucune d'elles
+        // n'est exploitable (sinon le statut aurait été `determine` ou `aucun_membre_interne`).
+        const nombreReglesInternes = membresConnus.filter(
+          (regle) => regle.statut === StatutMembre.Interne,
+        ).length;
+        if (nombreReglesInternes === 0) {
+          return 'aucun membre interne qualifié pour ce groupe';
+        }
+        return (
+          `${nombreReglesInternes} membres internes qualifiés, mais uniquement par identifiant de connexion : ` +
+          'renseignez un alias courriel sur ces règles, ou ajoutez une règle de courriel ou de domaine, pour ' +
+          'permettre la datation'
+        );
+      }
       case 'aucun_membre_interne':
         return 'aucun commit interne trouvé';
       case 'indetermine_trop_de_commits':

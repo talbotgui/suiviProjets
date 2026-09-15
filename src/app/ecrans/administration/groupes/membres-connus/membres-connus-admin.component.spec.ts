@@ -89,14 +89,16 @@ class DonneesDeTest {
   /**
    * Construit une règle de membre connu de test.
    * @param id - Identifiant de la règle.
+   * @param complement - Champs additionnels ou de substitution (ex. `libelle`, `partiLe`).
    * @returns Une règle de test.
    */
-  public static membre(id: string): MembreConnu {
+  public static membre(id: string, complement: Partial<MembreConnu> = {}): MembreConnu {
     return {
       id,
       critere: 'alice',
       typeCritere: TypeCritereMembre.Username,
       statut: StatutMembre.Interne,
+      ...complement,
     };
   }
 
@@ -559,4 +561,73 @@ describe('SqmMembresConnusAdminComponent', () => {
       );
     },
   );
+
+  describe('tri alphabétique de la liste (US-023, plan_20 Partie A)', () => {
+    it('affiche les règles triées par libellé, insensible à la casse et aux accents, règle sans libellé triée sur son critère', () => {
+      const membres: MembreConnu[] = [
+        DonneesDeTest.membre('m-marie', { critere: 'z-marie', libelle: 'marie' }),
+        DonneesDeTest.membre('m-elodie', { critere: 'z-elodie', libelle: 'Élodie' }),
+        DonneesDeTest.membre('m-sans-libelle', { critere: 'bernard' }),
+      ];
+      const racineAvecMembres: DonneesRacine = {
+        ...DonneesDeTest.racineActuelle(donneesApplication),
+        groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+          g.id === groupeId ? { ...g, membresConnus: membres } : g,
+        ),
+      };
+      donneesApplication.chargerRacine(racineAvecMembres);
+
+      composant.selectionnerGroupe(groupeId);
+
+      expect(composant.membresConnus().map((regle) => regle.id)).toEqual([
+        'm-sans-libelle',
+        'm-elodie',
+        'm-marie',
+      ]);
+    });
+
+    it('départage deux règles de même libellé sur leur critère puis sur leur identifiant, de façon stable', () => {
+      const membres: MembreConnu[] = [
+        DonneesDeTest.membre('m-2', { critere: 'b-critere', libelle: 'Même libellé' }),
+        DonneesDeTest.membre('m-1', { critere: 'a-critere', libelle: 'Même libellé' }),
+      ];
+      const racineAvecMembres: DonneesRacine = {
+        ...DonneesDeTest.racineActuelle(donneesApplication),
+        groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+          g.id === groupeId ? { ...g, membresConnus: membres } : g,
+        ),
+      };
+      donneesApplication.chargerRacine(racineAvecMembres);
+
+      composant.selectionnerGroupe(groupeId);
+
+      expect(composant.membresConnus().map((regle) => regle.id)).toEqual(['m-1', 'm-2']);
+    });
+
+    it("n'altère pas la détection de conflit ni l'ouverture en édition de la bonne règle après changement d'ordre", () => {
+      const membres: MembreConnu[] = [
+        DonneesDeTest.membre('m-marie', { critere: 'z-marie', libelle: 'marie' }),
+        DonneesDeTest.membre('m-elodie', { critere: 'z-elodie', libelle: 'Élodie' }),
+      ];
+      const racineAvecMembres: DonneesRacine = {
+        ...DonneesDeTest.racineActuelle(donneesApplication),
+        groupes: DonneesDeTest.racineActuelle(donneesApplication).groupes.map((g) =>
+          g.id === groupeId ? { ...g, membresConnus: membres } : g,
+        ),
+      };
+      donneesApplication.chargerRacine(racineAvecMembres);
+      composant.selectionnerGroupe(groupeId);
+
+      composant.ouvrirEdition('m-marie');
+
+      expect(composant.membreEnEditionId).toBe('m-marie');
+      expect(composant.critere).toBe('z-marie');
+    });
+  });
+
+  describe('affichage de la date de départ sans décalage de fuseau (plan_20 Partie B)', () => {
+    it('met en forme partiLe en JJ/MM/AAAA sans conversion de fuseau (non-régression du décalage R18-W-09)', () => {
+      expect(composant.formaterPartiLe('2026-09-01')).toBe('01/09/2026');
+    });
+  });
 });

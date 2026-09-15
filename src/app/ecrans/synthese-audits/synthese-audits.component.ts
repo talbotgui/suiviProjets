@@ -93,6 +93,7 @@ import type {
 } from '../../services/sansetat/commandes/types-facade';
 import { AgregationThemeFicheProjetUtils } from '../../services/sansetat/jugement/agregation-theme-fiche-projet.utils';
 import { BadgeAuditAncienUtils } from '../../services/sansetat/jugement/badge-audit-ancien.utils';
+import { DateCalendaireUtils } from '../../services/sansetat/jugement/date-calendaire.utils';
 import { DernierAuditRegulierUtils } from '../../services/sansetat/jugement/dernier-audit-regulier.utils';
 import { BadgeSonarKoUtils } from '../../services/sansetat/jugement/badge-sonar-ko.utils';
 import { ClasseTailleUtils } from '../../services/sansetat/jugement/classe-taille.utils';
@@ -1330,10 +1331,16 @@ export class SqmSyntheseAuditsComponent {
 
   /**
    * Met en forme une date ISO 8601 en libellé court `AAAA-MM-JJ` (sur le modèle de la maquette de référence).
-   * @param dateIso - Date ISO 8601 à mettre en forme.
+   * `dateIso` peut porter soit une date calendaire (audit historique), restituée telle quelle sans passer par
+   * `Date` (plan_20 Partie B), soit un horodatage complet (audit régulier), dont seul le jour civil local est
+   * extrait.
+   * @param dateIso - Date ISO 8601, ou date calendaire `AAAA-MM-JJ`, à mettre en forme.
    * @returns Le libellé court correspondant.
    */
   private formaterDate(dateIso: string): string {
+    if (DateCalendaireUtils.estDateCalendaire(dateIso)) {
+      return dateIso;
+    }
     const date = new Date(dateIso);
     const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
     return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;

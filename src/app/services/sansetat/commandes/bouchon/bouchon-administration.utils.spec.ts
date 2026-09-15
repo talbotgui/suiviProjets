@@ -1017,6 +1017,60 @@ describe('BouchonAdministrationUtils', () => {
       expect(resultat['calculeLe']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
+    it('doit renvoyer « aucune_regle_interne » quand toutes les règles interne sont de type username sans aliasEmail (plan_20 Partie C, décision 9)', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
+        'calculer_prise_en_charge_projet',
+        {
+          projetId: 'projet-1',
+          donnees: {
+            groupes: [
+              {
+                ...groupeComplet,
+                membresConnus: [
+                  { id: 'm1', critere: 'jdupont', typeCritere: 'username', statut: 'interne' },
+                ],
+              },
+            ],
+            brouillon: null,
+            campagnes: [],
+            meta: {},
+          },
+        },
+      );
+
+      expect(resultat['statut']).toBe('aucune_regle_interne');
+    });
+
+    it('doit renvoyer « determine » quand une règle username porte un aliasEmail (plan_20 Partie C, décision 9)', async () => {
+      const resultat = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
+        'calculer_prise_en_charge_projet',
+        {
+          projetId: 'projet-1',
+          donnees: {
+            groupes: [
+              {
+                ...groupeComplet,
+                membresConnus: [
+                  {
+                    id: 'm1',
+                    critere: 'jdupont',
+                    typeCritere: 'username',
+                    statut: 'interne',
+                    aliasEmail: 'j.dupont@entreprise.fr',
+                  },
+                ],
+              },
+            ],
+            brouillon: null,
+            campagnes: [],
+            meta: {},
+          },
+        },
+      );
+
+      expect(resultat['statut']).toBe('determine');
+    });
+
     it('doit renvoyer « non_applicable » quand le projet n’a aucune source GitLab', async () => {
       const resultat = await BouchonAdministrationUtils.invoquer<Record<string, unknown>>(
         'calculer_prise_en_charge_projet',

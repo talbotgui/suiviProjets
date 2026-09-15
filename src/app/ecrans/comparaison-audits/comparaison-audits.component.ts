@@ -66,6 +66,7 @@ import type {
   DifferentielIndicateurs,
   MembreDifferentiel,
 } from '../../services/sansetat/jugement/differentiel-audits.utils';
+import { DateCalendaireUtils } from '../../services/sansetat/jugement/date-calendaire.utils';
 import { DifferentielAuditsUtils } from '../../services/sansetat/jugement/differentiel-audits.utils';
 import { EcosystemeDependanceUtils } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import type { EcosystemeDependance } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
@@ -718,11 +719,16 @@ export class SqmComparaisonAuditsComponent {
 
   /**
    * Met en forme une date ISO 8601 en libellé court `AAAA-MM-JJ` (sur le modèle de
-   * `SqmFicheProjetComponent.formaterDateCourte`, cohérence visuelle entre écrans).
-   * @param dateIso - Date ISO 8601 à mettre en forme.
+   * `SqmFicheProjetComponent.formaterDateCourte`, cohérence visuelle entre écrans). `dateIso` peut porter soit une
+   * date calendaire (audit historique), restituée telle quelle sans passer par `Date` (plan_20 Partie B), soit un
+   * horodatage complet (audit régulier), dont seul le jour civil local est extrait.
+   * @param dateIso - Date ISO 8601, ou date calendaire `AAAA-MM-JJ`, à mettre en forme.
    * @returns Le libellé court correspondant.
    */
   private formaterDateCourte(dateIso: string): string {
+    if (DateCalendaireUtils.estDateCalendaire(dateIso)) {
+      return dateIso;
+    }
     const date = new Date(dateIso);
     const deuxChiffres = (valeur: number): string => valeur.toString().padStart(2, '0');
     return `${date.getFullYear()}-${deuxChiffres(date.getMonth() + 1)}-${deuxChiffres(date.getDate())}`;
