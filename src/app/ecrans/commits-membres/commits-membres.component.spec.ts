@@ -79,13 +79,21 @@ class Fixtures {
   }
 
   /**
-   * Événements d'un membre (`alice` régulière, autre membre silencieux).
+   * Événements d'un membre (`alice` régulière, autre membre silencieux). Horodatés à heure UTC fixe (12 h, hors de
+   * la plage « soirée » `19 h–7 h` de {@link CADENCE}) : sans cette heure fixe, `n` jours avant `Date.now()`
+   * hériterait de l'heure réelle d'exécution du test, faisant basculer les cinq poussées d'`alice` en soirée (donc
+   * une alerte `soiree` inattendue sur une régulière) selon le moment de la journée où la suite tourne.
    * @param utilisateurId - Identifiant du membre.
    * @returns Ses événements.
    */
   public static evenements(utilisateurId: number): readonly EvenementPoussee[] {
     const jour = 24 * 60 * 60 * 1000;
-    const iso = (n: number): string => new Date(Date.now() - n * jour).toISOString();
+    const heureUtcFixe = 12;
+    const iso = (n: number): string => {
+      const date = new Date(Date.now() - n * jour);
+      date.setUTCHours(heureUtcFixe, 0, 0, 0);
+      return date.toISOString();
+    };
     if (utilisateurId === 9001) {
       return [1, 2, 3, 4, 5].map((n) => ({
         horodatage: iso(n),

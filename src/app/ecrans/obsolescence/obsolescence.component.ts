@@ -350,11 +350,16 @@ export class SqmObsolescenceComponent {
   private modaleAffichee = false;
 
   /**
-   * Date du jour au format `AAAA-MM-JJ` (locale du système).
-   * @returns La date du jour.
+   * Date du jour au format `AAAA-MM-JJ`, en UTC : {@link auditRetenu} compare cette valeur à `Audit.date` (`new
+   * Date().toISOString()`, RG-046), lui-même un instant UTC — jamais la date civile locale du poste
+   * (`ExportImageUtils.construireHorodatage`, réservée à l'horodatage local des noms de fichier d'export), qui
+   * décalerait cette comparaison d'un jour selon le fuseau du poste dans la fenêtre où le jour civil local est en
+   * retard sur le jour UTC (même défaut que R18-W-09, cf. `date-calendaire.utils.ts`), excluant alors à tort le
+   * dernier audit du jour de {@link auditRetenu}.
+   * @returns La date du jour en UTC.
    */
   private static aujourdhui(): string {
-    return ExportImageUtils.construireHorodatage(new Date()).slice(0, 10);
+    return new Date().toISOString().slice(0, 10);
   }
 
   /** Groupes proposés au composant de filtre mutualisé (forme structurelle minimale, RG-053), triés par nom. */

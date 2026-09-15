@@ -397,6 +397,27 @@ describe('SqmObsolescenceComponent', () => {
     expect(composant.projetsAffiches()[0].valeurParCategorie.get('cat-exec')).toBe(13); // audit de janvier
   });
 
+  it('initialise la date du filtre au jour UTC, cohérent avec l’instant UTC porté par `Audit.date`', () => {
+    // Régression : `filtreDate` (date du jour, par défaut) est comparée à `Audit.date`, un instant UTC
+    // (`new Date().toISOString()`, RG-046) via `auditRetenu` — elle doit donc elle-même être calculée en UTC,
+    // jamais via les accesseurs locaux (`getFullYear`/`getMonth`/`getDate`) qu'utilise
+    // `ExportImageUtils.construireHorodatage` (réservé à l'horodatage local des noms de fichier d'export) : sur un
+    // poste à fuseau négatif, le jour civil local reste en retard d'un jour sur le jour UTC entre minuit UTC et
+    // l'heure locale équivalente, ce qui exclurait à tort de `auditRetenu` un audit horodaté aujourd'hui en UTC. Ce
+    // test ne peut pas reproduire ce décalage dans cet environnement Jest (le fuseau du processus Node, figé sur
+    // UTC dès la première résolution `Intl`/`Date`, ne suit pas une réaffectation de `process.env.TZ` en cours de
+    // test) ; il fixe néanmoins le contrat attendu — calcul en UTC — contre une régression vers l'implémentation
+    // locale précédente.
+    jest.useFakeTimers({ advanceTimers: false });
+    jest.setSystemTime(new Date('2026-01-15T23:30:00.000Z'));
+    try {
+      const composant = creer(DonneesDeTest.racine([])).componentInstance;
+      expect(composant.filtreDate()).toBe('2026-01-15');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('calcule la médiane par catégorie sur les projets affichés', () => {
     const racine = DonneesDeTest.racine([
       DonneesDeTest.groupe('g1', 'G1', 'p1', 'P1', [
