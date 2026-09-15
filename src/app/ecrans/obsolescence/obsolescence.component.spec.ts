@@ -76,6 +76,7 @@ class DonneesDeTest {
    * @param projetId - Identifiant du projet.
    * @param nomProjet - Nom du projet.
    * @param audits - Audits du projet.
+   * @param enStase - Qualification « en stase » du projet (US-064, RG-064, faux par défaut).
    * @returns Le groupe de test.
    */
   public static groupe(
@@ -84,6 +85,7 @@ class DonneesDeTest {
     projetId: string,
     nomProjet: string,
     audits: readonly Audit[],
+    enStase = false,
   ): Groupe {
     return {
       id: groupeId,
@@ -99,6 +101,7 @@ class DonneesDeTest {
           nom: nomProjet,
           description: '',
           iaAutorisee: false,
+          enStase,
           sources: [],
           annotations: [],
           audits,
@@ -782,6 +785,216 @@ describe('SqmObsolescenceComponent', () => {
 
     expect(toPng).toHaveBeenCalledTimes(1);
     expect(succes).toHaveBeenCalledWith(expect.stringContaining('obsolescence-'));
+  });
+
+  it('applique un fond gris clair et une infobulle explicite à la tuile d’un projet « en stase » (US-064, RG-064)', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe(
+        'g1',
+        'Groupe 1',
+        'p1',
+        'Projet En Stase',
+        [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '17', manifeste: 'pom.xml' },
+          ]),
+        ],
+        true,
+      ),
+    ]);
+    const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+      '.obsolescence__tuile',
+    );
+
+    expect(tuile?.classList.contains('obsolescence__tuile--en-stase')).toBe(true);
+    expect(tuile?.getAttribute('title')).toContain('Projet en stase');
+  });
+
+  it('n’applique aucun fond « en stase » à la tuile d’un projet actif', () => {
+    const racine = DonneesDeTest.racine([
+      DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'Projet Actif', [
+        DonneesDeTest.audit('2026-06-01', [
+          { reference: 'java', version: '17', manifeste: 'pom.xml' },
+        ]),
+      ]),
+    ]);
+    const tuile = DomTestUtils.obtenirElementNatif(creer(racine)).querySelector(
+      '.obsolescence__tuile',
+    );
+
+    expect(tuile?.classList.contains('obsolescence__tuile--en-stase')).toBe(false);
+    expect(tuile?.getAttribute('title')).not.toContain('en stase');
+  });
+
+  describe('bouton « Top 10 » (US-065, RG-065, plan_20 Partie F)', () => {
+    /**
+     * Construit une racine portant `nombre` projets, chacun avec un unique constat `java` dont la version
+     * détermine le score (`21 - version` = retard de la catégorie `cat-exec`, seule catégorie renseignée). Les
+     * projets sont nommés `Projet00`, `Projet01`, … pour un départage alphabétique déterministe des ex æquo.
+     * @param scores - Score voulu (retard, ≥ 0) pour chaque projet, dans l'ordre de création.
+     * @returns La racine de test.
+     */
+    function racineAvecScores(scores: readonly number[]): DonneesRacine {
+      return DonneesDeTest.racine(
+        scores.map((score, index) => {
+          const id = index.toString().padStart(2, '0');
+          const version = 21 - score;
+          return DonneesDeTest.groupe(`g${id}`, `Groupe${id}`, `p${id}`, `Projet${id}`, [
+            DonneesDeTest.audit('2026-06-01', [
+              { reference: 'java', version: String(version), manifeste: 'pom.xml' },
+            ]),
+          ]);
+        }),
+      );
+    }
+
+    it('reste inactif par défaut et conserve le tri par nom (aucune régression)', () => {
+      const composant = creer(racineAvecScores([1, 5, 3])).componentInstance;
+      expect(composant.topDixActif()).toBe(false);
+      expect(composant.tuiles().map((t) => t.nomProjet)).toEqual([
+        'Projet00',
+        'Projet01',
+        'Projet02',
+      ]);
+    });
+
+    it('restreint la grille aux dix projets de plus grand score, triés par score décroissant puis nom croissant', () => {
+      // 12 projets de scores distincts 1..12 : le Top 10 retient les scores 12..3, exclut 1 et 2.
+      const scores = Array.from({ length: 12 }, (_, i) => i + 1);
+      const composant = creer(racineAvecScores(scores)).componentInstance;
+
+      composant.basculerTopDix();
+
+      expect(composant.topDixActif()).toBe(true);
+      const tuiles = composant.tuiles();
+      expect(tuiles).toHaveLength(10);
+      expect(tuiles[0].mesures.find((m) => m.categorieId === 'cat-exec')?.valeur).toBe(12);
+      expect(tuiles.at(-1)?.mesures.find((m) => m.categorieId === 'cat-exec')?.valeur).toBe(3);
+      expect(composant.total()).toBe(10);
+    });
+
+    it('conserve tous les projets ex æquo au score du dixième rang (décision 24)', () => {
+      // 9 scores distincts (10..2) puis deux projets au score 1 (rangs 10 et 11 ex æquo) : la grille affiche 11 tuiles.
+      const scores = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1];
+      const composant = creer(racineAvecScores(scores)).componentInstance;
+
+      composant.basculerTopDix();
+
+      expect(composant.tuiles()).toHaveLength(11);
+      expect(composant.total()).toBe(11);
+    });
+
+    it('exclut les projets de score nul même quand moins de dix projets sont en retard', () => {
+      const composant = creer(racineAvecScores([0, 0, 3])).componentInstance;
+
+      composant.basculerTopDix();
+
+      expect(composant.tuiles()).toHaveLength(1);
+      expect(composant.tuiles()[0].nomProjet).toBe('Projet02');
+    });
+
+    it('affiche un message d’état dédié quand le Top 10 actif ne retient aucun projet', () => {
+      const fixture = creer(racineAvecScores([0, 0]));
+      fixture.componentInstance.basculerTopDix();
+      fixture.detectChanges();
+
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      expect(element.textContent).toContain('Aucun projet en retard ne correspond aux filtres.');
+      expect(element.textContent).not.toContain('Aucun projet ne correspond aux filtres.');
+    });
+
+    it('applique le Top 10 après le filtre groupe/projet mutualisé (RG-053, décision 26)', () => {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'ProjetG1', [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '11', manifeste: 'pom.xml' },
+          ]),
+        ]),
+        DonneesDeTest.groupe('g2', 'Groupe 2', 'p2', 'ProjetG2', [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '20', manifeste: 'pom.xml' },
+          ]),
+        ]),
+      ]);
+      const composant = creer(racine).componentInstance;
+      composant.onSelectionGroupeProjet({ groupeId: 'g2', projetIds: null });
+
+      composant.basculerTopDix();
+
+      // Seul le projet du groupe filtré (score 1) doit apparaître, jamais celui du groupe exclu (score 10).
+      expect(composant.tuiles().map((t) => t.nomProjet)).toEqual(['ProjetG2']);
+    });
+
+    it('recalcule le Top 10 quand un filtre est modifié après activation', () => {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'Groupe 1', 'p1', 'ProjetG1', [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '11', manifeste: 'pom.xml' },
+          ]),
+        ]),
+        DonneesDeTest.groupe('g2', 'Groupe 2', 'p2', 'ProjetG2', [
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '20', manifeste: 'pom.xml' },
+          ]),
+        ]),
+      ]);
+      const composant = creer(racine).componentInstance;
+      composant.basculerTopDix();
+      expect(
+        composant
+          .tuiles()
+          .map((t) => t.nomProjet)
+          .sort(),
+      ).toEqual(['ProjetG1', 'ProjetG2']);
+
+      composant.onSelectionGroupeProjet({ groupeId: 'g1', projetIds: null });
+
+      expect(composant.tuiles().map((t) => t.nomProjet)).toEqual(['ProjetG1']);
+    });
+
+    it('bascule via le bouton, avec aria-pressed et un libellé « Top 10 »', () => {
+      const fixture = creer(racineAvecScores([1, 2]));
+      const element = DomTestUtils.obtenirElementNatif(fixture);
+      const bouton = element.querySelector<HTMLButtonElement>('#obsolescence-bouton-top10');
+      expect(bouton).not.toBeNull();
+      expect(bouton?.getAttribute('aria-pressed')).toBe('false');
+
+      bouton?.click();
+      fixture.detectChanges();
+
+      expect(bouton?.getAttribute('aria-pressed')).toBe('true');
+      expect(element.textContent).toContain('projets les plus en retard');
+
+      // Régression : la mention doit rester accolée au décompte total (même parent flex), pas un 3ᵉ enfant
+      // direct du bandeau `justify-content: space-between` (qui la centrerait au lieu de l'accoler au total).
+      const mention = element.querySelector('.obsolescence__mention-top10');
+      const total = element.querySelector('.obsolescence__total');
+      expect(mention?.parentElement).toBe(total?.parentElement);
+    });
+
+    it('redevient inactif à la reconstruction du composant (état local non persisté, décision 27)', () => {
+      const racine = racineAvecScores([1, 2]);
+      const premiereInstance = creer(racine).componentInstance;
+      premiereInstance.basculerTopDix();
+      expect(premiereInstance.topDixActif()).toBe(true);
+
+      const nouvelleInstance = creer(racine).componentInstance;
+      expect(nouvelleInstance.topDixActif()).toBe(false);
+    });
+
+    it('n’est jamais touché par l’application d’une vue enregistrée, qui ne porte que groupe/projet (US-028, RG-027)', () => {
+      const composant = creer(racineAvecScores([1, 2])).componentInstance;
+      composant.basculerTopDix();
+
+      composant.appliquerVue({
+        id: 'vue-1',
+        nom: 'Vue',
+        parDefaut: false,
+        filtres: { groupeId: null, projetIds: null },
+      });
+
+      expect(composant.topDixActif()).toBe(true);
+    });
   });
 
   describe('vues enregistrées (US-028, RG-027 amendée, plan_16 incrément 3)', () => {

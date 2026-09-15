@@ -28,7 +28,7 @@
               >— ref auditée : {{ donnees.refAuditeeLabel }}</span
             >
           </p>
-          @if (donnees.sourcesExternes.length > 0) {
+          @if (donnees.sourcesExternes.length > 0 || donnees.enStase) {
             <div class="fiche-projet__sources-externes d-flex aligne-centre ecart-3 texte-sm">
               @for (source of donnees.sourcesExternes; track source.url) {
                 <a
@@ -38,6 +38,9 @@
                   [attr.title]="source.avertissementNonContractuel"
                   >{{ source.label }}</a
                 >
+              }
+              @if (donnees.enStase) {
+                <app-pastille-en-stase />
               }
             </div>
           }

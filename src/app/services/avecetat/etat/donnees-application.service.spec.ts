@@ -274,8 +274,30 @@ describe('DonneesApplicationService', () => {
 
       const projet = service.groupes()[0].projets.find((p) => p.id === id);
       expect(projet?.iaAutorisee).toBe(false);
+      expect(projet?.enStase).toBe(false);
       expect(projet?.sources).toEqual([]);
       expect(projet?.audits).toEqual([]);
+    });
+
+    it("bascule la qualification « en stase » d'un projet (US-064, RG-064)", () => {
+      const id = service.creerProjet(groupeId, DONNEES_PROJET);
+
+      service.definirEnStase(groupeId, id, true);
+      expect(service.groupes()[0].projets.find((p) => p.id === id)?.enStase).toBe(true);
+
+      service.definirEnStase(groupeId, id, false);
+      expect(service.groupes()[0].projets.find((p) => p.id === id)?.enStase).toBe(false);
+    });
+
+    it('ne modifie que le projet ciblé par definirEnStase', () => {
+      const id = service.creerProjet(groupeId, DONNEES_PROJET);
+      const autreId = service.creerProjet(groupeId, { ...DONNEES_PROJET, nom: 'Autre projet' });
+
+      service.definirEnStase(groupeId, id, true);
+
+      const projets = service.groupes()[0].projets;
+      expect(projets.find((p) => p.id === id)?.enStase).toBe(true);
+      expect(projets.find((p) => p.id === autreId)?.enStase).toBe(false);
     });
 
     it('modifie un projet existant', () => {
@@ -294,10 +316,11 @@ describe('DonneesApplicationService', () => {
       expect(service.groupes()[0].projets).toEqual([]);
     });
 
-    it('duplique un projet en reprenant ses sources mais jamais son historique ni sa politique IA (US-007, RG-014)', () => {
+    it('duplique un projet en reprenant ses sources mais jamais son historique, sa politique IA ni sa qualification « en stase » (US-007, RG-014, RG-064)', () => {
       const id = service.creerProjet(groupeId, DONNEES_PROJET);
       service.creerSource(groupeId, id, DONNEES_SOURCE);
       service.modifierProjet(groupeId, id, DONNEES_PROJET);
+      service.definirEnStase(groupeId, id, true);
       // Simule un projet source dont la politique IA aurait été autorisée : la duplication doit malgré tout
       // forcer l'interdiction par défaut (RG-014).
 
@@ -308,6 +331,7 @@ describe('DonneesApplicationService', () => {
       const copie = projets.find((p) => p.id === copieId);
       expect(copie?.nom).toBe(`${DONNEES_PROJET.nom} (copie)`);
       expect(copie?.iaAutorisee).toBe(false);
+      expect(copie?.enStase).toBe(false);
       expect(copie?.sources).toHaveLength(1);
       expect(copie?.sources[0].idExterne).toBe(DONNEES_SOURCE.idExterne);
       expect(copie?.sources[0].id).not.toBe(original?.sources[0].id);

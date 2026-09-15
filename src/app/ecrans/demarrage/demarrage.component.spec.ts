@@ -141,6 +141,7 @@ class DonneesDeTest {
           nom: 'Projet Test',
           description: '',
           iaAutorisee: false,
+          enStase: false,
           sources: [],
           annotations: [],
           audits: [audit],

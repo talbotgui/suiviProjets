@@ -79,6 +79,7 @@ class DonneesDeTest {
       nom,
       description: '',
       iaAutorisee: false,
+      enStase: false,
       sources: [],
       annotations: [],
       audits,

@@ -21,8 +21,9 @@
 //! incrément 2 : uniformisation de la forme du champ `filtres` de chaque `VueEnregistree` en `{ groupeId, projetIds }`,
 //! RG-027 amendée / RG-053) et [`migration_10_vers_11`] (plan_18 : `Projet.premierCommitInterne` en union
 //! discriminée sur `statut`, champs optionnels `MembreConnu.partiLe` et `Brouillon.prisesEnCharge` — palier à
-//! transformation nulle, RG-058 / RG-061) et [`migration_11_vers_12`] (plan_17 chapitre 4 : ajout de
-//! `parametres.cadenceCommits`, palier à transformation nulle, US-060 / RG-060).
+//! transformation nulle, RG-058 / RG-061), [`migration_11_vers_12`] (plan_17 chapitre 4 : ajout de
+//! `parametres.cadenceCommits`, palier à transformation nulle, US-060 / RG-060) et [`migration_12_vers_13`]
+//! (plan_20 Partie E : ajout de `Projet.enStase`, palier à transformation nulle, US-064 / RG-064).
 
 use super::erreurs::ErreurPersistance;
 use serde_json::Value;
@@ -214,6 +215,20 @@ fn migration_11_vers_12(valeur: &mut Value) -> Result<(), ErreurPersistance> {
     Ok(())
 }
 
+/// Douzième migration réelle du projet (plan_20 Partie E — qualification « en stase » d'un projet, US-064 /
+/// RG-064), faisant progresser `versionSchema` de `12` à `13`.
+///
+/// Aucune transformation de donnée n'est nécessaire ici, sur le modèle de [`migration_1_vers_2`] : le seul
+/// changement de forme est l'ajout du champ `Projet.enStase` (`#[serde(default)]`), dont l'absence sur un document
+/// existant se désérialise directement en `false` sans qu'aucune valeur n'ait à être recalculée ; seule la version
+/// de schéma progresse.
+fn migration_12_vers_13(valeur: &mut Value) -> Result<(), ErreurPersistance> {
+    if let Some(objet) = valeur.as_object_mut() {
+        objet.insert("versionSchema".to_string(), Value::from(13));
+    }
+    Ok(())
+}
+
 /// Réécrit le champ `filtres` et le champ `versionFiltres` de chaque entrée de `document.vuesEnregistrees`
 /// (cf. [`migration_9_vers_10`]). Best-effort, comme [`inserer_regle_java_si_absente`].
 fn uniformiser_filtres_vues(document: &mut serde_json::Map<String, Value>) {
@@ -292,8 +307,8 @@ fn inserer_regle_java_si_absente(document: &mut serde_json::Map<String, Value>) 
 /// Registre réel des étapes de migration connues de cette version de l'application, chacune associée à la version
 /// de schéma qu'elle sait faire progresser. Cf. [`migration_1_vers_2`], [`migration_2_vers_3`],
 /// [`migration_3_vers_4`], [`migration_4_vers_5`], [`migration_5_vers_6`], [`migration_6_vers_7`],
-/// [`migration_7_vers_8`], [`migration_8_vers_9`], [`migration_9_vers_10`], [`migration_10_vers_11`] et
-/// [`migration_11_vers_12`].
+/// [`migration_7_vers_8`], [`migration_8_vers_9`], [`migration_9_vers_10`], [`migration_10_vers_11`],
+/// [`migration_11_vers_12`] et [`migration_12_vers_13`].
 pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (1, migration_1_vers_2),
     (2, migration_2_vers_3),
@@ -306,6 +321,7 @@ pub(crate) const ETAPES_MIGRATION_REELLES: &[(u32, EtapeMigration)] = &[
     (9, migration_9_vers_10),
     (10, migration_10_vers_11),
     (11, migration_11_vers_12),
+    (12, migration_12_vers_13),
 ];
 
 /// Lit `versionSchema` à la racine du document, `0` si le champ est absent ou n'est pas un entier.
@@ -800,6 +816,56 @@ mod tests {
             racine.parametres.cadence_commits,
             crate::modele::racine::CadenceCommits::default()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn migration_reelle_12_vers_13_ajoute_en_stase_a_false_sans_rien_transformer()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Document typique d'avant plan_20 Partie E : `versionSchema: 12`, un projet sans champ `enStase`. La
+        // migration ne doit ni échouer ni altérer les données existantes : `versionSchema` progresse, `enStase` se
+        // désérialise nativement à `false` (`#[serde(default)]`).
+        let mut valeur = json!({
+            "versionSchema": 12,
+            "meta": { "creeLe": "2026-01-01T00:00:00Z", "modifieLe": "2026-01-01T00:00:00Z", "application": "test" },
+            "groupes": [
+                {
+                    "id": "a0000000-0000-4000-8000-000000000001",
+                    "nom": "Groupe historique",
+                    "description": "",
+                    "instances": [],
+                    "membresConnus": [],
+                    "annotations": [],
+                    "indicateursDesactives": [],
+                    "projets": [
+                        {
+                            "id": "d0000000-0000-4000-8000-000000000001",
+                            "nom": "Projet historique",
+                            "description": "",
+                            "iaAutorisee": false,
+                            "sources": [],
+                            "annotations": [],
+                            "audits": []
+                        }
+                    ]
+                }
+            ]
+        });
+
+        appliquer_migrations(
+            &mut valeur,
+            crate::modele::racine::VERSION_SCHEMA_COURANTE,
+            ETAPES_MIGRATION_REELLES,
+        )?;
+
+        assert_eq!(
+            valeur["versionSchema"],
+            json!(crate::modele::racine::VERSION_SCHEMA_COURANTE)
+        );
+
+        let racine: crate::modele::racine::DonneesRacine = serde_json::from_value(valeur)?;
+        assert!(!racine.groupes[0].projets[0].en_stase);
+        assert_eq!(racine.groupes[0].projets[0].nom, "Projet historique");
         Ok(())
     }
 

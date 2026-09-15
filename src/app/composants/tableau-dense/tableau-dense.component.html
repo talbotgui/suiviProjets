@@ -77,6 +77,7 @@
           [id]="'tableau-dense-ligne-' + i"
           class="tableau-dense__ligne"
           [class.tableau-dense__ligne--grisee]="estLigneGrisee(ligne)"
+          [class.tableau-dense__ligne--en-stase]="estLigneEnStase(ligne)"
           [class.tableau-dense__ligne--desactivee]="estLigneDesactivee(ligne)"
           [attr.tabindex]="estLigneDesactivee(ligne) ? null : 0"
           [attr.aria-disabled]="estLigneDesactivee(ligne) ? true : null"
@@ -91,6 +92,9 @@
               [class.tableau-dense__cellule--grisee]="cellule.grisee"
               [attr.data-label]="colonne.libelle"
             >
+              @if (estColonneFixe(i) && estLigneEnStase(ligne)) {
+                <app-pastille-en-stase />
+              }
               @for (segment of cellule.segments; track $index) {
                 @switch (segment.type) {
                   @case ('texte') {

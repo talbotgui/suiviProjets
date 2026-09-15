@@ -62,6 +62,7 @@ class DonneesDeTest {
               nom: 'Projet 1',
               description: '',
               iaAutorisee: false,
+              enStase: false,
               sources: [],
               annotations: [],
               audits: [
@@ -86,6 +87,7 @@ class DonneesDeTest {
               nom: 'Projet 2',
               description: '',
               iaAutorisee: false,
+              enStase: false,
               sources: [],
               annotations: [],
               audits: [

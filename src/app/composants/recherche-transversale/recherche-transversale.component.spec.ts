@@ -41,6 +41,7 @@ class DonneesDeTest {
           nom: 'Service Facturation',
           description: '',
           iaAutorisee: false,
+          enStase: false,
           sources: [
             {
               id: 'source-1',

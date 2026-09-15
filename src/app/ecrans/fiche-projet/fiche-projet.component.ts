@@ -49,6 +49,7 @@ import { SqmConfirmationSuppressionComponent } from '../../composants/confirmati
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
 import { SqmIconeLangageComponent } from '../../composants/icone-langage/icone-langage.component';
 import { SqmModaleSaisieMasseComponent } from '../../composants/modale-saisie-masse/modale-saisie-masse.component';
+import { SqmPastilleEnStaseComponent } from '../../composants/pastille-en-stase/pastille-en-stase.component';
 import type {
   ErreurLigneSaisieMasse,
   ResultatTraitementSaisieMasse,
@@ -410,6 +411,11 @@ interface DonneesFicheProjet {
   readonly nomProjet: string;
   /** Description du projet. */
   readonly description: string;
+  /**
+   * Qualification « en stase » du projet (US-064, RG-064) : affiche une pastille dédiée à côté des liens de
+   * sources externes, purement visuelle (aucun autre effet sur cet écran).
+   */
+  readonly enStase: boolean;
   /** Ref auditée du dépôt GitLab rattaché, libellé de repli si aucune source GitLab n'est rattachée. */
   readonly refAuditeeLabel: string;
   /** Liens directs vers les instances GitLab/Sonar réellement interrogées (US-008, RG-045, C15-13). */
@@ -544,6 +550,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmConfirmationMotDePasseComponent,
     SqmConfirmationSuppressionComponent,
     SqmModaleSaisieMasseComponent,
+    SqmPastilleEnStaseComponent,
   ],
   templateUrl: './fiche-projet.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -1134,6 +1141,7 @@ export class SqmFicheProjetComponent {
       projetId: projet.id,
       nomProjet: projet.nom,
       description: projet.description,
+      enStase: projet.enStase,
       refAuditeeLabel: refAuditeeSource?.refAuditee ?? 'branche par défaut du dépôt',
       sourcesExternes: this.construireSourcesExternes(projet.sources, groupe.instances),
       statutIa: this.construireEtiquetteStatutIa(projet.iaAutorisee, themes.marqueursIa),

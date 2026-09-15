@@ -105,6 +105,15 @@
   }
 }
 
+// US-064/RG-064 : fond propre, plus soutenu que `.tableau-dense__ligne--grisee` (« jamais audité ») ci-dessus, pour
+// qu'un projet à la fois « en stase » et jamais audité reste distinguable (la pastille de la colonne fixe, cf.
+// gabarit, porte l'essentiel de cette distinction ; le fond en est le renfort visuel).
+.tableau-dense__ligne--en-stase {
+  .tableau-dense__cellule {
+    background-color: var(--sqm-neutre-100);
+  }
+}
+
 // RG-013 : grisage d'une cellule isolée (ex. métriques Sonar d'une ligne SONAR_KO), indépendant du grisage de ligne
 // ci-dessus (ex. ligne « jamais audité »).
 .tableau-dense__cellule--grisee {
@@ -195,7 +204,8 @@
     }
   }
 
-  .tableau-dense__ligne--grisee .tableau-dense__cellule {
+  .tableau-dense__ligne--grisee .tableau-dense__cellule,
+  .tableau-dense__ligne--en-stase .tableau-dense__cellule {
     background-color: transparent;
   }
 }

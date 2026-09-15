@@ -242,6 +242,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
           nom: 'API Facturation',
           description: 'API centrale de facturation',
           iaAutorisee: false,
+          enStase: false,
           premierCommitInterne: {
             date: '2021-03-15',
             sha: 'a1b2c3d4',
@@ -629,6 +630,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
           nom: 'Batch Comptable',
           description: 'Traitements de nuit comptables',
           iaAutorisee: false,
+          enStase: false,
           premierCommitInterne: {
             date: '2019-09-02',
             sha: '0f9e8d7c',
@@ -776,6 +778,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
           nom: 'Référentiel Tiers',
           description: 'Ancien référentiel des tiers — candidat au décommissionnement',
           iaAutorisee: false,
+          enStase: false,
           premierCommitInterne: {
             date: '2016-01-20',
             sha: '11aa22bb',
@@ -949,6 +952,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
           description: 'Front Angular du portail client',
           iaAutorisee: true,
           iaAutoriseeDepuis: '2026-05-20',
+          enStase: false,
           premierCommitInterne: {
             date: '2023-06-12',
             sha: '9e8f7a6b',
@@ -1250,6 +1254,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
           nom: 'API Portail',
           description: 'Backend Node du portail',
           iaAutorisee: false,
+          enStase: false,
           premierCommitInterne: {
             date: '2023-08-01',
             sha: 'c4d5e6f7',
@@ -1402,6 +1407,10 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
           nom: 'Mobile Nova',
           description: 'Application mobile Android — pas encore de projet Sonar',
           iaAutorisee: false,
+          // Seul projet du jeu de démonstration qualifié « en stase » (US-064, RG-064, plan_20 Partie E) : exerce
+          // le fond gris clair de l'écran Obsolescence, le traitement dédié de la Synthèse des audits et la
+          // pastille de la Fiche projet, sur un projet par ailleurs normalement audité.
+          enStase: true,
           premierCommitInterne: {
             date: '2026-02-10',
             sha: 'd5e6f7a8',

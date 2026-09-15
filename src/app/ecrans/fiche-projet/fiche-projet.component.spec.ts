@@ -186,14 +186,21 @@ class DonneesDeTest {
    * @param id - Identifiant du projet.
    * @param audits - Historique des audits du projet.
    * @param iaAutorisee - Politique d'autorisation de l'IA du projet.
+   * @param enStase - Qualification « en stase » du projet (US-064, RG-064, faux par défaut).
    * @returns Le projet de test.
    */
-  public static projet(id: string, audits: readonly Audit[], iaAutorisee = false): Projet {
+  public static projet(
+    id: string,
+    audits: readonly Audit[],
+    iaAutorisee = false,
+    enStase = false,
+  ): Projet {
     return {
       id,
       nom: 'Projet Test',
       description: 'Une description de test.',
       iaAutorisee,
+      enStase,
       premierCommitInterne: {
         date: '2021-01-01',
         sha: 'abcdef1',
@@ -582,6 +589,35 @@ describe('SqmFicheProjetComponent', () => {
     const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
     const element = DomTestUtils.obtenirElementNatif(fixture);
     expect(element.querySelector('.fiche-projet__sources-externes')).toBeNull();
+  });
+
+  it('affiche la pastille « en stase » à côté des liens de sources pour un projet qualifié (US-064, RG-064)', () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})], false, true);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const pastille = element.querySelector('.fiche-projet__sources-externes .pastille-en-stase');
+    expect(pastille).not.toBeNull();
+    expect(pastille?.textContent).toContain('en stase');
+  });
+
+  it('n’affiche aucune pastille « en stase » pour un projet actif', () => {
+    const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    expect(element.querySelector('.pastille-en-stase')).toBeNull();
+  });
+
+  it('affiche la pastille « en stase » même sans aucune source externe rattachée', () => {
+    const projetGitlab = DonneesDeTest.projet(
+      'projet-1',
+      [DonneesDeTest.auditComplet({})],
+      false,
+      true,
+    );
+    const projet: Projet = { ...projetGitlab, sources: [] };
+    const fixture = creerFixture('projet-1', DonneesDeTest.racine(projet));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    expect(element.querySelector('.pastille-en-stase')).not.toBeNull();
   });
 
   it('affiche le badge membre inconnu en en-tête dès qu’un membre du dépôt est de statut inconnu (RG-006 à RG-009)', () => {

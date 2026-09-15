@@ -20,6 +20,7 @@ class DonneesDeTest {
       nom: id,
       description: '',
       iaAutorisee: false,
+      enStase: false,
       sources: [],
       annotations: [],
       audits,

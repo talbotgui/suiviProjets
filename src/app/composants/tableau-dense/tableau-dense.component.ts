@@ -37,6 +37,7 @@ import type { InputSignal, OutputEmitterRef, Signal, WritableSignal } from '@ang
 import { SqmBadgeComponent } from '../badge/badge.component';
 import { SqmExplicationJugementComponent } from '../explication-jugement/explication-jugement.component';
 import type { CleExplicationJugement } from '../explication-jugement/explication-jugement.component';
+import { SqmPastilleEnStaseComponent } from '../pastille-en-stase/pastille-en-stase.component';
 import type { Couleur } from '../../services/sansetat/jugement/seuils-couleur.utils';
 
 /**
@@ -124,7 +125,7 @@ type SensTri = 'asc' | 'desc';
  */
 @Component({
   selector: 'app-tableau-dense',
-  imports: [SqmBadgeComponent, SqmExplicationJugementComponent],
+  imports: [SqmBadgeComponent, SqmExplicationJugementComponent, SqmPastilleEnStaseComponent],
   templateUrl: './tableau-dense.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tableau-dense.component.scss',
@@ -159,6 +160,15 @@ export class SqmTableauDenseComponent<T> {
    * ligne n'est grisée.
    */
   public readonly ligneGrisee: InputSignal<((ligne: T) => boolean) | undefined> = input<
+    ((ligne: T) => boolean) | undefined
+  >(undefined);
+
+  /**
+   * Prédicat optionnel désignant les lignes qualifiées « en stase » (US-064, RG-064) : fond gris propre, distinct
+   * de {@link ligneGrisee}, doublé d'une pastille « en stase » (`SqmPastilleEnStaseComponent`) dans la colonne
+   * fixe, pour rester lisible même combiné au grisage « jamais audité ». Absent : aucune ligne n'est « en stase ».
+   */
+  public readonly ligneEnStase: InputSignal<((ligne: T) => boolean) | undefined> = input<
     ((ligne: T) => boolean) | undefined
   >(undefined);
 
@@ -280,6 +290,15 @@ export class SqmTableauDenseComponent<T> {
    */
   public estLigneGrisee(ligne: T): boolean {
     return this.ligneGrisee()?.(ligne) ?? false;
+  }
+
+  /**
+   * Indique si une ligne est qualifiée « en stase » (cf. {@link ligneEnStase}).
+   * @param ligne - Ligne concernée.
+   * @returns `true` si la ligne est « en stase ».
+   */
+  public estLigneEnStase(ligne: T): boolean {
+    return this.ligneEnStase()?.(ligne) ?? false;
   }
 
   /**

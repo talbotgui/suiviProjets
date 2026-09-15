@@ -58,6 +58,24 @@
   }
 }
 
+// US-064/RG-064 : fond gris clair d'un projet « en stase », purement visuel. `--sqm-neutre-200` (plutôt que
+// `--sqm-neutre-100`, déjà la couleur de survol ci-dessus) pour que le survol reste perceptible au repos.
+.obsolescence__tuile--en-stase {
+  background-color: var(--sqm-neutre-200);
+}
+
+// US-065/RG-065 : bouton bascule « Top 10 » à l'état actif, même traitement que les onglets à bascule existants
+// (`.liste-travail__onglet--actif`, `liste-travail.component.scss`).
+.obsolescence__bouton-top10--actif {
+  background-color: var(--sqm-marque-fond);
+  color: var(--sqm-marque-texte);
+  font-weight: var(--sqm-poids-demi-gras);
+
+  &:hover {
+    background-color: var(--sqm-marque-fond);
+  }
+}
+
 // Ligne du nom : le nom garde la priorité d'espace, la zone d'icônes de langage (US-057) est poussée à droite
 // (`exterieur-gauche-auto` sur le gabarit) et peut repasser sous le nom sur un nom long, jamais le tronquer.
 .obsolescence__ligne-nom {

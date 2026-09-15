@@ -103,7 +103,12 @@ use std::collections::HashMap;
 /// donnée existante ne soit transformée. Voir `migration_11_vers_12` enregistrée dans
 /// `crate::persistance::migration::ETAPES_MIGRATION_REELLES`. `plan_18` ayant été intégré en premier (palier
 /// `10` → `11`), ce chapitre prend le palier suivant `11` → `12`.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 12;
+///
+/// Passage de `12` à `13` (plan_20 Partie E — qualification « en stase » d'un projet, US-064/RG-064) : palier **à
+/// transformation nulle**, comme `migration_1_vers_2`. Seul changement de forme : ajout du champ booléen
+/// `Projet.enStase` (`#[serde(default)]`), absent = `false`, aucune donnée existante à recalculer. Voir
+/// `migration_12_vers_13` enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 13;
 
 /// Version unique et partagée du schéma de filtres d'une [`VueEnregistree`], depuis le palier `9` → `10`
 /// (plan_16, incrément 2) : la forme de `filtres` (`{ groupeId, projetIds }`) est désormais commune à tous les
@@ -969,6 +974,11 @@ pub(crate) struct Projet {
     /// Date d'autorisation de l'IA, renseignée uniquement si `ia_autorisee` est ou a été vraie (RG-015).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) ia_autorisee_depuis: Option<String>,
+    /// Qualification « en stase » d'un projet volontairement mis en pause (RG-064), faux par défaut : purement
+    /// visuelle et organisationnelle, sans effet sur l'audit, les campagnes, les alertes ni le calcul des
+    /// indicateurs.
+    #[serde(default)]
+    pub(crate) en_stase: bool,
     /// Date de prise en charge du projet ([`PremierCommitInterne`], RG-058), une fois calculée à la demande ;
     /// absente tant qu'aucun calcul n'a été effectué.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1640,6 +1650,7 @@ mod tests {
                 description: "API centrale de facturation".to_string(),
                 ia_autorisee: false,
                 ia_autorisee_depuis: None,
+                en_stase: false,
                 premier_commit_interne: None,
                 sources: vec![Source {
                     id: "f0000000-0000-4000-8000-000000000001".to_string(),

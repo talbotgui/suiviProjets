@@ -77,6 +77,8 @@ Le sous-onglet « Annotations » gère des annotations datées de portée groupe
 
 Après avoir sélectionné un groupe, on crée, modifie, duplique ou supprime ses projets. Chaque projet porte un nom, une description et une politique d'usage de l'IA, interdite par défaut : l'autorisation explicite est une décision qui déclenche une écriture du fichier et donc la ressaisie du mot de passe (RG-014). Supprimer un projet supprime aussi tout son historique d'audits.
 
+Une case à cocher « En stase » signale un projet volontairement mis en pause : plus de développement attendu, mais l'historique d'audits et le rattachement à son groupe sont conservés. À la différence de la politique IA, cette case ne redemande pas le mot de passe immédiatement — la bascule est enregistrée en mémoire et suit la prochaine sauvegarde du fichier. Un projet « en stase » apparaît sur fond gris clair sur l'écran Obsolescence et sur la Synthèse des audits, et porte une pastille « en stase » sur sa Fiche projet, à côté des liens vers ses dépôts GitLab et ses projets Sonar ; cette qualification n'a aucun autre effet, le projet restant audité et alerté normalement.
+
 ### Sources
 
 ![Administration — onglet Sources](assets/captures/administration-sources.png)
@@ -165,13 +167,13 @@ L'écran d'accueil, accessible depuis la barre latérale, est un résumé de la 
 
 ![Synthèse des audits](assets/captures/synthese-audits.png)
 
-La synthèse présente le dernier audit intégré de chaque projet dans un tableau dense, filtrable par groupe et par indicateur. Les alertes « membre inconnu » sont toujours affichées au-dessus du tableau, quel que soit le filtre (RG-009). Une vue (combinaison de filtres) peut être enregistrée pour être rappelée plus tard, et la vue courante peut être exportée en image. Un clic sur une ligne ouvre la fiche du projet.
+La synthèse présente le dernier audit intégré de chaque projet dans un tableau dense, filtrable par groupe et par indicateur. Les alertes « membre inconnu » sont toujours affichées au-dessus du tableau, quel que soit le filtre (RG-009). Une vue (combinaison de filtres) peut être enregistrée pour être rappelée plus tard, et la vue courante peut être exportée en image. Un clic sur une ligne ouvre la fiche du projet. La ligne d'un projet « en stase » (cf. Administration) apparaît sur fond gris avec une pastille « en stase », distincte du grisage d'un projet « jamais audité ».
 
 ### Fiche projet
 
 ![Fiche projet](assets/captures/fiche-projet.png)
 
-La fiche projet réunit tout ce qui concerne un projet : en-tête avec badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (« Âge chez nous » — la [date de prise en charge](#date-de-prise-en-charge), avec son bouton « recalculer » —, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Juste au-dessus des dépendances, une ligne « Langages principaux » affiche une à deux icônes des langages dominants du projet d'après Sonar (le second n'apparaît que s'il pèse au moins 10 % des lignes de code) ; elle est grisée quand les indicateurs Sonar le sont et absente quand l'audit retenu ne porte pas de répartition par langage. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
+La fiche projet réunit tout ce qui concerne un projet : en-tête avec, le cas échéant, les liens vers ses dépôts GitLab et ses projets Sonar accompagnés d'une pastille « en stase » si le projet est marqué comme tel (cf. Administration), badges de statut (violation de politique IA, incohérence Sonar, membre inconnu), métadonnées (« Âge chez nous » — la [date de prise en charge](#date-de-prise-en-charge), avec son bouton « recalculer » —, dernier audit, dernière campagne, taille), indicateurs Sonar, dépendances et leur statut, merge requests ouvertes, membres et statuts (avec le lien « Qualifier ce membre » vers l'administration), marqueurs IA détectés, annotations et journal du projet. Les dépendances sont regroupées par écosystème dans des sections repliables — « Maven » (dont la version de Java), « NPM », et « Autres » lorsqu'un manifeste n'est pas reconnu — fermées par défaut, chaque titre rappelant le nombre de dépendances et leur répartition par statut. Juste au-dessus des dépendances, une ligne « Langages principaux » affiche une à deux icônes des langages dominants du projet d'après Sonar (le second n'apparaît que s'il pèse au moins 10 % des lignes de code) ; elle est grisée quand les indicateurs Sonar le sont et absente quand l'audit retenu ne porte pas de répartition par langage. Depuis cette fiche, on ouvre la comparaison entre deux audits et on exporte la vue en image (l'export déplie les sections repliables).
 
 ### Date de prise en charge
 
@@ -203,7 +205,9 @@ Chaque campagne d'audit détecte automatiquement les montées de version du serv
 
 ![Obsolescence](assets/captures/obsolescence.png)
 
-L'écran d'obsolescence présente une grille de tuiles, une par projet, indiquant le retard maximal en versions majeures pour chaque catégorie de dépendance au dernier audit retenu (`0` signifie « à jour »). Chaque tuile affiche aussi, en fin de la ligne du nom du projet, une à deux petites icônes de ses langages principaux (mêmes langages que la fiche projet). Les filtres min/max par catégorie et la date de référence permettent de cibler l'analyse ; un clic sur une tuile ouvre le détail du dernier audit du projet, l'infobulle de la tuile rappelant par ailleurs ces langages.
+L'écran d'obsolescence présente une grille de tuiles, une par projet, indiquant le retard maximal en versions majeures pour chaque catégorie de dépendance au dernier audit retenu (`0` signifie « à jour »). Chaque tuile affiche aussi, en fin de la ligne du nom du projet, une à deux petites icônes de ses langages principaux (mêmes langages que la fiche projet). Les filtres min/max par catégorie et la date de référence permettent de cibler l'analyse ; un clic sur une tuile ouvre le détail du dernier audit du projet, l'infobulle de la tuile rappelant par ailleurs ces langages. La tuile d'un projet marqué « en stase » (cf. Administration) apparaît sur fond gris clair.
+
+Le bouton « Top 10 », à côté du bouton d'export PNG, restreint la grille aux dix projets cumulant le plus grand retard cumulé, tous catégories confondues (ex æquo au dixième rang tous conservés, la grille pouvant alors afficher un peu plus de dix tuiles) ; les projets déjà à jour n'y figurent jamais. Ce bouton s'applique après les autres filtres et n'est pas mémorisé d'une visite à l'autre.
 
 ## Suivre la régularité des poussées : les commits des membres
 

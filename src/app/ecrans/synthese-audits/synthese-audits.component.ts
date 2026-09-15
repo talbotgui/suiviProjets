@@ -239,6 +239,11 @@ interface LigneSyntheseAudit {
   readonly pasDeSonar: boolean;
   /** `true` si le badge SONAR_KO est déclenché (RG-013) : grise les colonnes Couverture/Notes/Violations. */
   readonly sonarKo: boolean;
+  /**
+   * Qualification « en stase » du projet (US-064, RG-064) : fond gris propre et pastille dédiée sur cette ligne,
+   * distincts du grisage « jamais audité » ({@link jamaisAudite}) et du grisage cellule SONAR_KO.
+   */
+  readonly enStase: boolean;
   /** Couverture de tests, absente si non calculable ou {@link pasDeSonar}. */
   readonly couverture: EtiquetteCouleur | undefined;
   /** Notes A–E des quatre axes Sonar (fiabilité, sécurité, maintenabilité, revue sécurité), vide si non calculable. */
@@ -505,6 +510,16 @@ export class SqmSyntheseAuditsComponent {
    */
   public ligneGrisee(ligne: LigneSyntheseAudit): boolean {
     return ligne.jamaisAudite;
+  }
+
+  /**
+   * Désigne les lignes de projet « en stase » (US-064, RG-064) : fond gris propre et pastille dédiée, distincts
+   * du grisage « jamais audité » ci-dessus.
+   * @param ligne - Ligne concernée.
+   * @returns `true` si la ligne doit porter le traitement « en stase ».
+   */
+  public ligneEnStase(ligne: LigneSyntheseAudit): boolean {
+    return ligne.enStase;
   }
 
   /**
@@ -1173,6 +1188,7 @@ export class SqmSyntheseAuditsComponent {
         tailleLabel: '—',
         pasDeSonar: true,
         sonarKo: false,
+        enStase: projet.enStase,
         couverture: undefined,
         notes: [],
         violationBloquant: undefined,
@@ -1218,6 +1234,7 @@ export class SqmSyntheseAuditsComponent {
       nomProjet: projet.nom,
       jamaisAudite: false,
       campagneEnEchec,
+      enStase: projet.enStase,
       auditAncien: BadgeAuditAncienUtils.calculerAuditAncien(
         dernierAudit.date,
         ancienJours,

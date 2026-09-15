@@ -79,6 +79,7 @@ import {
   ObsolescenceRetardUtils,
   type ObsolescenceCategorie,
 } from '../../services/sansetat/jugement/obsolescence-retard.utils';
+import { ObsolescenceTopUtils } from '../../services/sansetat/jugement/obsolescence-top.utils';
 import {
   ParametresJugementUtils,
   type CategorieDependance,
@@ -117,6 +118,13 @@ interface FiltresObsolescence {
  */
 type OrigineApplicationVue = 'utilisateur' | 'vueParDefaut';
 
+/**
+ * Nombre de projets déterminant le score seuil du bouton « Top 10 » (US-065, RG-065, décision 24 du plan_20 Partie
+ * F) : valeur de présentation fixée arbitrairement par l'utilisateur (2026-09-11), distincte d'un seuil de
+ * référentiel — aucun N configurable à ce stade (cf. plan_20 §15).
+ */
+const TAILLE_TOP_OBSOLESCENCE = 10;
+
 /** Teintes catégorielles (même clarté/saturation) ; cyclées si le référentiel porte davantage de catégories. */
 const PALETTE_CATEGORIES: readonly string[] = [
   'hsl(215 65% 52%)',
@@ -137,6 +145,8 @@ interface LigneObsolescence {
   readonly audit: Audit | undefined;
   /** Retard par identifiant de catégorie ; une catégorie absente signifie « aucune valeur » (jamais `0`). */
   readonly valeurParCategorie: ReadonlyMap<string, number>;
+  /** Qualification « en stase » du projet (US-064, RG-064) : fond gris clair de la tuile, purement visuel. */
+  readonly enStase: boolean;
   /**
    * Langages principaux du projet (RG-057), sélectionnés à partir de la ventilation Sonar `ncloc_language_distribution`
    * de l'audit retenu. Liste vide si la ventilation par langage est indisponible.
@@ -160,6 +170,8 @@ interface TuileObsolescence {
   readonly projetId: string;
   readonly nomProjet: string;
   readonly infobulle: string;
+  /** Qualification « en stase » du projet (US-064, RG-064) : fond gris clair de la tuile, purement visuel. */
+  readonly enStase: boolean;
   /** Langages principaux du projet (RG-057), recopiés de la ligne source pour l'affichage en icônes sur la tuile. */
   readonly langagesPrincipaux: readonly LangagePrincipal[];
   readonly mesures: readonly MesureCategorie[];
@@ -449,12 +461,14 @@ export class SqmObsolescenceComponent {
           audit,
           valeurParCategorie,
           langagesPrincipaux,
+          enStase: projet.enStase,
           infobulle: SqmObsolescenceComponent.construireInfobulle(
             projet.nom,
             groupe.nom,
             categories,
             valeurParCategorie,
             langagesPrincipaux,
+            projet.enStase,
           ),
         });
       }
@@ -500,6 +514,7 @@ export class SqmObsolescenceComponent {
    * @param categories - Catégories du référentiel.
    * @param valeurParCategorie - Retard par identifiant de catégorie.
    * @param langagesPrincipaux - Langages principaux du projet (RG-057), ligne ajoutée si la liste est non vide.
+   * @param enStase - Qualification « en stase » du projet (US-064, RG-064), ligne ajoutée si vrai.
    * @returns Le texte de l'infobulle.
    */
   private static construireInfobulle(
@@ -508,6 +523,7 @@ export class SqmObsolescenceComponent {
     categories: readonly CategorieDependance[],
     valeurParCategorie: ReadonlyMap<string, number>,
     langagesPrincipaux: readonly LangagePrincipal[],
+    enStase: boolean,
   ): string {
     const details = categories.map((categorie) => {
       const valeur = valeurParCategorie.get(categorie.id);
@@ -521,7 +537,10 @@ export class SqmObsolescenceComponent {
       langagesPrincipaux.length === 0
         ? []
         : [`Langages : ${langagesPrincipaux.map((langage) => langage.cleSonar).join(', ')}`];
-    return [`${nomProjet} (${nomGroupe})`, ...details, ...ligneLangages].join('\n');
+    const ligneEnStase = enStase ? ['Projet en stase'] : [];
+    return [`${nomProjet} (${nomGroupe})`, ...details, ...ligneLangages, ...ligneEnStase].join(
+      '\n',
+    );
   }
 
   /**
@@ -569,16 +588,50 @@ export class SqmObsolescenceComponent {
     });
   });
 
+  /**
+   * État actif/inactif du bouton « Top 10 » (US-065, RG-065) : donnée locale transitoire de l'écran, jamais
+   * persistée dans une vue enregistrée (US-028/RG-027), réinitialisée à `false` à chaque (re)construction de ce
+   * composant (décision 27).
+   */
+  public readonly topDixActif: WritableSignal<boolean> = signal(false);
+
+  /**
+   * Bascule l'état actif/inactif du bouton « Top 10 ».
+   */
+  public basculerTopDix(): void {
+    this.topDixActif.update((actif) => !actif);
+  }
+
+  /**
+   * Projets affichés après application du Top 10 (RG-065), si actif : restreint {@link projetsAffiches} aux
+   * projets cumulant le plus grand retard d'obsolescence (score décroissant puis nom croissant, coupe au score du
+   * dixième projet, ex æquo inclus, scores nuls exclus — décisions 22 à 25). Le Top 10 s'applique donc toujours
+   * APRÈS les autres filtres (décision 26) ; inactif, restitue {@link projetsAffiches} sans changement (aucune
+   * régression du tri par nom).
+   */
+  public readonly projetsAffichesOuTop: Signal<readonly LigneObsolescence[]> = computed(() => {
+    const projetsAffiches = this.projetsAffiches();
+    if (!this.topDixActif()) {
+      return projetsAffiches;
+    }
+    return ObsolescenceTopUtils.classerTop(
+      projetsAffiches,
+      this.categories(),
+      TAILLE_TOP_OBSOLESCENCE,
+    );
+  });
+
   /** Tuiles à afficher : projet + une mesure par catégorie, tout précalculé pour le gabarit. */
   public readonly tuiles: Signal<readonly TuileObsolescence[]> = computed(() => {
     const categories = this.categories();
     const couleurs = this.couleurParCategorie();
     const maxParCategorie = this.maxParCategorie();
-    return this.projetsAffiches().map((ligne) => ({
+    return this.projetsAffichesOuTop().map((ligne) => ({
       projetId: ligne.projetId,
       nomProjet: ligne.nomProjet,
       infobulle: ligne.infobulle,
       langagesPrincipaux: ligne.langagesPrincipaux,
+      enStase: ligne.enStase,
       mesures: categories.map((categorie) => ({
         categorieId: categorie.id,
         sigle: categorie.sigle,
@@ -589,10 +642,10 @@ export class SqmObsolescenceComponent {
     }));
   });
 
-  /** Médiane de chaque catégorie sur les projets affichés (projets sans valeur exclus). */
+  /** Médiane de chaque catégorie sur les projets affichés (projets sans valeur exclus, Top 10 inclus s'il est actif). */
   public readonly medianeParCategorie: Signal<ReadonlyMap<string, number>> = computed(() => {
     const mediane = new Map<string, number>();
-    const lignes = this.projetsAffiches();
+    const lignes = this.projetsAffichesOuTop();
     for (const categorie of this.categories()) {
       const valeurs = lignes
         .map((ligne) => ligne.valeurParCategorie.get(categorie.id))
@@ -610,8 +663,8 @@ export class SqmObsolescenceComponent {
     return mediane;
   });
 
-  /** Nombre de projets affichés (décompte du bandeau). */
-  public readonly total: Signal<number> = computed(() => this.projetsAffiches().length);
+  /** Nombre de projets affichés (décompte du bandeau, Top 10 inclus s'il est actif). */
+  public readonly total: Signal<number> = computed(() => this.projetsAffichesOuTop().length);
 
   /** Détail des dépendances du dernier audit retenu du projet sélectionné (modale). */
   public readonly detailProjetSelectionne: Signal<DetailProjet | null> = computed(() => {

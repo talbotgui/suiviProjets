@@ -61,6 +61,7 @@ class DonneesDeTest {
               nom: 'API Facturation',
               description: '',
               iaAutorisee: false,
+              enStase: false,
               sources: [
                 {
                   id: 'source-1',

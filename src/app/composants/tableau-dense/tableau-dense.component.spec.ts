@@ -101,11 +101,13 @@ describe('SqmTableauDenseComponent', () => {
    * Crée et initialise un fixture du composant avec les données de test par défaut.
    * @param ligneDesactivee - Prédicat optionnel de désactivation de ligne.
    * @param ligneGrisee - Prédicat optionnel de grisage de ligne.
+   * @param ligneEnStase - Prédicat optionnel de qualification « en stase » de ligne.
    * @returns Le fixture prêt à l'emploi.
    */
   function creerFixture(
     ligneDesactivee?: (ligne: LigneTest) => boolean,
     ligneGrisee?: (ligne: LigneTest) => boolean,
+    ligneEnStase?: (ligne: LigneTest) => boolean,
   ): ComponentFixture<SqmTableauDenseComponent<LigneTest>> {
     const fixture = TestBed.createComponent(SqmTableauDenseComponent<LigneTest>);
     fixture.componentRef.setInput('colonnes', DonneesDeTest.colonnes());
@@ -116,6 +118,9 @@ describe('SqmTableauDenseComponent', () => {
     }
     if (ligneGrisee !== undefined) {
       fixture.componentRef.setInput('ligneGrisee', ligneGrisee);
+    }
+    if (ligneEnStase !== undefined) {
+      fixture.componentRef.setInput('ligneEnStase', ligneEnStase);
     }
     fixture.detectChanges();
     return fixture;
@@ -282,6 +287,32 @@ describe('SqmTableauDenseComponent', () => {
     const premiereLigne = DomTestUtils.obtenirElementNatif(fixture).querySelector('tbody tr');
     expect(premiereLigne?.classList.contains('tableau-dense__ligne--grisee')).toBe(true);
     expect(premiereLigne?.getAttribute('tabindex')).toBe('0');
+  });
+
+  it('applique la classe et la pastille « en stase » aux lignes désignées par ligneEnStase (US-064, RG-064), distinctes du grisage', () => {
+    const fixture = creerFixture(undefined, undefined, (ligne) => ligne.id === 'b');
+
+    const lignes = DomTestUtils.obtenirElementNatif(fixture).querySelectorAll('tbody tr');
+    const premiereLigne = lignes.item(0);
+    const deuxiemeLigne = lignes.item(1);
+    expect(premiereLigne.classList.contains('tableau-dense__ligne--en-stase')).toBe(true);
+    expect(premiereLigne.classList.contains('tableau-dense__ligne--grisee')).toBe(false);
+    expect(premiereLigne.querySelector('.pastille-en-stase')).not.toBeNull();
+    expect(deuxiemeLigne.classList.contains('tableau-dense__ligne--en-stase')).toBe(false);
+    expect(deuxiemeLigne.querySelector('.pastille-en-stase')).toBeNull();
+  });
+
+  it('combine grisage « jamais audité » et qualification « en stase » sans que la ligne devienne indiscernable', () => {
+    const fixture = creerFixture(
+      undefined,
+      (ligne) => ligne.id === 'b',
+      (ligne) => ligne.id === 'b',
+    );
+
+    const premiereLigne = DomTestUtils.obtenirElementNatif(fixture).querySelector('tbody tr');
+    expect(premiereLigne?.classList.contains('tableau-dense__ligne--grisee')).toBe(true);
+    expect(premiereLigne?.classList.contains('tableau-dense__ligne--en-stase')).toBe(true);
+    expect(premiereLigne?.querySelector('.pastille-en-stase')).not.toBeNull();
   });
 
   it('restitue les segments de type badge via SqmBadgeComponent', () => {

@@ -40,6 +40,7 @@ class DonneesDeTest {
       nom: `Projet ${id}`,
       description: '',
       iaAutorisee: false,
+      enStase: false,
       sources,
       annotations: [],
       audits: [],

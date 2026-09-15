@@ -346,6 +346,7 @@ mod tests {
             description: String::new(),
             ia_autorisee: false,
             ia_autorisee_depuis: None,
+            en_stase: false,
             premier_commit_interne: None,
             sources: vec![],
             annotations: vec![],

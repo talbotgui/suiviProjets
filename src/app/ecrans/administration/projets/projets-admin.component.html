@@ -185,6 +185,14 @@
         >
           {{ ligne.projet.iaAutorisee ? "Interdire l'IA" : "Autoriser l'IA" }}
         </button>
+        <label class="projets-admin__en-stase d-flex aligne-centre ecart-1 texte-sm">
+          <input
+            type="checkbox"
+            [checked]="ligne.projet.enStase"
+            (change)="basculerEnStase(ligne)"
+          />
+          En stase
+        </label>
         <button type="button" class="bouton bouton--discret" (click)="ouvrirEdition(ligne)">
           Modifier
         </button>

@@ -344,6 +344,7 @@ describe('SqmPurgeParametrageComponent', () => {
                 nom: 'API Facturation',
                 description: '',
                 iaAutorisee: false,
+                enStase: false,
                 sources: [],
                 annotations: [],
                 premierCommitInterne: {
@@ -377,6 +378,7 @@ describe('SqmPurgeParametrageComponent', () => {
                 nom: 'Batch Nocturne',
                 description: '',
                 iaAutorisee: false,
+                enStase: false,
                 sources: [],
                 annotations: [],
                 audits: [
@@ -405,6 +407,7 @@ describe('SqmPurgeParametrageComponent', () => {
                 nom: 'Front Nova',
                 description: '',
                 iaAutorisee: false,
+                enStase: false,
                 sources: [],
                 annotations: [],
                 audits: [

@@ -168,6 +168,7 @@ class DonneesDeTest {
    * @param nom - Nom du projet.
    * @param audits - Historique des audits du projet.
    * @param iaAutorisee - Politique d'autorisation de l'IA du projet (RG-014, faux par défaut).
+   * @param enStase - Qualification « en stase » du projet (US-064, RG-064, faux par défaut).
    * @returns Le projet de test.
    */
   public static projet(
@@ -175,12 +176,14 @@ class DonneesDeTest {
     nom: string,
     audits: readonly Audit[],
     iaAutorisee = false,
+    enStase = false,
   ): Projet {
     return {
       id,
       nom,
       description: '',
       iaAutorisee,
+      enStase,
       sources: [],
       annotations: [],
       audits,
@@ -641,6 +644,63 @@ describe('SqmSyntheseAuditsComponent', () => {
     // Aucun seuil de couleur applicable : ni badge ni texte coloré dans cette ligne.
     expect(ligneJamaisAuditee?.querySelectorAll('.badge').length).toBe(0);
     expect(ligneJamaisAuditee?.querySelectorAll('.tableau-dense__texte-couleur').length).toBe(0);
+  });
+
+  it('applique le traitement « en stase » (fond propre et pastille) à un projet qualifié (US-064, RG-064)', () => {
+    const audit = DonneesDeTest.auditComplet({ date: DonneesDeTest.ilYA(-1) });
+    const projet = DonneesDeTest.projet('projet-en-stase', 'Projet En Stase', [audit], false, true);
+    const groupe: Groupe = {
+      id: 'groupe-1',
+      nom: 'Groupe',
+      description: '',
+      instances: [],
+      membresConnus: [],
+      annotations: [],
+      indicateursDesactives: [],
+      projets: [projet],
+    };
+
+    const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const ligne = Array.from(element.querySelectorAll('tbody tr')).find((candidat) =>
+      candidat.textContent?.includes('Projet En Stase'),
+    );
+
+    expect(ligne).not.toBeUndefined();
+    expect(ligne?.classList.contains('tableau-dense__ligne--en-stase')).toBe(true);
+    expect(ligne?.classList.contains('tableau-dense__ligne--grisee')).toBe(false);
+    expect(ligne?.querySelector('.pastille-en-stase')).not.toBeNull();
+  });
+
+  it('distingue un projet « en stase » jamais audité d’un projet actif jamais audité (US-064, RG-064)', () => {
+    const projet = DonneesDeTest.projet(
+      'projet-en-stase-vide',
+      'Projet En Stase Vide',
+      [],
+      false,
+      true,
+    );
+    const groupe: Groupe = {
+      id: 'groupe-1',
+      nom: 'Groupe',
+      description: '',
+      instances: [],
+      membresConnus: [],
+      annotations: [],
+      indicateursDesactives: [],
+      projets: [projet],
+    };
+
+    const fixture = creerFixture(DonneesDeTest.racine([groupe]));
+    const element = DomTestUtils.obtenirElementNatif(fixture);
+    const ligne = Array.from(element.querySelectorAll('tbody tr')).find((candidat) =>
+      candidat.textContent?.includes('Projet En Stase Vide'),
+    );
+
+    expect(ligne).not.toBeUndefined();
+    expect(ligne?.classList.contains('tableau-dense__ligne--grisee')).toBe(true);
+    expect(ligne?.classList.contains('tableau-dense__ligne--en-stase')).toBe(true);
+    expect(ligne?.querySelector('.pastille-en-stase')).not.toBeNull();
   });
 
   it(

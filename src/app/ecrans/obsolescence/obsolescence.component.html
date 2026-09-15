@@ -75,6 +75,17 @@
     }
 
     <button
+      id="obsolescence-bouton-top10"
+      type="button"
+      class="bouton bouton--discret exterieur-haut-auto"
+      [class.obsolescence__bouton-top10--actif]="topDixActif()"
+      [attr.aria-pressed]="topDixActif()"
+      (click)="basculerTopDix()"
+    >
+      Top 10
+    </button>
+
+    <button
       id="obsolescence-bouton-export"
       type="button"
       class="bouton bouton--marque exterieur-haut-auto"
@@ -108,7 +119,14 @@
           </li>
         }
       </ul>
-      <span class="obsolescence__total texte-sm poids-demi-gras">{{ total() }} projet(s)</span>
+      <div class="d-flex aligne-centre ecart-3">
+        @if (topDixActif()) {
+          <span class="obsolescence__mention-top10 texte-sm poids-demi-gras texte-marque">
+            Top 10 — projets les plus en retard, ex æquo inclus
+          </span>
+        }
+        <span class="obsolescence__total texte-sm poids-demi-gras">{{ total() }} projet(s)</span>
+      </div>
     </div>
 
     @if (categories().length === 0) {
@@ -122,6 +140,7 @@
           <button
             type="button"
             class="obsolescence__tuile d-flex direction-colonne ecart-2"
+            [class.obsolescence__tuile--en-stase]="tuile.enStase"
             [title]="tuile.infobulle"
             (click)="ouvrirDetail(tuile.projetId)"
           >
@@ -152,7 +171,11 @@
           </button>
         } @empty {
           <p class="obsolescence__vide texte-discret interieur-4">
-            Aucun projet ne correspond aux filtres.
+            {{
+              topDixActif()
+                ? 'Aucun projet en retard ne correspond aux filtres.'
+                : 'Aucun projet ne correspond aux filtres.'
+            }}
           </p>
         }
       </div>

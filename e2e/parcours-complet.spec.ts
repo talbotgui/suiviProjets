@@ -239,6 +239,26 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#projets-admin-liste')).toContainText(PROJET_B1.nom);
   });
 
+  // 6b. Administration > Projets — qualification « en stase » (US-064, RG-064, plan_20 Partie E). Cible
+  // PROJET_B2, jamais revisité avant l'étape 22b (qui le vide de tout audit) : les étapes 16b/19f/22b vérifient
+  // que cette qualification reste visible sur l'écran Obsolescence, la Synthèse des audits et le cumul avec
+  // l'état « jamais audité », sans jamais affecter l'audit ni le calcul des indicateurs.
+  await test.step('6b. Administration > Projets — en stase', async () => {
+    const ligneB2 = page.locator('.projets-admin__ligne', { hasText: PROJET_B2.nom });
+    const caseEnStase = ligneB2.locator('.projets-admin__en-stase input[type="checkbox"]');
+    await expect(caseEnStase).not.toBeChecked();
+
+    await caseEnStase.check();
+
+    await expect(caseEnStase).toBeChecked();
+    // Notifications des créations de projets précédentes potentiellement encore affichées (non encore
+    // auto-fermées) : ciblée par son texte plutôt que `attendreNotificationSucces` (qui ne retiendrait que la
+    // première notification encore visible, pas nécessairement la plus récente).
+    await expect(
+      page.locator('#notification .notification__item--succes', { hasText: 'en stase' }),
+    ).toBeVisible();
+  });
+
   // 7. Administration > Sources — une source GitLab et une source Sonar par projet (huit au total).
   await test.step('7. Administration > Sources', async () => {
     await avantChangementEcran(page, '07-administration-sources');
@@ -742,6 +762,34 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(premieresCellules.first()).toContainText('dana.regulier');
   });
 
+  // 19f. Obsolescence — projet « en stase » (US-064, RG-064) et bouton « Top 10 » (US-065, RG-065, plan_20
+  // Parties E et F). PROJET_B2, marqué « en stase » à l'étape 6b, reste alors le seul « en stase » du parcours.
+  await test.step('19f. Obsolescence — en stase et Top 10', async () => {
+    await avantChangementEcran(page, '19f-obsolescence-en-stase-top10');
+    await page.locator('#shell-lien-obsolescence').click();
+    await expect(page).toHaveURL(/\/obsolescence$/);
+
+    // Fond gris clair et infobulle explicite sur la tuile du projet « en stase », aucune autre tuile concernée.
+    const tuileEnStase = page.locator('.obsolescence__tuile', { hasText: PROJET_B2.nom });
+    await expect(tuileEnStase).toHaveClass(/obsolescence__tuile--en-stase/);
+    await expect(tuileEnStase).toHaveAttribute('title', /Projet en stase/);
+    const autresTuiles = page.locator('.obsolescence__tuile', { hasText: PROJET_B1.nom });
+    await expect(autresTuiles).not.toHaveClass(/obsolescence__tuile--en-stase/);
+
+    // Bouton « Top 10 » : inactif par défaut, bascule à l'activation, mention explicite dans le bandeau (lisible
+    // à l'export PNG), retour à l'état inactif d'origine.
+    const boutonTop10 = page.locator('#obsolescence-bouton-top10');
+    await expect(boutonTop10).toHaveAttribute('aria-pressed', 'false');
+    await boutonTop10.click();
+    await expect(boutonTop10).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.obsolescence__mention-top10')).toContainText(
+      'projets les plus en retard',
+    );
+    await boutonTop10.click();
+    await expect(boutonTop10).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.obsolescence__mention-top10')).toHaveCount(0);
+  });
+
   // 20. Comparaison entre deux audits — comparaison des deux audits intégrés d'un même projet.
   await test.step('20. Comparaison entre deux audits', async () => {
     await avantChangementEcran(page, '20-comparaison-audits');
@@ -895,15 +943,19 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#purge-parametrage-ciblee-tableau tbody tr')).toHaveCount(4);
     await expect(page.locator('#purge-parametrage-ciblee-tableau')).not.toContainText(GROUPE_B.nom);
 
-    // Synthèse des audits : les deux projets Beta sont désormais « jamais audité ».
+    // Synthèse des audits : les deux projets Beta sont désormais « jamais audité ». PROJET_B2, en outre marqué
+    // « en stase » à l'étape 6b, reste identifiable comme tel : les deux traitements (grisage « jamais audité »,
+    // fond et pastille « en stase ») cohabitent sans que l'un masque l'autre (décision 19 du plan, US-064/RG-064).
     await page.locator('#shell-lien-synthese-audits').click();
     await expect(page).toHaveURL(/\/synthese-audits$/);
-    await expect(page.locator('.tableau-dense__ligne', { hasText: PROJET_B1.nom })).toContainText(
-      'jamais audité',
-    );
-    await expect(page.locator('.tableau-dense__ligne', { hasText: PROJET_B2.nom })).toContainText(
-      'jamais audité',
-    );
+    const ligneB1 = page.locator('.tableau-dense__ligne', { hasText: PROJET_B1.nom });
+    await expect(ligneB1).toContainText('jamais audité');
+    await expect(ligneB1).not.toHaveClass(/tableau-dense__ligne--en-stase/);
+    const ligneB2 = page.locator('.tableau-dense__ligne', { hasText: PROJET_B2.nom });
+    await expect(ligneB2).toContainText('jamais audité');
+    await expect(ligneB2).toHaveClass(/tableau-dense__ligne--grisee/);
+    await expect(ligneB2).toHaveClass(/tableau-dense__ligne--en-stase/);
+    await expect(ligneB2.locator('.pastille-en-stase')).toBeVisible();
 
     // Journal des modifications : une entrée récapitulative unique (RG-023), sur le modèle de la purge existante.
     await page.locator('#shell-lien-parametrage').click();

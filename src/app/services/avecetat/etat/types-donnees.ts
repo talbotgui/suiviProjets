@@ -563,6 +563,11 @@ export interface Projet {
   readonly iaAutorisee: boolean;
   /** Date d'autorisation de l'IA, renseignée uniquement si `iaAutorisee` est ou a été vraie (RG-015). */
   readonly iaAutoriseeDepuis?: string;
+  /**
+   * Qualification « en stase » d'un projet volontairement mis en pause (RG-064), faux par défaut : purement
+   * visuelle et organisationnelle, sans effet sur l'audit, les campagnes, les alertes ni le calcul des indicateurs.
+   */
+  readonly enStase: boolean;
   /** Date du premier commit interne, une fois calculée (consommé par la future Fiche projet, Phase 6). */
   readonly premierCommitInterne?: PremierCommitInterne;
   /** Sources rattachées au projet. */

@@ -1,0 +1,15 @@
+// Gris neutre dédié (jamais une couleur sémantique de `SqmBadgeComponent`, cf. commentaire d'en-tête du composant),
+// même forme que `.badge` (`badge.component.scss`) pour rester visuellement cohérent avec les autres pastilles de
+// la charte d'ergonomie.
+.pastille-en-stase {
+  background-color: var(--sqm-neutre-200);
+  color: var(--sqm-neutre-800);
+}
+
+.pastille-en-stase__point {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex: none;
+  background-color: var(--sqm-neutre-700);
+}

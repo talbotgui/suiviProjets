@@ -193,6 +193,7 @@ class DonneesDeTest {
       nom: 'Projet Test',
       description: '',
       iaAutorisee,
+      enStase: false,
       sources: [
         {
           id: 'source-gitlab',

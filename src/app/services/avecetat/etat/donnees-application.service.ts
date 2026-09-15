@@ -468,6 +468,7 @@ export class DonneesApplicationService {
       nom: donnees.nom,
       description: donnees.description,
       iaAutorisee: false,
+      enStase: false,
       sources: [],
       annotations: [],
       audits: [],
@@ -496,6 +497,32 @@ export class DonneesApplicationService {
               ...groupe,
               projets: groupe.projets.map((projet) =>
                 projet.id === projetId ? { ...projet, ...donnees } : projet,
+              ),
+            }
+          : groupe,
+      ),
+    }));
+  }
+
+  /**
+   * Bascule la qualification « en stase » d'un projet (US-064, RG-064) : mutation en mémoire de la racine, sur le
+   * patron exact de {@link modifierProjet}, à la différence de {@link definirPolitiqueIA} qui délègue à une
+   * commande nommée de la Façade. La persistance sur disque reste assurée par la sauvegarde explicite du fichier
+   * existante (`sauvegarderFichier`), avec ressaisie du mot de passe à ce moment-là (RG-002) — aucune ressaisie
+   * n'est déclenchée par cette seule bascule.
+   * @param groupeId - Identifiant du groupe de rattachement.
+   * @param projetId - Identifiant du projet concerné.
+   * @param enStase - Nouvelle valeur de la qualification « en stase ».
+   */
+  public definirEnStase(groupeId: string, projetId: string, enStase: boolean): void {
+    this.mettreAJourRacine((racine) => ({
+      ...racine,
+      groupes: racine.groupes.map((groupe) =>
+        groupe.id === groupeId
+          ? {
+              ...groupe,
+              projets: groupe.projets.map((projet) =>
+                projet.id === projetId ? { ...projet, enStase } : projet,
               ),
             }
           : groupe,
@@ -536,6 +563,7 @@ export class DonneesApplicationService {
       nom: `${projetSource.nom} (copie)`,
       description: projetSource.description,
       iaAutorisee: false,
+      enStase: false,
       sources: projetSource.sources.map((source) => ({ ...source, id: this.genererId() })),
       annotations: [],
       audits: [],

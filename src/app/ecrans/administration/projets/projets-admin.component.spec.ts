@@ -273,6 +273,58 @@ describe('SqmProjetsAdminComponent', () => {
     expect(composant.lignesProjets()).toEqual([]);
   });
 
+  describe('qualification « en stase » (US-064, RG-064, plan_20 Partie E)', () => {
+    it('bascule « en stase » sans ressaisie de mot de passe, avec notification de succès', () => {
+      donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
+      composant.selectionnerGroupe(groupeId);
+      const ligne = composant.lignesProjets()[0];
+      expect(ligne.projet.enStase).toBe(false);
+
+      composant.basculerEnStase(ligne);
+
+      expect(composant.lignesProjets()[0].projet.enStase).toBe(true);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({
+          type: 'succes',
+          message: 'Le projet a été marqué « en stase ».',
+        }),
+      ]);
+    });
+
+    it('bascule à nouveau vers « actif » et notifie en conséquence', () => {
+      donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
+      composant.selectionnerGroupe(groupeId);
+      const ligne = composant.lignesProjets()[0];
+      composant.basculerEnStase(ligne);
+
+      composant.basculerEnStase(composant.lignesProjets()[0]);
+
+      expect(composant.lignesProjets()[0].projet.enStase).toBe(false);
+      expect(TestBed.inject(NotificationService).liste().at(-1)).toEqual(
+        expect.objectContaining({ type: 'succes', message: "Le projet n'est plus « en stase »." }),
+      );
+    });
+
+    it('reflète l’état dans la case à cocher du gabarit et la bascule au changement', () => {
+      donneesApplication.creerProjet(groupeId, { nom: 'API Facturation', description: '' });
+      composant.selectionnerGroupe(groupeId);
+      fixture.detectChanges();
+
+      const caseACocher = DomTestUtils.obtenirElementNatif(fixture).querySelector<HTMLInputElement>(
+        '.projets-admin__en-stase input[type="checkbox"]',
+      );
+      if (caseACocher === null) {
+        throw new Error('case à cocher « en stase » introuvable dans le gabarit sous test.');
+      }
+      expect(caseACocher.checked).toBe(false);
+
+      caseACocher.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(composant.lignesProjets()[0].projet.enStase).toBe(true);
+    });
+  });
+
   describe('politique IA (US-024, Phase 4)', () => {
     let projetId: string;
 

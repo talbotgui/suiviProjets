@@ -375,6 +375,22 @@ export class SqmProjetsAdminComponent {
   }
 
   /**
+   * Bascule la qualification « en stase » d'un projet (US-064, RG-064) : mutation en mémoire immédiate, aucune
+   * ressaisie du mot de passe (à la différence de la politique IA) — la persistance sur disque suit la sauvegarde
+   * explicite du fichier existante.
+   * @param ligne - Ligne du projet concerné, portant son groupe de rattachement réel.
+   */
+  public basculerEnStase(ligne: LigneProjet): void {
+    const nouvelleValeur = !ligne.projet.enStase;
+    this.donneesApplication.definirEnStase(ligne.groupeId, ligne.projet.id, nouvelleValeur);
+    this.notification.succes(
+      nouvelleValeur
+        ? 'Le projet a été marqué « en stase ».'
+        : "Le projet n'est plus « en stase ».",
+    );
+  }
+
+  /**
    * Bascule la politique IA du projet désigné par {@link demanderBasculePolitiqueIA}, après confirmation du mot
    * de passe (US-024, RG-014 à RG-016, RG-023).
    * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
