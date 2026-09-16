@@ -2,16 +2,16 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Client typé de la Façade de commandes, dédié à l'écran « Commits des membres » (US-060, RG-060, plan_17
-// chapitre 4) : passe de préparation d'une analyse (`preparerAnalyseCommitsMembres`) et récupération des
-// événements de poussée d'un membre du roster (`listerEvenementsPousseesMembre`), appelée en boucle par le Store
-// d'orchestration. Cinquième client de la Façade, classé sous `services/sansetat/commandes/` (aucun état interne
-// conservé entre deux appels).
+// chapitre 4, amendé par plan_21 le 2026-09-16) : résolution d'un membre connu par nom d'utilisateur GitLab exact
+// (`interrogerMembreGitlabParUsername`) et récupération des événements de poussée d'un membre
+// (`listerEvenementsPousseesMembre`), les deux appelées en boucle par le Store d'orchestration. Cinquième client
+// de la Façade, classé sous `services/sansetat/commandes/` (aucun état interne conservé entre deux appels).
 //
 // Ces deux commandes échangent des types miroir des structures brutes du Connecteur GitLab (`Instance`,
-// `PreparationAnalyseCommitsMembres`, `EvenementPoussee`), tous possédés par la Façade et typés dans
-// `types-facade.ts` : aucune généricité n'est nécessaire ici, à la différence des façades qui échangent la racine
-// complète du fichier ou un type possédé par un Store `avecetat/etat/`. Aucun type de `MembreConnu` ne transite
-// par ces commandes (la classification des membres est faite côté interface par le Moteur de jugement).
+// `MembreGroupeGitlab`, `EvenementPoussee`), tous possédés par la Façade et typés dans `types-facade.ts` : aucune
+// généricité n'est nécessaire ici, à la différence des façades qui échangent la racine complète du fichier ou un
+// type possédé par un Store `avecetat/etat/`. Aucun type de `MembreConnu` ne transite par ces commandes (le Store
+// dérive lui-même, sans appel réseau, les membres analysables depuis `membresConnus`).
 //
 // Invocation IPC passée par `InvocationCommandeUtils` (et non `invoke` directement) : point de passage unique
 // permettant le bouchon TS hors contexte Tauri (`ng serve`), cf. `bouchon/bouchon-commits-membres.utils.ts`.
@@ -22,33 +22,33 @@ import type {
   ErreurConnecteur,
   EvenementPoussee,
   Instance,
-  PreparationAnalyseCommitsMembres,
+  MembreGroupeGitlab,
+  ResultatInterrogerMembreGitlabParUsername,
   ResultatListerEvenementsPousseesMembre,
-  ResultatPreparationAnalyseCommitsMembres,
 } from './types-facade';
 
 /**
  * Client typé de la Façade de commandes pour l'écran « Commits des membres » (US-060, RG-060). Chaque méthode
- * invoque une commande Tauri identique côté cœur natif (`preparer_analyse_commits_membres`,
+ * invoque une commande Tauri identique côté cœur natif (`interroger_membre_gitlab_par_username`,
  * `lister_evenements_poussees_membre`) et renvoie un Résultat discriminé plutôt qu'un rejet de Promise non typé.
  */
 @Injectable({ providedIn: 'root' })
 export class FacadeCommitsMembresService {
   /**
-   * Passe de préparation d'une analyse : liste les membres `active` du groupe GitLab désigné puis ses dépôts
-   * (US-060, RG-060). `groupeGitlab` (chemin ou identifiant numérique) est obligatoire.
+   * Résout un membre connu par nom d'utilisateur GitLab exact (US-060, RG-060, plan_21). `resultat` vaut `null` si
+   * aucun compte GitLab actif ne correspond (cas métier, pas une anomalie).
    * @param instance - Première instance de type GitLab déclarée par le groupe applicatif analysé.
-   * @param groupeGitlab - Référence du groupe GitLab dont le roster est analysé.
-   * @returns Le roster et les dépôts en cas de succès, ou l'anomalie typée (RG-021) en cas d'échec.
+   * @param username - Nom d'utilisateur GitLab exact du membre connu recherché.
+   * @returns Le compte résolu (ou `null`) en cas de succès, ou l'anomalie typée (RG-021) en cas d'échec.
    */
-  public async preparerAnalyseCommitsMembres(
+  public async interrogerMembreGitlabParUsername(
     instance: Instance,
-    groupeGitlab: string,
-  ): Promise<ResultatPreparationAnalyseCommitsMembres> {
+    username: string,
+  ): Promise<ResultatInterrogerMembreGitlabParUsername> {
     try {
-      const resultat = await InvocationCommandeUtils.invoquer<PreparationAnalyseCommitsMembres>(
-        'preparer_analyse_commits_membres',
-        { instance, groupeGitlab },
+      const resultat = await InvocationCommandeUtils.invoquer<MembreGroupeGitlab | null>(
+        'interroger_membre_gitlab_par_username',
+        { instance, username },
       );
       return { type: 'succes', resultat };
     } catch (erreur: unknown) {

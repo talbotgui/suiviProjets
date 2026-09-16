@@ -1,20 +1,16 @@
-// Test de CadencePousseesUtils (cf. cadence-poussees.utils.ts, US-060, RG-060, plan_17 chapitre 4), Moteur de
-// jugement de l'écran « Commits des membres », généré avec l'assistance de l'IA (Claude Code), conformément à
-// .claude/rules/01-usage-ia-et-conventions.md.
+// Test de CadencePousseesUtils (cf. cadence-poussees.utils.ts, US-060, RG-060, plan_17 chapitre 4, amendé par
+// plan_21 le 2026-09-16), Moteur de jugement de l'écran « Commits des membres », généré avec l'assistance de l'IA
+// (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import type { EvenementPoussee } from '../commandes/types-facade';
 import {
   CadencePousseesUtils,
   type ActivitePousseesDeveloppeur,
   type SeuilsCadencePoussees,
 } from './cadence-poussees.utils';
-import type { RegleMembreConnu } from './statut-membre.utils';
-
-type StatutDeveloppeur = 'interne' | 'client' | 'partenaire' | 'inconnu';
 
 /** Lundi midi UTC, instant de référence de tous les tests. */
 const MAINTENANT = '2026-03-16T12:00:00.000Z';
 const CHEMINS = new Map<number, string>([[1, 'demo/api']]);
-const SANS_REGLE: readonly RegleMembreConnu<StatutDeveloppeur>[] = [];
 
 const SEUILS: SeuilsCadencePoussees = {
   fenetreJours: 28,
@@ -79,21 +75,19 @@ class Fixtures {
    * Enveloppe une liste d'événements dans une entrée d'activité.
    * @param username - Identifiant du développeur.
    * @param evenements - Ses événements.
-   * @param courriel - Son courriel (défaut `null`).
    * @returns L'entrée d'activité.
    */
   public static activite(
     username: string,
     evenements: readonly EvenementPoussee[],
-    courriel: string | null = null,
   ): ActivitePousseesDeveloppeur {
-    return { membre: { id: 1, username, nom: username, courriel }, evenements };
+    return { membre: { id: 1, username, nom: username, courriel: null }, evenements };
   }
 }
 
 describe('CadencePousseesUtils.analyser', () => {
-  it('ne produit aucune ligne pour un roster vide', () => {
-    expect(CadencePousseesUtils.analyser([], SEUILS, CHEMINS, SANS_REGLE, MAINTENANT)).toEqual([]);
+  it('ne produit aucune ligne pour une activité vide', () => {
+    expect(CadencePousseesUtils.analyser([], SEUILS, CHEMINS, MAINTENANT)).toEqual([]);
   });
 
   it('retire une ligne dont le compte figure dans comptesExclus, casse ignorée', () => {
@@ -104,7 +98,6 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       { ...SEUILS, comptesExclus: ['robot-ci'] },
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(lignes.map((ligne) => ligne.username)).toEqual(['dev']);
@@ -115,7 +108,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('dev', [Fixtures.poussee(1, 10)])],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.donneesInsuffisantes).toBe(true);
@@ -136,7 +128,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('dana', evenements)],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.donneesInsuffisantes).toBe(false);
@@ -168,7 +159,6 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(depuisVendredi.joursOuvresDepuisDernierePoussee).toBe(1);
@@ -177,7 +167,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('dev', [Fixtures.poussee(0, 8), Fixtures.poussee(0, 9)])],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(memeJour.joursOuvresDepuisDernierePoussee).toBe(0);
@@ -189,7 +178,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('dev', [Fixtures.poussee(20, 10), Fixtures.poussee(20, 11)])],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.alertes).toContain('ecartCadence');
@@ -202,7 +190,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('nadia', [Fixtures.poussee(1, 20), Fixtures.poussee(2, 20)])],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.partSoiree).toBe(1);
@@ -215,7 +202,6 @@ describe('CadencePousseesUtils.analyser', () => {
         [Fixtures.activite('dev', [Fixtures.poussee(1, 13), Fixtures.poussee(2, 13)])],
         { ...SEUILS, fuseauHoraire },
         CHEMINS,
-        SANS_REGLE,
         MAINTENANT,
       );
       expect(ligne.partSoiree).toBe(0);
@@ -232,7 +218,6 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       '2026-07-20T12:00:00.000Z',
     )[0];
     // Paris en juillet (CEST, UTC+2) : 17 h UTC → 19 h locales → dans la plage 19 h – 7 h.
@@ -247,7 +232,6 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       '2026-01-19T12:00:00.000Z',
     )[0];
     // Paris en janvier (CET, UTC+1) : 17 h UTC → 18 h locales → hors de la plage.
@@ -260,7 +244,6 @@ describe('CadencePousseesUtils.analyser', () => {
         [Fixtures.activite('dev', [Fixtures.poussee(1, 20), Fixtures.poussee(2, 20)])],
         { ...SEUILS, fuseauHoraire: 'Pas/UnFuseau' },
         CHEMINS,
-        SANS_REGLE,
         MAINTENANT,
       ),
     ).not.toThrow();
@@ -277,7 +260,6 @@ describe('CadencePousseesUtils.analyser', () => {
         [Fixtures.activite('dev', evenements)],
         SEUILS,
         CHEMINS,
-        SANS_REGLE,
         MAINTENANT,
       );
       return ligne.scoreRisque;
@@ -291,14 +273,12 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('dev', evenements)],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     )[0];
     const sansSoiree = CadencePousseesUtils.analyser(
       [Fixtures.activite('dev', evenements)],
       { ...SEUILS, ponderationSoiree: 0 },
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     )[0];
     expect(sansSoiree.scoreRisque).toBeLessThan(avecSoiree.scoreRisque);
@@ -329,59 +309,10 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(lignes[0].username).toBe('a-silencieux');
     expect(lignes.slice(1).map((ligne) => ligne.username)).toEqual(['b-regulier', 'c-regulier']);
-  });
-
-  it('classe un développeur par une règle username, une règle email et une règle de domaine', () => {
-    const regles: readonly RegleMembreConnu<StatutDeveloppeur>[] = [
-      { critere: 'interne.login', typeCritere: 'username', statut: 'interne' },
-      { critere: 'client@client.example', typeCritere: 'email', statut: 'client' },
-      { critere: '*.partenaire.example', typeCritere: 'domaineEmail', statut: 'partenaire' },
-    ];
-    const lignes = CadencePousseesUtils.analyser(
-      [
-        Fixtures.activite('interne.login', [Fixtures.poussee(1, 10)]),
-        Fixtures.activite('inconnu.email', [Fixtures.poussee(1, 10)], 'client@client.example'),
-        Fixtures.activite(
-          'inconnu.domaine',
-          [Fixtures.poussee(1, 10)],
-          'x@sous.partenaire.example',
-        ),
-        Fixtures.activite(
-          'parfait.inconnu',
-          [Fixtures.poussee(1, 10)],
-          'personne@ailleurs.example',
-        ),
-      ],
-      SEUILS,
-      CHEMINS,
-      regles,
-      MAINTENANT,
-    );
-    const statutParUsername = new Map(lignes.map((ligne) => [ligne.username, ligne.statut]));
-    expect(statutParUsername.get('interne.login')).toBe('interne');
-    expect(statutParUsername.get('inconnu.email')).toBe('client');
-    expect(statutParUsername.get('inconnu.domaine')).toBe('partenaire');
-    expect(statutParUsername.get('parfait.inconnu')).toBe('inconnu');
-  });
-
-  it('ramène une issue « conflit de règles » à inconnu', () => {
-    const regles: readonly RegleMembreConnu<StatutDeveloppeur>[] = [
-      { critere: 'a@x.example', typeCritere: 'email', statut: 'interne' },
-      { critere: 'a@x.example', typeCritere: 'email', statut: 'client' },
-    ];
-    const [ligne] = CadencePousseesUtils.analyser(
-      [Fixtures.activite('ambigu', [Fixtures.poussee(1, 10)], 'a@x.example')],
-      SEUILS,
-      CHEMINS,
-      regles,
-      MAINTENANT,
-    );
-    expect(ligne.statut).toBe('inconnu');
   });
 
   it('exclut de la fenêtre les poussées trop anciennes', () => {
@@ -389,7 +320,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('dev', [Fixtures.poussee(2, 10), Fixtures.poussee(40, 10)])],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.nombrePoussees).toBe(1);
@@ -415,7 +345,6 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       { ...SEUILS, heureDebutSoiree: 0, heureFinSoiree: 6, fuseauHoraire: 'UTC' },
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.partSoiree).toBe(0.5);
@@ -433,7 +362,6 @@ describe('CadencePousseesUtils.analyser', () => {
       ],
       { ...SEUILS, ponderationInactivite: 0, ponderationEcartCadence: 0, ponderationSoiree: 0 },
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.scoreRisque).toBe(0);
@@ -444,7 +372,6 @@ describe('CadencePousseesUtils.analyser', () => {
       [Fixtures.activite('sans-activite', [])],
       SEUILS,
       CHEMINS,
-      SANS_REGLE,
       MAINTENANT,
     );
     expect(ligne.scoreRisque).toBe(0);

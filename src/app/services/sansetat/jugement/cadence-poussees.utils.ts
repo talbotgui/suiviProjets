@@ -1,15 +1,15 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Moteur de jugement de l'écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4) : fonction pure,
-// sans effet de bord ni accès disque/réseau, calculant les indicateurs de régularité de poussée d'un développeur
-// à partir de l'activité brute déjà récupérée, des seuils courants et de l'instant de référence. Elle est
-// réévaluée par le Store d'orchestration à chaque changement de seuil, sans nouvel appel réseau.
+// Moteur de jugement de l'écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4, amendé par plan_21
+// le 2026-09-16) : fonction pure, sans effet de bord ni accès disque/réseau, calculant les indicateurs de
+// régularité de poussée d'un développeur à partir de l'activité brute déjà récupérée, des seuils courants et de
+// l'instant de référence. Elle est réévaluée par le Store d'orchestration à chaque changement de seuil, sans
+// nouvel appel réseau. Depuis plan_21, seuls des membres connus déjà `interne` sont transmis (filtrage en amont
+// par le Store) : la classification de statut par ligne (RG-006 à RG-010) est donc retirée, devenue triviale.
 //
 // Priorité de couverture unitaire (seuil 90 %, cf. docs/02_documentation/16_normesTests.md).
 import type { EvenementPoussee } from '../commandes/types-facade';
-import { StatutMembreUtils } from './statut-membre.utils';
-import type { RegleMembreConnu } from './statut-membre.utils';
 
 /** Millisecondes par heure, pour convertir les écarts d'horodatage. */
 const MS_PAR_HEURE = 60 * 60 * 1000;
@@ -40,13 +40,10 @@ export interface SeuilsCadencePoussees {
   readonly comptesExclus: readonly string[];
 }
 
-/** Statut de rattachement d'un développeur, issu de `StatutMembreUtils` (RG-006 à RG-010). */
-export type StatutDeveloppeur = 'interne' | 'client' | 'partenaire' | 'inconnu';
-
 /** Alertes possibles sur une ligne du tableau (RG-060). */
 export type AlerteCadence = 'inactivite' | 'ecartCadence' | 'soiree';
 
-/** Membre du roster et son activité brute sur la fenêtre, entrée de {@link CadencePousseesUtils.analyser}. */
+/** Membre retenu et son activité brute sur la fenêtre, entrée de {@link CadencePousseesUtils.analyser}. */
 export interface ActivitePousseesDeveloppeur {
   /** Identité GitLab du membre. */
   readonly membre: {
@@ -63,7 +60,6 @@ export interface ActivitePousseesDeveloppeur {
 export interface LigneCadencePoussees {
   readonly username: string;
   readonly nom: string;
-  readonly statut: StatutDeveloppeur;
   /** Horodatage ISO de la dernière poussée sur la fenêtre, `null` si aucune. */
   readonly dernierePousseeIso: string | null;
   /** Chemin (ou identifiant à défaut) du dépôt de la dernière poussée, `null` si aucune. */
@@ -96,10 +92,9 @@ export class CadencePousseesUtils {
   /**
    * Produit une ligne par développeur non exclu, filtrée à la fenêtre glissante, triée par score de risque
    * décroissant (départage stable par `username` croissant).
-   * @param activite - Activité brute par développeur du roster.
+   * @param activite - Activité brute par développeur retenu.
    * @param seuils - Seuils de calcul courants.
    * @param cheminsDepotsParId - Correspondance identifiant de dépôt GitLab -> chemin lisible.
-   * @param reglesMembresConnus - Règles de membre connu du groupe, projetées sur {@link StatutDeveloppeur}.
    * @param maintenantIso - Instant de référence (horodatage ISO de l'analyse).
    * @returns Les lignes du tableau, triées.
    */
@@ -107,7 +102,6 @@ export class CadencePousseesUtils {
     activite: readonly ActivitePousseesDeveloppeur[],
     seuils: SeuilsCadencePoussees,
     cheminsDepotsParId: ReadonlyMap<number, string>,
-    reglesMembresConnus: readonly RegleMembreConnu<StatutDeveloppeur>[],
     maintenantIso: string,
   ): readonly LigneCadencePoussees[] {
     const maintenant = Date.parse(maintenantIso);
@@ -123,7 +117,6 @@ export class CadencePousseesUtils {
           entree,
           seuils,
           cheminsDepotsParId,
-          reglesMembresConnus,
           maintenant,
           debutFenetre,
         ),
@@ -139,7 +132,6 @@ export class CadencePousseesUtils {
    * @param entree - Activité brute du développeur.
    * @param seuils - Seuils courants.
    * @param cheminsDepotsParId - Correspondance identifiant -> chemin de dépôt.
-   * @param reglesMembresConnus - Règles de membre connu du groupe.
    * @param maintenant - Instant de référence (ms).
    * @param debutFenetre - Borne basse de la fenêtre (ms).
    * @returns La ligne calculée.
@@ -148,7 +140,6 @@ export class CadencePousseesUtils {
     entree: ActivitePousseesDeveloppeur,
     seuils: SeuilsCadencePoussees,
     cheminsDepotsParId: ReadonlyMap<number, string>,
-    reglesMembresConnus: readonly RegleMembreConnu<StatutDeveloppeur>[],
     maintenant: number,
     debutFenetre: number,
   ): LigneCadencePoussees {
@@ -160,7 +151,6 @@ export class CadencePousseesUtils {
       .slice()
       .sort((a, b) => Date.parse(a.horodatage) - Date.parse(b.horodatage));
 
-    const statut = CadencePousseesUtils.resoudreStatut(entree.membre, reglesMembresConnus);
     const nombrePoussees = evenements.length;
     const nombreCommits = evenements.reduce(
       (total, evenement) => total + evenement.nombreCommits,
@@ -171,7 +161,6 @@ export class CadencePousseesUtils {
       return {
         username: entree.membre.username,
         nom: entree.membre.nom,
-        statut,
         dernierePousseeIso: null,
         depotDernierePoussee: null,
         joursOuvresDepuisDernierePoussee: null,
@@ -245,7 +234,6 @@ export class CadencePousseesUtils {
     return {
       username: entree.membre.username,
       nom: entree.membre.nom,
-      statut,
       dernierePousseeIso,
       depotDernierePoussee,
       joursOuvresDepuisDernierePoussee: joursOuvresDepuis,
@@ -258,25 +246,6 @@ export class CadencePousseesUtils {
       alertes,
       donneesInsuffisantes,
     };
-  }
-
-  /**
-   * Résout le statut d'un développeur contre les règles de membre connu (RG-006 à RG-010). Une issue `conflit` est
-   * ramenée à `inconnu` (RG-008) ; les règles `email` / `domaineEmail` ne sont résolues que si le courriel est
-   * connu (jeton d'administration).
-   * @param membre - Identité GitLab du développeur.
-   * @param regles - Règles de membre connu du groupe.
-   * @returns Le statut de rattachement.
-   */
-  private static resoudreStatut(
-    membre: ActivitePousseesDeveloppeur['membre'],
-    regles: readonly RegleMembreConnu<StatutDeveloppeur>[],
-  ): StatutDeveloppeur {
-    const resolution = StatutMembreUtils.calculerStatutMembre<StatutDeveloppeur>(
-      { username: membre.username, email: membre.courriel ?? undefined },
-      regles,
-    );
-    return resolution.type === 'connu' ? resolution.statut : 'inconnu';
   }
 
   /**

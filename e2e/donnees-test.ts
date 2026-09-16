@@ -76,6 +76,24 @@ export const MEMBRE_A_QUALIFIER_DEPUIS_ALERTE = {
   statut: 'partenaire',
 };
 
+/**
+ * Deux membres connus `interne`/`username` actifs du groupe E2E Alpha, seul périmètre analysable par l'écran
+ * « Commits des membres » depuis plan_21 (2026-09-16) : leur `critere` correspond aux noms d'utilisateur reconnus
+ * par le jeu de démonstration du bouchon (`bouchon-commits-membres.utils.ts`), pour que l'analyse lancée à
+ * l'étape « 19e » retourne une activité déterministe.
+ */
+export const MEMBRE_COMMITS_REGULIER = {
+  critere: 'mdurand',
+  typeCritere: 'username',
+  statut: 'interne',
+};
+
+export const MEMBRE_COMMITS_SILENCIEUX = {
+  critere: 'jpetit',
+  typeCritere: 'username',
+  statut: 'interne',
+};
+
 export const REGLE_DEPENDANCE = {
   motif: 'org.exemple:lib-e2e',
   versionsInitiales: '1.0.*=obsolete',

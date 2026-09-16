@@ -1,12 +1,14 @@
 // Fichier généré avec l'assistance de l'IA (Claude Code), conformément à la mention d'origine requise par
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
-// Écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4) : vérifie que les développeurs d'un groupe
-// poussent leur code régulièrement sur GitLab, et repère une inactivité prolongée annonçant un risque de perte de
-// travail non partagé. L'orchestration (préparation du roster, boucle sur les membres à concurrence limitée) est
-// portée par `CommitsMembresService` ; le calcul des indicateurs par la fonction pure `CadencePousseesUtils`. Cet
-// écran ne fait que présenter, trier et filtrer les lignes — le tri, le filtrage et tout changement de seuil ne
-// déclenchent jamais de nouvel appel réseau.
+// Écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4, amendé par plan_21 le 2026-09-16) : vérifie
+// que les développeurs d'un groupe poussent leur code régulièrement sur GitLab, et repère une inactivité
+// prolongée annonçant un risque de perte de travail non partagé. L'analyse porte sur les seuls membres connus
+// `interne`, qualifiés par un nom d'utilisateur exact, actifs, du groupe applicatif sélectionné — une sélection
+// unique, sans plus aucune référence de groupe GitLab distant à saisir. L'orchestration (résolution des membres
+// puis boucle sur leurs événements à concurrence limitée) est portée par `CommitsMembresService` ; le calcul des
+// indicateurs par la fonction pure `CadencePousseesUtils`. Cet écran ne fait que présenter, trier et filtrer les
+// lignes — le tri, le filtrage et tout changement de seuil ne déclenchent jamais de nouvel appel réseau.
 //
 // Dimension RH assumée (arbitrage humain du 2026-09-02) : les indicateurs sont nominatifs ; un bandeau permanent
 // non masquable rappelle que leur exploitation relève de la responsabilité RH et d'information du personnel de
@@ -23,13 +25,11 @@ import type { Groupe } from '../../services/avecetat/etat/types-donnees';
 import type {
   AlerteCadence,
   LigneCadencePoussees,
-  StatutDeveloppeur,
 } from '../../services/sansetat/jugement/cadence-poussees.utils';
 
 /** Colonne de tri du tableau. */
 type ColonneTri =
   | 'developpeur'
-  | 'statut'
   | 'dernierePoussee'
   | 'joursOuvres'
   | 'poussees'
@@ -37,9 +37,6 @@ type ColonneTri =
   | 'ecart'
   | 'soiree'
   | 'score';
-
-/** Filtre de statut du tableau (`tous` par défaut, RG-060 / décision d'architecture n° 5). */
-type FiltreStatut = 'tous' | 'interne' | 'client' | 'partenaire' | 'inconnu';
 
 /**
  * Écran « Commits des membres » (US-060, RG-060).
@@ -59,15 +56,11 @@ export class SqmCommitsMembresComponent {
 
   /** Groupe applicatif sélectionné pour l'analyse. */
   public readonly groupeSelectionneId: WritableSignal<string | null> = signal<string | null>(null);
-  /** Référence (chemin ou identifiant) du groupe GitLab, obligatoire pour lancer une analyse. */
-  public readonly referenceGroupeGitlab: WritableSignal<string> = signal('');
 
   /** Colonne de tri courante (défaut : score de risque). */
   public readonly colonneTri: WritableSignal<ColonneTri> = signal<ColonneTri>('score');
   /** Sens de tri courant (`true` = décroissant, défaut). */
   public readonly triDecroissant: WritableSignal<boolean> = signal(true);
-  /** Filtre de statut (défaut « tous »). */
-  public readonly filtreStatut: WritableSignal<FiltreStatut> = signal<FiltreStatut>('tous');
   /** Filtre plein texte sur le développeur. */
   public readonly filtreTexte: WritableSignal<string> = signal('');
   /** Restreint aux lignes portant au moins une alerte. */
@@ -91,12 +84,8 @@ export class SqmCommitsMembresComponent {
    */
   public readonly lignesAffichees: Signal<readonly LigneCadencePoussees[]> = computed(() => {
     const texte = this.filtreTexte().trim().toLowerCase();
-    const statut = this.filtreStatut();
     const seulementAlertes = this.seulementAlertes();
     const filtrees = this.store.lignes().filter((ligne) => {
-      if (statut !== 'tous' && ligne.statut !== statut) {
-        return false;
-      }
       if (seulementAlertes && ligne.alertes.length === 0) {
         return false;
       }
@@ -139,15 +128,29 @@ export class SqmCommitsMembresComponent {
   );
 
   /**
-   * Lance une analyse si un groupe est sélectionné et la référence GitLab renseignée.
+   * Message signalant le nombre de règles `interne` non analysables du groupe analysé (type `email` ou
+   * `domaineEmail`, plan_21 §2 décision 2), jamais une exclusion silencieuse.
+   * @returns Le message, ou chaîne vide si aucune règle non analysable.
+   */
+  public readonly messageReglesNonAnalysables: Signal<string> = computed(() => {
+    const nombre = this.store.reglesNonAnalysables();
+    if (nombre === 0) {
+      return '';
+    }
+    return nombre === 1
+      ? '1 règle « interne » de type courriel ou domaine de courriel ne peut pas être analysée (aucun compte GitLab précis désigné).'
+      : `${nombre} règles « interne » de type courriel ou domaine de courriel ne peuvent pas être analysées (aucun compte GitLab précis désigné).`;
+  });
+
+  /**
+   * Lance une analyse si un groupe est sélectionné.
    */
   public async lancerAnalyse(): Promise<void> {
     const groupeId = this.groupeSelectionneId();
-    const reference = this.referenceGroupeGitlab().trim();
-    if (groupeId === null || reference.length === 0) {
+    if (groupeId === null) {
       return;
     }
-    await this.store.analyser(groupeId, reference);
+    await this.store.analyser(groupeId);
   }
 
   /**
@@ -167,29 +170,10 @@ export class SqmCommitsMembresComponent {
    * Réinitialise filtres et tri à leurs valeurs par défaut.
    */
   public reinitialiserFiltres(): void {
-    this.filtreStatut.set('tous');
     this.filtreTexte.set('');
     this.seulementAlertes.set(false);
     this.colonneTri.set('score');
     this.triDecroissant.set(true);
-  }
-
-  /**
-   * Libellé lisible d'un statut de développeur (switch exhaustif).
-   * @param statut - Statut résolu.
-   * @returns Le libellé.
-   */
-  public libelleStatut(statut: StatutDeveloppeur): string {
-    switch (statut) {
-      case 'interne':
-        return 'Interne';
-      case 'client':
-        return 'Client';
-      case 'partenaire':
-        return 'Partenaire';
-      case 'inconnu':
-        return 'Inconnu';
-    }
   }
 
   /**
@@ -257,8 +241,6 @@ export class SqmCommitsMembresComponent {
     switch (this.colonneTri()) {
       case 'developpeur':
         return signe * a.username.localeCompare(b.username);
-      case 'statut':
-        return signe * a.statut.localeCompare(b.statut);
       case 'poussees':
         return signe * (a.nombrePoussees - b.nombrePoussees);
       case 'score':

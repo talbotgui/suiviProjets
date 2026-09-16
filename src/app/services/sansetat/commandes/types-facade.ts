@@ -470,24 +470,16 @@ export type ResultatInterrogationMonteesVersionSonar =
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**
- * Membre `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`), miroir strict de `MembreGroupeGitlab` côté
- * cœur natif (`camelCase`), pour le roster de l'écran « Commits des membres » (US-060, RG-060, plan_17 chapitre 4).
- * `courriel` n'est renseigné que lorsque l'API le retourne (jeton d'administration).
+ * Compte GitLab actif résolu par recherche exacte de nom d'utilisateur (`GET /users?username=<exact>`), miroir
+ * strict de `MembreGroupeGitlab` côté cœur natif (`camelCase`), pour l'écran « Commits des membres » (US-060,
+ * RG-060, plan_17 chapitre 4, amendé par plan_21 le 2026-09-16). `courriel` n'est renseigné que lorsque l'API le
+ * retourne (jeton d'administration).
  */
 export interface MembreGroupeGitlab {
   readonly id: number;
   readonly username: string;
   readonly nom: string;
   readonly courriel: string | null;
-}
-
-/**
- * Dépôt d'un groupe GitLab (`GET /groups/{ref}/projects`), miroir strict de `ProjetGroupeGitlab` côté cœur natif,
- * pour afficher un nom de dépôt lisible dans le tableau « Commits des membres » (US-060, RG-060).
- */
-export interface ProjetGroupeGitlab {
-  readonly id: number;
-  readonly chemin: string;
 }
 
 /**
@@ -503,21 +495,12 @@ export interface EvenementPoussee {
 }
 
 /**
- * Résultat de la passe de préparation d'une analyse « Commits des membres » (US-060, RG-060) : le roster du groupe
- * GitLab et ses dépôts. Miroir strict de `PreparationAnalyseCommitsMembres` côté cœur natif ; type possédé par la
- * Façade (structure de transfert calculée, jamais stockée), importable directement sans généricité.
+ * Résultat typé de `FacadeCommitsMembresService.interrogerMembreGitlabParUsername` (US-060, RG-060, plan_21), sur
+ * le modèle de {@link ResultatInterrogationMonteesVersionSonar}. `resultat` vaut `null` si aucun compte GitLab
+ * actif ne correspond au `username` recherché (cas métier, pas une anomalie).
  */
-export interface PreparationAnalyseCommitsMembres {
-  readonly membres: readonly MembreGroupeGitlab[];
-  readonly projets: readonly ProjetGroupeGitlab[];
-}
-
-/**
- * Résultat typé de `FacadeCommitsMembresService.preparerAnalyseCommitsMembres` (US-060, RG-060, plan_17
- * chapitre 4), sur le modèle de {@link ResultatInterrogationMonteesVersionSonar}.
- */
-export type ResultatPreparationAnalyseCommitsMembres =
-  | { readonly type: 'succes'; readonly resultat: PreparationAnalyseCommitsMembres }
+export type ResultatInterrogerMembreGitlabParUsername =
+  | { readonly type: 'succes'; readonly resultat: MembreGroupeGitlab | null }
   | { readonly type: 'echec'; readonly anomalie: ErreurConnecteur };
 
 /**

@@ -54,7 +54,7 @@ import type {
   SourceDisponible,
   VerdictConnectivite,
 } from '../types-facade';
-import type { EvenementPoussee, PreparationAnalyseCommitsMembres } from '../types-facade';
+import type { EvenementPoussee, MembreGroupeGitlab } from '../types-facade';
 import { BouchonCommitsMembresUtils } from './bouchon-commits-membres.utils';
 import {
   CONSTATS_GITLAB_BOUCHON,
@@ -96,8 +96,9 @@ const COMMANDES_INTERROGATION_AUDIT: ReadonlySet<string> = new Set([
   'interroger_notes',
   'interroger_ncloc',
   'interroger_montees_version_sonar',
-  // Écran « Commits des membres » (US-060) : un appel par membre du roster, le délai artificiel permet d'exercer
-  // l'indicateur de progression de l'analyse (la passe de préparation, elle, reste instantanée).
+  // Écran « Commits des membres » (US-060, RG-060, plan_21) : un appel de chacune des deux commandes par membre
+  // analysable, le délai artificiel permet d'exercer l'indicateur de progression de l'analyse.
+  'interroger_membre_gitlab_par_username',
   'lister_evenements_poussees_membre',
 ]);
 
@@ -128,7 +129,7 @@ type ReponseBouchon =
   | ResultatSonarNcloc
   | readonly SourceDisponible[]
   | readonly MonteeVersionSonar[]
-  | PreparationAnalyseCommitsMembres
+  | MembreGroupeGitlab
   | readonly EvenementPoussee[];
 
 /**
@@ -258,8 +259,8 @@ export class BouchonCommandesUtils {
         return BouchonCommandesUtils.derniereAnalyse(parametres);
       case 'interroger_montees_version_sonar':
         return BouchonCommandesUtils.monteesVersionSonar(parametres);
-      case 'preparer_analyse_commits_membres':
-        return BouchonCommitsMembresUtils.preparerAnalyse();
+      case 'interroger_membre_gitlab_par_username':
+        return BouchonCommitsMembresUtils.rechercherMembreParUsername(parametres);
       case 'lister_evenements_poussees_membre':
         return BouchonCommitsMembresUtils.listerEvenementsPoussees(parametres);
       case 'consigner_erreur_ui':

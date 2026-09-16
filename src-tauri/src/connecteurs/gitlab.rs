@@ -1654,16 +1654,21 @@ pub(crate) async fn interroger_merge_requests(
     })
 }
 
-/// Réponse d'un membre de l'API GitLab (`/members` ou `/members/all`), réduite aux champs exploités ici.
+/// Réponse d'un membre ou d'un utilisateur de l'API GitLab (`/members`, `/members/all` ou `/users`), réduite aux
+/// champs exploités ici.
 ///
-/// Les champs `id`, `state` et `email` portent `#[serde(default)]` : ils ne sont exploités que par
-/// [`lister_membres_groupe`] (US-060) et absents des réponses simulées des tests plus anciens de
-/// [`interroger_membres`] / [`recuperer_usernames_membres_groupe`], qui ne s'appuient que sur les trois premiers.
-/// `email` n'est renseigné par `GET /groups/{ref}/members/all` que pour un jeton d'administration.
+/// Les champs `id`, `state` et `email` portent `#[serde(default)]` : ils sont absents des réponses simulées des
+/// tests plus anciens de [`interroger_membres`] / [`recuperer_usernames_membres_groupe`], qui ne s'appuient que sur
+/// les trois premiers champs. `access_level` porte lui aussi `#[serde(default)]` depuis plan_21 (2026-09-16) : la
+/// réponse de `GET /users` (utilisée par [`interroger_membre_par_username`]) ne comporte pas ce champ, à la
+/// différence de `/members`/`/members/all` — champ non exploité par [`interroger_membre_par_username`], sa valeur
+/// par défaut (`0`) y est donc sans conséquence. `email` n'est renseigné par l'API que pour un jeton
+/// d'administration.
 #[derive(Debug, Deserialize)]
 struct ReponseMembre {
     username: String,
     name: String,
+    #[serde(default)]
     access_level: u32,
     #[serde(default)]
     id: u64,
@@ -1947,9 +1952,9 @@ async fn recuperer_usernames_membres_groupe(
 /// l'indicateur « dernière poussée » et la cadence récente restent exacts.
 const MAX_PAGES_EVENEMENTS_POUSSEE: u32 = 10;
 
-/// États de membre GitLab explicitement non actifs, exclus du roster de l'écran « Commits des membres » (US-060 /
-/// RG-060). Repli défensif : un membre dont le `state` est absent ou d'une valeur inconnue est **conservé** plutôt
-/// que d'exposer un roster vide (lu comme une inactivité universelle) si l'API cessait un jour de renvoyer ce
+/// États de membre GitLab explicitement non actifs, écartés du résultat de [`interroger_membre_par_username`] pour
+/// l'écran « Commits des membres » (US-060 / RG-060). Repli défensif : un membre dont le `state` est absent ou
+/// d'une valeur inconnue est **conservé** plutôt que d'être écarté à tort si l'API cessait un jour de renvoyer ce
 /// champ.
 const ETATS_MEMBRE_NON_ACTIFS: &[&str] = &[
     "blocked",
@@ -1960,21 +1965,8 @@ const ETATS_MEMBRE_NON_ACTIFS: &[&str] = &[
     "awaiting",
 ];
 
-/// Contrôle de forme d'une référence de groupe GitLab (saisie libre obligatoire de l'écran « Commits des membres »,
-/// US-060) avant tout appel réseau : non vide, sans `..`, et composée uniquement de lettres, chiffres, `_`, `-`,
-/// `.` et `/` — ce qui rejette une espace, un caractère de contrôle, un `%` (double-décodage) ou une tentative de
-/// remontée de chemin. Revalidation côté cœur natif d'une saisie déjà contrainte côté interface
-/// (`docs/02_documentation/15_normesSecurite.md#contrôle-des-entrées-et-sorties`).
-fn reference_groupe_valide(reference: &str) -> bool {
-    !reference.is_empty()
-        && !reference.contains("..")
-        && reference
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/'))
-}
-
-/// Membre `active` d'un groupe GitLab (`GET /groups/{ref}/members/all`), pour le roster de l'écran
-/// « Commits des membres » (US-060 / RG-060). Miroir strict, en `camelCase`, de la structure TypeScript.
+/// Compte GitLab actif résolu par [`interroger_membre_par_username`] (US-060 / RG-060, plan_21). Miroir strict, en
+/// `camelCase`, de la structure TypeScript.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MembreGroupeGitlab {
@@ -1986,17 +1978,6 @@ pub(crate) struct MembreGroupeGitlab {
     pub(crate) nom: String,
     /// Adresse électronique, renseignée uniquement quand l'API la retourne (jeton d'administration).
     pub(crate) courriel: Option<String>,
-}
-
-/// Dépôt d'un groupe GitLab (`GET /groups/{ref}/projects`), pour afficher un nom de dépôt lisible dans le tableau
-/// « Commits des membres » (US-060 / RG-060).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ProjetGroupeGitlab {
-    /// Identifiant numérique GitLab du projet.
-    pub(crate) id: u64,
-    /// Chemin complet (`path_with_namespace`).
-    pub(crate) chemin: String,
 }
 
 /// Événement de poussée d'un utilisateur GitLab (`GET /users/{id}/events?action=pushed`), pour le calcul de
@@ -2013,13 +1994,6 @@ pub(crate) struct EvenementPoussee {
     pub(crate) ref_poussee: String,
     /// Nombre de commits transportés par la poussée (`push_data.commit_count`).
     pub(crate) nombre_commits: u32,
-}
-
-/// Réponse d'un dépôt de `GET /groups/{ref}/projects`, réduite aux champs exploités par [`lister_projets_groupe`].
-#[derive(Debug, Deserialize)]
-struct ReponseProjetGroupe {
-    id: u64,
-    path_with_namespace: String,
 }
 
 /// Bloc `push_data` d'un événement `GET /users/{id}/events`, réduit aux champs exploités par
@@ -2073,11 +2047,10 @@ fn url_api(url_base: &str, segments: &[&str]) -> Result<url::Url, ErreurConnecte
 }
 
 /// Traduit le statut HTTP d'une réponse GitLab en [`ErreurConnecteur`] typée selon RG-021 : 401 → authentification
-/// refusée, 403 → droits insuffisants, 404 → ref introuvable (la référence de groupe / l'identifiant d'utilisateur
-/// n'existe pas — c'est l'erreur de saisie la plus probable sur la référence de groupe obligatoire de l'écran
-/// « Commits des membres »), tout autre statut non 2xx → réponse inattendue ; `Ok(())` pour un 2xx. Factorisé pour
-/// les trois fonctions du roster « Commits des membres » (US-060) ; les fonctions plus anciennes de ce module
-/// inlinent un contrôle équivalent.
+/// refusée, 403 → droits insuffisants, 404 → ref introuvable, tout autre statut non 2xx → réponse inattendue ;
+/// `Ok(())` pour un 2xx. Factorisé pour les fonctions de l'écran « Commits des membres » (US-060) :
+/// [`interroger_membre_par_username`] et [`lister_evenements_poussees`] ; les fonctions plus anciennes de ce
+/// module inlinent un contrôle équivalent.
 fn statut_reponse_ok(reponse: &reqwest::Response) -> Result<(), ErreurConnecteur> {
     let statut = reponse.status();
     match statut.as_u16() {
@@ -2097,118 +2070,49 @@ fn statut_reponse_ok(reponse: &reqwest::Response) -> Result<(), ErreurConnecteur
     }
 }
 
-/// Liste les membres actifs d'un groupe GitLab (`GET /groups/{ref}/members/all`, paginé jusqu'à épuisement ou
-/// [`MAX_PAGES_CONTRIBUTEURS`]), pour le roster de l'écran « Commits des membres » (US-060 / RG-060), sur le modèle
-/// de [`recuperer_usernames_membres_groupe`]. `groupe_ref` (chemin ou identifiant numérique) est contrôlé en forme
-/// (cf. [`reference_groupe_valide`]) puis percent-encodé comme un unique segment de chemin. Les membres au `state`
-/// explicitement non actif ([`ETATS_MEMBRE_NON_ACTIFS`]) sont écartés ; un `state` absent ou inconnu est conservé.
-/// `courriel` n'est renseigné que lorsque l'API le retourne (jeton d'administration) ; à défaut, seules les règles
-/// de membre connu de type `username` pourront être résolues côté interface.
+/// Recherche un compte GitLab par nom d'utilisateur exact (`GET /users?username=<exact>`, recherche globale, hors
+/// périmètre d'un groupe GitLab), pour l'écran « Commits des membres » (US-060 / RG-060, plan_21). GitLab filtre
+/// déjà en égalité stricte sur `username` : au plus un compte peut correspondre, aucune pagination n'est
+/// nécessaire. `courriel` n'est renseigné que lorsque l'API le retourne (jeton d'administration).
+///
+/// `Ok(None)` — cas métier, pas une anomalie — si la recherche ne renvoie aucun compte, ou seulement des comptes
+/// dont l'état figure dans [`ETATS_MEMBRE_NON_ACTIFS`] : un membre connu sans compte GitLab actif correspondant
+/// est un cas métier légitime, distinct d'un échec réseau (RG-021).
 ///
 /// # Erreurs
 ///
-/// [`ErreurConnecteur::RefIntrouvable`] si `groupe_ref` n'a pas une forme valide ; [`ErreurConnecteur`] typée selon
-/// RG-021 (cf. [`statut_reponse_ok`]) ; erreur réseau mappée par [`erreur_depuis_reqwest`] ; corps non
-/// désérialisable → [`ErreurConnecteur::ReponseInattendue`].
-pub(crate) async fn lister_membres_groupe(
+/// [`ErreurConnecteur`] typée selon RG-021 (cf. [`statut_reponse_ok`]) ; erreur réseau mappée par
+/// [`erreur_depuis_reqwest`] ; corps non désérialisable → [`ErreurConnecteur::ReponseInattendue`].
+pub(crate) async fn interroger_membre_par_username(
     url_base: &str,
     credential: &str,
-    groupe_ref: &str,
+    username: &str,
     client: &reqwest::Client,
-) -> Result<Vec<MembreGroupeGitlab>, ErreurConnecteur> {
-    if !reference_groupe_valide(groupe_ref) {
-        return Err(ErreurConnecteur::RefIntrouvable {
-            message: "Référence de groupe GitLab de forme invalide".to_string(),
-        });
-    }
-    let url = url_api(url_base, &["groups", groupe_ref, "members", "all"])?;
-    let mut membres = Vec::new();
-    for page in 1..=MAX_PAGES_CONTRIBUTEURS {
-        let reponse = client
-            .get(url.clone())
-            .header("PRIVATE-TOKEN", credential)
-            .query(&[
-                ("per_page", TAILLE_PAGE_AUDIT),
-                ("page", page.to_string().as_str()),
-            ])
-            .send()
-            .await
-            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-        statut_reponse_ok(&reponse)?;
-        let page_membres = reponse
-            .json::<Vec<ReponseMembre>>()
-            .await
-            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-                message: erreur.to_string(),
-            })?;
-        if page_membres.is_empty() {
-            break;
-        }
-        membres.extend(
-            page_membres
-                .into_iter()
-                .filter(|membre| !ETATS_MEMBRE_NON_ACTIFS.contains(&membre.state.as_str()))
-                .map(|membre| MembreGroupeGitlab {
-                    id: membre.id,
-                    username: membre.username,
-                    nom: membre.name,
-                    courriel: membre.email,
-                }),
-        );
-    }
-    Ok(membres)
-}
-
-/// Liste les dépôts d'un groupe GitLab, sous-groupes compris (`GET /groups/{ref}/projects?simple=true&include_subgroups=true`,
-/// paginé jusqu'à épuisement ou [`MAX_PAGES_PROJETS`]), pour afficher un nom de dépôt lisible dans le tableau
-/// « Commits des membres » (US-060 / RG-060). Un identifiant de dépôt hors du périmètre du groupe (poussée sur un
-/// projet externe) reste affiché tel quel côté interface.
-///
-/// # Erreurs
-///
-/// Voir [`lister_membres_groupe`].
-pub(crate) async fn lister_projets_groupe(
-    url_base: &str,
-    credential: &str,
-    groupe_ref: &str,
-    client: &reqwest::Client,
-) -> Result<Vec<ProjetGroupeGitlab>, ErreurConnecteur> {
-    if !reference_groupe_valide(groupe_ref) {
-        return Err(ErreurConnecteur::RefIntrouvable {
-            message: "Référence de groupe GitLab de forme invalide".to_string(),
-        });
-    }
-    let url = url_api(url_base, &["groups", groupe_ref, "projects"])?;
-    let mut projets = Vec::new();
-    for page in 1..=MAX_PAGES_PROJETS {
-        let reponse = client
-            .get(url.clone())
-            .header("PRIVATE-TOKEN", credential)
-            .query(&[
-                ("simple", "true"),
-                ("include_subgroups", "true"),
-                ("per_page", TAILLE_PAGE_PROJETS),
-                ("page", page.to_string().as_str()),
-            ])
-            .send()
-            .await
-            .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
-        statut_reponse_ok(&reponse)?;
-        let page_projets = reponse
-            .json::<Vec<ReponseProjetGroupe>>()
-            .await
-            .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
-                message: erreur.to_string(),
-            })?;
-        if page_projets.is_empty() {
-            break;
-        }
-        projets.extend(page_projets.into_iter().map(|projet| ProjetGroupeGitlab {
-            id: projet.id,
-            chemin: projet.path_with_namespace,
-        }));
-    }
-    Ok(projets)
+) -> Result<Option<MembreGroupeGitlab>, ErreurConnecteur> {
+    let url = url_api(url_base, &["users"])?;
+    let reponse = client
+        .get(url)
+        .header("PRIVATE-TOKEN", credential)
+        .query(&[("username", username)])
+        .send()
+        .await
+        .map_err(|erreur| erreur_depuis_reqwest(&erreur))?;
+    statut_reponse_ok(&reponse)?;
+    let comptes = reponse
+        .json::<Vec<ReponseMembre>>()
+        .await
+        .map_err(|erreur| ErreurConnecteur::ReponseInattendue {
+            message: erreur.to_string(),
+        })?;
+    Ok(comptes
+        .into_iter()
+        .find(|compte| !ETATS_MEMBRE_NON_ACTIFS.contains(&compte.state.as_str()))
+        .map(|compte| MembreGroupeGitlab {
+            id: compte.id,
+            username: compte.username,
+            nom: compte.name,
+            courriel: compte.email,
+        }))
 }
 
 /// Liste les événements de poussée d'un utilisateur GitLab
@@ -2221,7 +2125,7 @@ pub(crate) async fn lister_projets_groupe(
 ///
 /// # Erreurs
 ///
-/// Voir [`lister_membres_groupe`].
+/// Voir [`interroger_membre_par_username`].
 pub(crate) async fn lister_evenements_poussees(
     url_base: &str,
     credential: &str,
@@ -7410,178 +7314,87 @@ mod tests {
         assert!(parser_build_gradle("// rien à voir ici\n", "build.gradle").is_empty());
     }
 
-    // --- Roster « Commits des membres » (US-060 / RG-060) : `lister_membres_groupe`, `lister_projets_groupe`,
+    // --- Écran « Commits des membres » (US-060 / RG-060, plan_21) : `interroger_membre_par_username`,
     // `lister_evenements_poussees`. Client HTTP simulé, jamais d'appel réseau réel (cf. `16_normesTests.md`).
 
     #[tokio::test]
-    async fn lister_membres_groupe_agrege_les_pages_et_ecarte_les_etats_non_actifs()
+    async fn interroger_membre_par_username_retourne_le_compte_correspondant()
     -> Result<(), ErreurConnecteur> {
         use wiremock::matchers::query_param;
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(path("/api/v4/groups/equipe-plateforme/members/all"))
+            .and(path("/api/v4/users"))
             .and(header("PRIVATE-TOKEN", "jeton-admin"))
-            .and(query_param("page", "1"))
+            .and(query_param("username", "alice"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                { "id": 1, "username": "alice", "name": "Alice", "access_level": 40, "state": "active", "email": "alice@example.com" },
-                { "id": 2, "username": "ex-bob", "name": "Bob", "access_level": 30, "state": "blocked", "email": "bob@example.com" },
-                { "id": 4, "username": "diane", "name": "Diane", "access_level": 40, "state": "awaiting" }
+                { "id": 1, "username": "alice", "name": "Alice", "state": "active", "email": "alice@example.com" }
             ])))
-            .mount(&serveur)
-            .await;
-        Mock::given(method("GET"))
-            .and(path("/api/v4/groups/equipe-plateforme/members/all"))
-            .and(query_param("page", "2"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                // Repli défensif : `state` absent → membre conservé (l'API le renvoie toujours en pratique).
-                { "id": 3, "username": "carole", "name": "Carole", "access_level": 40 }
-            ])))
-            .mount(&serveur)
-            .await;
-        Mock::given(method("GET"))
-            .and(path("/api/v4/groups/equipe-plateforme/members/all"))
-            .and(query_param("page", "3"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
             .mount(&serveur)
             .await;
 
-        let membres = lister_membres_groupe(
+        let membre = interroger_membre_par_username(
             &serveur.uri(),
             "jeton-admin",
-            "equipe-plateforme",
+            "alice",
             &client_test_delai_court(),
         )
         .await?;
 
         assert_eq!(
-            membres,
-            vec![
-                MembreGroupeGitlab {
-                    id: 1,
-                    username: "alice".to_string(),
-                    nom: "Alice".to_string(),
-                    courriel: Some("alice@example.com".to_string()),
-                },
-                MembreGroupeGitlab {
-                    id: 3,
-                    username: "carole".to_string(),
-                    nom: "Carole".to_string(),
-                    courriel: None,
-                },
-            ]
+            membre,
+            Some(MembreGroupeGitlab {
+                id: 1,
+                username: "alice".to_string(),
+                nom: "Alice".to_string(),
+                courriel: Some("alice@example.com".to_string()),
+            })
         );
         Ok(())
     }
 
     #[tokio::test]
-    async fn roster_commits_membres_rejette_une_reference_de_groupe_malformee_sans_appel_reseau() {
-        // Aucun serveur monté : si un appel réseau partait, il échouerait en `InstanceInjoignable`, pas en
-        // `RefIntrouvable` — le test prouve donc que la validation de forme court-circuite avant tout appel.
-        for reference in [
-            "",
-            "equipe/../secret",
-            "equipe%2Fx",
-            "equipe ",
-            "equipe\ntech",
-        ] {
-            assert!(
-                matches!(
-                    lister_membres_groupe(
-                        "http://127.0.0.1:1",
-                        "j",
-                        reference,
-                        &client_test_delai_court()
-                    )
-                    .await,
-                    Err(ErreurConnecteur::RefIntrouvable { .. })
-                ),
-                "membres, référence {reference:?}"
-            );
-            assert!(
-                matches!(
-                    lister_projets_groupe(
-                        "http://127.0.0.1:1",
-                        "j",
-                        reference,
-                        &client_test_delai_court()
-                    )
-                    .await,
-                    Err(ErreurConnecteur::RefIntrouvable { .. })
-                ),
-                "projets, référence {reference:?}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn lister_membres_groupe_percent_encode_une_reference_de_groupe_imbrique()
+    async fn interroger_membre_par_username_retourne_aucun_resultat_sans_compte_correspondant()
     -> Result<(), ErreurConnecteur> {
-        use wiremock::matchers::query_param;
         let serveur = MockServer::start().await;
-        // Le `/` de `dir-tech/plateforme` doit rester un unique segment (`%2F`), sans introduire de sous-chemin :
-        // seul un mock monté sur le chemin percent-encodé répond, tout autre chemin renvoyant 404 par défaut.
         Mock::given(method("GET"))
-            .and(path("/api/v4/groups/dir-tech%2Fplateforme/members/all"))
-            .and(query_param("page", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                { "id": 1, "username": "alice", "name": "Alice", "access_level": 40, "state": "active" }
-            ])))
-            .mount(&serveur)
-            .await;
-        Mock::given(method("GET"))
-            .and(path("/api/v4/groups/dir-tech%2Fplateforme/members/all"))
-            .and(query_param("page", "2"))
+            .and(path("/api/v4/users"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
             .mount(&serveur)
             .await;
 
-        let membres = lister_membres_groupe(
+        let membre = interroger_membre_par_username(
             &serveur.uri(),
             "jeton",
-            "dir-tech/plateforme",
+            "inconnu-sur-linstance",
             &client_test_delai_court(),
         )
         .await?;
 
-        assert_eq!(membres.len(), 1);
+        assert_eq!(membre, None);
         Ok(())
     }
 
     #[tokio::test]
-    async fn lister_projets_groupe_agrege_les_pages() -> Result<(), ErreurConnecteur> {
-        use wiremock::matchers::query_param;
+    async fn interroger_membre_par_username_ignore_un_compte_inactif()
+    -> Result<(), ErreurConnecteur> {
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
-            .and(path("/api/v4/groups/equipe/projects"))
-            .and(query_param("include_subgroups", "true"))
-            .and(query_param("page", "1"))
+            .and(path("/api/v4/users"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                { "id": 10, "path_with_namespace": "equipe/api" }
+                { "id": 2, "username": "ex-bob", "name": "Bob", "state": "blocked", "email": "bob@example.com" }
             ])))
             .mount(&serveur)
             .await;
-        Mock::given(method("GET"))
-            .and(path("/api/v4/groups/equipe/projects"))
-            .and(query_param("page", "2"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
-            .mount(&serveur)
-            .await;
 
-        let projets = lister_projets_groupe(
+        let membre = interroger_membre_par_username(
             &serveur.uri(),
             "jeton",
-            "equipe",
+            "ex-bob",
             &client_test_delai_court(),
         )
         .await?;
 
-        assert_eq!(
-            projets,
-            vec![ProjetGroupeGitlab {
-                id: 10,
-                chemin: "equipe/api".to_string(),
-            }]
-        );
+        assert_eq!(membre, None);
         Ok(())
     }
 
@@ -7674,7 +7487,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roster_commits_membres_classe_chaque_categorie_danomalie_rg021() {
+    async fn commits_membres_classe_chaque_categorie_danomalie_rg021() {
         for statut in [401_u16, 403, 404, 500, 503] {
             let serveur = MockServer::start().await;
             Mock::given(method("GET"))
@@ -7683,19 +7496,16 @@ mod tests {
                 .await;
             assert!(
                 anomalie_rg021_attendue(
-                    &lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court())
-                        .await,
+                    &interroger_membre_par_username(
+                        &serveur.uri(),
+                        "j",
+                        "u",
+                        &client_test_delai_court()
+                    )
+                    .await,
                     statut
                 ),
-                "membres, statut {statut}"
-            );
-            assert!(
-                anomalie_rg021_attendue(
-                    &lister_projets_groupe(&serveur.uri(), "j", "g", &client_test_delai_court())
-                        .await,
-                    statut
-                ),
-                "projets, statut {statut}"
+                "membre, statut {statut}"
             );
             assert!(
                 anomalie_rg021_attendue(
@@ -7715,7 +7525,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roster_commits_membres_classe_un_corps_non_desserialisable_en_reponse_inattendue() {
+    async fn commits_membres_classe_un_corps_non_desserialisable_en_reponse_inattendue() {
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .respond_with(ResponseTemplate::new(200).set_body_string("pas du JSON"))
@@ -7723,11 +7533,8 @@ mod tests {
             .await;
 
         assert!(matches!(
-            lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
-            Err(ErreurConnecteur::ReponseInattendue { .. })
-        ));
-        assert!(matches!(
-            lister_projets_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
+            interroger_membre_par_username(&serveur.uri(), "j", "u", &client_test_delai_court())
+                .await,
             Err(ErreurConnecteur::ReponseInattendue { .. })
         ));
         assert!(matches!(
@@ -7744,18 +7551,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roster_commits_membres_classe_un_delai_depasse_sur_les_trois_fonctions() {
+    async fn commits_membres_classe_un_delai_depasse_sur_les_deux_fonctions() {
         let serveur = MockServer::start().await;
         Mock::given(method("GET"))
             .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_millis(500)))
             .mount(&serveur)
             .await;
         assert!(matches!(
-            lister_membres_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
-            Err(ErreurConnecteur::DelaiDepasse { .. })
-        ));
-        assert!(matches!(
-            lister_projets_groupe(&serveur.uri(), "j", "g", &client_test_delai_court()).await,
+            interroger_membre_par_username(&serveur.uri(), "j", "u", &client_test_delai_court())
+                .await,
             Err(ErreurConnecteur::DelaiDepasse { .. })
         ));
         assert!(matches!(
@@ -7772,15 +7576,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roster_commits_membres_classe_une_instance_injoignable_sur_les_trois_fonctions() {
+    async fn commits_membres_classe_une_instance_injoignable_sur_les_deux_fonctions() {
         // Aucun serveur n'écoute sur ce port : la connexion échoue avant même le délai de requête.
         let injoignable = "http://127.0.0.1:1";
         assert!(matches!(
-            lister_membres_groupe(injoignable, "j", "g", &client_test_delai_court()).await,
-            Err(ErreurConnecteur::InstanceInjoignable { .. })
-        ));
-        assert!(matches!(
-            lister_projets_groupe(injoignable, "j", "g", &client_test_delai_court()).await,
+            interroger_membre_par_username(injoignable, "j", "u", &client_test_delai_court()).await,
             Err(ErreurConnecteur::InstanceInjoignable { .. })
         ));
         assert!(matches!(

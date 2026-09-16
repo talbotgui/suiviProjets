@@ -19,6 +19,8 @@ import {
   GROUPE_B,
   MARQUEUR_IA,
   MEMBRE_A_QUALIFIER_DEPUIS_ALERTE,
+  MEMBRE_COMMITS_REGULIER,
+  MEMBRE_COMMITS_SILENCIEUX,
   MEMBRE_QUALIFIE_ANTICIPATION,
   MOT_DE_PASSE_FICHIER,
   PROJET_A1,
@@ -221,6 +223,20 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#membres-connus-admin-liste')).toContainText(
       MEMBRE_QUALIFIE_ANTICIPATION.critere,
     );
+
+    // Deux membres connus `interne`/`username` actifs, seul périmètre analysable par l'écran « Commits des
+    // membres » depuis plan_21 (US-060/RG-060, étape 19e).
+    for (const membre of [MEMBRE_COMMITS_REGULIER, MEMBRE_COMMITS_SILENCIEUX]) {
+      await page.locator('#membres-connus-admin-bouton-creer').click();
+      await page.locator('#membres-connus-admin-champ-critere').fill(membre.critere);
+      await page
+        .locator('#membres-connus-admin-champ-type-critere')
+        .selectOption(membre.typeCritere);
+      await page.locator('#membres-connus-admin-champ-statut').selectOption(membre.statut);
+      await page.locator('#membres-connus-admin-bouton-enregistrer').click();
+      await confirmerMotDePasse();
+      await expect(page.locator('#membres-connus-admin-liste')).toContainText(membre.critere);
+    }
   });
 
   // 6. Administration > Projets — deux projets par groupe (quatre au total).
@@ -720,7 +736,9 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page).toHaveURL(/\/synthese-audits$/);
   });
 
-  // 19e. Commits des membres — régularité des poussées de code d'un groupe (US-060, RG-060, plan_17 chapitre 4).
+  // 19e. Commits des membres — régularité des poussées de code des membres connus `interne`/`username` actifs
+  // d'un groupe (US-060, RG-060, plan_17 chapitre 4, amendé par plan_21 le 2026-09-16 : sélection unique du groupe
+  // applicatif, plus de référence de groupe GitLab distant à saisir).
   await test.step('19e. Commits des membres', async () => {
     await avantChangementEcran(page, '19e-commits-membres');
     await page.locator('#shell-lien-commits-membres').click();
@@ -732,34 +750,39 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     );
     await expect(page.locator('.commits-membres__bandeau-rh button')).toHaveCount(0);
 
-    // Sélection du groupe applicatif (Alpha porte une instance GitLab) et saisie de la référence de groupe GitLab.
+    // Sélection unique du groupe applicatif (Alpha porte une instance GitLab et les deux membres connus
+    // `interne`/`username` ajoutés à l'étape 5) puis lancement de l'analyse.
     await page.locator('select[name="groupeSelectionneId"]').selectOption({ label: GROUPE_A.nom });
-    await page.locator('input[name="referenceGroupeGitlab"]').fill('e2e/groupe-alpha');
     await page.locator('.commits-membres__commande button[type="submit"]').click();
 
-    // Le jeu de démonstration du bouchon TS expose quatre développeurs synthétiques.
+    // Les deux membres connus `interne`/`username` de l'étape 5 sont résolus par le jeu de démonstration du
+    // bouchon TS (`mdurand` régulier, `jpetit` silencieux).
     const lignes = page.locator('.commits-membres__tableau tbody tr');
-    await expect(lignes).toHaveCount(4);
+    await expect(lignes).toHaveCount(2);
     const premieresCellules = page.locator('.commits-membres__tableau tbody tr td:first-child');
 
     // Tri par défaut (score de risque décroissant) : le développeur « silencieux » apparaît en alerte et devant
     // le développeur « régulier ». Assertions sur l'ORDRE et la PRÉSENCE uniquement, jamais sur des magnitudes
     // (les horodatages du bouchon sont relatifs à `Date.now()`).
     const noms = await premieresCellules.allInnerTexts();
-    const indexSilencieux = noms.findIndex((texte) => texte.includes('sam.silencieux'));
-    const indexRegulier = noms.findIndex((texte) => texte.includes('dana.regulier'));
+    const indexSilencieux = noms.findIndex((texte) =>
+      texte.includes(MEMBRE_COMMITS_SILENCIEUX.critere),
+    );
+    const indexRegulier = noms.findIndex((texte) =>
+      texte.includes(MEMBRE_COMMITS_REGULIER.critere),
+    );
     expect(indexSilencieux).toBeGreaterThanOrEqual(0);
     expect(indexRegulier).toBeGreaterThanOrEqual(0);
     expect(indexSilencieux).toBeLessThan(indexRegulier);
     await expect(lignes.nth(indexSilencieux)).toContainText('Inactivité');
 
-    // Le tri d'une autre colonne s'applique côté interface, sans nouvel appel réseau (le nombre de lignes reste 4,
-    // seul l'ordre change). Deux clics sur « Développeur » -> tri alphabétique croissant.
+    // Le tri d'une autre colonne s'applique côté interface, sans nouvel appel réseau (le nombre de lignes reste 2,
+    // seul l'ordre change). Deux clics sur « Développeur » -> tri alphabétique croissant (`jpetit` avant `mdurand`).
     const entete = page.locator('.commits-membres__tri', { hasText: 'Développeur' });
     await entete.click();
     await entete.click();
-    await expect(lignes).toHaveCount(4);
-    await expect(premieresCellules.first()).toContainText('dana.regulier');
+    await expect(lignes).toHaveCount(2);
+    await expect(premieresCellules.first()).toContainText(MEMBRE_COMMITS_SILENCIEUX.critere);
   });
 
   // 19f. Obsolescence — projet « en stase » (US-064, RG-064) et bouton « Top 10 » (US-065, RG-065, plan_20

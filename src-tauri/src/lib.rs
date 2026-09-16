@@ -95,7 +95,7 @@ pub fn run() {
             commandes::audit::enregistrer_brouillon,
             commandes::audit::integrer_brouillon,
             commandes::audit::rejeter_brouillon,
-            commandes::commits_membres::preparer_analyse_commits_membres,
+            commandes::commits_membres::interroger_membre_gitlab_par_username,
             commandes::commits_membres::lister_evenements_poussees_membre,
             commandes::parametrage::definir_seuil,
             commandes::parametrage::definir_referentiel,

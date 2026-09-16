@@ -2,20 +2,21 @@
 // .claude/rules/01-usage-ia-et-conventions.md.
 //
 // Jeu de démonstration déterministe et rejouable de l'écran « Commits des membres » (US-060, RG-060, plan_17
-// chapitre 4), servi hors contexte Tauri (`ng serve`, test manuel et test de bout en bout Playwright) via
-// `BouchonCommandesUtils`, qui délègue à cette classe les deux commandes `preparer_analyse_commits_membres` et
-// `lister_evenements_poussees_membre`.
+// chapitre 4, amendé par plan_21 le 2026-09-16), servi hors contexte Tauri (`ng serve`, test manuel et test de
+// bout en bout Playwright) via `BouchonCommandesUtils`, qui délègue à cette classe les deux commandes
+// `interroger_membre_gitlab_par_username` et `lister_evenements_poussees_membre`.
 //
-// Quatre développeurs synthétiques et trois dépôts. Les horodatages de poussée sont **calculés par décalage fixe
-// depuis `Date.now()`** au moment de l'appel (jamais aléatoires) : l'ordre des lignes du tableau et l'état des
-// alertes sont donc stables d'une exécution à l'autre. Un développeur « silencieux » (dernière poussée il y a une
-// dizaine de jours ouvrés) apparaît en alerte et devant le développeur « régulier » au tri par score de risque.
-import type {
-  EvenementPoussee,
-  MembreGroupeGitlab,
-  PreparationAnalyseCommitsMembres,
-  ProjetGroupeGitlab,
-} from '../types-facade';
+// Depuis plan_21, l'analyse ne porte plus sur un roster de groupe GitLab distant mais sur les membres connus
+// `interne`/`username` actifs du groupe applicatif sélectionné : les trois profils synthétiques ci-dessous
+// reprennent donc les noms d'utilisateur **réels** des membres connus `interne`/`username` du jeu de démonstration
+// principal (`donnees-racine-bouchon.ts`) — `mdurand` et `jpetit` du groupe « Socle Comptable », `smartin` du
+// groupe « Portail Nova » — plutôt que des identités inventées sans rapport avec ce jeu de données, pour qu'une
+// analyse lancée depuis `npm start` sur l'un de ces deux groupes reste démonstrative. Les horodatages de poussée
+// sont **calculés par décalage fixe depuis `Date.now()`** au moment de l'appel (jamais aléatoires) : l'ordre des
+// lignes du tableau et l'état des alertes sont donc stables d'une exécution à l'autre. Un développeur « silencieux »
+// (dernière poussée il y a une dizaine de jours ouvrés) apparaît en alerte et devant le développeur « régulier » au
+// tri par score de risque.
+import type { EvenementPoussee, MembreGroupeGitlab } from '../types-facade';
 
 /** Millisecondes par heure. */
 const MS_PAR_HEURE = 60 * 60 * 1000;
@@ -24,55 +25,55 @@ const MS_PAR_HEURE = 60 * 60 * 1000;
 const MS_PAR_JOUR = 24 * MS_PAR_HEURE;
 
 /**
- * Jeu de démonstration des deux commandes de `FacadeCommitsMembresService` (US-060, RG-060), auxquelles
+ * Jeu de démonstration des deux commandes de `FacadeCommitsMembresService` (US-060, RG-060, plan_21), auxquelles
  * `BouchonCommandesUtils` délègue. Classe à membres statiques uniquement, sur le modèle de `BouchonAlertesUtils` /
  * `BouchonParametrageUtils`.
  */
 export class BouchonCommitsMembresUtils {
-  /** Dépôts synthétiques du groupe analysé. */
-  private static readonly PROJETS: readonly ProjetGroupeGitlab[] = [
-    { id: 5001, chemin: 'demonstration/api-commandes' },
-    { id: 5002, chemin: 'demonstration/portail-web' },
-    { id: 5003, chemin: 'demonstration/batch-nuit' },
-  ];
-
-  /** Roster synthétique du groupe analysé (quatre profils distincts). */
-  private static readonly MEMBRES: readonly MembreGroupeGitlab[] = [
-    {
-      id: 9001,
-      username: 'dana.regulier',
-      nom: 'Dana Régulier',
-      courriel: 'dana@demonstration.example',
-    },
-    {
-      id: 9002,
-      username: 'sam.silencieux',
-      nom: 'Sam Silencieux',
-      courriel: 'sam@demonstration.example',
-    },
-    {
-      id: 9003,
-      username: 'nadia.dusoir',
-      nom: 'Nadia Du Soir',
-      courriel: 'nadia@demonstration.example',
-    },
-    {
-      id: 9004,
-      username: 'igor.irregulier',
-      nom: 'Igor Irrégulier',
-      courriel: 'igor@partenaire.example',
-    },
-  ];
+  /**
+   * Comptes GitLab synthétiques, indexés par nom d'utilisateur exact (comme le ferait `GET /users?username=`) —
+   * trois profils reprenant les membres connus `interne`/`username` réels du jeu de démonstration principal.
+   */
+  private static readonly MEMBRES_PAR_USERNAME: ReadonlyMap<string, MembreGroupeGitlab> = new Map([
+    [
+      'mdurand',
+      {
+        id: 9001,
+        username: 'mdurand',
+        nom: 'Marie Durand',
+        courriel: 'marie.durand@entreprise.fr',
+      },
+    ],
+    [
+      'jpetit',
+      { id: 9002, username: 'jpetit', nom: 'Julien Petit', courriel: 'julien.petit@entreprise.fr' },
+    ],
+    [
+      'smartin',
+      {
+        id: 9003,
+        username: 'smartin',
+        nom: 'Sofia Martin',
+        courriel: 'sofia.martin@entreprise.fr',
+      },
+    ],
+  ]);
 
   /**
-   * Passe de préparation : le roster et les dépôts synthétiques, servis quel que soit le groupe demandé.
-   * @returns Le roster et les dépôts.
+   * Recherche un compte GitLab par nom d'utilisateur exact (US-060, RG-060, plan_21), sur le modèle de
+   * `GET /users?username=<exact>`. `null` si `username` ne correspond à aucun des profils synthétiques (cas
+   * démonstratif du membre connu sans compte GitLab actif correspondant).
+   * @param parametres - Paramètres transmis par la Façade à `invoke` (`username` lu ici).
+   * @returns Le compte correspondant, ou `null`.
    */
-  public static preparerAnalyse(): PreparationAnalyseCommitsMembres {
-    return {
-      membres: BouchonCommitsMembresUtils.MEMBRES,
-      projets: BouchonCommitsMembresUtils.PROJETS,
-    };
+  public static rechercherMembreParUsername(
+    parametres: Readonly<Record<string, unknown>>,
+  ): MembreGroupeGitlab | null {
+    const username = parametres['username'];
+    if (typeof username !== 'string') {
+      return null;
+    }
+    return BouchonCommitsMembresUtils.MEMBRES_PAR_USERNAME.get(username) ?? null;
   }
 
   /**
@@ -111,7 +112,8 @@ export class BouchonCommitsMembresUtils {
    * Construit un événement de poussée synthétique.
    * @param joursAvant - Ancienneté de la poussée en jours.
    * @param heureUtc - Heure UTC de la poussée.
-   * @param projetId - Dépôt poussé.
+   * @param projetId - Dépôt poussé (identifiant externe GitLab d'une source réelle du jeu de démonstration
+   * principal, pour qu'un nom de dépôt lisible se résolve).
    * @param nombreCommits - Nombre de commits de la poussée.
    * @returns L'événement.
    */
@@ -137,41 +139,34 @@ export class BouchonCommitsMembresUtils {
   private static evenementsPour(utilisateurId: number): readonly EvenementPoussee[] {
     switch (utilisateurId) {
       case 9001: {
-        // Régulier : une poussée par jour ouvré sur trois semaines, en milieu de journée.
+        // mdurand, régulier : une poussée par jour ouvré sur trois semaines, en milieu de journée, sur le dépôt
+        // « API Facturation » (idExterne 1234, groupe Socle Comptable).
         const evenements: EvenementPoussee[] = [];
         for (let jour = 0; jour <= 21; jour += 1) {
           const jourSemaine = new Date(Date.now() - jour * MS_PAR_JOUR).getUTCDay();
           if (jourSemaine !== 0 && jourSemaine !== 6) {
-            evenements.push(BouchonCommitsMembresUtils.poussee(jour, 13, 5001, 2));
+            evenements.push(BouchonCommitsMembresUtils.poussee(jour, 13, 1234, 2));
           }
         }
         return evenements;
       }
       case 9002:
-        // Silencieux : dernière poussée il y a ~14 jours calendaires (≈ 10 jours ouvrés), puis plus rien.
+        // jpetit, silencieux : dernière poussée il y a ~14 jours calendaires (≈ 10 jours ouvrés), puis plus rien,
+        // sur le dépôt « Batch Comptable » (idExterne 1567, groupe Socle Comptable).
         return [
-          BouchonCommitsMembresUtils.poussee(14, 10, 5002, 1),
-          BouchonCommitsMembresUtils.poussee(17, 9, 5002, 3),
-          BouchonCommitsMembresUtils.poussee(21, 11, 5002, 2),
+          BouchonCommitsMembresUtils.poussee(14, 10, 1567, 1),
+          BouchonCommitsMembresUtils.poussee(17, 9, 1567, 3),
+          BouchonCommitsMembresUtils.poussee(21, 11, 1567, 2),
         ];
       case 9003: {
-        // Du soir : poussées tous les deux jours, en soirée (20 h UTC ≈ 21–22 h à Paris).
+        // smartin, du soir : poussées tous les deux jours, en soirée (20 h UTC ≈ 21–22 h à Paris), sur le dépôt
+        // « Front Portail » (idExterne 88, groupe Portail Nova).
         const evenements: EvenementPoussee[] = [];
         for (let jour = 1; jour <= 20; jour += 2) {
-          evenements.push(BouchonCommitsMembresUtils.poussee(jour, 20, 5001, 3));
+          evenements.push(BouchonCommitsMembresUtils.poussee(jour, 20, 88, 3));
         }
         return evenements;
       }
-      case 9004:
-        // Irrégulier : une rafale il y a ~12 jours, puis un sursaut récent.
-        return [
-          BouchonCommitsMembresUtils.poussee(2, 15, 5003, 1),
-          BouchonCommitsMembresUtils.poussee(12, 9, 5003, 4),
-          BouchonCommitsMembresUtils.poussee(12, 10, 5003, 2),
-          BouchonCommitsMembresUtils.poussee(12, 11, 5003, 3),
-          BouchonCommitsMembresUtils.poussee(13, 16, 5003, 5),
-          BouchonCommitsMembresUtils.poussee(14, 17, 5003, 1),
-        ];
       default:
         return [];
     }

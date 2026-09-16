@@ -32,31 +32,11 @@
       }
     </label>
 
-    <label class="champ">
-      Groupe GitLab (chemin ou identifiant)
-      <input
-        type="text"
-        class="champ__controle"
-        name="referenceGroupeGitlab"
-        [ngModel]="referenceGroupeGitlab()"
-        (ngModelChange)="referenceGroupeGitlab.set($event)"
-        required
-        aria-describedby="commits-membres-reference-aide"
-      />
-      <span id="commits-membres-reference-aide" class="champ__aide">
-        Cette référence n'est jamais enregistrée : elle vit uniquement le temps de la session.
-      </span>
-    </label>
-
     <div class="d-flex aligne-centre retour-ligne ecart-3">
       <button
         type="submit"
         class="bouton bouton--principal"
-        [disabled]="
-          store.enCours() ||
-          groupeSelectionneId() === null ||
-          referenceGroupeGitlab().trim().length === 0
-        "
+        [disabled]="store.enCours() || groupeSelectionneId() === null"
       >
         Analyser
       </button>
@@ -81,6 +61,9 @@
     @if (messagePlusieursInstances(); as message) {
       <p class="texte-sm" role="note">{{ message }}</p>
     }
+    @if (messageReglesNonAnalysables(); as message) {
+      <p class="texte-sm" role="note">{{ message }}</p>
+    }
   </form>
 
   @if (store.enCours()) {
@@ -94,21 +77,6 @@
     <div
       class="commits-membres__filtres carte interieur-3 exterieur-bas-3 d-flex retour-ligne ecart-3 aligne-centre"
     >
-      <label class="champ champ--en-ligne">
-        Statut
-        <select
-          class="champ__controle"
-          name="filtreStatut"
-          [ngModel]="filtreStatut()"
-          (ngModelChange)="filtreStatut.set($event)"
-        >
-          <option value="tous">Tous</option>
-          <option value="interne">Internes</option>
-          <option value="client">Clients</option>
-          <option value="partenaire">Partenaires</option>
-          <option value="inconnu">Inconnus</option>
-        </select>
-      </label>
       <label class="champ champ--en-ligne">
         Recherche
         <input
@@ -143,11 +111,6 @@
             <th scope="col">
               <button type="button" class="commits-membres__tri" (click)="trierPar('developpeur')">
                 Développeur
-              </button>
-            </th>
-            <th scope="col">
-              <button type="button" class="commits-membres__tri" (click)="trierPar('statut')">
-                Statut
               </button>
             </th>
             <th scope="col">
@@ -202,7 +165,6 @@
                   <span class="commits-membres__badge-alerte">{{ libelleAlerte(alerte) }}</span>
                 }
               </td>
-              <td>{{ libelleStatut(ligne.statut) }}</td>
               <td>{{ formaterHorodatage(ligne.dernierePousseeIso) }}</td>
               <td>{{ ligne.depotDernierePoussee ?? '—' }}</td>
               <td>{{ ligne.joursOuvresDepuisDernierePoussee ?? '—' }}</td>
@@ -214,7 +176,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="10" class="texte-discret">
+              <td colspan="9" class="texte-discret">
                 Aucun développeur ne correspond aux filtres.
               </td>
             </tr>
@@ -224,7 +186,7 @@
     </div>
   } @else {
     <p class="commits-membres__initial texte-discret">
-      Sélectionnez un groupe, saisissez la référence du groupe GitLab, puis lancez une analyse.
+      Sélectionnez un groupe, puis lancez une analyse.
     </p>
   }
 </section>

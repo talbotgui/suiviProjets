@@ -1,20 +1,25 @@
 // Test du bouchon TS des commandes de l'écran « Commits des membres » (cf. bouchon-commits-membres.utils.ts,
-// US-060, RG-060, plan_17 chapitre 4), généré avec l'assistance de l'IA (Claude Code), conformément à
-// .claude/rules/01-usage-ia-et-conventions.md.
+// US-060, RG-060, plan_17 chapitre 4, amendé par plan_21 le 2026-09-16), généré avec l'assistance de l'IA
+// (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
 import { BouchonCommitsMembresUtils } from './bouchon-commits-membres.utils';
 
 describe('BouchonCommitsMembresUtils', () => {
-  it('sert un roster de quatre développeurs et trois dépôts', () => {
-    const preparation = BouchonCommitsMembresUtils.preparerAnalyse();
+  it('résout un compte GitLab par nom d’utilisateur exact', () => {
+    const membre = BouchonCommitsMembresUtils.rechercherMembreParUsername({ username: 'mdurand' });
 
-    expect(preparation.membres).toHaveLength(4);
-    expect(preparation.projets).toHaveLength(3);
-    expect(preparation.membres.map((membre) => membre.username)).toEqual([
-      'dana.regulier',
-      'sam.silencieux',
-      'nadia.dusoir',
-      'igor.irregulier',
-    ]);
+    expect(membre).toEqual({
+      id: 9001,
+      username: 'mdurand',
+      nom: 'Marie Durand',
+      courriel: 'marie.durand@entreprise.fr',
+    });
+  });
+
+  it('renvoie null pour un nom d’utilisateur inconnu ou absent', () => {
+    expect(
+      BouchonCommitsMembresUtils.rechercherMembreParUsername({ username: 'inconnu' }),
+    ).toBeNull();
+    expect(BouchonCommitsMembresUtils.rechercherMembreParUsername({})).toBeNull();
   });
 
   it('produit des horodatages relatifs à Date.now(), donc rejouables', () => {

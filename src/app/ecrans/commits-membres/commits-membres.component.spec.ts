@@ -1,7 +1,8 @@
-// Test de SqmCommitsMembresComponent (cf. commits-membres.component.ts, US-060, RG-060, plan_17 chapitre 4),
-// généré avec l'assistance de l'IA (Claude Code), conformément à .claude/rules/01-usage-ia-et-conventions.md.
-// Composant de présentation : suivi du nombre de méthodes jamais appelées (16_normesTests.md), plus les
-// assertions ci-dessous sur l'absence d'appel réseau au tri / filtrage / changement de seuil.
+// Test de SqmCommitsMembresComponent (cf. commits-membres.component.ts, US-060, RG-060, plan_17 chapitre 4, amendé
+// par plan_21 le 2026-09-16), généré avec l'assistance de l'IA (Claude Code), conformément à
+// .claude/rules/01-usage-ia-et-conventions.md. Composant de présentation : suivi du nombre de méthodes jamais
+// appelées (16_normesTests.md), plus les assertions ci-dessous sur l'absence d'appel réseau au tri / filtrage /
+// changement de seuil.
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import type { WritableSignal } from '@angular/core';
@@ -9,9 +10,17 @@ import { provideRouter } from '@angular/router';
 import { invoke } from '@tauri-apps/api/core';
 import type { InvokeArgs } from '@tauri-apps/api/core';
 import { TypeInstance } from '../../services/sansetat/commandes/types-facade';
-import type { EvenementPoussee, Instance } from '../../services/sansetat/commandes/types-facade';
+import type {
+  EvenementPoussee,
+  Instance,
+  MembreGroupeGitlab,
+} from '../../services/sansetat/commandes/types-facade';
 import { StatutMembre, TypeCritereMembre } from '../../services/avecetat/etat/types-donnees';
-import type { CadenceCommits, Groupe } from '../../services/avecetat/etat/types-donnees';
+import type {
+  CadenceCommits,
+  Groupe,
+  MembreConnu,
+} from '../../services/avecetat/etat/types-donnees';
 import { DonneesApplicationService } from '../../services/avecetat/etat/donnees-application.service';
 import { NotificationService } from '../../services/avecetat/etat/notification.service';
 import { DomTestUtils } from '../../testing/dom-test.utils';
@@ -41,13 +50,11 @@ const CADENCE: CadenceCommits = {
   comptesExclus: [],
 };
 
-const ROSTER = {
-  membres: [
-    { id: 9001, username: 'alice', nom: 'Alice', courriel: null },
-    { id: 9002, username: 'bob', nom: 'Bob', courriel: null },
-  ],
-  projets: [{ id: 1, chemin: 'demo/api' }],
-};
+/** Comptes GitLab résolus par username, comme le ferait `GET /users?username=`. */
+const COMPTES_PAR_USERNAME: ReadonlyMap<string, MembreGroupeGitlab> = new Map([
+  ['alice', { id: 9001, username: 'alice', nom: 'Alice', courriel: null }],
+  ['bob', { id: 9002, username: 'bob', nom: 'Bob', courriel: null }],
+]);
 
 interface RacineMinimale {
   readonly parametres: {
@@ -60,6 +67,24 @@ interface RacineMinimale {
  * Fabriques de test, classe à membres statiques uniquement (règle « aucune fonction hors classe »).
  */
 class Fixtures {
+  /**
+   * Lit `username` dans les arguments d'un appel `invoke` à `interroger_membre_gitlab_par_username`.
+   * @param args - Arguments transmis à `invoke`.
+   * @returns Le nom d'utilisateur, ou chaîne vide.
+   */
+  public static lireUsername(args: InvokeArgs | undefined): string {
+    if (
+      args !== undefined &&
+      !Array.isArray(args) &&
+      !(args instanceof ArrayBuffer) &&
+      !(args instanceof Uint8Array) &&
+      'username' in args
+    ) {
+      return String(args['username']);
+    }
+    return '';
+  }
+
   /**
    * Lit `utilisateurId` dans les arguments d'un appel `invoke`, sans assertion de type.
    * @param args - Arguments transmis à `invoke`.
@@ -109,24 +134,41 @@ class Fixtures {
   }
 
   /**
-   * Groupe applicatif de test.
+   * Groupe applicatif de test. `membresConnus` retient par défaut deux membres `interne`/`username` actifs
+   * (`alice`, `bob`) et une règle `interne`/`email` non analysable, pour exercer le signalement (plan_21).
    * @param instances - Instances déclarées.
+   * @param membresConnus - Membres connus du groupe (défaut ci-dessus).
    * @returns Le groupe.
    */
-  public static groupe(instances: readonly Instance[]): Groupe {
+  public static groupe(
+    instances: readonly Instance[],
+    membresConnus: readonly MembreConnu[] = [
+      {
+        id: 'm-1',
+        critere: 'alice',
+        typeCritere: TypeCritereMembre.Username,
+        statut: StatutMembre.Interne,
+      },
+      {
+        id: 'm-2',
+        critere: 'bob',
+        typeCritere: TypeCritereMembre.Username,
+        statut: StatutMembre.Interne,
+      },
+      {
+        id: 'm-3',
+        critere: 'x@interne.test',
+        typeCritere: TypeCritereMembre.Email,
+        statut: StatutMembre.Interne,
+      },
+    ],
+  ): Groupe {
     return {
       id: 'g-1',
       nom: 'Groupe démo',
       description: '',
       instances,
-      membresConnus: [
-        {
-          id: 'm-1',
-          critere: 'alice',
-          typeCritere: TypeCritereMembre.Username,
-          statut: StatutMembre.Interne,
-        },
-      ],
+      membresConnus,
       annotations: [],
       indicateursDesactives: [],
       projets: [],
@@ -141,8 +183,8 @@ describe('SqmCommitsMembresComponent', () => {
   beforeEach(async () => {
     invokeSimule.mockReset();
     invokeSimule.mockImplementation((commande, args) => {
-      if (commande === 'preparer_analyse_commits_membres') {
-        return Promise.resolve(ROSTER);
+      if (commande === 'interroger_membre_gitlab_par_username') {
+        return Promise.resolve(COMPTES_PAR_USERNAME.get(Fixtures.lireUsername(args)) ?? null);
       }
       if (commande === 'lister_evenements_poussees_membre') {
         return Promise.resolve(Fixtures.evenements(Fixtures.lireUtilisateurId(args)));
@@ -180,7 +222,7 @@ describe('SqmCommitsMembresComponent', () => {
     ).toBeNull();
   });
 
-  it('désactive le bouton « Analyser » tant que groupe ou référence GitLab manquent', () => {
+  it('désactive le bouton « Analyser » tant qu’aucun groupe n’est sélectionné', () => {
     const fixture = TestBed.createComponent(SqmCommitsMembresComponent);
     fixture.detectChanges();
     const bouton =
@@ -190,20 +232,17 @@ describe('SqmCommitsMembresComponent', () => {
     expect(bouton?.disabled).toBe(true);
 
     fixture.componentInstance.groupeSelectionneId.set('g-1');
-    fixture.componentInstance.referenceGroupeGitlab.set('demo/groupe');
     fixture.detectChanges();
     expect(bouton?.disabled).toBe(false);
   });
 
-  it('trie et filtre sans nouvel appel réseau ; filtre de statut par défaut « tous »', async () => {
+  it('trie et filtre sans nouvel appel réseau', async () => {
     const fixture = TestBed.createComponent(SqmCommitsMembresComponent);
     const composant = fixture.componentInstance;
     composant.groupeSelectionneId.set('g-1');
-    composant.referenceGroupeGitlab.set('demo/groupe');
     await composant.lancerAnalyse();
     fixture.detectChanges();
 
-    expect(composant.filtreStatut()).toBe('tous');
     expect(composant.lignesAffichees()).toHaveLength(2);
     const appelsAvant = invokeSimule.mock.calls.length;
 
@@ -223,7 +262,6 @@ describe('SqmCommitsMembresComponent', () => {
     const fixture = TestBed.createComponent(SqmCommitsMembresComponent);
     const composant = fixture.componentInstance;
     composant.groupeSelectionneId.set('g-1');
-    composant.referenceGroupeGitlab.set('demo/groupe');
     await composant.lancerAnalyse();
     const appelsAvant = invokeSimule.mock.calls.length;
 
@@ -245,9 +283,43 @@ describe('SqmCommitsMembresComponent', () => {
     const fixture = TestBed.createComponent(SqmCommitsMembresComponent);
     const composant = fixture.componentInstance;
     composant.groupeSelectionneId.set('g-1');
-    composant.referenceGroupeGitlab.set('demo/groupe');
     await composant.lancerAnalyse();
 
     expect(composant.messagePlusieursInstances()).toContain('seule la première (GitLab interne)');
+  });
+
+  it('signale le nombre de règles interne non analysables (plan_21), jamais une exclusion silencieuse', async () => {
+    const fixture = TestBed.createComponent(SqmCommitsMembresComponent);
+    const composant = fixture.componentInstance;
+    composant.groupeSelectionneId.set('g-1');
+    await composant.lancerAnalyse();
+    fixture.detectChanges();
+
+    // Une règle `interne`/`email` (`m-3`) n'est pas analysable.
+    expect(composant.messageReglesNonAnalysables()).toContain('1 règle');
+    const texte = DomTestUtils.obtenirElementNatif(fixture).textContent ?? '';
+    expect(texte).toContain('1 règle');
+  });
+
+  it('ne signale rien quand toutes les règles interne sont analysables', async () => {
+    groupesSignal.set([
+      Fixtures.groupe(
+        [INSTANCE_GITLAB],
+        [
+          {
+            id: 'm-1',
+            critere: 'alice',
+            typeCritere: TypeCritereMembre.Username,
+            statut: StatutMembre.Interne,
+          },
+        ],
+      ),
+    ]);
+    const fixture = TestBed.createComponent(SqmCommitsMembresComponent);
+    const composant = fixture.componentInstance;
+    composant.groupeSelectionneId.set('g-1');
+    await composant.lancerAnalyse();
+
+    expect(composant.messageReglesNonAnalysables()).toBe('');
   });
 });
