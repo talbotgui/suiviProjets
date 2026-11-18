@@ -59,6 +59,8 @@ Au-delà de la production documentaire, l'usage de l'IA dans ce projet s'organis
 
 L'IA peut rédiger les documents de cadrage et produire du code, avec une supervision humaine continue : chaque étape intermédiaire fait l'objet d'un point de contrôle, en complément de la relecture systématique exigée avant toute intégration. Ce périmètre est réévalué si la nature des tâches à venir le justifie.
 
+Le parcours du code existant (localisation d'une fonctionnalité, traçage d'un flux de l'interface au cœur natif, recherche de l'implémentation d'un `US-NNN`/`RG-NNN`) est délégué de préférence au sous-agent dédié `explorateur-code` (`.claude/agents/explorateur-code.md`), exécuté sur un modèle plus économique (Sonnet) que celui de la session principale, en lecture seule et sans accès aux fichiers sensibles ; il restitue des constats référencés, sans avis de conformité ni arbitrage, et ne se substitue pas au sous-agent de relecture exigé par les [règles générales de collaboration](#rappel-des-règles-générales-de-collaboration) (ajouté le 2026-11-18, pour réduire le coût des phases d'exploration du code).
+
 #### Actions à exécution strictement humaine
 
 L'IA n'exécute jamais elle-même : la commande `git push` (cf. règles générales), le déploiement en production, l'envoi de communications externes, la suppression de données, et plus généralement toute opération irréversible ou affectant des systèmes partagés. Ces opérations restent de la seule responsabilité humaine, même lorsque l'IA a préparé ou proposé le contenu de l'action.

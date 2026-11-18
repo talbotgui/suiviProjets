@@ -15,6 +15,10 @@ Synthèse actionnable de [01_modalitesUsageEtConventions.md](../../docs/02_docum
 - Chaque exigence porte un identifiant stable (`US-NNN`, `RG-NNN`), réutilisé sans être renommé dans toutes les étapes suivantes.
 - Modèles de structure et de format à respecter pour tout document produit : `./docs/_modèles` ([source](../../docs/02_documentation/01_modalitesUsageEtConventions.md#rappel-des-règles-générales-de-collaboration)).
 
+## Délégation
+
+- Parcours du code existant (localisation, traçage d'un flux UI → Façade → cœur natif, recherche d'un `US-NNN`/`RG-NNN`) délégué de préférence au sous-agent `explorateur-code` (`.claude/agents/explorateur-code.md`, modèle Sonnet, lecture seule) ; constats référencés uniquement, sans avis ni arbitrage, et sans remplacer le sous-agent de relecture (ajouté le 2026-11-18, cf. [source](../../docs/02_documentation/01_modalitesUsageEtConventions.md#périmètre-des-tâches-délégables-à-lia)).
+
 ## Actions interdites à l'IA
 
 - Toute commande git est autorisée à l'IA, à l'exception de `git push` qui reste réservée à l'exécution humaine (cf. convention de commits de code applicatif dans [09-normes-developpement.md#git-et-commits](./09-normes-developpement.md#git-et-commits)).
