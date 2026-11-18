@@ -133,6 +133,12 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
       dependances: [
         { reference: 'java', version: '21', manifeste: 'pom.xml' },
         { reference: 'org.springframework:spring-core', version: '6.1.8', manifeste: 'pom.xml' },
+        // US-067 : authentification OIDC détectée (règle par défaut `spring-boot-starter-oauth2-client`).
+        {
+          reference: 'org.springframework.boot:spring-boot-starter-oauth2-client',
+          version: '3.3.1',
+          manifeste: 'pom.xml',
+        },
         {
           reference: 'org.apache.logging.log4j:log4j-core',
           version: '2.17.1',
@@ -217,6 +223,13 @@ export const CONSTATS_GITLAB_BOUCHON: ReadonlyMap<string, ConstatGitlabBouchon> 
         { reference: 'java', version: '8', manifeste: 'pom.xml' },
         { reference: 'org.springframework:spring-core', version: '4.3.30', manifeste: 'pom.xml' },
         { reference: 'log4j:log4j', version: '1.2.17', manifeste: 'pom.xml' },
+        // US-067 : deux modes d'authentification détectés (SAML puis CAS, règles par défaut).
+        {
+          reference: 'org.jasig.cas.client:cas-client-core',
+          version: '3.6.4',
+          manifeste: 'pom.xml',
+        },
+        { reference: 'org.opensaml:opensaml-core', version: '4.3.0', manifeste: 'pom.xml' },
       ],
       branches: [{ nom: 'master', avecMR: false, dernierCommitLe: '2024-11-03' }],
       branchesAutocompletion: ['master'],
@@ -490,7 +503,15 @@ export const CONSTAT_GITLAB_REPLI: ConstatGitlabBouchon = {
     },
   ],
   marqueurs: [],
-  dependances: [{ reference: 'org.exemple:lib-e2e', version: '1.0.0', manifeste: 'pom.xml' }],
+  dependances: [
+    { reference: 'org.exemple:lib-e2e', version: '1.0.0', manifeste: 'pom.xml' },
+    // US-067 : authentification OIDC détectée sur tous les projets du parcours de bout en bout.
+    {
+      reference: 'org.springframework.boot:spring-boot-starter-oauth2-client',
+      version: '3.3.1',
+      manifeste: 'pom.xml',
+    },
+  ],
   branches: [{ nom: 'main', avecMR: false, dernierCommitLe: '2026-07-01' }],
   branchesAutocompletion: ['main'],
 };

@@ -75,6 +75,7 @@ class DonneesDeTest {
         reglesDependances: [],
         reglesMarqueursIA: [],
         motifNommageBranches: '^(main|develop)$',
+        reglesAuthentification: [],
         categoriesDependances: [],
       },
       parametres: {

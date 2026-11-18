@@ -1030,8 +1030,8 @@ export class DonneesApplicationService {
    * effectivement le fichier (RG-002, RG-023, RG-030) avant de renvoyer la racine mise à jour, substituée à
    * l'état courant de ce Store. Sans nouvel audit, le Moteur de jugement recalcule immédiatement, côté UI, tous
    * les statuts affichés à partir du nouveau référentiel (RG-012, RG-022, RG-030).
-   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances`, `reglesMarqueursIA` ou
-   * `motifNommageBranches`).
+   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances`, `reglesMarqueursIA`,
+   * `categoriesDependances`, `reglesAuthentification` ou `motifNommageBranches`).
    * @param entree - Entrée à ajouter ou mettre à jour (objet portant `id`), ou nouvelle valeur scalaire.
    * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
    * @returns Le Résultat typé de l'opération.
@@ -1283,6 +1283,34 @@ export class DonneesApplicationService {
     const chemin = this.cheminFichierActuel();
     try {
       const nouvelleRacine = await this.facadeParametrage.supprimerCategorieDependance<
+        DonneesRacine,
+        DonneesRacine
+      >({ chemin, donnees: racine, id, motDePasse });
+      this.racineInterne.set(nouvelleRacine);
+      return { type: 'succes' };
+    } catch (erreur: unknown) {
+      return { type: 'echec', anomalie: this.anomalieAdministration(erreur) };
+    }
+  }
+
+  /**
+   * Supprime une entrée du référentiel des règles de détection du mode d'authentification (US-067, RG-035) :
+   * invoque la commande native `supprimerRegleAuthentification`, sur le même modèle que
+   * {@link supprimerCategorieDependance}. Les ajouts et mises à jour passent par {@link definirReferentiel} avec le
+   * type `'reglesAuthentification'`.
+   * @param id - Identifiant de la règle à supprimer.
+   * @param motDePasse - Mot de passe du fichier, ressaisi par l'utilisateur pour cette sauvegarde (RG-002).
+   * @returns Le Résultat typé de l'opération.
+   * @throws {Error} Si aucun fichier n'est chargé ou si aucun chemin de fichier n'est connu de la session.
+   */
+  public async supprimerRegleAuthentification(
+    id: string,
+    motDePasse: string,
+  ): Promise<ResultatMutationAdministration> {
+    const racine = this.racineActuelle();
+    const chemin = this.cheminFichierActuel();
+    try {
+      const nouvelleRacine = await this.facadeParametrage.supprimerRegleAuthentification<
         DonneesRacine,
         DonneesRacine
       >({ chemin, donnees: racine, id, motDePasse });

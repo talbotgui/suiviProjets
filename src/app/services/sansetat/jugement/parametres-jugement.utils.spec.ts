@@ -399,6 +399,36 @@ describe('ParametresJugementUtils', () => {
     });
   });
 
+  describe('lireReglesAuthentification (US-067)', () => {
+    it('lit les règles valides en ne conservant que mode et motif', () => {
+      expect(
+        ParametresJugementUtils.lireReglesAuthentification({
+          reglesAuthentification: [{ id: 'a1', mode: 'CAS', motif: 'org.jasig.cas.client:*' }],
+        }),
+      ).toEqual({ type: 'valeur', valeur: [{ mode: 'CAS', motif: 'org.jasig.cas.client:*' }] });
+    });
+
+    it('écarte silencieusement un mode hors liste, un motif vide ou une entrée non objet', () => {
+      expect(
+        ParametresJugementUtils.lireReglesAuthentification({
+          reglesAuthentification: [
+            { mode: 'LDAP', motif: 'org.ldap:*' },
+            { mode: 'OIDC', motif: '' },
+            { mode: 'SAML' },
+            'texte',
+            null,
+            { mode: 'SAML', motif: 'org.opensaml:*' },
+          ],
+        }),
+      ).toEqual({ type: 'valeur', valeur: [{ mode: 'SAML', motif: 'org.opensaml:*' }] });
+    });
+
+    it('restitue absent si reglesAuthentification n’est pas un tableau', () => {
+      expect(ParametresJugementUtils.lireReglesAuthentification({})).toEqual({ type: 'absent' });
+      expect(ParametresJugementUtils.lireReglesAuthentification(null)).toEqual({ type: 'absent' });
+    });
+  });
+
   describe('lireReglesMarqueursIA', () => {
     it('lit une règle de marqueur IA valide', () => {
       const resultat = ParametresJugementUtils.lireReglesMarqueursIA({

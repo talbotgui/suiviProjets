@@ -18,7 +18,8 @@
 //! `docs/02_documentation/13_conceptionDetaillee.md` pour cette fonctionnalité (décision arbitraire, cf. rapport de
 //! développement de cet incrément) : le différentiel à trois catégories (ajout, modification, identique) reprend le
 //! vocabulaire exact de `Specification.md#523-f23` (« différentiel à trois colonnes »), une ligne par entrée de
-//! référentiel-liste (`reglesDependances`/`reglesMarqueursIA`/`categoriesDependances`, identifiée par son `id`),
+//! référentiel-liste (`reglesDependances`/`reglesMarqueursIA`/`categoriesDependances`/`reglesAuthentification`,
+//! identifiée par son `id`),
 //! par le motif de nommage de
 //! branche (valeur scalaire) et par feuille de `parametres.seuils` (chemin pointé obtenu par aplanissement
 //! récursif de l'objet JSON, sur le même principe que le chemin pointé déjà utilisé par `definir_seuil`).
@@ -33,7 +34,8 @@
 //! Correction post-relecture (Phase 9, incrément 3, arbitrage humain explicite) : la voie d'import réutilise
 //! désormais les mêmes validateurs que la saisie manuelle de `parametrage::definir_referentiel`
 //! (`valider_entree_regles_dependances`, `valider_entree_regles_marqueurs_ia`,
-//! `valider_entree_categorie_dependance`, `valider_motif_nommage_branches`)
+//! `valider_entree_categorie_dependance`, `valider_entree_regle_authentification` (US-067),
+//! `valider_motif_nommage_branches`)
 //! pour ne jamais être moins stricte qu'elle sur les mêmes données ; une entrée importée qui échoue à cette
 //! validation (motif de nommage syntaxiquement invalide, champ obligatoire manquant, `id` absent compris) n'est
 //! jamais proposée à l'acceptation, mais reste explicitement signalée à l'utilisateur (`lignes_invalides`) plutôt
@@ -44,8 +46,8 @@ use crate::persistance::erreurs::ErreurPersistance;
 use crate::persistance::migration::{ETAPES_MIGRATION_REELLES, appliquer_migrations};
 use crate::persistance::parametrage::{
     ErreurParametrage, upsert_par_id, valider_entree_categorie_dependance,
-    valider_entree_regles_dependances, valider_entree_regles_marqueurs_ia,
-    valider_motif_nommage_branches,
+    valider_entree_regle_authentification, valider_entree_regles_dependances,
+    valider_entree_regles_marqueurs_ia, valider_motif_nommage_branches,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -256,7 +258,7 @@ fn ligne_scalaire(
 }
 
 /// Ajoute une ligne par entrée importée d'un référentiel-liste
-/// (`reglesDependances`/`reglesMarqueursIA`/`categoriesDependances`), validée
+/// (`reglesDependances`/`reglesMarqueursIA`/`categoriesDependances`/`reglesAuthentification`), validée
 /// au préalable par `valider` (la même fonction que celle appliquée par `parametrage::definir_referentiel` à la
 /// saisie manuelle, RG-023 : la voie d'import ne doit jamais être moins stricte), puis appariée à l'entrée
 /// courante de même `id`. Une entrée importée invalide (`id` manquant compris) est signalée dans
@@ -349,6 +351,14 @@ fn calculer_differentiel(
         configuration_importee.pointer("/referentiels/categoriesDependances"),
         valider_entree_categorie_dependance,
     );
+    ajouter_lignes_referentiel_liste(
+        &mut lignes,
+        &mut lignes_invalides,
+        "referentiels.reglesAuthentification",
+        &donnees.referentiels.regles_authentification,
+        configuration_importee.pointer("/referentiels/reglesAuthentification"),
+        valider_entree_regle_authentification,
+    );
 
     let mut feuilles_importees = Vec::new();
     if let Some(seuils_importes) = configuration_importee.pointer("/seuils") {
@@ -415,6 +425,17 @@ fn appliquer_ligne(donnees: &mut DonneesRacine, ligne: &LigneDifferentielImport)
     {
         upsert_par_id(
             &mut donnees.referentiels.categories_dependances,
+            id,
+            ligne.apres.clone(),
+        );
+        return;
+    }
+    if let Some(id) = ligne
+        .chemin
+        .strip_prefix("referentiels.reglesAuthentification/")
+    {
+        upsert_par_id(
+            &mut donnees.referentiels.regles_authentification,
             id,
             ligne.apres.clone(),
         );
@@ -1239,6 +1260,61 @@ mod tests {
         assert_eq!(
             racine.journal[0].objet,
             "referentiels.categoriesDependances/c9"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn importer_configuration_regles_authentification_applique_une_regle_valide_et_signale_une_invalide()
+    -> Result<(), ErreurConfigurationPartageable> {
+        // US-067 : le référentiel-liste `reglesAuthentification` est diffé, validé et appliqué comme les autres ;
+        // une entrée de mode hors liste fermée est signalée invalide plutôt qu'appliquée.
+        let mut racine = racine_de_test();
+        let regles_avant = racine.referentiels.regles_authentification.len();
+        let dossier = DossierTemporaire::nouveau("import-authentification");
+        let chemin = dossier.chemin_fichier("configuration.json");
+        ecrire_json_de_test(
+            &chemin,
+            &json!({
+                "versionSchema": VERSION_SCHEMA_COURANTE,
+                "referentiels": {
+                    "reglesDependances": [],
+                    "reglesMarqueursIA": [],
+                    "motifNommageBranches": racine.referentiels.motif_nommage_branches,
+                    "reglesAuthentification": [
+                        { "id": "a9", "mode": "CAS", "motif": "fr.entreprise:cas-maison" },
+                        { "id": "a10", "mode": "LDAP", "motif": "org.ldap:*" }
+                    ],
+                },
+                "seuils": {},
+            }),
+        )
+        .map_err(|_| ErreurConfigurationPartageable::FichierIllisible)?;
+
+        let differentiel = previsualiser_import_configuration(&racine, &chemin)?;
+        assert!(differentiel.lignes.iter().any(|ligne| ligne.chemin
+            == "referentiels.reglesAuthentification/a9"
+            && ligne.categorie == CategorieLigneDifferentiel::Ajout));
+        assert_eq!(differentiel.lignes_invalides.len(), 1);
+        assert_eq!(
+            differentiel.lignes_invalides[0].chemin,
+            "referentiels.reglesAuthentification/a10"
+        );
+
+        importer_configuration(
+            &mut racine,
+            &chemin,
+            &["referentiels.reglesAuthentification/a9".to_string()],
+            "2026-11-18T09:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.referentiels.regles_authentification.len(),
+            regles_avant + 1
+        );
+        assert_eq!(
+            racine.journal[0].objet,
+            "referentiels.reglesAuthentification/a9"
         );
         Ok(())
     }

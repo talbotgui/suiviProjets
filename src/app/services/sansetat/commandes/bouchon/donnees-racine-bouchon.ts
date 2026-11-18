@@ -41,6 +41,7 @@ export interface RacineBouchon {
     readonly reglesMarqueursIA: readonly unknown[];
     readonly motifNommageBranches: string;
     readonly categoriesDependances: readonly unknown[];
+    readonly reglesAuthentification: readonly unknown[];
   };
   readonly parametres: Readonly<Record<string, unknown>>;
   readonly campagnes: readonly unknown[];
@@ -68,6 +69,57 @@ const CATEGORIES_DEPENDANCES_PAR_DEFAUT: readonly { id: string; libelle: string;
     { id: '40000000-0000-4000-8000-000000000003', libelle: 'fmkBack', sigle: 'FMB' },
     { id: '40000000-0000-4000-8000-000000000004', libelle: 'fmkFront', sigle: 'FMF' },
   ];
+
+/**
+ * Règles de détection du mode d'authentification par défaut (US-067, RG-067), repli exact de
+ * `src-tauri/src/modele/racine.rs#REGLES_AUTHENTIFICATION_PAR_DEFAUT`.
+ */
+const REGLES_AUTHENTIFICATION_PAR_DEFAUT: readonly { id: string; mode: string; motif: string }[] = [
+  {
+    id: '50000000-0000-4000-8000-000000000001',
+    mode: 'OIDC',
+    motif: 'org.springframework.boot:spring-boot-starter-oauth2-client',
+  },
+  {
+    id: '50000000-0000-4000-8000-000000000002',
+    mode: 'OIDC',
+    motif: 'org.springframework.security:spring-security-oauth2-client',
+  },
+  { id: '50000000-0000-4000-8000-000000000003', mode: 'OIDC', motif: 'org.keycloak:*' },
+  {
+    id: '50000000-0000-4000-8000-000000000004',
+    mode: 'OIDC',
+    motif: 'com.nimbusds:oauth2-oidc-sdk',
+  },
+  { id: '50000000-0000-4000-8000-000000000005', mode: 'OIDC', motif: 'keycloak-js' },
+  { id: '50000000-0000-4000-8000-000000000006', mode: 'OIDC', motif: 'keycloak-angular' },
+  { id: '50000000-0000-4000-8000-000000000007', mode: 'OIDC', motif: 'angular-oauth2-oidc' },
+  { id: '50000000-0000-4000-8000-000000000008', mode: 'OIDC', motif: 'angular-auth-oidc-client' },
+  { id: '50000000-0000-4000-8000-000000000009', mode: 'OIDC', motif: 'oidc-client-ts' },
+  { id: '50000000-0000-4000-8000-00000000000a', mode: 'OIDC', motif: 'oidc-client' },
+  {
+    id: '50000000-0000-4000-8000-000000000011',
+    mode: 'SAML',
+    motif: 'org.springframework.security:spring-security-saml2-service-provider',
+  },
+  {
+    id: '50000000-0000-4000-8000-000000000012',
+    mode: 'SAML',
+    motif: 'org.springframework.security.extensions:spring-security-saml2-core',
+  },
+  { id: '50000000-0000-4000-8000-000000000013', mode: 'SAML', motif: 'org.opensaml:*' },
+  { id: '50000000-0000-4000-8000-000000000014', mode: 'SAML', motif: 'org.pac4j:pac4j-saml' },
+  { id: '50000000-0000-4000-8000-000000000015', mode: 'SAML', motif: '@node-saml/*' },
+  { id: '50000000-0000-4000-8000-000000000016', mode: 'SAML', motif: 'passport-saml' },
+  {
+    id: '50000000-0000-4000-8000-000000000021',
+    mode: 'CAS',
+    motif: 'org.springframework.security:spring-security-cas',
+  },
+  { id: '50000000-0000-4000-8000-000000000022', mode: 'CAS', motif: 'org.jasig.cas.client:*' },
+  { id: '50000000-0000-4000-8000-000000000023', mode: 'CAS', motif: 'org.apereo.cas.client:*' },
+  { id: '50000000-0000-4000-8000-000000000024', mode: 'CAS', motif: 'org.pac4j:pac4j-cas' },
+];
 
 /**
  * Règle de dépendances `java` par défaut (US-050), repli exact de
@@ -151,6 +203,7 @@ export class RacineBouchonUtils {
         reglesMarqueursIA: [],
         motifNommageBranches: MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT,
         categoriesDependances: CATEGORIES_DEPENDANCES_PAR_DEFAUT,
+        reglesAuthentification: REGLES_AUTHENTIFICATION_PAR_DEFAUT,
       },
       parametres: PARAMETRES_BOUCHON,
       campagnes: [],
@@ -1642,6 +1695,7 @@ export const RACINE_BOUCHON_CHARGEMENT: RacineBouchon = {
     ],
     motifNommageBranches: MOTIF_NOMMAGE_BRANCHES_PAR_DEFAUT,
     categoriesDependances: CATEGORIES_DEPENDANCES_PAR_DEFAUT,
+    reglesAuthentification: REGLES_AUTHENTIFICATION_PAR_DEFAUT,
   },
   parametres: PARAMETRES_BOUCHON,
   campagnes: [

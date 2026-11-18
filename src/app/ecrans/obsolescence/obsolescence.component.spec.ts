@@ -148,6 +148,7 @@ class DonneesDeTest {
         ],
         reglesMarqueursIA: [],
         motifNommageBranches: '',
+        reglesAuthentification: [],
         categoriesDependances: [
           { id: 'cat-exec', libelle: 'exec', sigle: 'EXE' },
           { id: 'cat-back', libelle: 'fmkBack', sigle: 'FMB' },
@@ -666,6 +667,96 @@ describe('SqmObsolescenceComponent', () => {
     const infobulle = composant.projetsAffiches()[0].infobulle;
     expect(infobulle).toContain('exec : 4 version(s) majeure(s) de retard');
     expect(infobulle).toContain('fmkBack : aucune dépendance');
+  });
+
+  describe('mode d’authentification (US-067, RG-067)', () => {
+    /**
+     * Construit une racine d'un projet unique, dont l'audit porte les dépendances fournies, avec deux règles de
+     * détection (OIDC, CAS).
+     * @param audits - Audits du projet.
+     * @returns La racine de test.
+     */
+    function racineAuthentification(audits: readonly Audit[]): DonneesRacine {
+      const racine = DonneesDeTest.racine([
+        DonneesDeTest.groupe('g1', 'G1', 'p1', 'Projet 1', audits),
+      ]);
+      return {
+        ...racine,
+        referentiels: {
+          ...racine.referentiels,
+          reglesAuthentification: [
+            { id: 'a1', mode: 'CAS', motif: 'org.jasig.cas.client:*' },
+            { id: 'a2', mode: 'OIDC', motif: 'keycloak-js' },
+          ],
+        },
+      };
+    }
+
+    it('affiche une icône réduite par mode détecté sur la tuile et enrichit l’infobulle', () => {
+      const fixture = creer(
+        racineAuthentification([
+          DonneesDeTest.audit('2026-06-01', [
+            {
+              reference: 'org.jasig.cas.client:cas-client-core',
+              version: '3.6.4',
+              manifeste: 'pom.xml',
+            },
+            { reference: 'keycloak-js', version: '24.0.0', manifeste: 'package.json' },
+          ]),
+        ]),
+      );
+      const zone = DomTestUtils.obtenirElementNatif(fixture).querySelector(
+        '.obsolescence__tuile .obsolescence__authentification',
+      );
+      const icones = Array.from(zone?.querySelectorAll('img') ?? []);
+      expect(icones.map((icone) => icone.getAttribute('alt'))).toEqual([
+        'Authentification OIDC',
+        'Authentification CAS',
+      ]);
+      expect(icones[0]?.classList.contains('icone-authentification--sm')).toBe(true);
+      expect(fixture.componentInstance.projetsAffiches()[0].infobulle).toContain(
+        'Authentification : OIDC, CAS',
+      );
+    });
+
+    it('affiche la mention neutre quand aucune règle ne correspond aux dépendances', () => {
+      const fixture = creer(
+        racineAuthentification([
+          DonneesDeTest.audit('2026-06-01', [
+            { reference: 'java', version: '17', manifeste: 'pom.xml' },
+          ]),
+        ]),
+      );
+      const icone = DomTestUtils.obtenirElementNatif(fixture).querySelector(
+        '.obsolescence__authentification img',
+      );
+      expect(icone?.getAttribute('src')).toBe('authentification/aucun.svg');
+      expect(fixture.componentInstance.projetsAffiches()[0].infobulle).toContain(
+        'Authentification : aucune détectée',
+      );
+    });
+
+    it('n’affiche aucune zone d’authentification quand l’audit retenu ne porte pas de résultat gitlab.dependances', () => {
+      const audit = DonneesDeTest.audit('2026-06-01', []);
+      const auditSansDependances: Audit = {
+        ...audit,
+        resultats: audit.resultats.filter((resultat) => resultat.type !== 'gitlab.dependances'),
+      };
+      const fixture = creer(racineAuthentification([auditSansDependances]));
+      const tuile = DomTestUtils.obtenirElementNatif(fixture).querySelector('.obsolescence__tuile');
+      expect(tuile).not.toBeNull();
+      expect(tuile?.querySelector('.obsolescence__authentification')).toBeNull();
+    });
+
+    it('n’affiche aucune zone d’authentification pour un projet jamais audité', () => {
+      const fixture = creer(racineAuthentification([]));
+      const tuile = DomTestUtils.obtenirElementNatif(fixture).querySelector('.obsolescence__tuile');
+      expect(tuile).not.toBeNull();
+      expect(tuile?.querySelector('.obsolescence__authentification')).toBeNull();
+      expect(fixture.componentInstance.projetsAffiches()[0].infobulle).not.toContain(
+        'Authentification',
+      );
+    });
   });
 
   describe('langages principaux (US-057)', () => {

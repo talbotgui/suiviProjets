@@ -292,6 +292,32 @@
             }
 
             <h2 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">Dépendances</h2>
+            <!-- Mode d'authentification (US-067, RG-067) : déduit des dépendances déclarées du dernier audit régulier,
+                 une icône par mode détecté (ordre OIDC, SAML, CAS), mention neutre si aucun ; absent sans constat
+                 `gitlab.dependances`. -->
+            @if (donnees.modeAuthentification; as detection) {
+              <p
+                id="fiche-projet-authentification"
+                class="fiche-projet__authentification d-flex aligne-centre ecart-2 texte-sm exterieur-haut-0 exterieur-bas-2"
+              >
+                <span class="poids-demi-gras">Authentification</span>
+                @switch (detection.type) {
+                  @case ('detecte') {
+                    @for (detecte of detection.modes; track detecte.mode) {
+                      <app-icone-authentification
+                        [variante]="detecte.mode"
+                        [references]="detecte.references"
+                      />
+                      <span>{{ detecte.mode }}</span>
+                    }
+                  }
+                  @case ('aucunDetecte') {
+                    <app-icone-authentification variante="aucun" />
+                    <span class="texte-discret">Aucune authentification détectée</span>
+                  }
+                }
+              </p>
+            }
             @if (afficherLienSaisieMasseDependances(donnees.dependances)) {
               <p class="exterieur-bas-2">
                 <button

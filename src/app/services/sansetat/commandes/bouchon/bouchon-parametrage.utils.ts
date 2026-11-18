@@ -81,6 +81,7 @@ export class BouchonParametrageUtils {
     'supprimer_regle_dependance',
     'supprimer_regle_marqueur_ia',
     'supprimer_categorie_dependance',
+    'supprimer_regle_authentification',
     'definir_verrouillage',
     'definir_concurrence_audit',
     'definir_proxy',
@@ -158,6 +159,10 @@ export class BouchonParametrageUtils {
       case 'supprimer_categorie_dependance':
         return BouchonParametrageUtils.horodater(
           BouchonParametrageUtils.supprimerEntreeReferentiel(parametres, 'categoriesDependances'),
+        );
+      case 'supprimer_regle_authentification':
+        return BouchonParametrageUtils.horodater(
+          BouchonParametrageUtils.supprimerEntreeReferentiel(parametres, 'reglesAuthentification'),
         );
       case 'definir_verrouillage':
         return BouchonParametrageUtils.horodater(
@@ -300,13 +305,17 @@ export class BouchonParametrageUtils {
   /**
    * Supprime une entrée d'un référentiel-liste par identifiant (US-033, RG-035).
    * @param parametres - Paramètres reçus (`id`, `donnees`).
-   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances`, `reglesMarqueursIA` ou
-   * `categoriesDependances`).
+   * @param typeReferentiel - Branche de référentiel concernée (`reglesDependances`, `reglesMarqueursIA`,
+   * `categoriesDependances` ou `reglesAuthentification`).
    * @returns La racine mise à jour (non encore horodatée).
    */
   private static supprimerEntreeReferentiel(
     parametres: Readonly<Record<string, unknown>>,
-    typeReferentiel: 'reglesDependances' | 'reglesMarqueursIA' | 'categoriesDependances',
+    typeReferentiel:
+      | 'reglesDependances'
+      | 'reglesMarqueursIA'
+      | 'categoriesDependances'
+      | 'reglesAuthentification',
   ): Record<string, unknown> {
     const donnees = BouchonParametrageUtils.exigerObjet(parametres['donnees']);
     const id = BouchonParametrageUtils.lireTexte(parametres, 'id');

@@ -217,6 +217,42 @@ pub(crate) fn supprimer_regle_marqueur_ia(
     resultat
 }
 
+/// Supprime une entrée du référentiel des règles de détection du mode d'authentification, sauvegarde le fichier et
+/// consigne la suppression au journal (US-067, RG-035). Nom retenu par symétrie avec
+/// [`supprimer_regle_marqueur_ia`] (décision arbitraire à valider, cf. rapport de développement).
+///
+/// # Erreurs
+///
+/// Voir [`supprimer_regle_dependance`].
+#[tauri::command]
+pub(crate) fn supprimer_regle_authentification(
+    chemin: String,
+    donnees: DonneesRacine,
+    id: String,
+    mot_de_passe: String,
+    etat: State<'_, EtatSession>,
+) -> Result<DonneesRacine, ErreurFacade> {
+    crate::journalisation::consigner_debut_commande("supprimerRegleAuthentification");
+    let resultat = (|| -> Result<DonneesRacine, ErreurFacade> {
+        super::fichier::verifier_avant_ecriture(Path::new(&chemin), &mot_de_passe, &etat)?;
+        let mut donnees = donnees;
+        let horodatage = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        parametrage::supprimer_regle_authentification(&mut donnees, &id, horodatage)?;
+
+        let cle_session = moteur::sauvegarder_fichier(
+            Path::new(&chemin),
+            &donnees,
+            &mot_de_passe,
+            "supprimerRegleAuthentification",
+        )?;
+        etat.definir(PathBuf::from(chemin), cle_session);
+
+        Ok(donnees)
+    })();
+    crate::journalisation::consigner_fin_commande("supprimerRegleAuthentification");
+    resultat
+}
+
 /// Supprime une entrée du référentiel des catégories de dépendance, sauvegarde le fichier et consigne la
 /// suppression au journal (US-048, RG-035).
 ///

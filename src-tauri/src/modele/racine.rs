@@ -108,7 +108,13 @@ use std::collections::HashMap;
 /// transformation nulle**, comme `migration_1_vers_2`. Seul changement de forme : ajout du champ booléen
 /// `Projet.enStase` (`#[serde(default)]`), absent = `false`, aucune donnée existante à recalculer. Voir
 /// `migration_12_vers_13` enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
-pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 13;
+///
+/// Passage de `13` à `14` (plan_22 — mode d'authentification détecté par les dépendances, US-067/RG-067) : palier
+/// **à transformation nulle**, comme `migration_1_vers_2`. Seul changement de forme : ajout du référentiel
+/// `referentiels.reglesAuthentification` ([`Referentiels::regles_authentification`]), dont l'absence sur un document
+/// existant se désérialise vers la liste par défaut ([`REGLES_AUTHENTIFICATION_PAR_DEFAUT`]). Voir
+/// `migration_13_vers_14` enregistrée dans `crate::persistance::migration::ETAPES_MIGRATION_REELLES`.
+pub(crate) const VERSION_SCHEMA_COURANTE: u32 = 14;
 
 /// Version unique et partagée du schéma de filtres d'une [`VueEnregistree`], depuis le palier `9` → `10`
 /// (plan_16, incrément 2) : la forme de `filtres` (`{ groupeId, projetIds }`) est désormais commune à tous les
@@ -212,6 +218,131 @@ fn categories_dependances_par_defaut() -> Vec<Value> {
         .map(|(id, libelle, sigle)| {
             serde_json::json!({ "id": id, "libelle": libelle, "sigle": sigle })
         })
+        .collect()
+}
+
+/// Modes d'authentification reconnus (liste fermée, RG-067). Miroir de `ParametresJugementUtils.MODES_AUTHENTIFICATION`
+/// (`src/app/services/sansetat/jugement/mode-authentification.utils.ts`).
+pub(crate) const MODES_AUTHENTIFICATION: [&str; 3] = ["OIDC", "SAML", "CAS"];
+
+/// Règles de détection du mode d'authentification par défaut (US-067, RG-067), appliquées en l'absence de valeur
+/// explicite dans `referentiels.reglesAuthentification` : chaque entrée associe un motif glob, confronté à la
+/// `reference` d'une dépendance collectée (`groupId:artifactId` pour Maven/Gradle, nom de paquet pour npm), à l'un
+/// des modes de [`MODES_AUTHENTIFICATION`]. Aucune valeur fixée par un texte normatif ni portée par
+/// `docs/01_besoin/exemple-donnees.json` (jamais modifié) : jeu de bibliothèques courantes proposé par
+/// `docs/03_plan/plan_22_modeAuthentification.md` — décision arbitraire à valider par un humain (cf. rapport de
+/// développement), révisable depuis l'écran de Paramétrage.
+pub(crate) const REGLES_AUTHENTIFICATION_PAR_DEFAUT: &[(&str, &str, &str)] = &[
+    (
+        "50000000-0000-4000-8000-000000000001",
+        "OIDC",
+        "org.springframework.boot:spring-boot-starter-oauth2-client",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000002",
+        "OIDC",
+        "org.springframework.security:spring-security-oauth2-client",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000003",
+        "OIDC",
+        "org.keycloak:*",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000004",
+        "OIDC",
+        "com.nimbusds:oauth2-oidc-sdk",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000005",
+        "OIDC",
+        "keycloak-js",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000006",
+        "OIDC",
+        "keycloak-angular",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000007",
+        "OIDC",
+        "angular-oauth2-oidc",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000008",
+        "OIDC",
+        "angular-auth-oidc-client",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000009",
+        "OIDC",
+        "oidc-client-ts",
+    ),
+    (
+        "50000000-0000-4000-8000-00000000000a",
+        "OIDC",
+        "oidc-client",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000011",
+        "SAML",
+        "org.springframework.security:spring-security-saml2-service-provider",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000012",
+        "SAML",
+        "org.springframework.security.extensions:spring-security-saml2-core",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000013",
+        "SAML",
+        "org.opensaml:*",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000014",
+        "SAML",
+        "org.pac4j:pac4j-saml",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000015",
+        "SAML",
+        "@node-saml/*",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000016",
+        "SAML",
+        "passport-saml",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000021",
+        "CAS",
+        "org.springframework.security:spring-security-cas",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000022",
+        "CAS",
+        "org.jasig.cas.client:*",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000023",
+        "CAS",
+        "org.apereo.cas.client:*",
+    ),
+    (
+        "50000000-0000-4000-8000-000000000024",
+        "CAS",
+        "org.pac4j:pac4j-cas",
+    ),
+];
+
+/// Fonction de repli pour `#[serde(default = "...")]` sur [`Referentiels::regles_authentification`], sur le modèle
+/// de [`categories_dependances_par_defaut`] : reconstruit la liste par défaut
+/// ([`REGLES_AUTHENTIFICATION_PAR_DEFAUT`]) sous la même forme JSON générique que les entrées saisies
+/// (`{ id, mode, motif }`).
+pub(crate) fn regles_authentification_par_defaut() -> Vec<Value> {
+    REGLES_AUTHENTIFICATION_PAR_DEFAUT
+        .iter()
+        .map(|(id, mode, motif)| serde_json::json!({ "id": id, "mode": mode, "motif": motif }))
         .collect()
 }
 
@@ -1058,6 +1189,14 @@ pub(crate) struct Referentiels {
     /// ([`CATEGORIES_DEPENDANCES_PAR_DEFAUT`]) et non une liste vide (même choix que `motif_nommage_branches`).
     #[serde(default = "categories_dependances_par_defaut")]
     pub(crate) categories_dependances: Vec<Value>,
+    /// Règles de détection du mode d'authentification d'une application (US-067, RG-067) : `{ id, mode, motif }`,
+    /// `mode` parmi [`MODES_AUTHENTIFICATION`], `motif` glob confronté à la `reference` des dépendances collectées.
+    /// Consommées exclusivement à l'affichage par le Moteur de jugement (vue calculée jamais persistée) ; le cœur
+    /// natif n'effectue qu'un round-trip fidèle et une validation de forme minimale (cf.
+    /// `crate::persistance::parametrage::valider_entree_regle_authentification`). `#[serde(default = "...")]` : un
+    /// document antérieur à US-067 récupère la liste par défaut (même choix que [`Self::categories_dependances`]).
+    #[serde(default = "regles_authentification_par_defaut")]
+    pub(crate) regles_authentification: Vec<Value>,
 }
 
 impl Default for Referentiels {
@@ -1067,6 +1206,7 @@ impl Default for Referentiels {
             regles_marqueurs_ia: Vec::new(),
             motif_nommage_branches: motif_nommage_branches_par_defaut(),
             categories_dependances: categories_dependances_par_defaut(),
+            regles_authentification: regles_authentification_par_defaut(),
         }
     }
 }
@@ -1768,6 +1908,7 @@ mod tests {
             regles_marqueurs_ia: vec![],
             motif_nommage_branches: r"^feature/.+$".to_string(),
             categories_dependances: categories_dependances_par_defaut(),
+            regles_authentification: vec![],
         };
 
         let json = serde_json::to_string(&referentiels)?;
@@ -1777,6 +1918,38 @@ mod tests {
         assert_eq!(relu.motif_nommage_branches, r"^feature/.+$");
         assert!(json.contains("\"motifNommageBranches\":\"^feature/.+$\""));
         Ok(())
+    }
+
+    #[test]
+    fn referentiels_regles_authentification_par_defaut_ont_des_identifiants_uniques_et_des_modes_valides()
+     {
+        // US-067 / RG-067 : chaque règle par défaut porte un `id` unique, un `motif` non vide et un `mode` de la
+        // liste fermée ; les trois modes sont représentés.
+        let regles = Referentiels::default().regles_authentification;
+        let mut identifiants: Vec<&str> = regles
+            .iter()
+            .filter_map(|regle| regle.get("id").and_then(Value::as_str))
+            .collect();
+        assert_eq!(identifiants.len(), regles.len());
+        identifiants.sort_unstable();
+        identifiants.dedup();
+        assert_eq!(identifiants.len(), regles.len());
+        for regle in &regles {
+            let mode = regle
+                .get("mode")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            assert!(MODES_AUTHENTIFICATION.contains(&mode));
+            assert!(
+                regle
+                    .get("motif")
+                    .and_then(Value::as_str)
+                    .is_some_and(|motif| !motif.is_empty())
+            );
+        }
+        for mode in MODES_AUTHENTIFICATION {
+            assert!(regles.iter().any(|regle| regle["mode"] == mode));
+        }
     }
 
     #[test]

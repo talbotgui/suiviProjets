@@ -148,14 +148,37 @@
               <span class="obsolescence__nom-projet poids-demi-gras texte-sm">{{
                 tuile.nomProjet
               }}</span>
-              <!-- Langages principaux (US-057, RG-057), icônes réduites poussées en fin de ligne du nom ;
-                   absentes si la ventilation Sonar par langage de l'audit retenu est indisponible. -->
-              @if (tuile.langagesPrincipaux.length > 0) {
-                <span
-                  class="obsolescence__langages d-flex aligne-centre ecart-1 exterieur-gauche-auto"
-                >
-                  @for (langage of tuile.langagesPrincipaux; track langage.cleSonar) {
-                    <app-icone-langage [cleSonar]="langage.cleSonar" taille="sm" />
+              <!-- Mode(s) d'authentification (US-067, RG-067) puis langages principaux (US-057, RG-057), icônes
+                   réduites poussées en fin de ligne du nom ; chaque groupe est absent si sa donnée source
+                   (`gitlab.dependances`, ventilation Sonar par langage) est indisponible dans l'audit retenu. -->
+              @if (
+                tuile.modeAuthentification !== undefined || tuile.langagesPrincipaux.length > 0
+              ) {
+                <span class="d-flex aligne-centre ecart-1 exterieur-gauche-auto">
+                  @if (tuile.modeAuthentification; as detection) {
+                    <span class="obsolescence__authentification d-flex aligne-centre ecart-1">
+                      @switch (detection.type) {
+                        @case ('detecte') {
+                          @for (detecte of detection.modes; track detecte.mode) {
+                            <app-icone-authentification
+                              [variante]="detecte.mode"
+                              [references]="detecte.references"
+                              taille="sm"
+                            />
+                          }
+                        }
+                        @case ('aucunDetecte') {
+                          <app-icone-authentification variante="aucun" taille="sm" />
+                        }
+                      }
+                    </span>
+                  }
+                  @if (tuile.langagesPrincipaux.length > 0) {
+                    <span class="obsolescence__langages d-flex aligne-centre ecart-1">
+                      @for (langage of tuile.langagesPrincipaux; track langage.cleSonar) {
+                        <app-icone-langage [cleSonar]="langage.cleSonar" taille="sm" />
+                      }
+                    </span>
                   }
                 </span>
               }

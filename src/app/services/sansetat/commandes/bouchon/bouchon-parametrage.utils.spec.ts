@@ -177,6 +177,26 @@ describe('BouchonParametrageUtils', () => {
     expect(resultat.referentiels.reglesMarqueursIA).toHaveLength(0);
   });
 
+  it('supprime une entrée du référentiel des règles de détection d’authentification par identifiant', async () => {
+    const resultat = await BouchonParametrageUtils.invoquer<{
+      readonly referentiels: { readonly reglesAuthentification: readonly unknown[] };
+    }>('supprimer_regle_authentification', {
+      donnees: {
+        referentiels: {
+          reglesAuthentification: [
+            { id: 'a1', mode: 'CAS', motif: 'org.jasig.cas.client:*' },
+            { id: 'a2', mode: 'OIDC', motif: 'keycloak-js' },
+          ],
+        },
+      },
+      id: 'a1',
+    });
+
+    expect(resultat.referentiels.reglesAuthentification).toEqual([
+      { id: 'a2', mode: 'OIDC', motif: 'keycloak-js' },
+    ]);
+  });
+
   it('gère sans erreur un référentiel-liste absent de la racine reçue', async () => {
     const resultat = await BouchonParametrageUtils.invoquer<{
       readonly referentiels: { readonly reglesMarqueursIA: readonly unknown[] };

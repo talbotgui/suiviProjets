@@ -1,0 +1,17 @@
+Pictogrammes de mode d'authentification (US-067, RG-067, plan_22)
+=================================================================
+
+Ce dossier héberge quatre pictogrammes SVG maison, dessinés pour ce projet (cadenas
+stylisé portant l'initiale du mode), servis localement par le composant partagé
+SqmIconeAuthentificationComponent (src/app/composants/icone-authentification/).
+Aucun logo tiers n'est reproduit (le logo OpenID est une marque déposée de
+l'OpenID Foundation ; SAML et CAS n'ont pas de logo d'usage libre établi) et
+aucune ressource externe n'est chargée à l'exécution (CSP `img-src 'self' data:`).
+
+  oidc.svg   OpenID Connect (orange, « O »)
+  saml.svg   SAML (bleu, « S »)
+  cas.svg    CAS (vert, « C »)
+  aucun.svg  aucune authentification détectée (gris, cadenas ouvert, « ? »)
+
+Tout fichier manquant ou illisible fait basculer le composant sur un repli textuel.
+Fichiers générés avec l'assistance de l'IA (Claude Code).

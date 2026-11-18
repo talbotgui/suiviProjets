@@ -51,6 +51,7 @@ class DonneesDeTest {
           },
         ],
         motifNommageBranches: '^(main|develop)$',
+        reglesAuthentification: [],
         categoriesDependances: [{ id: 'cat-front', libelle: 'fmkFront', sigle: 'FMF' }],
       },
       parametres: {
@@ -773,6 +774,155 @@ describe('SqmReferentielsParametrageComponent', () => {
       'supprimer_regle_marqueur_ia',
       expect.objectContaining({ id: 'm1', motDePasse: 'mot-de-passe' }),
     );
+  });
+
+  describe('règles de détection du mode d’authentification (US-067, RG-067)', () => {
+    /**
+     * Charge une racine portant trois règles de détection d'authentification, volontairement dans le désordre.
+     */
+    function chargerReglesAuthentification(): void {
+      const base = DonneesDeTest.racineVide();
+      donneesApplication.chargerRacine({
+        ...base,
+        referentiels: {
+          ...base.referentiels,
+          reglesAuthentification: [
+            { id: 'a-cas', mode: 'CAS', motif: 'org.jasig.cas.client:*' },
+            { id: 'a-oidc-2', mode: 'OIDC', motif: 'org.keycloak:*' },
+            { id: 'a-oidc-1', mode: 'OIDC', motif: 'keycloak-js' },
+          ],
+        },
+      });
+    }
+
+    it('liste les règles triées par mode (OIDC, SAML, CAS) puis par motif', () => {
+      chargerReglesAuthentification();
+      const fixture = TestBed.createComponent(SqmReferentielsParametrageComponent);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.reglesAuthentification().map((regle) => regle.id)).toEqual([
+        'a-oidc-1',
+        'a-oidc-2',
+        'a-cas',
+      ]);
+      const lignes = DomTestUtils.obtenirElementNatif(fixture).querySelectorAll(
+        '#referentiels-parametrage-liste-authentification li',
+      );
+      expect(lignes).toHaveLength(3);
+      expect(lignes[2]?.textContent).toContain('CAS');
+    });
+
+    it('bloque l’enregistrement d’une règle sans motif', () => {
+      const composant = TestBed.createComponent(
+        SqmReferentielsParametrageComponent,
+      ).componentInstance;
+      composant.ouvrirCreationAuthentification();
+      expect(composant.modeAuthentification).toBe('OIDC');
+      expect(composant.formulaireAuthentificationVisible()).toBe(true);
+
+      composant.demanderEnregistrementAuthentification();
+
+      expect(composant.messageErreur).toBe('Le mode et le motif sont obligatoires.');
+      expect(composant.actionEnAttenteMotDePasse()).toBeNull();
+      composant.fermerFormulaireAuthentification();
+      expect(composant.formulaireAuthentificationVisible()).toBe(false);
+    });
+
+    it('crée une règle après ressaisie du mot de passe (identifiant généré, motif nettoyé)', async () => {
+      const composant = TestBed.createComponent(
+        SqmReferentielsParametrageComponent,
+      ).componentInstance;
+      invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+      composant.ouvrirCreationAuthentification();
+      composant.modeAuthentification = 'SAML';
+      composant.motifAuthentification = '  org.opensaml:*  ';
+
+      composant.demanderEnregistrementAuthentification();
+      expect(composant.actionEnAttenteMotDePasse()).toBe('authentification');
+      await composant.confirmerEnregistrementAuthentification('mot-de-passe');
+
+      expect(invokeSimule.mock.calls[0]?.[0]).toBe('definir_referentiel');
+      expect(invokeSimule.mock.calls[0]?.[1]).toMatchObject({
+        typeReferentiel: 'reglesAuthentification',
+        entree: { mode: 'SAML', motif: 'org.opensaml:*' },
+      });
+      expect(composant.formulaireAuthentificationVisible()).toBe(false);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({
+          type: 'succes',
+          message: 'La règle de détection d’authentification a été ajoutée.',
+        }),
+      ]);
+    });
+
+    it('modifie une règle existante en réutilisant son identifiant', async () => {
+      chargerReglesAuthentification();
+      const composant = TestBed.createComponent(
+        SqmReferentielsParametrageComponent,
+      ).componentInstance;
+      invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+      composant.ouvrirEditionAuthentification('a-cas');
+      expect(composant.motifAuthentification).toBe('org.jasig.cas.client:*');
+      composant.motifAuthentification = 'org.apereo.cas.client:*';
+
+      composant.demanderEnregistrementAuthentification();
+      await composant.confirmerEnregistrementAuthentification('mot-de-passe');
+
+      expect(invokeSimule.mock.calls[0]?.[1]).toMatchObject({
+        entree: { id: 'a-cas', mode: 'CAS', motif: 'org.apereo.cas.client:*' },
+      });
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({
+          message: 'La règle de détection d’authentification a été modifiée.',
+        }),
+      ]);
+    });
+
+    it('ignore une édition désignant un identifiant introuvable', () => {
+      const composant = TestBed.createComponent(
+        SqmReferentielsParametrageComponent,
+      ).componentInstance;
+
+      composant.ouvrirEditionAuthentification('id-inconnu');
+
+      expect(composant.formulaireAuthentificationVisible()).toBe(false);
+    });
+
+    it('notifie l’échec d’enregistrement sans refermer le formulaire', async () => {
+      const composant = TestBed.createComponent(
+        SqmReferentielsParametrageComponent,
+      ).componentInstance;
+      invokeSimule.mockRejectedValue({ type: 'entreeReferentielInvalide' });
+      composant.ouvrirCreationAuthentification();
+      composant.motifAuthentification = 'keycloak-js';
+
+      composant.demanderEnregistrementAuthentification();
+      await composant.confirmerEnregistrementAuthentification('mot-de-passe');
+
+      expect(composant.formulaireAuthentificationVisible()).toBe(true);
+      expect(TestBed.inject(NotificationService).liste()).toEqual([
+        expect.objectContaining({ type: 'erreur' }),
+      ]);
+    });
+
+    it('supprime une règle après confirmation puis ressaisie du mot de passe', async () => {
+      chargerReglesAuthentification();
+      const composant = TestBed.createComponent(
+        SqmReferentielsParametrageComponent,
+      ).componentInstance;
+      invokeSimule.mockResolvedValue(DonneesDeTest.racineVide());
+
+      composant.demanderSuppressionAuthentification('a-cas');
+      composant.confirmerSuppression();
+      expect(composant.actionEnAttenteMotDePasse()).toBe('suppressionAuthentification');
+      await composant.confirmerSuppressionMotDePasse('mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith(
+        'supprimer_regle_authentification',
+        expect.objectContaining({ id: 'a-cas', motDePasse: 'mot-de-passe' }),
+      );
+      expect(composant.suppressionEnAttente()).toBeNull();
+    });
   });
 
   it('convertit un rejet typé « entreeReferentielIntrouvable » en message explicite à la suppression', async () => {

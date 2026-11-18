@@ -234,6 +234,34 @@ pub(crate) fn valider_entree_regles_marqueurs_ia(
     Ok(id)
 }
 
+/// Valide la forme minimale attendue d'une entrée de `referentiels.reglesAuthentification` (US-067, RG-067) : `id`
+/// et `motif` non vides, `mode` parmi la liste fermée [`crate::modele::racine::MODES_AUTHENTIFICATION`] (même
+/// ensemble que `ParametresJugementUtils.MODES_AUTHENTIFICATION` côté UI). Sur le modèle de
+/// [`valider_entree_regles_marqueurs_ia`].
+///
+/// `pub(crate)` : réutilisé par `persistance::configuration_partageable::calculer_differentiel` afin que la voie
+/// d'import ne soit jamais moins stricte que la saisie manuelle sur la même donnée.
+pub(crate) fn valider_entree_regle_authentification(
+    entree: &Value,
+) -> Result<&str, ErreurParametrage> {
+    let objet = entree
+        .as_object()
+        .ok_or(ErreurParametrage::EntreeReferentielInvalide)?;
+    let id = lire_champ_chaine_non_vide(objet, "id")?;
+    // Un motif fait uniquement d'espaces est rejeté, à l'identique de la saisie côté interface (`trim`).
+    if lire_champ_chaine_non_vide(objet, "motif")?
+        .trim()
+        .is_empty()
+    {
+        return Err(ErreurParametrage::EntreeReferentielInvalide);
+    }
+    let mode = lire_champ_chaine_non_vide(objet, "mode")?;
+    if !crate::modele::racine::MODES_AUTHENTIFICATION.contains(&mode) {
+        return Err(ErreurParametrage::EntreeReferentielInvalide);
+    }
+    Ok(id)
+}
+
 /// Valide qu'une valeur JSON est une chaîne non vide et syntaxiquement valide comme expression régulière (RG-030),
 /// et la renvoie. Extraite de [`definir_referentiel`] à la Phase 9, incrément 3 (correction post-relecture) :
 /// `pub(crate)`, réutilisée telle quelle par `persistance::configuration_partageable::calculer_differentiel` pour
@@ -272,12 +300,13 @@ pub(crate) fn upsert_par_id(regles: &mut Vec<Value>, id: &str, entree: Value) ->
 /// nommage de branche, puis consigne la modification au journal (RG-023, RG-030).
 ///
 /// `type_referentiel` désigne la branche concernée : `"reglesDependances"`, `"reglesMarqueursIA"`,
-/// `"categoriesDependances"` (ajout/mise à jour d'une entrée par `id`, cf. [`upsert_par_id`]) ou
+/// `"categoriesDependances"`, `"reglesAuthentification"` (ajout/mise à jour d'une entrée par `id`, cf.
+/// [`upsert_par_id`]) ou
 /// `"motifNommageBranches"` (remplacement scalaire).
 ///
 /// # Erreurs
 ///
-/// [`ErreurParametrage::TypeReferentielInconnu`] si `type_referentiel` ne désigne aucune des quatre branches
+/// [`ErreurParametrage::TypeReferentielInconnu`] si `type_referentiel` ne désigne aucune des cinq branches
 /// ci-dessus ; [`ErreurParametrage::EntreeReferentielInvalide`] si `entree` ne porte pas la forme minimale requise
 /// pour un référentiel-liste ; [`ErreurParametrage::MotifDependanceDejaExistant`] si `type_referentiel` vaut
 /// `"reglesDependances"` et que le `motif` soumis correspond déjà à une autre entrée existante du référentiel
@@ -368,6 +397,15 @@ pub(crate) fn definir_referentiel(
                 entree.clone(),
             );
             (format!("referentiels.categoriesDependances/{id}"), avant)
+        }
+        "reglesAuthentification" => {
+            let id = valider_entree_regle_authentification(&entree)?.to_string();
+            let avant = upsert_par_id(
+                &mut donnees.referentiels.regles_authentification,
+                &id,
+                entree.clone(),
+            );
+            (format!("referentiels.reglesAuthentification/{id}"), avant)
         }
         "motifNommageBranches" => {
             let motif = valider_motif_nommage_branches(&entree)?.to_string();
@@ -747,6 +785,35 @@ pub(crate) fn supprimer_categorie_dependance(
     consigner_modification(
         donnees,
         &format!("referentiels.categoriesDependances/{id}"),
+        supprimee,
+        Value::Null,
+        horodatage,
+    );
+    Ok(())
+}
+
+/// Supprime une entrée du référentiel des règles de détection du mode d'authentification
+/// (`referentiels.reglesAuthentification`), par son identifiant, puis consigne la suppression au journal (US-067,
+/// RG-035). Cf. [`supprimer_regle_dependance`] pour la justification du choix de fonctions dédiées plutôt qu'une
+/// commande générique.
+///
+/// # Erreurs
+///
+/// [`ErreurParametrage::EntreeReferentielIntrouvable`] si `id` ne désigne aucune entrée existante.
+pub(crate) fn supprimer_regle_authentification(
+    donnees: &mut DonneesRacine,
+    id: &str,
+    horodatage: String,
+) -> Result<(), ErreurParametrage> {
+    let position = position_par_id(&donnees.referentiels.regles_authentification, id)
+        .ok_or(ErreurParametrage::EntreeReferentielIntrouvable)?;
+    let supprimee = donnees
+        .referentiels
+        .regles_authentification
+        .remove(position);
+    consigner_modification(
+        donnees,
+        &format!("referentiels.reglesAuthentification/{id}"),
         supprimee,
         Value::Null,
         horodatage,
@@ -1639,6 +1706,131 @@ mod tests {
             &mut racine,
             "inexistante",
             "2026-07-27T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(
+            resultat,
+            Err(ErreurParametrage::EntreeReferentielIntrouvable)
+        );
+    }
+
+    #[test]
+    fn definir_referentiel_regles_authentification_cree_puis_met_a_jour_une_entree()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        let nombre_par_defaut = racine.referentiels.regles_authentification.len();
+        definir_referentiel(
+            &mut racine,
+            "reglesAuthentification",
+            json!({ "id": "a1", "mode": "CAS", "motif": "fr.entreprise:auth-cas" }),
+            "2026-11-18T09:00:00Z".to_string(),
+        )?;
+        definir_referentiel(
+            &mut racine,
+            "reglesAuthentification",
+            json!({ "id": "a1", "mode": "OIDC", "motif": "fr.entreprise:auth-oidc" }),
+            "2026-11-18T10:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.referentiels.regles_authentification.len(),
+            nombre_par_defaut + 1
+        );
+        assert_eq!(
+            racine.referentiels.regles_authentification.last(),
+            Some(&json!({ "id": "a1", "mode": "OIDC", "motif": "fr.entreprise:auth-oidc" }))
+        );
+        let derniere_entree = &racine.journal[1];
+        assert_eq!(
+            derniere_entree.objet,
+            "referentiels.reglesAuthentification/a1"
+        );
+        assert_eq!(derniere_entree.avant["mode"], json!("CAS"));
+        Ok(())
+    }
+
+    #[test]
+    fn definir_referentiel_regles_authentification_mode_hors_liste_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesAuthentification",
+            json!({ "id": "a1", "mode": "LDAP", "motif": "org.ldap:*" }),
+            "2026-11-18T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_regles_authentification_motif_vide_est_rejete() {
+        let mut racine = racine_de_test();
+
+        let resultat = definir_referentiel(
+            &mut racine,
+            "reglesAuthentification",
+            json!({ "id": "a1", "mode": "SAML", "motif": "" }),
+            "2026-11-18T09:00:00Z".to_string(),
+        );
+
+        assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+    }
+
+    #[test]
+    fn definir_referentiel_regles_authentification_forme_invalide_est_rejetee() {
+        // `id` absent, `mode` absent ou non textuel, motif fait uniquement d'espaces.
+        for entree in [
+            json!({ "mode": "OIDC", "motif": "keycloak-js" }),
+            json!({ "id": "a1", "motif": "keycloak-js" }),
+            json!({ "id": "a1", "mode": 1, "motif": "keycloak-js" }),
+            json!({ "id": "a1", "mode": "CAS", "motif": "   " }),
+        ] {
+            let mut racine = racine_de_test();
+            let resultat = definir_referentiel(
+                &mut racine,
+                "reglesAuthentification",
+                entree,
+                "2026-11-18T09:00:00Z".to_string(),
+            );
+            assert_eq!(resultat, Err(ErreurParametrage::EntreeReferentielInvalide));
+        }
+    }
+
+    #[test]
+    fn supprimer_regle_authentification_retire_lentree_et_consigne_le_journal()
+    -> Result<(), ErreurParametrage> {
+        let mut racine = racine_de_test();
+        let nombre_par_defaut = racine.referentiels.regles_authentification.len();
+
+        supprimer_regle_authentification(
+            &mut racine,
+            crate::modele::racine::REGLES_AUTHENTIFICATION_PAR_DEFAUT[0].0,
+            "2026-11-18T10:00:00Z".to_string(),
+        )?;
+
+        assert_eq!(
+            racine.referentiels.regles_authentification.len(),
+            nombre_par_defaut - 1
+        );
+        assert_eq!(
+            racine.journal[0].objet,
+            format!(
+                "referentiels.reglesAuthentification/{}",
+                crate::modele::racine::REGLES_AUTHENTIFICATION_PAR_DEFAUT[0].0
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn supprimer_regle_authentification_introuvable_est_rejetee() {
+        let mut racine = racine_de_test();
+
+        let resultat = supprimer_regle_authentification(
+            &mut racine,
+            "inexistante",
+            "2026-11-18T09:00:00Z".to_string(),
         );
 
         assert_eq!(

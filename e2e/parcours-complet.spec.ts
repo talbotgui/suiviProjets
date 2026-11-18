@@ -28,6 +28,7 @@ import {
   PROJET_B1,
   PROJET_B2,
   REGLAGE_CONCURRENCE_AUDIT,
+  REGLE_AUTHENTIFICATION,
   REGLE_DEPENDANCE,
   SEUIL_VITALITE_MORT_JOURS,
   SOURCES,
@@ -373,7 +374,8 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#reglages-applicatifs-champ-concurrence')).toBeHidden();
   });
 
-  // 10. Paramétrage > Seuils et référentiels — un seuil, une règle de dépendance, un marqueur IA.
+  // 10. Paramétrage > Seuils et référentiels — un seuil, une règle de dépendance, un marqueur IA, une règle de
+  // détection d'authentification (US-067).
   await test.step('10. Paramétrage > Seuils et référentiels', async () => {
     await avantChangementEcran(page, '10-parametrage-seuils-referentiels');
 
@@ -407,6 +409,21 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('#referentiels-parametrage-liste-marqueurs-ia')).toContainText(
       MARQUEUR_IA.motif,
     );
+
+    // US-067 : règle de détection d'authentification (les règles par défaut sont déjà présentes).
+    const listeAuthentification = page.locator('#referentiels-parametrage-liste-authentification');
+    await expect(listeAuthentification).toContainText('spring-boot-starter-oauth2-client');
+    await page.locator('#referentiels-parametrage-bouton-ajouter-authentification').click();
+    await page
+      .locator('#referentiels-parametrage-champ-mode-authentification')
+      .selectOption({ label: REGLE_AUTHENTIFICATION.mode });
+    await page
+      .locator('#referentiels-parametrage-champ-motif-authentification')
+      .fill(REGLE_AUTHENTIFICATION.motif);
+    await page.locator('#referentiels-parametrage-bouton-enregistrer-authentification').click();
+    await confirmerMotDePasse();
+    // Les notifications de succès de cette étape s'empilent : le retour visuel vérifié est l'ajout à la liste.
+    await expect(listeAuthentification).toContainText(REGLE_AUTHENTIFICATION.motif);
   });
 
   // 11. Sauvegarde du fichier (bouton barre supérieure).
@@ -523,6 +540,15 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
       await sectionsDependances.filter({ hasText: REGLE_DEPENDANCE.motif }).count(),
     ).toBeGreaterThan(0);
     expect(await sectionsDependances.filter({ hasText: 'obsolète' }).count()).toBeGreaterThan(0);
+
+    // US-067 : ligne « Authentification » de la section Dépendances, deux modes détectés sur la dépendance de repli
+    // du bouchon (OIDC par la règle par défaut, CAS par la règle ajoutée à l'étape 10), dans l'ordre fixe.
+    const ligneAuthentification = page.locator('#fiche-projet-authentification');
+    await expect(ligneAuthentification).toBeAttached();
+    await expect(ligneAuthentification.locator('app-icone-authentification img')).toHaveCount(2);
+    await expect(
+      ligneAuthentification.locator('app-icone-authentification img').first(),
+    ).toHaveAttribute('alt', 'Authentification OIDC');
 
     // US-057 : ligne « Langages principaux » au-dessus des dépendances, au moins une icône de langage
     // (le bouchon Sonar de repli fournit une ventilation `ncloc_language_distribution` à deux langages).
@@ -667,6 +693,11 @@ test('parcours complet — tous les écrans de l’application', async ({ page }
     await expect(page.locator('.obsolescence__legende')).toContainText('exec');
     const premiereTuile = page.locator('.obsolescence__tuile').first();
     await expect(premiereTuile).toBeVisible();
+
+    // US-067 : chaque tuile auditée porte une zone d'icônes d'authentification (OIDC et CAS sur le bouchon).
+    await expect(
+      page.locator('.obsolescence__tuile .obsolescence__authentification img').first(),
+    ).toHaveAttribute('alt', 'Authentification OIDC');
 
     // US-057 : au moins une tuile porte une zone d'icônes de langage en fin de ligne du nom de projet.
     await expect(

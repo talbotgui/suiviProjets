@@ -94,6 +94,17 @@ export const MEMBRE_COMMITS_SILENCIEUX = {
   statut: 'interne',
 };
 
+/**
+ * Règle de détection d'authentification ajoutée à l'étape 10 (US-067) : rattache la dépendance de repli du bouchon au
+ * mode CAS, en plus du mode OIDC déjà détecté par la règle par défaut `spring-boot-starter-oauth2-client`.
+ */
+export const REGLE_AUTHENTIFICATION = {
+  mode: 'CAS',
+  // Motif glob (et non la référence exacte) : exerce la correspondance par motif et reste distinct, au texte près,
+  // du motif de `REGLE_DEPENDANCE`, recherché par son libellé dans la liste du paramétrage à l'étape 25.
+  motif: 'org.exemple:*',
+};
+
 export const REGLE_DEPENDANCE = {
   motif: 'org.exemple:lib-e2e',
   versionsInitiales: '1.0.*=obsolete',

@@ -110,6 +110,7 @@ class DonneesDeTest {
         ],
         reglesMarqueursIA: [],
         motifNommageBranches: '^(main|develop)$',
+        reglesAuthentification: [],
         categoriesDependances: [],
       },
       parametres: {

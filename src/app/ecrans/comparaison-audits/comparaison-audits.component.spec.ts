@@ -265,6 +265,7 @@ class DonneesDeTest {
         ],
         reglesMarqueursIA: [],
         motifNommageBranches: '',
+        reglesAuthentification: [],
         categoriesDependances: [],
       },
       parametres: {

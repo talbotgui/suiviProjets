@@ -37,6 +37,7 @@ class DonneesDeTest {
         reglesDependances: [],
         reglesMarqueursIA: [],
         motifNommageBranches: '^(main)$',
+        reglesAuthentification: [],
         categoriesDependances: [],
       },
       parametres: {

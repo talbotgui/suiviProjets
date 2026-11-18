@@ -51,6 +51,7 @@ class DonneesDeTest {
         reglesDependances: [],
         reglesMarqueursIA: [],
         motifNommageBranches: '',
+        reglesAuthentification: [],
         categoriesDependances: [],
       },
       parametres: {
@@ -942,6 +943,34 @@ describe('DonneesApplicationService', () => {
       });
       expect(resultat).toEqual({ type: 'succes' });
       expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('invoque supprimer_regle_authentification avec les paramètres attendus et met à jour la racine (US-067, RG-035)', async () => {
+      const racineAvantAppel = DonneesDeTest.racineActuelle(service);
+      const racineMiseAJour: DonneesRacine = { ...racineAvantAppel, versionSchema: 5 };
+      invokeSimule.mockResolvedValue(racineMiseAJour);
+
+      const resultat = await service.supprimerRegleAuthentification('a1', 'mot-de-passe');
+
+      expect(invokeSimule).toHaveBeenCalledWith('supprimer_regle_authentification', {
+        chemin: '/tmp/donnees-test.sqm',
+        donnees: racineAvantAppel,
+        id: 'a1',
+        motDePasse: 'mot-de-passe',
+      });
+      expect(resultat).toEqual({ type: 'succes' });
+      expect(service.racine()).toBe(racineMiseAJour);
+    });
+
+    it('convertit un rejet de supprimer_regle_authentification en Résultat « echec »', async () => {
+      invokeSimule.mockRejectedValue({ type: 'entreeReferentielIntrouvable' });
+
+      const resultat = await service.supprimerRegleAuthentification('inconnu', 'mot-de-passe');
+
+      expect(resultat).toEqual({
+        type: 'echec',
+        anomalie: { type: 'entreeReferentielIntrouvable' },
+      });
     });
 
     it('convertit un rejet typé « entreeReferentielIntrouvable » en Résultat « echec »', async () => {

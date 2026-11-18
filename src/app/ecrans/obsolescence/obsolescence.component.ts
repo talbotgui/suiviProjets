@@ -30,6 +30,11 @@
 //
 // Toutes les données par tuile (mesures, infobulle) et la table des couleurs sont précalculées dans des `computed`
 // (N9, relecture) : aucune méthode en O(n) n'est appelée depuis le gabarit dans une boucle de rendu.
+//
+// Évolution plan_22 (US-067, RG-067) : chaque tuile restitue en icônes réduites, avant les langages principaux, le
+// ou les modes d'authentification détectés à partir des dépendances de l'audit retenu
+// (`ModeAuthentificationUtils.detecter`, règles `referentiels.reglesAuthentification`), ou la mention neutre
+// « aucune authentification détectée » ; rien sans constat `gitlab.dependances`.
 import {
   Component,
   ElementRef,
@@ -48,6 +53,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toPng } from 'html-to-image';
 import { SqmBarreMesureComponent } from '../../composants/barre-mesure/barre-mesure.component';
 import { SqmIconeLangageComponent } from '../../composants/icone-langage/icone-langage.component';
+import { SqmIconeAuthentificationComponent } from '../../composants/icone-authentification/icone-authentification.component';
 import { SqmSelecteurVueComponent } from '../../composants/selecteur-vue/selecteur-vue.component';
 import type {
   DemandeEnregistrementVue,
@@ -76,6 +82,10 @@ import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.
 import { LangagesPrincipauxUtils } from '../../services/sansetat/jugement/langages-principaux.utils';
 import type { LangagePrincipal } from '../../services/sansetat/jugement/langages-principaux.utils';
 import {
+  ModeAuthentificationUtils,
+  type DetectionAuthentification,
+} from '../../services/sansetat/jugement/mode-authentification.utils';
+import {
   ObsolescenceRetardUtils,
   type ObsolescenceCategorie,
 } from '../../services/sansetat/jugement/obsolescence-retard.utils';
@@ -83,6 +93,7 @@ import { ObsolescenceTopUtils } from '../../services/sansetat/jugement/obsolesce
 import {
   ParametresJugementUtils,
   type CategorieDependance,
+  type RegleAuthentification,
   type RegleDependance,
 } from '../../services/sansetat/jugement/parametres-jugement.utils';
 import { StatutObsolescenceUtils } from '../../services/sansetat/jugement/statut-obsolescence.utils';
@@ -152,6 +163,11 @@ interface LigneObsolescence {
    * de l'audit retenu. Liste vide si la ventilation par langage est indisponible.
    */
   readonly langagesPrincipaux: readonly LangagePrincipal[];
+  /**
+   * Mode(s) d'authentification détecté(s) à partir des dépendances de l'audit retenu (RG-067), `undefined` si
+   * aucun constat `gitlab.dependances` n'est disponible.
+   */
+  readonly modeAuthentification: DetectionAuthentification | undefined;
   /** Texte de l'infobulle native de la tuile, précalculé. */
   readonly infobulle: string;
 }
@@ -174,6 +190,8 @@ interface TuileObsolescence {
   readonly enStase: boolean;
   /** Langages principaux du projet (RG-057), recopiés de la ligne source pour l'affichage en icônes sur la tuile. */
   readonly langagesPrincipaux: readonly LangagePrincipal[];
+  /** Mode(s) d'authentification détecté(s) (RG-067), recopié(s) de la ligne source. */
+  readonly modeAuthentification: DetectionAuthentification | undefined;
   readonly mesures: readonly MesureCategorie[];
 }
 
@@ -211,6 +229,7 @@ interface DetailProjet {
   imports: [
     SqmBarreMesureComponent,
     SqmIconeLangageComponent,
+    SqmIconeAuthentificationComponent,
     SqmSelecteurVueComponent,
     SqmFiltreGroupeProjetComponent,
     RouterLink,
@@ -427,6 +446,16 @@ export class SqmObsolescenceComponent {
     return lecture.type === 'valeur' ? lecture.valeur : [];
   });
 
+  /** Règles de détection du mode d'authentification courantes (RG-067), lues une seule fois par cycle. */
+  private readonly reglesAuthentification: Signal<readonly RegleAuthentification[]> = computed(
+    () => {
+      const lecture = ParametresJugementUtils.lireReglesAuthentification(
+        this.donneesApplication.racine()?.referentiels,
+      );
+      return lecture.type === 'valeur' ? lecture.valeur : [];
+    },
+  );
+
   /** Retard d'obsolescence de chaque projet (tous groupes), pour la date de filtre courante. */
   private readonly lignesTousProjets: Signal<readonly LigneObsolescence[]> = computed(() => {
     const racine = this.donneesApplication.racine();
@@ -434,6 +463,7 @@ export class SqmObsolescenceComponent {
       return [];
     }
     const regles = this.regles();
+    const reglesAuthentification = this.reglesAuthentification();
     const categories = this.categories();
     const dateLimite = this.filtreDate();
 
@@ -441,14 +471,22 @@ export class SqmObsolescenceComponent {
     for (const groupe of racine.groupes) {
       for (const projet of groupe.projets) {
         const audit = SqmObsolescenceComponent.auditRetenu(projet.audits, dateLimite);
-        const obsolescence: readonly ObsolescenceCategorie[] =
+        const themes =
           audit === undefined
+            ? undefined
+            : AgregationThemeFicheProjetUtils.regrouper(audit.resultats);
+        const obsolescence: readonly ObsolescenceCategorie[] =
+          themes === undefined
             ? []
             : ObsolescenceRetardUtils.calculerObsolescenceParCategorie(
-                AgregationThemeFicheProjetUtils.regrouper(audit.resultats).dependances,
+                themes.dependances,
                 regles,
                 categories,
               );
+        const modeAuthentification =
+          themes?.dependancesDisponibles === true
+            ? ModeAuthentificationUtils.detecter(themes.dependances, reglesAuthentification)
+            : undefined;
         const valeurParCategorie = new Map(
           obsolescence.map((entree) => [entree.categorieId, entree.valeur]),
         );
@@ -466,6 +504,7 @@ export class SqmObsolescenceComponent {
           audit,
           valeurParCategorie,
           langagesPrincipaux,
+          modeAuthentification,
           enStase: projet.enStase,
           infobulle: SqmObsolescenceComponent.construireInfobulle(
             projet.nom,
@@ -473,6 +512,7 @@ export class SqmObsolescenceComponent {
             categories,
             valeurParCategorie,
             langagesPrincipaux,
+            modeAuthentification,
             projet.enStase,
           ),
         });
@@ -519,6 +559,7 @@ export class SqmObsolescenceComponent {
    * @param categories - Catégories du référentiel.
    * @param valeurParCategorie - Retard par identifiant de catégorie.
    * @param langagesPrincipaux - Langages principaux du projet (RG-057), ligne ajoutée si la liste est non vide.
+   * @param modeAuthentification - Mode(s) d'authentification détecté(s) (RG-067), ligne ajoutée si défini.
    * @param enStase - Qualification « en stase » du projet (US-064, RG-064), ligne ajoutée si vrai.
    * @returns Le texte de l'infobulle.
    */
@@ -528,6 +569,7 @@ export class SqmObsolescenceComponent {
     categories: readonly CategorieDependance[],
     valeurParCategorie: ReadonlyMap<string, number>,
     langagesPrincipaux: readonly LangagePrincipal[],
+    modeAuthentification: DetectionAuthentification | undefined,
     enStase: boolean,
   ): string {
     const details = categories.map((categorie) => {
@@ -542,10 +584,22 @@ export class SqmObsolescenceComponent {
       langagesPrincipaux.length === 0
         ? []
         : [`Langages : ${langagesPrincipaux.map((langage) => langage.cleSonar).join(', ')}`];
+    const ligneAuthentification: readonly string[] =
+      modeAuthentification === undefined
+        ? []
+        : modeAuthentification.type === 'detecte'
+          ? [
+              `Authentification : ${modeAuthentification.modes.map((detecte) => detecte.mode).join(', ')}`,
+            ]
+          : ['Authentification : aucune détectée'];
     const ligneEnStase = enStase ? ['Projet en stase'] : [];
-    return [`${nomProjet} (${nomGroupe})`, ...details, ...ligneLangages, ...ligneEnStase].join(
-      '\n',
-    );
+    return [
+      `${nomProjet} (${nomGroupe})`,
+      ...details,
+      ...ligneLangages,
+      ...ligneAuthentification,
+      ...ligneEnStase,
+    ].join('\n');
   }
 
   /**
@@ -636,6 +690,7 @@ export class SqmObsolescenceComponent {
       nomProjet: ligne.nomProjet,
       infobulle: ligne.infobulle,
       langagesPrincipaux: ligne.langagesPrincipaux,
+      modeAuthentification: ligne.modeAuthentification,
       enStase: ligne.enStase,
       mesures: categories.map((categorie) => ({
         categorieId: categorie.id,

@@ -1,0 +1,21 @@
+<!-- Pictogramme de mode d'authentification servi localement (`<img src>` vers un SVG de public/authentification/),
+     jamais d'injection HTML dynamique ([innerHTML]) : libellé et références de dépendances sont portés par les
+     attributs alt/title échappés nativement par Angular (RG-067, .claude/rules/10-normes-securite.md). -->
+@if (source(); as src) {
+  <img
+    class="icone-authentification"
+    [class.icone-authentification--sm]="taille() === 'sm'"
+    [src]="src"
+    [alt]="libelle()"
+    [attr.title]="infobulle()"
+    (error)="onErreurImage()"
+  />
+} @else {
+  <span
+    class="icone-authentification icone-authentification--repli"
+    [class.icone-authentification--sm]="taille() === 'sm'"
+    [attr.title]="infobulle()"
+    [attr.aria-label]="libelle()"
+    >{{ entree().repli }}</span
+  >
+}

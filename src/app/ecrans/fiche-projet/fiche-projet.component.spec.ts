@@ -288,6 +288,7 @@ class DonneesDeTest {
         ],
         reglesMarqueursIA: [],
         motifNommageBranches: '',
+        reglesAuthentification: [],
         categoriesDependances: [],
       },
       parametres: {
@@ -1385,6 +1386,92 @@ describe('SqmFicheProjetComponent', () => {
           element.querySelectorAll<HTMLDetailsElement>('.fiche-projet__section-dependances'),
         ).map((section) => section.open),
       ).toEqual([false, false]);
+    });
+  });
+
+  describe('mode d’authentification (US-067, RG-067)', () => {
+    /**
+     * Retrouve la ligne « Authentification ».
+     * @param element - Élément natif de la fixture rendue.
+     * @returns L'élément `<p>` de la ligne, ou `null` s'il est absent.
+     */
+    function ligneAuthentification(element: HTMLElement): HTMLElement | null {
+      return element.querySelector<HTMLElement>('#fiche-projet-authentification');
+    }
+
+    /**
+     * Construit une racine de test portant les règles de détection fournies.
+     * @param projet - Projet de test.
+     * @param reglesAuthentification - Règles `referentiels.reglesAuthentification`.
+     * @returns La racine de test.
+     */
+    function racineAvecRegles(
+      projet: Projet,
+      reglesAuthentification: DonneesRacine['referentiels']['reglesAuthentification'],
+    ): DonneesRacine {
+      const racine = DonneesDeTest.racine(projet);
+      return { ...racine, referentiels: { ...racine.referentiels, reglesAuthentification } };
+    }
+
+    it('affiche une icône par mode détecté, dans l’ordre OIDC puis CAS', () => {
+      const projet = DonneesDeTest.projet('projet-1', [
+        auditAvecDependances([
+          {
+            reference: 'org.jasig.cas.client:cas-client-core',
+            version: '3.6.4',
+            manifeste: 'pom.xml',
+          },
+          { reference: 'keycloak-js', version: '24.0.0', manifeste: 'package.json' },
+        ]),
+      ]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture(
+          'projet-1',
+          racineAvecRegles(projet, [
+            { id: 'a1', mode: 'CAS', motif: 'org.jasig.cas.client:*' },
+            { id: 'a2', mode: 'OIDC', motif: 'keycloak-js' },
+          ]),
+        ),
+      );
+
+      const icones = ligneAuthentification(element)?.querySelectorAll(
+        'app-icone-authentification img',
+      );
+      expect(Array.from(icones ?? []).map((icone) => icone.getAttribute('alt'))).toEqual([
+        'Authentification OIDC',
+        'Authentification CAS',
+      ]);
+      expect(icones?.[1]?.getAttribute('title')).toBe(
+        'Authentification CAS détectée via : org.jasig.cas.client:cas-client-core',
+      );
+    });
+
+    it('affiche la mention neutre quand aucune règle ne correspond', () => {
+      const projet = DonneesDeTest.projet('projet-1', [DonneesDeTest.auditComplet({})]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture(
+          'projet-1',
+          racineAvecRegles(projet, [{ id: 'a1', mode: 'SAML', motif: 'org.opensaml:*' }]),
+        ),
+      );
+
+      expect(ligneAuthentification(element)?.textContent).toContain(
+        'Aucune authentification détectée',
+      );
+    });
+
+    it('n’affiche pas la ligne sans constat gitlab.dependances', () => {
+      const audit = DonneesDeTest.auditComplet({});
+      const auditSansDependances: Audit = {
+        ...audit,
+        resultats: audit.resultats.filter((resultat) => resultat.type !== 'gitlab.dependances'),
+      };
+      const projet = DonneesDeTest.projet('projet-1', [auditSansDependances]);
+      const element = DomTestUtils.obtenirElementNatif(
+        creerFixture('projet-1', DonneesDeTest.racine(projet)),
+      );
+
+      expect(ligneAuthentification(element)).toBeNull();
     });
   });
 

@@ -57,7 +57,10 @@ import type {
   ResultatCroiseFraicheurSonar,
   ResultatCroiseIaNouveauCode,
 } from '../campagne/connecteur-croise.utils';
-import type { RegleDependance } from '../../sansetat/jugement/parametres-jugement.utils';
+import type {
+  RegleAuthentification,
+  RegleDependance,
+} from '../../sansetat/jugement/parametres-jugement.utils';
 
 /**
  * Résultat typé d'un audit, mirroir de `Resultat` côté cœur natif : union discriminée sur `type` (16 variantes du
@@ -122,6 +125,15 @@ export interface EntreeCategorieDependance {
 }
 
 /**
+ * Règle de détection du mode d'authentification persistée (`referentiels.reglesAuthentification[]`, US-067),
+ * `RegleAuthentification` du Moteur de jugement complétée de l'identifiant stable requis par `definirReferentiel`.
+ */
+export interface EntreeRegleAuthentification extends RegleAuthentification {
+  /** Identifiant UUID v4 de la règle, stable d'une édition à l'autre. */
+  readonly id: string;
+}
+
+/**
  * Grilles de lecture partageables (référentiels), mirroir strict de `Referentiels` côté cœur natif.
  */
 export interface Referentiels {
@@ -140,6 +152,11 @@ export interface Referentiels {
    * (cf. `CATEGORIES_DEPENDANCES_PAR_DEFAUT` côté cœur natif).
    */
   readonly categoriesDependances: readonly EntreeCategorieDependance[];
+  /**
+   * Règles de détection du mode d'authentification (US-067, RG-067), amorcées par défaut (cf.
+   * `REGLES_AUTHENTIFICATION_PAR_DEFAUT` côté cœur natif).
+   */
+  readonly reglesAuthentification: readonly EntreeRegleAuthentification[];
 }
 
 /**

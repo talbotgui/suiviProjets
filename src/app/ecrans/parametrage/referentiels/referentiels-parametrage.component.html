@@ -542,6 +542,150 @@
     </ul>
   </section>
 
+  <!-- Règles de détection du mode d'authentification (US-067, RG-067, plan_22) : CRUD sur le modèle des règles de
+       marqueurs IA ; appliquées à l'affichage aux dépendances déjà collectées, donc rétroactivement. -->
+  <section class="referentiels-parametrage__bloc carte interieur-4 exterieur-haut-5">
+    <header
+      class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"
+    >
+      <h3 class="texte-md poids-gras exterieur-bas-0 exterieur-haut-0">
+        Règles de détection de l'authentification
+      </h3>
+      <button
+        id="referentiels-parametrage-bouton-ajouter-authentification"
+        type="button"
+        class="bouton"
+        [disabled]="enCours()"
+        (click)="ouvrirCreationAuthentification()"
+      >
+        Ajouter une règle
+      </button>
+    </header>
+    <p class="texte-discret texte-sm exterieur-bas-3">
+      Chaque règle associe un motif de dépendance à un mode d'authentification (OIDC, SAML, CAS).
+      Les règles s'appliquent immédiatement à tous les audits, y compris ceux déjà intégrés : seules
+      les dépendances déclarées dans les manifestes du dépôt sont examinées.
+    </p>
+
+    @if (formulaireAuthentificationVisible()) {
+      <form
+        class="referentiels-parametrage__formulaire d-flex direction-colonne ecart-3 exterieur-haut-4"
+        (ngSubmit)="demanderEnregistrementAuthentification()"
+      >
+        <h4 class="texte-sm poids-gras exterieur-bas-0 exterieur-haut-0">
+          {{ authentificationEnEditionId ? 'Modifier la règle' : 'Créer une règle' }}
+        </h4>
+        <label class="champ">
+          Mode d'authentification
+          <select
+            #premierChampAuthentification
+            id="referentiels-parametrage-champ-mode-authentification"
+            class="champ__controle"
+            name="modeAuthentification"
+            [(ngModel)]="modeAuthentification"
+          >
+            @for (mode of modesAuthentification; track mode) {
+              <option [ngValue]="mode">{{ mode }}</option>
+            }
+          </select>
+        </label>
+        <label class="champ">
+          Motif de dépendance
+          <input
+            id="referentiels-parametrage-champ-motif-authentification"
+            type="text"
+            class="champ__controle"
+            name="motifAuthentification"
+            [(ngModel)]="motifAuthentification"
+            required
+            aria-describedby="referentiels-parametrage-champ-motif-authentification-aide"
+          />
+          <span id="referentiels-parametrage-champ-motif-authentification-aide" class="champ__aide">
+            Glob simple sur la référence de la dépendance (seul
+            <code class="police-mono">*</code> est spécial) :
+            <code class="police-mono">groupId:artifactId</code> pour Maven/Gradle, nom du paquet
+            pour npm. Ex. <code class="police-mono">org.keycloak:*</code>,
+            <code class="police-mono">keycloak-js</code>.
+          </span>
+        </label>
+        <div class="referentiels-parametrage__actions-formulaire d-flex justifie-fin ecart-2">
+          <button
+            id="referentiels-parametrage-bouton-annuler-authentification"
+            type="button"
+            class="bouton"
+            (click)="fermerFormulaireAuthentification()"
+          >
+            Annuler
+          </button>
+          <button
+            id="referentiels-parametrage-bouton-enregistrer-authentification"
+            type="submit"
+            class="bouton bouton--principal"
+            [disabled]="enCours()"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </form>
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'authentification') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour enregistrer cette règle de détection d'authentification."
+        (confirmee)="confirmerEnregistrementAuthentification($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    @if (suppressionEnAttente()?.type === 'authentification') {
+      <app-confirmation-suppression
+        message="Cette règle de détection d'authentification sera supprimée définitivement du référentiel."
+        (confirmee)="confirmerSuppression()"
+        (annulee)="annulerSuppression()"
+      />
+    }
+
+    @if (actionEnAttenteMotDePasse() === 'suppressionAuthentification') {
+      <app-confirmation-mot-de-passe
+        message="Ressaisissez le mot de passe du fichier pour supprimer cette règle de détection d'authentification."
+        (confirmee)="confirmerSuppressionMotDePasse($event)"
+        (annulee)="annulerMotDePasse()"
+      />
+    }
+
+    <ul
+      id="referentiels-parametrage-liste-authentification"
+      class="referentiels-parametrage__liste sans-liste d-flex direction-colonne ecart-2"
+    >
+      @for (regle of reglesAuthentification(); track regle.id) {
+        <li class="referentiels-parametrage__ligne d-flex retour-ligne aligne-centre ecart-4">
+          <span class="poids-demi-gras">{{ regle.mode }}</span>
+          <span class="police-mono texte-sm">{{ regle.motif }}</span>
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours()"
+            (click)="ouvrirEditionAuthentification(regle.id)"
+          >
+            Modifier
+          </button>
+          <button
+            type="button"
+            class="bouton bouton--discret"
+            [disabled]="enCours()"
+            (click)="demanderSuppressionAuthentification(regle.id)"
+          >
+            Supprimer
+          </button>
+        </li>
+      } @empty {
+        <li class="referentiels-parametrage__vide texte-discret">
+          Aucune règle de détection d'authentification n'est encore définie.
+        </li>
+      }
+    </ul>
+  </section>
+
   <section class="referentiels-parametrage__bloc carte interieur-4 exterieur-haut-5">
     <header
       class="referentiels-parametrage__entete d-flex retour-ligne aligne-centre justifie-espace ecart-2 exterieur-bas-3"

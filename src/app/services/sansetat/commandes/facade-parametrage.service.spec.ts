@@ -146,6 +146,25 @@ describe('FacadeParametrageService', () => {
     expect(resultat).toEqual({ versionSchema: 2 });
   });
 
+  it('invoque supprimer_regle_authentification avec les paramètres fournis et renvoie la racine native', async () => {
+    invokeSimule.mockResolvedValue({ versionSchema: 2 });
+
+    const resultat = await service.supprimerRegleAuthentification({
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      id: 'a1',
+      motDePasse: 'mot-de-passe',
+    });
+
+    expect(invokeSimule).toHaveBeenCalledWith('supprimer_regle_authentification', {
+      chemin: '/tmp/donnees-test.sqm',
+      donnees: { versionSchema: 1 },
+      id: 'a1',
+      motDePasse: 'mot-de-passe',
+    });
+    expect(resultat).toEqual({ versionSchema: 2 });
+  });
+
   it('invoque supprimer_regle_marqueur_ia avec les paramètres fournis et renvoie la racine native', async () => {
     invokeSimule.mockResolvedValue({ versionSchema: 2 });
 

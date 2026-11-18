@@ -14,6 +14,10 @@
 // générique paramétrée par type, sur le modèle à deux étapes (confirmation puis mot de passe) déjà utilisé par
 // `SqmMembresConnusAdminComponent` pour une action irréversible.
 //
+// Évolution plan_22 (US-067, RG-067) : CRUD des règles de détection du mode d'authentification
+// (`referentiels.reglesAuthentification`, mode OIDC/SAML/CAS + motif glob sur la référence d'une dépendance), sur le
+// modèle des règles de marqueurs IA ; suppression via la commande dédiée `supprimerRegleAuthentification`.
+//
 // Décisions arbitraires (à valider par un humain, cf. rapport de développement de cet incrément) :
 // - L'identifiant d'une nouvelle règle est généré côté interface (`crypto.randomUUID()`, réutilisé tel quel du
 //   Store, cf. `DonneesApplicationService`), le cœur natif ne générant jamais lui-même cet identifiant pour
@@ -68,12 +72,17 @@ import { DonneesApplicationService } from '../../../services/avecetat/etat/donne
 import { NotificationService } from '../../../services/avecetat/etat/notification.service';
 import type {
   EntreeCategorieDependance,
+  EntreeRegleAuthentification,
   EntreeReglesDependances,
   EntreeReglesMarqueursIA,
   ErreurAdministration,
   ResultatMutationAdministration,
 } from '../../../services/avecetat/etat/types-donnees';
-import type { VersionDependance } from '../../../services/sansetat/jugement/parametres-jugement.utils';
+import {
+  ParametresJugementUtils,
+  type ModeAuthentification,
+  type VersionDependance,
+} from '../../../services/sansetat/jugement/parametres-jugement.utils';
 import { ObsolescenceRetardUtils } from '../../../services/sansetat/jugement/obsolescence-retard.utils';
 import { StatutObsolescenceUtils } from '../../../services/sansetat/jugement/statut-obsolescence.utils';
 import { TriAlphabetiqueUtils } from '../../../services/sansetat/jugement/tri-alphabetique.utils';
@@ -92,6 +101,8 @@ type ActionReferentielEnAttente =
   | 'suppressionDependance'
   | 'suppressionMarqueurIA'
   | 'suppressionCategorieDependance'
+  | 'authentification'
+  | 'suppressionAuthentification'
   | null;
 
 /**
@@ -99,7 +110,7 @@ type ActionReferentielEnAttente =
  * aucune (US-033, US-048, RG-035, Phase 10 incrément 8).
  */
 interface SuppressionEnAttente {
-  readonly type: 'dependance' | 'marqueurIA' | 'categorieDependance';
+  readonly type: 'dependance' | 'marqueurIA' | 'categorieDependance' | 'authentification';
   readonly id: string;
 }
 
@@ -134,6 +145,13 @@ export class SqmReferentielsParametrageComponent {
     viewChild<ElementRef<HTMLInputElement>>('premierChampMarqueurIa');
 
   /**
+   * Premier champ du formulaire de règle de détection du mode d'authentification (US-067, cf.
+   * {@link ouvrirCreationAuthentification}).
+   */
+  private readonly premierChampAuthentification: Signal<ElementRef<HTMLSelectElement> | undefined> =
+    viewChild<ElementRef<HTMLSelectElement>>('premierChampAuthentification');
+
+  /**
    * Premier champ du formulaire du motif de nommage des branches (cf. {@link ouvrirEditionMotifNommage}, C15-02).
    */
   private readonly premierChampMotifNommage: Signal<ElementRef<HTMLInputElement> | undefined> =
@@ -152,7 +170,7 @@ export class SqmReferentielsParametrageComponent {
    * `afterNextRender` diffère l'appel après le rendu réel du DOM (cf. `exemple-reference.component.ts`).
    * @param champ - Référence du champ à focaliser, résolue par `viewChild()`.
    */
-  private focusApresRendu(champ: Signal<ElementRef<HTMLInputElement> | undefined>): void {
+  private focusApresRendu(champ: Signal<ElementRef<HTMLElement> | undefined>): void {
     afterNextRender(() => champ()?.nativeElement.focus(), { injector: this.injector });
   }
 
@@ -643,6 +661,129 @@ export class SqmReferentielsParametrageComponent {
     );
   }
 
+  // --- Règles de détection du mode d'authentification (US-067, RG-067) ---
+
+  /** Modes d'authentification proposés dans le formulaire, liste fermée dans l'ordre de restitution (RG-067). */
+  public readonly modesAuthentification: readonly ModeAuthentification[] =
+    ParametresJugementUtils.MODES_AUTHENTIFICATION;
+
+  /**
+   * Règles de détection du mode d'authentification actuellement chargées, triées par mode (ordre OIDC, SAML, CAS)
+   * puis par motif.
+   * @returns Le tableau trié des règles de la racine courante.
+   */
+  public reglesAuthentification(): readonly EntreeRegleAuthentification[] {
+    const ordre = ParametresJugementUtils.MODES_AUTHENTIFICATION;
+    return [...(this.donneesApplication.racine()?.referentiels.reglesAuthentification ?? [])].sort(
+      (a, b) =>
+        ordre.indexOf(a.mode) - ordre.indexOf(b.mode) ||
+        TriAlphabetiqueUtils.comparerTextes(a.motif, b.motif),
+    );
+  }
+
+  /** Visibilité du formulaire de règle de détection d'authentification. */
+  public readonly formulaireAuthentificationVisible: WritableSignal<boolean> = signal(false);
+
+  public authentificationEnEditionId: string | null = null;
+  public modeAuthentification: ModeAuthentification = 'OIDC';
+  public motifAuthentification = '';
+
+  /**
+   * Ouvre le formulaire pour la création d'une nouvelle règle de détection d'authentification.
+   */
+  public ouvrirCreationAuthentification(): void {
+    this.authentificationEnEditionId = null;
+    this.modeAuthentification = 'OIDC';
+    this.motifAuthentification = '';
+    this.messageErreur = null;
+    this.formulaireAuthentificationVisible.set(true);
+    this.focusApresRendu(this.premierChampAuthentification);
+  }
+
+  /**
+   * Ouvre le formulaire pré-rempli pour la modification d'une règle de détection d'authentification existante.
+   * @param id - Identifiant de la règle à modifier.
+   */
+  public ouvrirEditionAuthentification(id: string): void {
+    const regle = this.reglesAuthentification().find((candidate) => candidate.id === id);
+    if (!regle) {
+      return;
+    }
+    this.authentificationEnEditionId = regle.id;
+    this.modeAuthentification = regle.mode;
+    this.motifAuthentification = regle.motif;
+    this.messageErreur = null;
+    this.formulaireAuthentificationVisible.set(true);
+    this.focusApresRendu(this.premierChampAuthentification);
+  }
+
+  /**
+   * Referme le formulaire de règle de détection d'authentification sans enregistrer.
+   */
+  public fermerFormulaireAuthentification(): void {
+    this.formulaireAuthentificationVisible.set(false);
+  }
+
+  /**
+   * Valide le formulaire (motif non vide, mode dans la liste fermée) puis, si valide, ouvre la ressaisie du mot de
+   * passe (RG-002). Validation revérifiée côté cœur natif.
+   */
+  public demanderEnregistrementAuthentification(): void {
+    if (
+      this.motifAuthentification.trim().length === 0 ||
+      !this.modesAuthentification.includes(this.modeAuthentification)
+    ) {
+      this.messageErreur = 'Le mode et le motif sont obligatoires.';
+      return;
+    }
+    this.messageErreur = null;
+    this.actionEnAttenteMotDePasse.set('authentification');
+  }
+
+  /**
+   * Enregistre la règle de détection d'authentification après confirmation du mot de passe (US-067, RG-002,
+   * RG-023).
+   * @param motDePasse - Mot de passe du fichier ressaisi par l'utilisateur.
+   */
+  public async confirmerEnregistrementAuthentification(motDePasse: string): Promise<void> {
+    const authentificationEnEditionId = this.authentificationEnEditionId;
+    const entree: EntreeRegleAuthentification = {
+      id: authentificationEnEditionId ?? crypto.randomUUID(),
+      mode: this.modeAuthentification,
+      motif: this.motifAuthentification.trim(),
+    };
+
+    this.enCours.set(true);
+    const resultat = await this.donneesApplication.definirReferentiel(
+      'reglesAuthentification',
+      entree,
+      motDePasse,
+    );
+    this.enCours.set(false);
+    this.actionEnAttenteMotDePasse.set(null);
+
+    if (resultat.type === 'echec') {
+      this.notification.erreur(this.libelleAnomalie(resultat.anomalie));
+      return;
+    }
+    this.formulaireAuthentificationVisible.set(false);
+    this.notification.succes(
+      authentificationEnEditionId
+        ? 'La règle de détection d’authentification a été modifiée.'
+        : 'La règle de détection d’authentification a été ajoutée.',
+    );
+  }
+
+  /**
+   * Demande la suppression d'une règle de détection d'authentification : ouvre la confirmation de suppression
+   * (avant ressaisie du mot de passe).
+   * @param id - Identifiant de la règle à supprimer.
+   */
+  public demanderSuppressionAuthentification(id: string): void {
+    this.messageErreur = null;
+    this.suppressionEnAttente.set({ type: 'authentification', id });
+  }
+
   // --- Catégories de dépendance (US-048, RG-048) ---
 
   /**
@@ -920,6 +1061,9 @@ export class SqmReferentielsParametrageComponent {
       case 'categorieDependance':
         this.actionEnAttenteMotDePasse.set('suppressionCategorieDependance');
         break;
+      case 'authentification':
+        this.actionEnAttenteMotDePasse.set('suppressionAuthentification');
+        break;
     }
   }
 
@@ -945,6 +1089,9 @@ export class SqmReferentielsParametrageComponent {
         break;
       case 'categorieDependance':
         resultat = await this.donneesApplication.supprimerCategorieDependance(id, motDePasse);
+        break;
+      case 'authentification':
+        resultat = await this.donneesApplication.supprimerRegleAuthentification(id, motDePasse);
         break;
     }
     this.enCours.set(false);

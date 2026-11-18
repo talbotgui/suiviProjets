@@ -1,0 +1,37 @@
+// Résidu propre à ce composant (plan_22, RG-067), repris de `icone-langage.component.scss` : dimensionnement carré
+// sous-échelle (deux tailles `md`/`sm`) et mise en forme compacte de la puce de repli, non exprimables par les
+// classes utilitaires génériques de src/styles/_utilitaires.scss. Couleurs et fond repris des tokens neutres.
+.icone-authentification {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+  vertical-align: middle;
+  flex: none;
+}
+
+.icone-authentification--sm {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.icone-authentification--repli {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: auto;
+  padding: 0 0.15rem;
+  border-radius: var(--sqm-rayon-sm);
+  background-color: var(--sqm-neutre-150);
+  color: var(--sqm-neutre-900);
+  font-size: var(--sqm-texte-2xs);
+  font-weight: var(--sqm-poids-demi-gras);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+}
+
+.icone-authentification--repli.icone-authentification--sm {
+  font-size: 0.6rem;
+}

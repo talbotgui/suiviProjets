@@ -22,6 +22,11 @@
 // (`SqmIconeLangageComponent`) est insérée au-dessus de la section « Dépendances », alimentée par la ventilation
 // `sonar.ncloc.parLangage` du dernier audit régulier via `LangagesPrincipauxUtils.selectionner` ; elle est grisée
 // avec le bloc Sonar (`sonarKo`, RG-013) et absente quand la ventilation par langage est indisponible.
+//
+// Évolution plan_22 (US-067, RG-067) : une ligne « Authentification » en tête de la section « Dépendances »
+// restitue le ou les modes d'authentification détectés (`SqmIconeAuthentificationComponent`), calculés à l'affichage
+// par `ModeAuthentificationUtils.detecter` à partir des dépendances du dernier audit régulier et des règles
+// `referentiels.reglesAuthentification` ; absente quand aucun constat `gitlab.dependances` n'est disponible.
 import {
   Component,
   ElementRef,
@@ -48,6 +53,7 @@ import { SqmConfirmationMotDePasseComponent } from '../../composants/confirmatio
 import { SqmConfirmationSuppressionComponent } from '../../composants/confirmation-suppression/confirmation-suppression.component';
 import { SqmExplicationJugementComponent } from '../../composants/explication-jugement/explication-jugement.component';
 import { SqmIconeLangageComponent } from '../../composants/icone-langage/icone-langage.component';
+import { SqmIconeAuthentificationComponent } from '../../composants/icone-authentification/icone-authentification.component';
 import { SqmModaleSaisieMasseComponent } from '../../composants/modale-saisie-masse/modale-saisie-masse.component';
 import { SqmPastilleEnStaseComponent } from '../../composants/pastille-en-stase/pastille-en-stase.component';
 import type {
@@ -93,6 +99,10 @@ import { EcosystemeDependanceUtils } from '../../services/sansetat/jugement/ecos
 import type { EcosystemeDependance } from '../../services/sansetat/jugement/ecosysteme-dependance.utils';
 import { ExportImageUtils } from '../../services/sansetat/jugement/export-image.utils';
 import { LangagesPrincipauxUtils } from '../../services/sansetat/jugement/langages-principaux.utils';
+import {
+  ModeAuthentificationUtils,
+  type DetectionAuthentification,
+} from '../../services/sansetat/jugement/mode-authentification.utils';
 import type { LangagePrincipal } from '../../services/sansetat/jugement/langages-principaux.utils';
 import { LienExterneSourceUtils } from '../../services/sansetat/jugement/lien-externe-source.utils';
 import { NoteSonarUtils } from '../../services/sansetat/jugement/note-sonar.utils';
@@ -484,6 +494,11 @@ interface DonneesFicheProjet {
    * comme le bloc Sonar quand {@link sonarKo}.
    */
   readonly langagesPrincipaux: readonly LangagePrincipal[];
+  /**
+   * Mode(s) d'authentification détecté(s) à partir des dépendances du dernier audit régulier (RG-067), `undefined`
+   * si aucun constat `gitlab.dependances` n'est disponible (rien n'est alors affiché).
+   */
+  readonly modeAuthentification: DetectionAuthentification | undefined;
   /** Étiquette résumée des demandes de fusion ouvertes (nombre, conflits). */
   readonly mrResume: EtiquetteCouleur | undefined;
   /** Demandes de fusion ouvertes constatées, détaillées ligne par ligne. */
@@ -547,6 +562,7 @@ const LIBELLES_NIVEAU_ACCES: Readonly<Record<number, string>> = {
     SqmBoutonCopieComponent,
     SqmExplicationJugementComponent,
     SqmIconeLangageComponent,
+    SqmIconeAuthentificationComponent,
     SqmConfirmationMotDePasseComponent,
     SqmConfirmationSuppressionComponent,
     SqmModaleSaisieMasseComponent,
@@ -1087,6 +1103,10 @@ export class SqmFicheProjetComponent {
     const seuilsTailleDepot = ParametresJugementUtils.lireSeuilsTailleDepot(seuilsBruts);
     const seuilsMrOuvertes = ParametresJugementUtils.lireSeuilsMrOuvertes(seuilsBruts);
     const reglesDependances = ParametresJugementUtils.lireReglesDependances(referentielsBruts);
+    const lectureReglesAuthentification =
+      ParametresJugementUtils.lireReglesAuthentification(referentielsBruts);
+    const reglesAuthentification =
+      lectureReglesAuthentification.type === 'valeur' ? lectureReglesAuthentification.valeur : [];
 
     const resultatFraicheurSonar =
       dernierAudit === undefined
@@ -1199,6 +1219,9 @@ export class SqmFicheProjetComponent {
       dependances: lignesDependances,
       sectionsDependances: this.construireSectionsDependances(lignesDependances),
       langagesPrincipaux: LangagesPrincipauxUtils.selectionner(resultatNcloc?.parLangage ?? {}),
+      modeAuthentification: themes.dependancesDisponibles
+        ? ModeAuthentificationUtils.detecter(themes.dependances, reglesAuthentification)
+        : undefined,
       mrResume: this.construireResumeMr(mrOuvertesToutesSources, seuilsMrOuvertes, maintenant),
       mrOuvertes: mrOuvertesToutesSources.map((mr) => this.construireLigneMr(mr, maintenant)),
       membres,

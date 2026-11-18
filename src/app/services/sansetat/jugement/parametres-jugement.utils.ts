@@ -29,6 +29,9 @@
 // Ajout US-049 : `RegleDependance.categorie` (identifiant facultatif d'une catégorie du référentiel) et
 // `lireCategoriesDependances` complètent la lecture défensive de `referentiels` avec `categoriesDependances`
 // (US-048), consommé par l'écran Obsolescence et le calcul du retard par catégorie (RG-050, RG-051).
+//
+// Ajout US-067 : `lireReglesAuthentification` complète la lecture défensive de `referentiels` avec
+// `reglesAuthentification` (RG-067), consommé par `ModeAuthentificationUtils` (Fiche projet, écran Obsolescence).
 import type {
   NatureMarqueur,
   PorteeMarqueur,
@@ -498,6 +501,60 @@ export class ParametresJugementUtils {
   }
 
   /**
+   * Modes d'authentification reconnus, liste fermée dans l'ordre de restitution (RG-067). Miroir de
+   * `MODES_AUTHENTIFICATION` côté cœur natif (`src-tauri/src/modele/racine.rs`).
+   */
+  public static readonly MODES_AUTHENTIFICATION: readonly ModeAuthentification[] = [
+    'OIDC',
+    'SAML',
+    'CAS',
+  ];
+
+  /**
+   * Valide une entrée brute de `referentiels.reglesAuthentification` (US-067) : `motif` chaîne non vide, `mode`
+   * parmi {@link MODES_AUTHENTIFICATION}, recherché par `find` plutôt que par assertion de type.
+   * @param brut - Élément brut du tableau `reglesAuthentification`.
+   * @returns L'entrée validée, ou `undefined` si elle est malformée (entrée silencieusement écartée).
+   */
+  private static validerRegleAuthentification(brut: unknown): RegleAuthentification | undefined {
+    if (!ParametresJugementUtils.estEnregistrement(brut)) {
+      return undefined;
+    }
+    const { mode, motif } = brut;
+    const modeValide = ParametresJugementUtils.MODES_AUTHENTIFICATION.find(
+      (candidat) => candidat === mode,
+    );
+    if (modeValide === undefined || !ParametresJugementUtils.estChaineNonVide(motif)) {
+      return undefined;
+    }
+    return { mode: modeValide, motif };
+  }
+
+  /**
+   * Lit défensivement le référentiel des règles de détection du mode d'authentification
+   * (`referentiels.reglesAuthentification`, US-067, RG-067). Symétrique de {@link lireReglesMarqueursIA} : chaque
+   * entrée malformée est silencieusement écartée, un référentiel vide restitue une lecture `valeur` avec un tableau
+   * vide (pas `absent`).
+   * @param referentielsBruts - Valeur brute de `referentiels`, non garantie conforme à la forme attendue.
+   * @returns Le résultat de la lecture, `absent` uniquement si `reglesAuthentification` n'est pas un tableau.
+   */
+  public static lireReglesAuthentification(
+    referentielsBruts: unknown,
+  ): LectureDefensive<readonly RegleAuthentification[]> {
+    if (!ParametresJugementUtils.estEnregistrement(referentielsBruts)) {
+      return { type: 'absent' };
+    }
+    const brut = referentielsBruts['reglesAuthentification'];
+    if (!Array.isArray(brut)) {
+      return { type: 'absent' };
+    }
+    const regles = brut
+      .map((regle) => ParametresJugementUtils.validerRegleAuthentification(regle))
+      .filter((regle): regle is RegleAuthentification => regle !== undefined);
+    return { type: 'valeur', valeur: regles };
+  }
+
+  /**
    * Valide une entrée brute de `referentiels.categoriesDependances` (US-048) : `id` et `libelle` chaînes non
    * vides ; `sigle` tronqué aux trois premiers caractères s'il est plus long (le cœur natif et l'interface
    * plafonnent à trois, mais un fichier édité ou importé à la main pourrait déborder), repli sur les trois
@@ -716,4 +773,22 @@ export interface CategorieDependance {
   readonly libelle: string;
   /** Sigle de trois lettres au plus, colonne compacte de l'écran Obsolescence. */
   readonly sigle: string;
+}
+
+/**
+ * Mode d'authentification d'une application, liste fermée (US-067, RG-067).
+ */
+export type ModeAuthentification = 'OIDC' | 'SAML' | 'CAS';
+
+/**
+ * Règle de détection du mode d'authentification (`referentiels.reglesAuthentification[]`, US-067). Forme minimale
+ * redéclarée ici, comme {@link RegleDependance}, sans identifiant (seule la correspondance par motif compte pour le
+ * Moteur de jugement) ; `EntreeRegleAuthentification` de `services/avecetat/etat/types-donnees.ts` l'étend de
+ * l'identifiant stable nécessaire à l'édition.
+ */
+export interface RegleAuthentification {
+  /** Mode d'authentification signalé par la dépendance. */
+  readonly mode: ModeAuthentification;
+  /** Motif glob (cf. {@link ParametresJugementUtils.correspondMotifGlob}) appliqué à la référence de la dépendance. */
+  readonly motif: string;
 }

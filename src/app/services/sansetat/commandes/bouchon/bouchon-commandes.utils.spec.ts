@@ -107,9 +107,9 @@ describe('BouchonCommandesUtils', () => {
       readonly dependances: readonly unknown[];
     }>('interroger_dependances', { sourceId: SOURCE_ID_GITLAB_CONNU });
 
-    // 3 dépendances déclarées + la version de Java synthétique (US-050, ajoutée au jeu bouchon pour l'écran
-    // Obsolescence).
-    expect(resultat.dependances).toHaveLength(4);
+    // 4 dépendances déclarées (dont la bibliothèque d'authentification OIDC ajoutée pour US-067) + la version de
+    // Java synthétique (US-050, ajoutée au jeu bouchon pour l'écran Obsolescence).
+    expect(resultat.dependances).toHaveLength(5);
     expect(resultat.dependances).toContainEqual({
       reference: 'java',
       version: '21',

@@ -103,6 +103,7 @@ pub fn run() {
             commandes::parametrage::supprimer_regle_dependance,
             commandes::parametrage::supprimer_regle_marqueur_ia,
             commandes::parametrage::supprimer_categorie_dependance,
+            commandes::parametrage::supprimer_regle_authentification,
             commandes::parametrage::definir_verrouillage,
             commandes::parametrage::definir_concurrence_audit,
             commandes::parametrage::definir_proxy,

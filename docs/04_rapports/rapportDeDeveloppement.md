@@ -4349,3 +4349,48 @@ Relecture du code des incréments 2 à 8 contre les spécifications précises du
 **Point resté ouvert, non levé par ce développement** (§15 point 5 du plan, cf. Étape 43) : le prérequis de portée du jeton GitLab pour `GET /users?username=<exact>` reste à déterminer et documenter par un humain dans `15_normesSecurite.md`.
 
 **Validation humaine explicite de cette étape requise**, notamment sur les décisions arbitraires signalées (choix des trois profils du bouchon, conservation des constantes de pagination partagées) et sur le point resté ouvert.
+
+## Étape 45 — plan_22 : mode d'authentification d'un projet détecté par ses dépendances (US-067 / RG-067)
+
+Développement assisté par l'IA (Claude Code), sur validation explicite du plan par l'utilisateur (2026-11-18, « Je valide le plan. Tu peux développer »), interprétée comme autorisation d'enchaîner les trois incréments du plan (§13) et la mise à jour des documents normatifs, chaque incrément ayant été compilé et testé avant le suivant. Arbitrages préalables de l'utilisateur (2026-11-18) : détection **uniquement par les dépendances** (la recherche de chaînes dans le contenu des fichiers, envisagée dans la demande initiale, est abandonnée), liste fermée OIDC/SAML/CAS, une icône par mode détecté, mention neutre « aucune authentification détectée ».
+
+**Incrément 1 — Référentiel et Moteur de jugement.** Rust : champ `Referentiels::regles_authentification` (`Vec<Value>`, `#[serde(default = "regles_authentification_par_defaut")]`, sur le modèle exact de `categories_dependances`), constantes `MODES_AUTHENTIFICATION` et `REGLES_AUTHENTIFICATION_PAR_DEFAUT` (20 règles, identifiants stables préfixés `50000000-…`) dans `modele/racine.rs` ; `VERSION_SCHEMA_COURANTE` portée à `14`, palier `migration_13_vers_14` à transformation nulle (`persistance/migration.rs`). `persistance/parametrage.rs` : `valider_entree_regle_authentification` (`id`/`motif` non vides, `mode` dans la liste fermée), bras `"reglesAuthentification"` de `definir_referentiel`, `supprimer_regle_authentification`. Commande de la Façade `supprimer_regle_authentification` (`commandes/parametrage.rs`, journalisation début/fin, enregistrée dans `lib.rs`). `persistance/configuration_partageable.rs` : différentiel et application d'import étendus au nouveau référentiel, avec le même validateur que la saisie manuelle. TypeScript : type `ModeAuthentification`, interface `RegleAuthentification` et lecteur défensif `ParametresJugementUtils.lireReglesAuthentification` (`parametres-jugement.utils.ts`), `EntreeRegleAuthentification` et champ `Referentiels.reglesAuthentification` (`types-donnees.ts`), Moteur de jugement `ModeAuthentificationUtils.detecter` (`mode-authentification.utils.ts`, fonction pure, ordre fixe, références dédoublonnées et triées), `FacadeParametrageService.supprimerRegleAuthentification`, `DonneesApplicationService.supprimerRegleAuthentification`, bouchon TS (règles par défaut, suppression). Les fixtures de 34 fichiers de test construisant un `Referentiels` ont reçu `reglesAuthentification: []` (ajout mécanique imposé par le typage strict).
+
+**Incrément 2 — Restitution.** Composant partagé `SqmIconeAuthentificationComponent` (`app-icone-authentification`, patron d'`app-icone-langage`, variantes `OIDC`/`SAML`/`CAS`/`aucun`, infobulle listant les dépendances déclenchantes, repli textuel). Quatre pictogrammes SVG maison sous `public/authentification/` (cadenas stylisé portant l'initiale du mode ; cadenas gris ouvert « ? » pour `aucun`), sans logo tiers. Fiche projet : champ `modeAuthentification` de `DonneesFicheProjet`, ligne `#fiche-projet-authentification` en tête de la section « Dépendances » (et non dans la branche Sonar comme les langages, la donnée étant issue de GitLab). Obsolescence : champ propagé de `LigneObsolescence` à `TuileObsolescence`, conteneur `.obsolescence__authentification` placé avant `.obsolescence__langages` dans un même groupe poussé en fin de ligne du nom, ligne « Authentification : … » ajoutée à l'infobulle de la tuile. Données de démonstration du bouchon : OIDC sur la première source, SAML + CAS sur la source Java 8, rien sur la source Express ; dépendance OIDC ajoutée au constat de repli utilisé par l'E2E.
+
+**Incrément 3 — Administration, E2E et documentation.** Section « Règles de détection de l'authentification » de l'onglet Seuils et référentiels (`referentiels-parametrage.component`) : liste triée par mode puis motif, formulaire mode + motif, validation côté interface, ressaisie du mot de passe (RG-002), suppression en deux étapes. E2E (`parcours-complet.spec.ts`) : ajout d'une règle CAS `org.exemple:*` à l'étape 10, vérification des deux icônes OIDC puis CAS sur la Fiche projet et de l'icône OIDC sur la première tuile Obsolescence. Documents : `04_casUsage.md` (US-067, matrice de couverture), `05_reglesGestion.md` (RG-067, extension de RG-035, matrice écrans→RG, traçabilité), `12_modeleDonnees.md` (entité `RegleAuthentification`, palier 13→14), `13_conceptionDetaillee.md`, `guide-utilisateur.md`, statut de `plan_22_modeAuthentification.md`.
+
+**Écart de forme au plan** : la liste fermée des modes côté TS est portée par `ParametresJugementUtils.MODES_AUTHENTIFICATION` (`parametres-jugement.utils.ts`, à côté du type `ModeAuthentification` et du lecteur défensif qui la consomme), et non par `ModeAuthentificationUtils.ORDRE_MODES` comme l'indiquait le §5 du plan.
+
+**Décisions arbitraires à valider par un humain** :
+
+- jeu de 20 règles par défaut (coordonnées non vérifiées une à une contre Maven Central / le registre npm ; `spring-boot-starter-oauth2-client` signale aussi un usage OAuth2 sans OIDC ; `spring-boot-starter-oauth2-resource-server` volontairement exclu) ;
+- nom de commande `supprimerRegleAuthentification` / `supprimer_regle_authentification`, par symétrie avec `supprimerRegleMarqueurIA` ;
+- pictogrammes maison (couleurs : OIDC orange, SAML bleu, CAS vert, aucun gris) ;
+- variante `aucun` portée par le composant d'icône (le plan la laissait à l'écran appelant) : un pictogramme neutre est nécessaire sur la tuile Obsolescence, faute de place pour un texte ;
+- sur la Fiche projet, chaque icône est suivie du sigle du mode en texte, pour la lisibilité.
+
+**Vérification** : `cargo fmt --check` propre ; `cargo clippy --locked --all-targets` propre ; `cargo test --locked` — 476 tests, 0 échec (9 `#[ignore]`) ; `npm run typecheck` propre ; `npx eslint` sur les fichiers modifiés propre (les 6 erreurs `no-restricted-syntax` de `e2e/aides/verification-ecran.ts` sont préexistantes, constatées à l'identique avant modification) ; `npx ng build` propre ; `npx jest --coverage` — **123 suites, 1894 tests, 0 échec**, `mode-authentification.utils.ts` à 100 % (lignes, branches, fonctions) après simplification du comparateur de tri dont la branche d'égalité était inatteignable ; seuil de branches non atteint sur `facade-commits-membres.service.ts` (50 % pour 80 %), fichier non modifié par cette étape ; `npm run test:e2e` — **parcours complet passé (2,0 min)**, après deux corrections du test lui-même (assertion de notification remplacée par la vérification de la liste, les notifications de succès s'empilant ; motif de la règle E2E rendu distinct, au texte près, de celui de `REGLE_DEPENDANCE`, recherché par libellé à l'étape 25) et une exécution interrompue par un plantage du navigateur dû à un build Angular lancé en parallèle. `npm start` (vérification visuelle interactive) non réalisable dans cet environnement (aucun serveur graphique).
+
+### Relecture isolée (sous-agent dédié, sans accès au raisonnement du Codeur)
+
+Relecture du code et de la documentation contre le plan et les normes. Le relecteur a rejoué lui-même les tests Rust ciblés, Clippy, Jest ciblé (15 suites, 530 tests), `typecheck` et ESLint, puis a comparé par script les règles par défaut entre `racine.rs` et le bouchon (20 entrées identiques). Il n'a relevé **aucune anomalie bloquante ni majeure**, et six mineures, corrigées comme suit :
+
+1. Le Rustdoc renvoyait vers un symbole TS inexistant (`ModeAuthentificationUtils.ORDRE_MODES`) : renvoi corrigé vers `ParametresJugementUtils.MODES_AUTHENTIFICATION` dans `racine.rs` et `parametrage.rs` ; l'écart de nom au plan est désormais signalé ci-dessus.
+2. Le paragraphe « écart au plan » sur la version de schéma était contradictoire, le plan prévoyant bien le palier 13 → 14 : il a été supprimé.
+3. Trois cas limites manquaient ; ils sont désormais testés :
+   - joker `*` au milieu d'un motif (Jest) ;
+   - audit retenu sans résultat `gitlab.dependances` sur l'Obsolescence (Jest) ;
+   - `id` absent, `mode` absent ou non textuel, motif fait uniquement d'espaces (Rust).
+4. Le validateur natif rejette désormais un motif fait uniquement d'espaces, comme l'interface. Les autres référentiels gardent leur comportement antérieur, sans régression de ce plan.
+5. La ligne « Authentification » de la Fiche projet a reçu une classe dédiée `fiche-projet__authentification`.
+6. Trois écarts de forme déjà tracés dans la liste des décisions arbitraires ci-dessus restent à confirmer par un humain : variante `aucun` portée par le composant, emplacement de la ligne en tête des dépendances, sigle affiché en texte.
+
+Après ces corrections, les vérifications suivantes passent sans échec :
+
+- `cargo clippy` est propre ;
+- `cargo test --locked authentification` : 24 tests ;
+- Jest ciblé (jugement, Fiche projet, Obsolescence) : 150 tests ;
+- ESLint est propre.
+
+**Validation humaine explicite de cette étape requise**, notamment sur le jeu de règles par défaut, les pictogrammes maison et les écarts de forme listés ci-dessus. Aucun commit n'a été effectué.

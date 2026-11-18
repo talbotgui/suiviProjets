@@ -436,6 +436,20 @@ export class FacadeParametrageService {
   }
 
   /**
+   * Supprime une entrée du référentiel des règles de détection du mode d'authentification, sauvegarde le fichier
+   * et consigne la suppression au journal (US-067, RG-035).
+   * @param parametres - Paramètres de la commande, cf. {@link ParametresSuppressionEntreeReferentiel}.
+   * @returns La racine mise à jour, typée par l'appelant via `TReponse`.
+   */
+  public async supprimerRegleAuthentification<TDonnees, TReponse>(
+    parametres: ParametresSuppressionEntreeReferentiel<TDonnees>,
+  ): Promise<TReponse> {
+    return InvocationCommandeUtils.invoquer<TReponse>('supprimer_regle_authentification', {
+      ...parametres,
+    });
+  }
+
+  /**
    * Modifie les réglages de verrouillage de session, sauvegarde le fichier et consigne la modification au
    * journal (US-034, RG-031, Phase 10 incrément 8).
    * @param parametres - Paramètres de la commande, cf. {@link ParametresDefinitionVerrouillage}.
